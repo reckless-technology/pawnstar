@@ -105,11 +105,11 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
 
 FoundAttacker:
     square = BITBOARD(location);
-    position->pieces[piece_on_square]     ^= square;
-    position->pieces_of_color[ENEMY(color)]   ^= square;
-    position->pieces[capturing_piece]    ^= attacker | square;
-    position->pieces_of_color[color]          ^= attacker | square;
-    position->occupied_squares            = position->white_pieces | position->black_pieces;
+    position->pieces[piece_on_square]       ^= square;
+    position->pieces_of_color[ENEMY(color)] ^= square;
+    position->pieces[capturing_piece]       ^= attacker | square;
+    position->pieces_of_color[color]        ^= attacker | square;
+    position->occupied_squares              = position->white_pieces | position->black_pieces;
     score = PIECE_VALUES[piece_on_square] - EvaluateSwapOff(position, location, ENEMY(color), capturing_piece);
     return score > 0 ? score : 0;
 }
