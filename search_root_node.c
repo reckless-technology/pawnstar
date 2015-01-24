@@ -30,7 +30,7 @@ int SearchRootNode(const Position* src_position)
     int         stop_time;
     int         book_move;
     int         best_move = 0;
-    int         ms_timeout;
+    int         timeout_ms;
     int         ms_allocated;
     int         moves_to_go;
     int         alpha;
@@ -52,45 +52,44 @@ int SearchRootNode(const Position* src_position)
     {
     case STANDARD_CHESS_CLOCK:
     default:
-        moves_to_go   = globals->time_control.moves_per_period - (src_position->full_move_count % globals->time_control.moves_per_period);
+        moves_to_go  = globals->time_control.moves_per_period - (src_position->full_move_count % globals->time_control.moves_per_period);
         ms_allocated = globals->time_control.milliseconds_remaining / moves_to_go;
-        ms_timeout   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 1000));
+        timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 1000));
         break;
     
     case FIXED_DEPTH:
-        ms_timeout   = 0;
+        timeout_ms   = 0;
         ms_allocated = 0;
         break;
     
     case FIXED_TIME:
-        ms_timeout   = globals->time_control.fixed_milliseconds;
+        timeout_ms   = globals->time_control.fixed_milliseconds;
         ms_allocated = 0;
         break;
     
     case INCREMENTAL_CLOCK:
         ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 20);
-        ms_timeout   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 1000));
+        timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 1000));
         break;
     }
     InitializeGoodMoveCounts();
     /**************************************************************************
-    For first pass move ordering before we do any search, just use the static
-    evaluation. Subsequent passes will use the results of the previous
-    iteration to sort the moves (the merge sort is stable).
+    For first pass move ordering before we do any search, just use the a depth
+    1 search with wide open alpha beta window. Subsequent passes will use the 
+    results of the previous iteration to sort the moves (the merge sort is 
+    stable).
     ***************************************************************************/
     for (i = 0; i != move_count; ++i)
     {
-        Position position[1];
-        MakeMove(position, src_position, moves[i]);
         scored_moves[i].move  = moves[i];
-        scored_moves[i].score = EvaluatePosition(position, ALPHA, BETA);
+        scored_moves[i].score = SearchSingleMove(src_position, 1, 0, ALPHA, BETA, moves[i], i, false, &cancel);
     }
     DEBUG_STATEMENT(DebugXClear());
     start_time = GetMilliseconds();
     cancel = false;
-    if (ms_timeout)
+    if (timeout_ms)
     {
-        SetStopThinkingTimer(ms_timeout, &cancel);
+        SetStopThinkingTimer(timeout_ms, &cancel);
     }
     for (depth = 1; depth != MAX_PLY; ++depth)
     {       
