@@ -96,13 +96,13 @@ This is analagous to 'strchr' but using 32-bit words instead of bytes.
 *******************************************************************************/
 INLINE const int* FindMove(const int moves[], int move)
 {
-    int i;
-    for (i = 0; moves[i]; ++i)
+    while (*moves)
     {
-        if (moves[i] == move)
+        if (*moves == move)
         {
-            return &moves[i];
+            return moves;
         }
+        ++moves;
     }
     return NULL;
 }

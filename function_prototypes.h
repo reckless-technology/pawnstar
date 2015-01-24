@@ -13,7 +13,7 @@ SearchTask* GetNextPendingTask(void);
 int         GetNumberOfPendingTasks(void);
 void        AbortTask(SearchTask* task);
 void        DoSomethingUseful(void);
-void        InitializeThreads(int num_cPUs);
+void        InitializeThreads(int num_cpus);
 void        WaitForSearchToComplete(void);
 /******************************************************************************
 Search

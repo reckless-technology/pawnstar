@@ -6,6 +6,8 @@ Refer to:
 http://chessprogramming.wikispaces.com/Alpha-Beta
 http://chessprogramming.wikispaces.com/Principal+Variation+Search
 *******************************************************************************/
+static const int SEVENTH_RANK[2] = { 6, 1 };
+
 int Search(const Position* src_position, 
            int depth, 
            int ply, 
@@ -51,6 +53,7 @@ int Search(const Position* src_position,
         INCREMENT("max ply reached");
         return EvaluatePosition(src_position, alpha, beta);
     }
+
     if (!(src_position->state_flags & IS_CHECK) && depth <= 0)
     {
         return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
@@ -150,6 +153,20 @@ int Search(const Position* src_position,
             }
             INCREMENT("null move fails");
         }
+    }
+#endif
+    
+#if DO_FUTILITY_PRUNING
+    /**************************************************************************
+    Futility pruning doesn't really achieve much, the idea is to prune frontier
+    nodes where the eval is so bad there is no way we can match alpha.
+    ***************************************************************************/
+    if (depth == 1 &&
+        !(src_position->state_flags & IS_CHECK) &&
+        EvaluatePosition(src_position, alpha, beta) + 900 <= alpha)
+    {
+        INCREMENT("futility cutoffs");
+        return alpha;
     }
 #endif
 
@@ -311,8 +328,7 @@ int SearchSingleMove(const Position* src_position,
                      int move_index,
                      bool is_deferred_move,
                      volatile bool* cancel)
-{
-    static const int SEVENTH_RANK[2] = { 6, 1 };
+{  
     Position position[1];
     int child_depth;
     int score;

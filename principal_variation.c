@@ -10,7 +10,7 @@ typedef struct
     uint64  payload; /* (move | (random << 32)) */
 } PvMove;
 
-static PvMove  pv_table[PV_TABLE_SIZE];
+static PvMove pv_table[PV_TABLE_SIZE];
 
 /******************************************************************************
 Initialize the PV hashtable, deleting any existing entries

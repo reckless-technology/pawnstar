@@ -41,6 +41,12 @@ Whether to enable null move reductions
 #define DO_NULL_MOVE_PRUNING 1
 #endif
 /******************************************************************************
+Whether to enable futility pruning at frontier nodes
+*******************************************************************************/
+#ifndef DO_FUTILITY_PRUNING
+#define DO_FUTILITY_PRUNING 0
+#endif
+/******************************************************************************
 Whether to enable late move reductions
 *******************************************************************************/
 #ifndef DO_LATE_MOVE_REDUCTION

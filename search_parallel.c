@@ -12,16 +12,16 @@ static CONDITION_VARIABLE   new_task_cond_var[1];
 static CRITICAL_SECTION     new_task_mutex[1];
 
 static DWORD WINAPI WorkerThreadLoop(LPVOID args);
-static void         StartWorkerThreads(int num_cPUs);
+static void         StartWorkerThreads(int num_cpus);
 /******************************************************************************
 Initialize the worker threads and synchronization events.
 *******************************************************************************/
-void InitializeThreads(int num_cPUs)
+void InitializeThreads(int num_cpus)
 {
     InitializeConditionVariable(new_task_cond_var);
     InitializeCriticalSectionAndSpinCount(new_task_mutex, MUTEX_SPIN_COUNT);
     search_complete_event = CreateEvent(NULL, FALSE, FALSE, NULL);
-    StartWorkerThreads(num_cPUs);
+    StartWorkerThreads(num_cpus);
 }
 /******************************************************************************
 Wait until all the workers have finished their work.
@@ -43,17 +43,17 @@ SearchTask* NewSearchTask(const Position* src_position,
                           int move, 
                           int move_index)
 {
-    SearchTask* task  = ObtainTaskFromPool();
+    SearchTask* task   = ObtainTaskFromPool();
     task->src_position = src_position;
-    task->depth       = depth;
-    task->ply         = ply;
-    task->alpha       = alpha;
-    task->beta        = beta;
-    task->move        = move;
+    task->depth        = depth;
+    task->ply          = ply;
+    task->alpha        = alpha;
+    task->beta         = beta;
+    task->move         = move;
     task->move_index   = move_index;
-    task->cancel      = false;
+    task->cancel       = false;
     task->task_state   = TASK_PENDING;
-    task->score       = ILLEGAL_SCORE;
+    task->score        = ILLEGAL_SCORE;
     AddPendingTask(task);
     WakeConditionVariable(new_task_cond_var);
     return task;
@@ -137,9 +137,9 @@ static DWORD WINAPI WorkerThreadLoop(LPVOID args)
 /******************************************************************************
 Start the search worker threads.
 *******************************************************************************/
-static void StartWorkerThreads(int num_cPUs)
+static void StartWorkerThreads(int num_cpus)
 {
-    while (num_cPUs--)
+    while (num_cpus--)
     {
         QueueUserWorkItem((LPTHREAD_START_ROUTINE)WorkerThreadLoop, NULL, WT_EXECUTEDEFAULT);
     }
