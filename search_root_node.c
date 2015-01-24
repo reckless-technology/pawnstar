@@ -26,8 +26,8 @@ int SearchRootNode(const Position* src_position)
     int         principal_variation[MAX_PLY];
     int         move_count;
     int         depth;
-    int         start_time;
-    int         stop_time;
+    int         start_ms;
+    int         stop_ms;
     int         book_move;
     int         best_move = 0;
     int         timeout_ms;
@@ -74,8 +74,8 @@ int SearchRootNode(const Position* src_position)
     }
     InitializeGoodMoveCounts();
     /**************************************************************************
-    For first pass move ordering before we do any search, just use the a depth
-    1 search with wide open alpha beta window. Subsequent passes will use the 
+    For first pass move ordering before we do any search, just use a depth 1 
+    search with wide open alpha beta window. Subsequent passes will use the 
     results of the previous iteration to sort the moves (the merge sort is 
     stable).
     ***************************************************************************/
@@ -85,7 +85,7 @@ int SearchRootNode(const Position* src_position)
         scored_moves[i].score = SearchSingleMove(src_position, 1, 0, ALPHA, BETA, moves[i], i, false, &cancel);
     }
     DEBUG_STATEMENT(DebugXClear());
-    start_time = GetMilliseconds();
+    start_ms = GetMilliseconds();
     cancel = false;
     if (timeout_ms)
     {
@@ -118,7 +118,7 @@ int SearchRootNode(const Position* src_position)
                 RecordTransposition(src_position->hash, depth, scored_moves[i].score, scored_moves[i].move, NODE_PV);            
             }
         }        
-        stop_time = GetMilliseconds();
+        stop_ms = GetMilliseconds();
         FindPrincipalVariation(src_position, principal_variation);
         if (principal_variation[0] == 0)
         {
@@ -129,7 +129,7 @@ int SearchRootNode(const Position* src_position)
         {
             char move_string[256];
             MoveSequenceToSanString(src_position, principal_variation, move_string);
-            printf("%2u %5d %4u %8u %s\n", depth, best_move_at_each_iteration[depth].score, (stop_time - start_time) / 10, globals->node_count, move_string);
+            printf("%2u %5d %4u %8u %s\n", depth, best_move_at_each_iteration[depth].score, (stop_ms - start_ms) / 10, globals->node_count, move_string);
         }
         if (alpha > WIN_THRESHOLD || 
             alpha < LOSE_THRESHOLD)
@@ -139,7 +139,7 @@ int SearchRootNode(const Position* src_position)
         if (globals->time_control.clock_type == STANDARD_CHESS_CLOCK || 
             globals->time_control.clock_type == INCREMENTAL_CLOCK)
         {
-            const int elapsed_ms = stop_time - start_time;
+            const int elapsed_ms = stop_ms - start_ms;
             bool is_best_move_consistent = true;
             bool is_score_stable = true;
             for (i = 1; i != depth; ++i)

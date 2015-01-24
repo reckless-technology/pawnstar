@@ -39,7 +39,7 @@ void RunPositionTests(int depth)
     int first_start;
     const char* const * tests;
     int prev_clock_type = globals->time_control.clock_type;
-    int prev_depth     = globals->time_control.fixed_depth;
+    int prev_depth      = globals->time_control.fixed_depth;
     globals->time_control.clock_type  = FIXED_DEPTH;
     globals->time_control.fixed_depth = depth;
     globals->do_show_thinking         = true;
@@ -57,7 +57,7 @@ void RunPositionTests(int depth)
         DEBUG_STATEMENT(DebugXWrite(stdout));
         //DisplayClientsAndWorkers();
     }
-    printf("total elapsed milliseconds                        %10ld\n", GetMilliseconds() - first_start);
+    printf("total elapsed milliseconds                        %10d\n", GetMilliseconds() - first_start);
     globals->time_control.clock_type  = prev_clock_type;
     globals->time_control.fixed_depth = prev_depth;
 }

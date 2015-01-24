@@ -93,9 +93,9 @@ void MergeSort(int num_elements, ScoredMove values[])
     ScoredMove* merge_src = values;
     ScoredMove* merge_dst = work;
     ScoredMove* tmp;
-    for (width = 1; width < num_elements; width <<= 1)
+    for (width = 1; width < num_elements; width *= 2)
     {
-        const int twice_width = width << 1;
+        const int twice_width = width * 2;
         int left;
         for (left = 0; left < num_elements; left += twice_width)
         {
@@ -105,7 +105,7 @@ void MergeSort(int num_elements, ScoredMove values[])
             to:
             merge_dst[left:left+twice_width)
             *******************************************************************/
-            const int right = MIN(left + width,      num_elements);
+            const int right = MIN(left + width,       num_elements);
             const int end   = MIN(left + twice_width, num_elements);
             int dst = left;
             int j   = left;
@@ -134,7 +134,7 @@ void MergeSort(int num_elements, ScoredMove values[])
         Toggle merge source and dest between successive runs to avoid copy
         overhead.
         ***********************************************************************/
-        tmp      = merge_src;
+        tmp       = merge_src;
         merge_src = merge_dst;
         merge_dst = tmp;
     }
