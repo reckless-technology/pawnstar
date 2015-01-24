@@ -13,18 +13,18 @@ int Search(const Position* src_position,
            int beta, 
            volatile bool* cancel)
 {
-    Transposition   transposition[1];
-    int             move;   
-    int             moves[MAX_MOVES_PER_POSITION];
-    int             deferred_moves[MAX_MOVES_PER_POSITION];    
-    int             score;   
-    bool            is_transposition;
-    int*            deferred_move     = deferred_moves;
-    int             num_legal_moves   = 0;      
-    int             best_move         = 0;
-    bool            have_raised_alpha = false;
-    const int*      move_types[3]     = { moves, deferred_moves, NULL };
-    const int**     move_type;
+    Transposition       transposition[1];
+    int                 move;   
+    int                 moves[MAX_MOVES_PER_POSITION];
+    int                 deferred_moves[MAX_MOVES_PER_POSITION];    
+    int                 score;   
+    bool                is_transposition;
+    int*                deferred_move     = deferred_moves;
+    int                 num_legal_moves   = 0;      
+    int                 best_move         = 0;
+    bool                has_raised_alpha  = false;
+    const int* const    move_types[3]     = { moves, deferred_moves, NULL };
+    const int* const *  move_type;
 
     if (*cancel)
     {
@@ -174,7 +174,7 @@ int Search(const Position* src_position,
         if (score > alpha)
         {
             INCREMENT("pv table move changed pv");
-            have_raised_alpha = true;
+            has_raised_alpha = true;
             best_move = move;
             alpha = score;
             RecordGoodMove(ply, move);                       
@@ -202,7 +202,7 @@ int Search(const Position* src_position,
         if (score > alpha)
         {
             INCREMENT("table move changed pv");
-            have_raised_alpha = true;
+            has_raised_alpha = true;
             best_move = move;
             alpha = score;
             RecordGoodMove(ply, move);            
@@ -250,7 +250,7 @@ int Search(const Position* src_position,
             if (score > alpha)
             {
                 INCREMENT("pv changed");
-                have_raised_alpha = true;
+                has_raised_alpha = true;
                 best_move = move;
                 alpha = score;
                 RecordGoodMove(ply, move);
@@ -279,7 +279,7 @@ int Search(const Position* src_position,
         INCREMENT("stalemates");
         return DRAW_SCORE;
     }     
-    if (have_raised_alpha)
+    if (has_raised_alpha)
     {
         /**********************************************************************
         We raised alpha but did not cutoff; this was a PV node

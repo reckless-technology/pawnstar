@@ -133,12 +133,12 @@ c) the side not on move shall not be in check
 *******************************************************************************/
 bool IsPositionLegal(const Position* position)
 {
-    const int color        = COLOR_TO_MOVE(position);
+    const int color           = COLOR_TO_MOVE(position);
     const bitboard white_king = position->kings & position->white_pieces;
     const bitboard black_king = position->kings & position->black_pieces;
     return
-        HAS_SINGLE_BIT_SET(white_king)                 &&
-        HAS_SINGLE_BIT_SET(black_king)                 &&
+        HAS_SINGLE_BIT_SET(white_king)                  &&
+        HAS_SINGLE_BIT_SET(black_king)                  &&
         white_king != black_king                        &&
         !(KING_ATTACKS[Lsb(white_king)] & black_king)   &&
         !IsAttacked(position, position->king_location[ENEMY(color)], color);
