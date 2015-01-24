@@ -51,9 +51,6 @@ int Search(const Position* src_position,
         INCREMENT("max ply reached");
         return EvaluatePosition(src_position, alpha, beta);
     }
-    /**************************************************************************
-    Is it appropriate to go to the quiescence search?
-    ***************************************************************************/
     if (!(src_position->state_flags & IS_CHECK) && depth <= 0)
     {
         return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
@@ -118,9 +115,8 @@ int Search(const Position* src_position,
             }            
         }
     } 
-
-    
-#if DO_NULL_MOVE_REDUCTION
+ 
+#if DO_NULL_MOVE_PRUNING
     /**************************************************************************
     Try null move reduction if ALL of the following are true:
 
@@ -129,7 +125,7 @@ int Search(const Position* src_position,
     # the previous move was not a null move    
     # we are not down to king and pawns
     # we have at least 4 pieces remaining
-    # the material eval score is high enough for a beta cutoff 
+    # the eval score is high enough for a beta cutoff 
     ***************************************************************************/
     if (!(src_position->state_flags & IS_CHECK) &&
         ply != 0                                &&
