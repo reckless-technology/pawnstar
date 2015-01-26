@@ -6,7 +6,8 @@ Refer to:
 http://chessprogramming.wikispaces.com/Alpha-Beta
 http://chessprogramming.wikispaces.com/Principal+Variation+Search
 *******************************************************************************/
-static const int SEVENTH_RANK[2] = { 6, 1 };
+static const int SEVENTH_RANK[2]       = { 6, 1 };
+static const int CLASSICAL_MATERIAL[7] = { 0, 1, 3, 3, 5, 9, 100 };
 
 int Search(const Position* src_position, 
            int depth, 
@@ -20,7 +21,7 @@ int Search(const Position* src_position,
     int                 moves[MAX_MOVES_PER_POSITION];
     int                 deferred_moves[MAX_MOVES_PER_POSITION];    
     int                 score;   
-    bool                is_transposition;
+    bool                is_transposition  = false;
     int*                deferred_move     = deferred_moves;
     int                 num_legal_moves   = 0;      
     int                 best_move         = 0;
@@ -70,7 +71,7 @@ int Search(const Position* src_position,
         if (IsDrawByRepetition(position, true))
         {
             /******************************************************************
-            We cannot trust this transposition table entry since it resulted 
+            We cannot trust this transposition table entry since it resulted
             in a draw by repetition when played here.
             *******************************************************************/
             INCREMENT("table hit caused draw by repetition");
@@ -83,19 +84,19 @@ int Search(const Position* src_position,
             {
             case NODE_CUT:
                 /**************************************************************
-                We don't know the exact score of the best move from this 
+                We don't know the exact score of the best move from this
                 position, but we do know it is at least transposition->score
-                ***************************************************************/ 
+                ***************************************************************/
                 if (transposition->score >= beta)
                 {
                     INCREMENT("table hit beta cutoffs");
                     return beta;
                 }
                 break;
-            
+
             case NODE_ALL:
                 /**************************************************************
-                We don't know the exact score of the best move from this 
+                We don't know the exact score of the best move from this
                 position, but we do know it is at most transposition->score
                 ***************************************************************/
                 if (transposition->score <= alpha)
@@ -104,7 +105,7 @@ int Search(const Position* src_position,
                     return alpha;
                 }
                 break;
-            
+
             case NODE_PV:
                 /**************************************************************
                 We know the exact score and the best move from this position.
@@ -115,9 +116,9 @@ int Search(const Position* src_position,
                     RecordPrincipalVariationMove(src_position->hash, transposition->move);
                 }
                 return transposition->score;
-            }            
+            }
         }
-    } 
+    }
  
 #if DO_NULL_MOVE_PRUNING
     /**************************************************************************
@@ -159,7 +160,8 @@ int Search(const Position* src_position,
 #if DO_FUTILITY_PRUNING
     /**************************************************************************
     Futility pruning doesn't really achieve much, the idea is to prune frontier
-    nodes where the eval is so bad there is no way we can match alpha.
+    nodes where the eval is so bad there is no way we can match alpha. I find
+    it worsens play.
     ***************************************************************************/
     if (depth == 1 &&
         !(src_position->state_flags & IS_CHECK) &&
@@ -304,6 +306,7 @@ int Search(const Position* src_position,
         RecordPrincipalVariationMove(src_position->hash, best_move);
         RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);
         RecordGoodMove(ply, best_move);
+        INCREMENT("pv recorded moves");
     }
     else
     {
@@ -345,13 +348,7 @@ int SearchSingleMove(const Position* src_position,
     Extend the search depth if ANY of the following are true:
     # We are in check
     # This is a pawn promotion
-    # This is a pawn push to the 7th rank
-    
-    Reduce the search depth if ALL of the following are true:
-    # The move was deferred due to negative SEE
-    # Search depth is greater than or equal to 3      
-    # The move is not a capture
-    # The move does not give check 
+    # This is a pawn push to the 7th rank 
     *******************************************************************/
     if (src_position->state_flags & IS_CHECK)
     {
@@ -369,7 +366,27 @@ int SearchSingleMove(const Position* src_position,
         INCREMENT("extensions push to 7th");
         child_depth = depth;
     }
+#if 0
+    else if (MOVE_CAPTURED(move) &&
+             CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
+    {
+        INCREMENT("extension recapture of same value piece");
+        child_depth = depth;
+    }
+#endif
 #if DO_LATE_MOVE_REDUCTION
+    /**************************************************************************
+    Reduce the search depth if ALL of the following are true:
+    # The move was deferred due to negative SEE
+    # Search depth is greater than or equal to 3      
+    # The move is not a capture
+    # The move does not give check
+    # The move has not raised alpha at this ply
+
+    Generally I have found LMR does not significantly speed up the search, and
+    in some positions causes the engine to miss a winning or significant line
+    of play, so my inclination is to disable it.
+    ***************************************************************************/
     else if (is_deferred_move     &&
              depth >= 3           &&
              !MOVE_CAPTURED(move) &&

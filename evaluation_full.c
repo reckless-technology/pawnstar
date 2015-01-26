@@ -204,7 +204,7 @@ static int EvaluateEndgame(const Position* position, const PawnStructure ps[2])
     for (color = WHITE; color <= BLACK; ++color)
     {         
         bitboard b;
-        int score                       = 0; 
+        int score                        = 0; 
         bitboard king_targets            = NO_SQUARES;
         const int king_location          = position->king_location[color];
         const bitboard friendly_pieces   = position->occupied_squares & position->pieces_of_color[color];
@@ -226,8 +226,8 @@ static int EvaluateEndgame(const Position* position, const PawnStructure ps[2])
         b = friendly_pawns;
         while (b)
         {
-            const int locn          = FindAndClearLsb(&b);
-            const bitboard square   = BITBOARD(locn);
+            const int locn           = FindAndClearLsb(&b);
+            const bitboard square    = BITBOARD(locn);
             bitboard forward_squares = FORWARD[color][locn];
             score += SCORE_PAWN_SQUARE_ENDGAME[locn ^ rank_flip];
             if (PopCount(PAWN_ATTACKS[color][locn] & enemy_pieces & ~position->pawns) == 2)

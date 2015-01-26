@@ -101,9 +101,9 @@ void MergeSort(int num_elements, ScoredMove values[])
         {
             /******************************************************************
             Merge the 2 sub-lists:
-            (merge_src[left:left+width), merge_src[left+width:left+twice_width))
+            merge_src[left:left+width], merge_src[left+width:left+twice_width]
             to:
-            merge_dst[left:left+twice_width)
+            merge_dst[left:left+twice_width]
             *******************************************************************/
             const int right = MIN(left + width,       num_elements);
             const int end   = MIN(left + twice_width, num_elements);
