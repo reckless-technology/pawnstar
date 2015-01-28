@@ -101,17 +101,9 @@ static const int MATERIAL_VALUES[8] = {
       0, // king
       0,
 };
-/******************************************************************************
-Bonus awarded to the "winning" side based on the total number of knights,
-bishops, rooks and queens left on the board. Encourages the side which is ahead
-to trade down pieces (but not pawns).
-*******************************************************************************/
-static const int PIECE_COUNT_BONUS[32] = { 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0 };
 
 static int piece_square_values[2][8][64];
 static int king_endgame_values[2][64];
-
-#define TRADE_DOWN_THRESHOLD 50
 
 /******************************************************************************
 Set up the piece square tables
@@ -173,14 +165,6 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     {
         score += piece_square_values[WHITE][KING][position->king_location[WHITE]];
         score -= piece_square_values[BLACK][KING][position->king_location[BLACK]];
-    }
-    if (score > TRADE_DOWN_THRESHOLD)
-    {
-        score += PIECE_COUNT_BONUS[PopCount(position->occupied_squares ^ position->kings ^ position->pawns)];
-    }
-    else if (score < -TRADE_DOWN_THRESHOLD)
-    {
-        score -= PIECE_COUNT_BONUS[PopCount(position->occupied_squares ^ position->kings ^ position->pawns)];
     }
     return position->state_flags & IS_BLACK_TO_MOVE ? -score : score;
     (void)alpha;
