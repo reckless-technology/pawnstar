@@ -6,7 +6,8 @@ Refer to:
 http://chessprogramming.wikispaces.com/Alpha-Beta
 http://chessprogramming.wikispaces.com/Principal+Variation+Search
 *******************************************************************************/
-static const int SEVENTH_RANK[2] = { 6, 1 };
+static const int SEVENTH_RANK[2]       = { 6, 1 };
+static const int CLASSICAL_MATERIAL[7] = { 0, 1, 3, 3, 5, 9, 0 };
 
 int Search(const Position* src_position, 
            int depth, 
@@ -348,6 +349,17 @@ int SearchSingleMove(const Position* src_position,
         child_depth = depth;
     }
 
+#if DO_RECAPTURE_EXTENSION
+    else if (depth > 1                                    &&
+             MOVE_CAPTURED(move)                          &&
+             MOVE_TO(move) == MOVE_TO(src_position->move) &&
+             CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
+    {
+        INCREMENT("extensions recapture");
+        child_depth = depth;
+    }
+#endif
+
 #if DO_LATE_MOVE_REDUCTION
     /**************************************************************************
     Reduce the search depth if ALL of the following are true:
@@ -370,17 +382,12 @@ int SearchSingleMove(const Position* src_position,
         INCREMENT("extensions reduce LMR");
         child_depth = depth - 2;
     }
-    else
-    {
-        child_depth = depth - 1;
-    }
-#else
-    else
-    {
-        child_depth = depth - 1;
-    }
 #endif
-
+   
+    else
+    {
+        child_depth = depth - 1;
+    }
     if (move_index != 0 && !(src_position->state_flags & IS_CHECK))
     {
         INCREMENT("pvs attempts");

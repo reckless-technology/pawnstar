@@ -35,10 +35,16 @@ every node in the perft test: slow
 #define DO_ENHANCED_PERFT 0
 #endif
 /******************************************************************************
-Whether to enable null move reductions
+Whether to enable null move pruning
 *******************************************************************************/
 #ifndef DO_NULL_MOVE_PRUNING
 #define DO_NULL_MOVE_PRUNING 1
+#endif
+/******************************************************************************
+Whether to enable extension on recapture of same value piece
+*******************************************************************************/
+#ifndef DO_RECAPTURE_EXTENSION
+#define DO_RECAPTURE_EXTENSION 0
 #endif
 /******************************************************************************
 Whether to enable futility pruning at frontier nodes
