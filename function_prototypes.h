@@ -40,7 +40,7 @@ bool        IsPositionLegal(const Position* position);
 void        MoveSequenceToSanString(const Position* position, const int moves[], char* move_string);
 char*       MoveToSanString(const Position* position, int the_move, char* move_string);
 void        MoveToString(int move, char* move_string);
-int         PlayMoveString(Game* game, char* move_str, bool is_sAN);
+int         PlayMoveString(Game* game, char* move_str, bool is_san);
 bool        AreMoveStringsEqual(char* str1, char* str2);
 uint64      ComputeHash(const Position* position);
 void        InitializeGame(Game* game);

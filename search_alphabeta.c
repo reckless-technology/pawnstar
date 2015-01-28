@@ -19,7 +19,7 @@ int Search(const Position* src_position,
     Transposition       transposition[1];
     int                 move;   
     int                 pre_moves[3];
-    int                 moves[MAX_MOVES_PER_POSITION];
+    int                 regular_moves[MAX_MOVES_PER_POSITION];
     int                 deferred_moves[MAX_MOVES_PER_POSITION];    
     int                 score;   
     bool                is_transposition  = false;
@@ -27,7 +27,7 @@ int Search(const Position* src_position,
     int                 num_legal_moves   = 0;
     int                 best_move         = 0;
     bool                has_raised_alpha  = false;
-    const int* const    move_phases[4]    = { pre_moves, moves, deferred_moves, NULL };
+    const int* const    move_phases[4]    = { pre_moves, regular_moves, deferred_moves, NULL };
     const int* const *  move_phase;
 
     if (*cancel)
@@ -216,14 +216,14 @@ int Search(const Position* src_position,
     {       
         const int* moves_this_phase = *move_phase;
         const bool is_deferred = (*move_phase == deferred_moves);
-        if (*move_phase == moves)
+        if (*move_phase == regular_moves)
         {
-            GeneratePseudoLegalMoves(src_position, moves, true);
-            SortMoves(moves, ply);
+            GeneratePseudoLegalMoves(src_position, regular_moves, true);
+            SortMoves(regular_moves, ply);
         }
         while ((move = *moves_this_phase++) != 0)
         {
-            if (*move_phase == moves && EvaluateStaticExchange(src_position, move) < 0)
+            if (*move_phase == regular_moves && EvaluateStaticExchange(src_position, move) < 0)
             {
                 /* defer moves with a negative static exchange evaluation for later consideration */
                 *deferred_move++ = move;

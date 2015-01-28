@@ -220,7 +220,7 @@ bitboard AttacksToSquare(const Position* position, int location)
     bitboard attackers =
         (PAWN_ATTACKS_WHITE[location] & position->pawns & position->black_pieces) |
         (PAWN_ATTACKS_BLACK[location] & position->pawns & position->white_pieces) |
-        (    KNIGHT_ATTACKS[location] & position->knights)                       |
+        (    KNIGHT_ATTACKS[location] & position->knights)                        |
         (      KING_ATTACKS[location] & position->kings);
     /**************************************************************************
     Rook and queen horizontal and vertical sliding attacks

@@ -279,7 +279,7 @@ format, and update game state_flags accordingly
 returns the move if a legal move was played
 returns zero if the move was illegal or the game is over
 *******************************************************************************/
-int PlayMoveString(Game* game, char* move_str, bool is_sAN)
+int PlayMoveString(Game* game, char* move_str, bool is_san)
 {
     int moves[MAX_MOVES_PER_POSITION];
     const int* move;
@@ -291,7 +291,7 @@ int PlayMoveString(Game* game, char* move_str, bool is_sAN)
     for (move = moves; *move; ++move)
     {
         char buffer[16];
-        if (is_sAN)
+        if (is_san)
         {
             MoveToSanString(game->position, *move,  buffer);
         }

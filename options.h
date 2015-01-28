@@ -76,7 +76,7 @@ Global constants
 #define CHECKMATED_SCORE                 -10000 // score for losing at this ply
 #define WIN_THRESHOLD                      9000 // score threshold for winning at any ply
 #define LOSE_THRESHOLD                    -9000 // score threshold for losing at any ply
-#define DRAW_SCORE                            0 // contempt factor - pawnstar won't play for a draw at scores above this
+#define DRAW_SCORE                         -150 // contempt factor - pawnstar won't play for a draw at scores above this
 #define MAX_PLY                              64 // terminate the search at this ply no matter what
 #define MAX_GAME_LENGTH                     512 // maximum number of positions we can store in a game
 #define RANK_FLIP                          0x38 // used as XOR mask to mirror or "flip" the board horizontally (x,y) => (x,7-y)
