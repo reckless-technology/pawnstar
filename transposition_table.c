@@ -97,10 +97,10 @@ void RecordTransposition(uint64 hash, int depth, int score, int move, int node_t
     for (i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
     {
         const int score = 
-           16 * (bucket->transpositions[i].hash == hash)                                                               +
-            8 * (bucket->transpositions[i].hash == 0)                                                                  +
+           16 * (bucket->transpositions[i].hash == hash)                                                                 +
+            8 * (bucket->transpositions[i].hash == 0)                                                                    +
             4 * (bucket->transpositions[replace].node_type == NODE_PV && bucket->transpositions[i].node_type != NODE_PV) +
-            2 * (bucket->transpositions[i].depth < bucket->transpositions[replace].depth)                              +            
+            2 * (bucket->transpositions[i].depth < bucket->transpositions[replace].depth)                                +            
                 (bucket->transpositions[i].move == 0);
 
         if (score > best_score)
@@ -117,7 +117,7 @@ void RecordTransposition(uint64 hash, int depth, int score, int move, int node_t
     bucket->transpositions[replace].depth       = (short)depth;
     bucket->transpositions[replace].score       = (short)score;
     bucket->transpositions[replace].move        = move;
-    bucket->transpositions[replace].node_type    = node_type;
+    bucket->transpositions[replace].node_type   = node_type;
     _InterlockedExchange(bucket->mutex, 0);
 }
 /******************************************************************************

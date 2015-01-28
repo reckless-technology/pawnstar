@@ -1,13 +1,12 @@
 #include "pawnstar.h"
 #pragma warning(disable:4221)
 /******************************************************************************
-Main search routine: fail-hard alpha beta
+Main search routine: fail-hard alpha beta with PVS
 Refer to:
 http://chessprogramming.wikispaces.com/Alpha-Beta
 http://chessprogramming.wikispaces.com/Principal+Variation+Search
 *******************************************************************************/
-static const int SEVENTH_RANK[2]       = { 6, 1 };
-static const int CLASSICAL_MATERIAL[7] = { 0, 1, 3, 3, 5, 9, 100 };
+static const int SEVENTH_RANK[2] = { 6, 1 };
 
 int Search(const Position* src_position, 
            int depth, 
@@ -18,16 +17,17 @@ int Search(const Position* src_position,
 {
     Transposition       transposition[1];
     int                 move;   
+    int                 pre_moves[3];
     int                 moves[MAX_MOVES_PER_POSITION];
     int                 deferred_moves[MAX_MOVES_PER_POSITION];    
     int                 score;   
     bool                is_transposition  = false;
     int*                deferred_move     = deferred_moves;
-    int                 num_legal_moves   = 0;      
+    int                 num_legal_moves   = 0;
     int                 best_move         = 0;
     bool                has_raised_alpha  = false;
-    const int* const    move_types[3]     = { moves, deferred_moves, NULL };
-    const int* const *  move_type;
+    const int* const    move_phases[4]    = { pre_moves, moves, deferred_moves, NULL };
+    const int* const *  move_phase;
 
     if (*cancel)
     {
@@ -54,7 +54,6 @@ int Search(const Position* src_position,
         INCREMENT("max ply reached");
         return EvaluatePosition(src_position, alpha, beta);
     }
-
     if (!(src_position->state_flags & IS_CHECK) && depth <= 0)
     {
         return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
@@ -78,8 +77,7 @@ int Search(const Position* src_position,
             is_transposition = false;
         }
         else if (transposition->depth >= depth)
-        {
-            INCREMENT("table hit");
+        {           
             switch (transposition->node_type)
             {
             case NODE_CUT:
@@ -87,6 +85,7 @@ int Search(const Position* src_position,
                 We don't know the exact score of the best move from this
                 position, but we do know it is at least transposition->score
                 ***************************************************************/
+                INCREMENT("table hit cut");
                 if (transposition->score >= beta)
                 {
                     INCREMENT("table hit beta cutoffs");
@@ -99,6 +98,7 @@ int Search(const Position* src_position,
                 We don't know the exact score of the best move from this
                 position, but we do know it is at most transposition->score
                 ***************************************************************/
+                INCREMENT("table hit all");
                 if (transposition->score <= alpha)
                 {
                     INCREMENT("table hit alpha cutoffs");
@@ -110,7 +110,7 @@ int Search(const Position* src_position,
                 /**************************************************************
                 We know the exact score and the best move from this position.
                 ***************************************************************/
-                INCREMENT("table hit exact score");
+                INCREMENT("table hit pv");
                 if (transposition->score > alpha && transposition->score < beta && transposition->move)
                 {
                     RecordPrincipalVariationMove(src_position->hash, transposition->move);
@@ -122,7 +122,7 @@ int Search(const Position* src_position,
  
 #if DO_NULL_MOVE_PRUNING
     /**************************************************************************
-    Try null move reduction if ALL of the following are true:
+    Try null move pruning if ALL of the following are true:
 
     # we are not in check 
     # this is not the root node
@@ -130,6 +130,12 @@ int Search(const Position* src_position,
     # we are not down to king and pawns
     # we have at least 4 pieces remaining
     # the eval score is high enough for a beta cutoff 
+
+    Hopefully this is sufficient to prevent most Zugzwang positions.
+
+    Null move pruning makes a huge improvement to search depth in a given
+    time. I have found it to be the single most useful technique to add to a 
+    standard alpha beta search.
     ***************************************************************************/
     if (!(src_position->state_flags & IS_CHECK) &&
         ply != 0                                &&
@@ -143,7 +149,7 @@ int Search(const Position* src_position,
             Position position[1];
             INCREMENT("null move attempts");
             MakeNullMove(position, src_position);
-            score = -Search(position, depth - 3, ply, -beta, -beta + 1, cancel);
+            score = -Search(position, depth - 4, ply + 1, -beta, -beta + 1, cancel);
             if (*cancel)
             {
                 return ILLEGAL_SCORE;
@@ -159,9 +165,9 @@ int Search(const Position* src_position,
     
 #if DO_FUTILITY_PRUNING
     /**************************************************************************
-    Futility pruning doesn't really achieve much, the idea is to prune frontier
-    nodes where the eval is so bad there is no way we can match alpha. I find
-    it worsens play.
+    Futility pruning doesn't really achieve much; the idea is to prune frontier
+    nodes where the eval is so bad there is no way we can match alpha even with
+    a winning tactical sequence. I find it worsens play in practice.
     ***************************************************************************/
     if (depth == 1 &&
         !(src_position->state_flags & IS_CHECK) &&
@@ -173,78 +179,52 @@ int Search(const Position* src_position,
 #endif
 
     /**************************************************************************
-    Try any PV table move first
+    Before we generate any moves, try any principal variation table and 
+    transposition table moves first. This might save us the cost of move 
+    generation, or provide better alpha beta bounds for the main search.
+    In any case, it's always a good idea to search the PV first.
     ***************************************************************************/
+    int* m = pre_moves;
     if ((move = GetPrincipalVariationMove(src_position->hash)) != 0)
     {
-        INCREMENT("pv table move");
-        score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, 0, false, cancel);
-        if (*cancel)
-        {
-            return ILLEGAL_SCORE;
-        }
-        if (score >= beta)
-        {
-            INCREMENT("pv table move caused beta cutoff");
-            RecordTransposition(src_position->hash, depth, beta, move, NODE_CUT);
-            RecordGoodMove(ply, move);
-            return beta;
-        }
-        if (score > alpha)
-        {
-            INCREMENT("pv table move changed pv");
-            has_raised_alpha = true;
-            best_move = move;
-            alpha = score;
-            RecordGoodMove(ply, move);                       
-        }
+        INCREMENT("pre moves - PV");
+        *m++ = move;
     }
-    /**************************************************************************
-    Try any transposition table move next
-    ***************************************************************************/
-    if (is_transposition && transposition->move && transposition->move != move)
+    if (is_transposition           && 
+        transposition->move        && 
+        transposition->move != move)
     {
-        INCREMENT("table move");
-        move = transposition->move;
-        score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, 0, false, cancel);
-        if (*cancel)
-        {
-            return ILLEGAL_SCORE;
-        }
-        if (score >= beta)
-        {
-            INCREMENT("table move caused beta cutoff");
-            RecordTransposition(src_position->hash, depth, beta, move, NODE_CUT);
-            RecordGoodMove(ply, move);
-            return beta;
-        }
-        if (score > alpha)
-        {
-            INCREMENT("table move changed pv");
-            has_raised_alpha = true;
-            best_move = move;
-            alpha = score;
-            RecordGoodMove(ply, move);            
-        }
+        INCREMENT("pre moves - TT");
+        *m++ = transposition->move;
     }
+    *m = 0;
     if (!is_transposition && depth > 1)
     {
         INCREMENT("nodes without transposition");
-    }
-    GeneratePseudoLegalMoves(src_position, moves, true);
-    SortMoves(moves, ply);
+    }    
     /**************************************************************************
-    Start of main loop
+    Start of main loop - we go through the following move phases:
+
+    1) Pre moves from the PV or TT
+    2) Regular moves with a SEE >= 0 (sorted by promoted and captured material)
+    3) Deferred moves with a SEE < 0
+
+    Move generation is deferred until after pre moves have been searched.
     ***************************************************************************/
-    for (move_type = move_types; *move_type; ++move_type)
-    {
-        const int* these_moves = *move_type;
-        const bool is_deferred = (these_moves == deferred_moves);
-        while ((move = *these_moves++) != 0)
+    for (move_phase = move_phases; *move_phase; ++move_phase)
+    {       
+        const int* moves_this_phase = *move_phase;
+        const bool is_deferred = (*move_phase == deferred_moves);
+        if (*move_phase == moves)
         {
-            if (!is_deferred && EvaluateStaticExchange(src_position, move) < 0)
+            GeneratePseudoLegalMoves(src_position, moves, true);
+            SortMoves(moves, ply);
+        }
+        while ((move = *moves_this_phase++) != 0)
+        {
+            if (*move_phase == moves && EvaluateStaticExchange(src_position, move) < 0)
             {
-                /* defer moves with a negative static exchange */
+                /* defer moves with a negative static exchange evaluation for later consideration */
                 *deferred_move++ = move;
                 INCREMENT("deferred moves");
                 continue;
@@ -270,8 +250,8 @@ int Search(const Position* src_position,
             {
                 INCREMENT("pv changed");
                 has_raised_alpha = true;
-                best_move = move;
                 alpha = score;
+                best_move = move;
                 RecordGoodMove(ply, move);
             }
         }
@@ -297,23 +277,24 @@ int Search(const Position* src_position,
         }
         INCREMENT("stalemates");
         return DRAW_SCORE;
-    }     
+    }
     if (has_raised_alpha)
     {
         /**********************************************************************
         We raised alpha but did not cutoff; this was a PV node
         ***********************************************************************/
+        INCREMENT("pv nodes");
         RecordPrincipalVariationMove(src_position->hash, best_move);
         RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);
-        RecordGoodMove(ply, best_move);
-        INCREMENT("pv recorded moves");
+        RecordGoodMove(ply, best_move);       
     }
     else
     {
         /**********************************************************************
         We tried every move but did not raise alpha; this was an all node
         ***********************************************************************/
-        RecordTransposition(src_position->hash, depth, alpha, 0, NODE_ALL);
+        INCREMENT("all nodes");
+        RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_ALL);       
     }
     return alpha;
 }
@@ -366,14 +347,7 @@ int SearchSingleMove(const Position* src_position,
         INCREMENT("extensions push to 7th");
         child_depth = depth;
     }
-#if 0
-    else if (MOVE_CAPTURED(move) &&
-             CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
-    {
-        INCREMENT("extension recapture of same value piece");
-        child_depth = depth;
-    }
-#endif
+
 #if DO_LATE_MOVE_REDUCTION
     /**************************************************************************
     Reduce the search depth if ALL of the following are true:
@@ -398,16 +372,15 @@ int SearchSingleMove(const Position* src_position,
     }
     else
     {
-        INCREMENT("extensions none (normal search depth)");
         child_depth = depth - 1;
     }
 #else
     else
     {
-        INCREMENT("extensions none (normal search depth)");
         child_depth = depth - 1;
     }
 #endif
+
     if (move_index != 0 && !(src_position->state_flags & IS_CHECK))
     {
         INCREMENT("pvs attempts");

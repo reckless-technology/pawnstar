@@ -1,6 +1,6 @@
 #include "pawnstar.h"
 /******************************************************************************
-Fail-hard alpha-beta quiescence search
+Fairly standard alpha-beta quiescence search
 Refer to: http://chessprogramming.wikispaces.com/Quiescence+Search
 *******************************************************************************/
 int SearchQuiescent(const Position* src_position, 
