@@ -108,7 +108,7 @@ static int king_endgame_values[2][64];
 /******************************************************************************
 Set up the piece square tables
 *******************************************************************************/
-void InitializePieceSquareTable()
+void InitializeEval()
 {
     int location;
     for (location = A1; location <= H8; ++location)

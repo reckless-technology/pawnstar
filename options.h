@@ -19,7 +19,7 @@ Determine whether to use the intrinsic population count instruction on native
 Use experimental "more sophisticated" eval, probably not a great idea yet...
 *******************************************************************************/
 #ifndef DO_EVALUATION_FULL
-#define DO_EVALUATION_FULL 0
+#define DO_EVALUATION_FULL 1
 #endif
 /******************************************************************************
 Multithreaded search

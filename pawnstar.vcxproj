@@ -254,7 +254,6 @@
     <ClCompile Include="command_processor.c" />
     <ClCompile Include="debug_hashtable.c" />
     <ClCompile Include="evaluation_full.c" />
-    <ClCompile Include="evaluation_lazy.c" />
     <ClCompile Include="evaluation_simple.c" />
     <ClCompile Include="forsyth_edwards.c" />
     <ClCompile Include="game_over_detection.c" />

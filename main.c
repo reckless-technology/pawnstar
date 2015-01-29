@@ -41,9 +41,7 @@ int main()
         "Compiled: " __DATE__ " " __TIME__                     "\n"
         );
     InitializeGlobals();
-#if !DO_EVALUATION_FULL
-    InitializePieceSquareTable();
-#endif
+    InitializeEval();
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
     InitializeGoodMoveCounts();
     InitializeTaskList();

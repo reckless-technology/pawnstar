@@ -96,11 +96,10 @@ int         NextMove(MoveGenerator* gen);
 /******************************************************************************
 Positional evaluation
 *******************************************************************************/
-void        InitializePieceSquareTable(void);
+void        InitializeEval(void);
 void        DeterminePins(const Position* position, Pins* pins);
 void        DeterminePawnStructure(const Position* position, PawnStructure pawn_struct[2]);
 void        DisplayPawnStructure(const Position* position);
-int         EvaluateMaterial(const Position* position);
 int         EvaluatePosition(const Position* position, int alpha, int beta);
 /******************************************************************************
 Game over (terminal node) detection

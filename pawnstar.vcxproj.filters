@@ -134,9 +134,6 @@
     <ClCompile Include="evaluation_full.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="evaluation_lazy.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="move_generator.c">
       <Filter>Source Files</Filter>
     </ClCompile>
