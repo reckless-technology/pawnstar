@@ -44,31 +44,31 @@ Whether to enable null move pruning
 Whether to enable extension on recapture of same value piece
 *******************************************************************************/
 #ifndef DO_RECAPTURE_EXTENSION
-#define DO_RECAPTURE_EXTENSION 0
+#define DO_RECAPTURE_EXTENSION 1
 #endif
 /******************************************************************************
 Whether to enable futility pruning at frontier nodes
 *******************************************************************************/
 #ifndef DO_FUTILITY_PRUNING
-#define DO_FUTILITY_PRUNING 0
+#define DO_FUTILITY_PRUNING 1
 #endif
 /******************************************************************************
 Whether to enable late move reductions
 *******************************************************************************/
 #ifndef DO_LATE_MOVE_REDUCTION
-#define DO_LATE_MOVE_REDUCTION 0
+#define DO_LATE_MOVE_REDUCTION 1
 #endif
 /******************************************************************************
 Whether to skip moves in quiescence search which have a negative static
 exchange evaluation (SEE)
 *******************************************************************************/
 #ifndef DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 1
+#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 0
 #endif
 /******************************************************************************
 Global constants
 *******************************************************************************/
-#define HASHTABLE_MEGABYTES                   2 // default transposition table size in MB
+#define HASHTABLE_MEGABYTES                 512 // default transposition table size in MB
 #define STRING_BUF_LEN                     1024 // default line buffer size
 #define MAX_MOVES_PER_POSITION              128 // maximum possible number of pseudo-legal moves for any chess position
 #define BETA                              11000 // greater than any possible evaluation score including checkmate

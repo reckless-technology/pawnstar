@@ -91,13 +91,14 @@ static const int MATERIAL_VALUES[8] = {
       0,
 };
 
-#define SCORE_BISHOP_PAIR           50  // bonus for the bishop pair
-#define SCORE_KNIGHT_PAIR          -20  // penalty for the knight pair
+#define SCORE_BISHOP_PAIR           60  // bonus for the bishop pair
+#define SCORE_KNIGHT_PAIR          -30  // penalty for the knight pair
 #define SCORE_PAWN_KING_ADJ1        20  // bonus for each pawn standing directly in front of the king after castling
 #define SCORE_PAWN_KING_ADJ2        10  // bonus for each pawn standing on the 3rd rank in front of the king
 #define SCORE_ISOLATED_PAWN        -20  // penalty for an isolated pawn
 #define SCORE_DOUBLED_PAWN         -10  // penalty for doubled or triped pawn
-#define SCORE_FORFEIT_CASTLING     -40  // penalty for forfeiting castling rights without castling
+#define SCORE_FORFEIT_CASTLING     -30  // penalty for forfeiting castling rights without castling
+#define SCORE_EIGHT_PAWNS          -20  // penalty for not having exchanged at least one pawn
 #define SCORE_MATERIAL_THRESHOLD   150  // threshold for eval cutoff on material balance only
 
 /******************************************************************************
@@ -127,28 +128,47 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     /**************************************************************************
     Material
     ***************************************************************************/
+    const bitboard white_pawns   = position->pawns   & position->white_pieces;
+    const bitboard black_pawns   = position->pawns   & position->black_pieces;
+    const bitboard white_knights = position->knights & position->white_pieces;
+    const bitboard black_knights = position->knights & position->black_pieces;
+    const bitboard white_bishops = position->bishops & position->white_pieces;
+    const bitboard black_bishops = position->bishops & position->black_pieces;
+    const bitboard white_rooks   = position->rooks   & position->white_pieces;
+    const bitboard black_rooks   = position->rooks   & position->black_pieces;
+    const bitboard white_queens  = position->queens  & position->white_pieces;
+    const bitboard black_queens  = position->queens  & position->black_pieces;
     score = 
-        MATERIAL_VALUES[PAWN]   * (PopCount(position->pawns   & position->white_pieces) - PopCount(position->pawns   & position->black_pieces)) +
-        MATERIAL_VALUES[KNIGHT] * (PopCount(position->knights & position->white_pieces) - PopCount(position->knights & position->black_pieces)) +
-        MATERIAL_VALUES[BISHOP] * (PopCount(position->bishops & position->white_pieces) - PopCount(position->bishops & position->black_pieces)) +
-        MATERIAL_VALUES[ROOK]   * (PopCount(position->rooks   & position->white_pieces) - PopCount(position->rooks   & position->black_pieces)) +
-        MATERIAL_VALUES[QUEEN]  * (PopCount(position->queens  & position->white_pieces) - PopCount(position->queens  & position->black_pieces));
-    if (PopCount(position->bishops & position->white_pieces) >= 2)
+        MATERIAL_VALUES[PAWN]   * (PopCount(white_pawns)   - PopCount(black_pawns))   +
+        MATERIAL_VALUES[KNIGHT] * (PopCount(white_knights) - PopCount(black_knights)) +
+        MATERIAL_VALUES[BISHOP] * (PopCount(white_bishops) - PopCount(black_bishops)) +
+        MATERIAL_VALUES[ROOK]   * (PopCount(white_rooks)   - PopCount(black_rooks))   +
+        MATERIAL_VALUES[QUEEN]  * (PopCount(white_queens)  - PopCount(black_queens));
+    if (PopCount(white_bishops) >= 2)
     {
         score += SCORE_BISHOP_PAIR;
     }
-    if (PopCount(position->bishops & position->black_pieces) >= 2)
+    if (PopCount(black_bishops) >= 2)
     {
         score -= SCORE_BISHOP_PAIR;
     }
-    if (PopCount(position->knights & position->white_pieces) >= 2)
+    if (PopCount(white_knights) >= 2)
     {
         score += SCORE_KNIGHT_PAIR;
     }
-    if (PopCount(position->knights & position->black_pieces) >= 2)
+    if (PopCount(black_knights) >= 2)
     {
         score -= SCORE_KNIGHT_PAIR;
-    }   
+    }  
+    if (PopCount(white_pawns) == 8)
+    {
+        score += SCORE_EIGHT_PAWNS;
+    }
+    if (PopCount(black_pawns) == 8)
+    {
+        score -= SCORE_EIGHT_PAWNS;
+    }
+#if 0
     if (score > 0)
     {
         score += PIECE_COUNT_VALUES[PopCount(position->knights | position->bishops | position->rooks | position->queens)];
@@ -157,6 +177,7 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     {
         score -= PIECE_COUNT_VALUES[PopCount(position->knights | position->bishops | position->rooks | position->queens)];
     }
+#endif
     if (score * score_sign > beta + SCORE_MATERIAL_THRESHOLD)
     {
         INCREMENT("eval beta cutoffs");
@@ -206,8 +227,6 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
         /**********************************************************************
         King pawn shield
         ***********************************************************************/
-        const bitboard white_pawns = position->pawns & position->white_pieces;
-        const bitboard black_pawns = position->pawns & position->black_pieces;
         score += SCORE_PAWN_KING_ADJ1 * PopCount(KING_PAWN_SHIELD_WHITE  [position->king_location[WHITE]] & white_pawns);
         score += SCORE_PAWN_KING_ADJ2 * PopCount(KING_PAWN_SHIELD_WHITE_2[position->king_location[WHITE]] & white_pawns);
         score -= SCORE_PAWN_KING_ADJ1 * PopCount(KING_PAWN_SHIELD_BLACK  [position->king_location[BLACK]] & black_pawns);
