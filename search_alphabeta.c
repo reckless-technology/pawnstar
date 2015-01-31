@@ -140,7 +140,8 @@ int Search(const Position* src_position,
     ***************************************************************************/
     if (!(src_position->state_flags & IS_CHECK) &&
         ply != 0                                &&
-        src_position->move)
+        src_position->move                      &&
+        depth > 3)
     {
         const bitboard friendly_pieces = (src_position->occupied_squares ^ src_position->kings) & src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
         if ((friendly_pieces & ~src_position->pawns) && 
@@ -168,7 +169,7 @@ int Search(const Position* src_position,
     /**************************************************************************
     Futility pruning doesn't really achieve much; the idea is to prune frontier
     nodes where the eval is so bad there is no way we can match alpha even with
-    a winning tactical sequence. I find it worsens play in practice.
+    a winning tactical sequence.
     ***************************************************************************/
     if (depth == 1 &&
         !(src_position->state_flags & IS_CHECK) &&
@@ -374,7 +375,7 @@ int SearchSingleMove(const Position* src_position,
     of play, so my inclination is to disable it.
     ***************************************************************************/
     else if (is_deferred_move     &&
-             depth >= 3           &&
+             depth > 2            &&
              !MOVE_CAPTURED(move) &&
              !(position->state_flags & IS_CHECK) &&
              !HasMoveBeenGood(ply, move))
@@ -403,17 +404,6 @@ int SearchSingleMove(const Position* src_position,
     {
         score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel);
     }
-#if DO_LATE_MOVE_REDUCTION
-    if (child_depth == depth - 2 && score > alpha && score < beta)
-    {
-        /**********************************************************************
-        A late move which was depth reduced turned out to be a good move after 
-        all. Redo the search with regular depth.
-        ***********************************************************************/
-        INCREMENT("lmr fail");
-        score = -Search(position, depth - 1, ply + 1, -beta, -alpha, cancel);
-    }
-#endif
     return score;
     is_deferred_move;
 }

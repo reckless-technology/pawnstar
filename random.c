@@ -13,12 +13,11 @@ int NextRandom(void)
         ***********************************************************************/
         int i; 
         lcg = (uint64)time(NULL);
-        i = (lcg % 337) + 13;
+        i = (lcg % 337) + 337;
         while (--i)
         {
             lcg = lcg * 6364136223846793005ull + 1442695040888963407ull;
         }
-        lcg ^= GetMilliseconds();
     }
     lcg = lcg * 6364136223846793005ull + 1442695040888963407ull;
     return lcg >> 32; /* only use the top 32 bits as lower bits are useless as a PRNG */
