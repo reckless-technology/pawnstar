@@ -63,7 +63,7 @@ Whether to skip moves in quiescence search which have a negative static
 exchange evaluation (SEE)
 *******************************************************************************/
 #ifndef DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 0
+#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 1
 #endif
 /******************************************************************************
 Global constants

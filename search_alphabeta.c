@@ -141,7 +141,7 @@ int Search(const Position* src_position,
     if (!(src_position->state_flags & IS_CHECK) &&
         ply != 0                                &&
         src_position->move                      &&
-        depth > 3)
+        depth > 1)
     {
         const bitboard friendly_pieces = (src_position->occupied_squares ^ src_position->kings) & src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
         if ((friendly_pieces & ~src_position->pawns) && 
@@ -173,7 +173,7 @@ int Search(const Position* src_position,
     ***************************************************************************/
     if (depth == 1 &&
         !(src_position->state_flags & IS_CHECK) &&
-        EvaluatePosition(src_position, alpha, beta) + 900 <= alpha)
+        EvaluateMaterial(src_position) + 900 <= alpha)
     {
         INCREMENT("futility cutoffs");
         return alpha;
@@ -207,8 +207,8 @@ int Search(const Position* src_position,
     /**************************************************************************
     Start of main loop - we go through the following move phases:
 
-    1) Pre moves from the PV or TT
-    2) Regular moves with a SEE >= 0 (sorted by promoted and captured material)
+    1) Pre moves from the PV and TT
+    2) Regular moves with a SEE >= 0 (sorted best first)
     3) Deferred moves with a SEE < 0
 
     Move generation is deferred until after pre moves have been searched.
