@@ -124,32 +124,6 @@ void InitializeEval()
     }
 }
 
-int EvaluateMaterial(const Position* position)
-{   
-    if (IsDrawByMaterial(position))
-    {
-        return DRAW_SCORE;
-    }
-    int score = 0;
-    const int score_sign = position->state_flags & IS_BLACK_TO_MOVE ? -1 : 1;
-    const bitboard white_pawns   = position->pawns   & position->white_pieces;
-    const bitboard black_pawns   = position->pawns   & position->black_pieces;
-    const bitboard white_knights = position->knights & position->white_pieces;
-    const bitboard black_knights = position->knights & position->black_pieces;
-    const bitboard white_bishops = position->bishops & position->white_pieces;
-    const bitboard black_bishops = position->bishops & position->black_pieces;
-    const bitboard white_rooks   = position->rooks   & position->white_pieces;
-    const bitboard black_rooks   = position->rooks   & position->black_pieces;
-    const bitboard white_queens  = position->queens  & position->white_pieces;
-    const bitboard black_queens  = position->queens  & position->black_pieces;
-    score = 
-        MATERIAL_VALUES[PAWN]   * (PopCount(white_pawns)   - PopCount(black_pawns))   +
-        MATERIAL_VALUES[KNIGHT] * (PopCount(white_knights) - PopCount(black_knights)) +
-        MATERIAL_VALUES[BISHOP] * (PopCount(white_bishops) - PopCount(black_bishops)) +
-        MATERIAL_VALUES[ROOK]   * (PopCount(white_rooks)   - PopCount(black_rooks))   +
-        MATERIAL_VALUES[QUEEN]  * (PopCount(white_queens)  - PopCount(black_queens));
-    return score * score_sign;
-}
 /******************************************************************************
 Evaluate the current position, assuming neither king is in check and the 
 position is quiet.

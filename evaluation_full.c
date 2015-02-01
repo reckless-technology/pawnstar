@@ -95,20 +95,21 @@ static const int MATERIAL_VALUES[8] = {
 #define SCORE_BISHOP_PAIR           50  // bonus for the bishop pair
 #define SCORE_KNIGHT_PAIR          -30  // penalty for the knight pair
 #define SCORE_PAWN_KING_ADJ1        25  // bonus for each pawn standing directly in front of the king after castling
-#define SCORE_PAWN_KING_ADJ2        15  // bonus for each pawn standing on the 3rd rank in front of the king
+#define SCORE_PAWN_KING_ADJ2        10  // bonus for each pawn standing on the 3rd rank in front of the king
 #define SCORE_ISOLATED_PAWN        -20  // penalty for an isolated pawn
 #define SCORE_DOUBLED_PAWN         -10  // penalty for doubled or triped pawn
 #define SCORE_FORFEIT_CASTLING     -30  // penalty for forfeiting castling rights without castling
 #define SCORE_EIGHT_PAWNS          -20  // penalty for not having exchanged at least one pawn
 #define SCORE_PROTECTED_PAWN         5  // bonus for pawn protected by a friendly pawn
-#define SCORE_STUCK_BISHOP         -30  // penalty for a bishop with poor mobility
 #define SCORE_MATERIAL_THRESHOLD   150  // threshold for eval cutoff on material balance only
 
 /******************************************************************************
-Added to the winning side based on the total number of knights, bishops, rooks
-and queens on the board. Encourages exchange of pieces but not pawns.
+Added to the materially ahead side, indexed by the total number of knights, 
+bishops, rooks and queens on the board. Encourages the side which is ahead on
+material to exchange pieces but not pawns, i.e. trade down to a hopefully won
+endgame.
 *******************************************************************************/
-static const int PIECE_COUNT_VALUES[32] = { 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0, /* ... */ };
+static const int TRADE_DOWN_BONUS[32] = { 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0, /* ... */ };
 /******************************************************************************
 Set up the piece square tables
 *******************************************************************************/
@@ -117,67 +118,11 @@ void InitializeEval()
     // nothing to do in this version
 }
 
-int EvaluateMaterial(const Position* position)
-{   
-    if (IsDrawByMaterial(position))
-    {
-        return DRAW_SCORE;
-    }
-    int score = 0;
-    const int score_sign = position->state_flags & IS_BLACK_TO_MOVE ? -1 : 1;
-    const bitboard white_pawns   = position->pawns   & position->white_pieces;
-    const bitboard black_pawns   = position->pawns   & position->black_pieces;
-    const bitboard white_knights = position->knights & position->white_pieces;
-    const bitboard black_knights = position->knights & position->black_pieces;
-    const bitboard white_bishops = position->bishops & position->white_pieces;
-    const bitboard black_bishops = position->bishops & position->black_pieces;
-    const bitboard white_rooks   = position->rooks   & position->white_pieces;
-    const bitboard black_rooks   = position->rooks   & position->black_pieces;
-    const bitboard white_queens  = position->queens  & position->white_pieces;
-    const bitboard black_queens  = position->queens  & position->black_pieces;
-    score = 
-        MATERIAL_VALUES[PAWN]   * (PopCount(white_pawns)   - PopCount(black_pawns))   +
-        MATERIAL_VALUES[KNIGHT] * (PopCount(white_knights) - PopCount(black_knights)) +
-        MATERIAL_VALUES[BISHOP] * (PopCount(white_bishops) - PopCount(black_bishops)) +
-        MATERIAL_VALUES[ROOK]   * (PopCount(white_rooks)   - PopCount(black_rooks))   +
-        MATERIAL_VALUES[QUEEN]  * (PopCount(white_queens)  - PopCount(black_queens));
-    if (PopCount(white_bishops) >= 2)
-    {
-        score += SCORE_BISHOP_PAIR;
-    }
-    if (PopCount(black_bishops) >= 2)
-    {
-        score -= SCORE_BISHOP_PAIR;
-    }
-    if (PopCount(white_knights) >= 2)
-    {
-        score += SCORE_KNIGHT_PAIR;
-    }
-    if (PopCount(black_knights) >= 2)
-    {
-        score -= SCORE_KNIGHT_PAIR;
-    }  
-    if (PopCount(white_pawns) == 8)
-    {
-        score += SCORE_EIGHT_PAWNS;
-    }
-    if (PopCount(black_pawns) == 8)
-    {
-        score -= SCORE_EIGHT_PAWNS;
-    }
-    if (score > 0)
-    {
-        score += PIECE_COUNT_VALUES[PopCount(position->knights | position->bishops | position->rooks | position->queens)];
-    }
-    else if (score < 0)
-    {
-        score -= PIECE_COUNT_VALUES[PopCount(position->knights | position->bishops | position->rooks | position->queens)];
-    }
-    return score * score_sign;
-}
 /******************************************************************************
 Evaluate the current position, assuming neither king is in check and the 
-position is quiet.
+position is quiet. This returns alpha or beta in the case of material cutoff
+and thus requires a fail hard alpha beta framework in which to operate 
+correctly.
 *******************************************************************************/
 int EvaluatePosition(const Position* position, int alpha, int beta)
 {    
@@ -186,7 +131,7 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     {
         return DRAW_SCORE;
     }
-    const int score_sign = position->state_flags & IS_BLACK_TO_MOVE ? -1 : 1;
+    const int score_sign  = position->state_flags & IS_BLACK_TO_MOVE ? -1 : 1;
     const bool is_endgame = !position->queens || PopCount(position->occupied_squares ^ position->pawns) < 8;
     /**************************************************************************
     Material
@@ -233,79 +178,50 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     }
     if (score > 0)
     {
-        score += PIECE_COUNT_VALUES[PopCount(position->knights | position->bishops | position->rooks | position->queens)];
+        score += TRADE_DOWN_BONUS[PopCount(position->knights | position->bishops | position->rooks | position->queens)];
     }
     else if (score < 0)
     {
-        score -= PIECE_COUNT_VALUES[PopCount(position->knights | position->bishops | position->rooks | position->queens)];
+        score -= TRADE_DOWN_BONUS[PopCount(position->knights | position->bishops | position->rooks | position->queens)];
     }
     if (score * score_sign > beta + SCORE_MATERIAL_THRESHOLD)
     {
         INCREMENT("eval beta cutoffs");
-        return beta;
+        return score * score_sign;
     }
     if (score * score_sign < alpha - SCORE_MATERIAL_THRESHOLD)
     {
         INCREMENT("eval alpha cutoffs");
-        return alpha;
+        return score * score_sign;
     }
     /**************************************************************************
     Piece square tables
     ***************************************************************************/
-    const int* const pawn_square = is_endgame ? PAWN_SQUARE_ENDGAME : PAWN_SQUARE_MIDGAME;
-    bitboard b = white_pawns;
-    while (b)
+    const int* const piece_square_table[8] = 
     {
-        score += pawn_square[FindAndClearLsb(&b) ^ RANK_FLIP];
-    }
-    b = black_pawns;
-    while (b)
+        NULL,
+        is_endgame ? PAWN_SQUARE_ENDGAME : PAWN_SQUARE_MIDGAME,
+        KNIGHT_SQUARE,
+        BISHOP_SQUARE,
+        ROOK_SQUARE,
+        QUEEN_SQUARE,
+        is_endgame ? KING_SQUARE_ENDGAME : KING_SQUARE_MIDGAME,
+        NULL,
+    };
+    for (int piece = PAWN; piece <= KING; ++piece)
     {
-        score -= pawn_square[FindAndClearLsb(&b)];
+        const int* const table = piece_square_table[piece];
+        bitboard b = position->pieces[piece] & position->white_pieces;        
+        while (b)
+        {
+            score += table[FindAndClearLsb(&b) ^ RANK_FLIP];
+        }
+        b = position->pieces[piece] & position->black_pieces;
+        while (b)
+        {
+            score -= table[FindAndClearLsb(&b)];
+        }
     }
-    b = white_knights;
-    while (b)
-    {
-        score += KNIGHT_SQUARE[FindAndClearLsb(&b) ^ RANK_FLIP];
-    }
-    b = black_knights;
-    while (b)
-    {
-        score -= KNIGHT_SQUARE[FindAndClearLsb(&b)];
-    }
-    b = white_bishops;
-    while (b)
-    {
-        score += BISHOP_SQUARE[FindAndClearLsb(&b) ^ RANK_FLIP];
-    }
-    b = black_bishops;
-    while (b)
-    {
-        score -= BISHOP_SQUARE[FindAndClearLsb(&b)];
-    }
-    b = white_rooks;
-    while (b)
-    {
-        score += ROOK_SQUARE[FindAndClearLsb(&b) ^ RANK_FLIP];
-    }
-    b = black_rooks;
-    while (b)
-    {
-        score -= ROOK_SQUARE[FindAndClearLsb(&b)];
-    }
-    b = white_queens;
-    while (b)
-    {
-        score += QUEEN_SQUARE[FindAndClearLsb(&b) ^ RANK_FLIP];
-    }
-    b = black_queens;
-    while (b)
-    {
-        score -= QUEEN_SQUARE[FindAndClearLsb(&b)];
-    }
-    const int* const king_square = is_endgame ? KING_SQUARE_ENDGAME : KING_SQUARE_MIDGAME;
-    score += king_square[position->king_location[WHITE] ^ RANK_FLIP];
-    score -= king_square[position->king_location[BLACK]];
     /**************************************************************************
     Pawns
     ***************************************************************************/
@@ -343,38 +259,6 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
         {
             score -= SCORE_FORFEIT_CASTLING;
         }
-#if 0
-        /**********************************************************************
-        Bad bishops
-        A very primitive heuristic which penalizes poor bishop mobility, 
-        without any regard to viable bishop target squares due to tactical 
-        considerations such as protection, pins, static exchange etc.
-        Bishops should not move to squares which are attacked by an enemy pawn 
-        if they are empty or occupied by an enemy pawn.
-        ***********************************************************************/
-        b = white_bishops;
-        while (b)
-        {
-            const int locn = FindAndClearLsb(&b);
-            const bitboard targets = BishopAttacks(position->occupied_squares, locn) & ~position->white_pieces;
-            const bitboard bad_targets = black_pawn_attacks & (~position->occupied_squares | black_pawns);
-            if (PopCount(targets & ~bad_targets) < 3)
-            {
-                score += SCORE_STUCK_BISHOP;
-            }
-        }
-        b = black_bishops;
-        while (b)
-        {
-            const int locn = FindAndClearLsb(&b);
-            const bitboard targets = BishopAttacks(position->occupied_squares, locn) & ~position->black_pieces;
-            const bitboard bad_targets = white_pawn_attacks & (~position->occupied_squares | white_pawns);
-            if (PopCount(targets & ~bad_targets) < 3)
-            {
-                score -= SCORE_STUCK_BISHOP;
-            }
-        }
-#endif
     }
     return score * score_sign;
 }

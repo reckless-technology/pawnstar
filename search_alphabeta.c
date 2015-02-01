@@ -173,7 +173,7 @@ int Search(const Position* src_position,
     ***************************************************************************/
     if (depth == 1 &&
         !(src_position->state_flags & IS_CHECK) &&
-        EvaluateMaterial(src_position) + 900 <= alpha)
+        EvaluatePosition(src_position, alpha, beta) + 900 <= alpha)
     {
         INCREMENT("futility cutoffs");
         return alpha;
