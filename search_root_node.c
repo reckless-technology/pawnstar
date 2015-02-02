@@ -54,7 +54,7 @@ int SearchRootNode(const Position* src_position)
     default:
         moves_to_go  = globals->time_control.moves_per_period - (src_position->full_move_count % globals->time_control.moves_per_period);
         ms_allocated = globals->time_control.milliseconds_remaining / moves_to_go;
-        timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 1000));
+        timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 3000));
         break;
     
     case FIXED_DEPTH:
@@ -69,7 +69,7 @@ int SearchRootNode(const Position* src_position)
     
     case INCREMENTAL_CLOCK:
         ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 20);
-        timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 1000));
+        timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 3000));
         break;
     }
     InitializeGoodMoveCounts();

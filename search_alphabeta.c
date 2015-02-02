@@ -172,8 +172,8 @@ int Search(const Position* src_position,
     a winning tactical sequence.
     ***************************************************************************/
     if (depth == 1 &&
-        !(src_position->state_flags & IS_CHECK) &&
-        EvaluatePosition(src_position, alpha, beta) + 900 <= alpha)
+        //!(src_position->state_flags & IS_CHECK) &&
+        EvaluatePosition(src_position, alpha, beta) + FUTILITY_CUTOFF_THRESHOLD < alpha)
     {
         INCREMENT("futility cutoffs");
         return alpha;

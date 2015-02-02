@@ -88,3 +88,4 @@ Global constants
 #define PV_TABLE_SIZE                      4999 // number of entries in the principal variation hashtable (should be prime)
 #define DEBUG_DICT_SIZE                    4999 // number of entries in the debug counts hashtable (should be prime)
 #define ASPIRATION_SEARCH_WINDOW             50 // Alpha beta window width at root node (centipawns)
+#define FUTILITY_CUTOFF_THRESHOLD           900 // Prune frontier nodes where eval is this much below alpha

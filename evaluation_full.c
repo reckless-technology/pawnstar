@@ -2,9 +2,9 @@
 #if DO_EVALUATION_FULL
 static const int PAWN_SQUARE_MIDGAME[64] = {
      0,  0,  0,  0,  0,  0,  0,  0,
-    50, 50, 50, 50, 50, 50, 50, 50,
-    20, 30, 30, 40, 40, 30, 30, 20,
+    35, 35, 35, 35, 35, 35, 35, 35, 
     10, 20, 20, 30, 30, 20, 20, 10,
+     5, 15, 15, 25, 25, 15, 15,  5,
      0,  0,  0, 20, 20,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,-20,-20,  0,  0,  0,
@@ -100,7 +100,7 @@ static const int MATERIAL_VALUES[8] = {
 #define SCORE_DOUBLED_PAWN         -10  // penalty for doubled or triped pawn
 #define SCORE_FORFEIT_CASTLING     -30  // penalty for forfeiting castling rights without castling
 #define SCORE_EIGHT_PAWNS          -20  // penalty for not having exchanged at least one pawn
-#define SCORE_PROTECTED_PAWN         5  // bonus for pawn protected by a friendly pawn
+#define SCORE_PROTECTED_PAWN        10  // bonus for pawn protected by a friendly pawn
 #define SCORE_MATERIAL_THRESHOLD   150  // threshold for eval cutoff on material balance only
 
 /******************************************************************************
@@ -111,13 +111,17 @@ endgame.
 *******************************************************************************/
 static const int TRADE_DOWN_BONUS[32] = { 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0, /* ... */ };
 /******************************************************************************
+Bonus / penalty for bishops based on number of available psuedo legal target 
+squares. The rest should be handled by search.
+*******************************************************************************/
+static const int BISHOP_MOBILITY[14] = { -30, -20, 0, 5, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10 };
+/******************************************************************************
 Set up the piece square tables
 *******************************************************************************/
 void InitializeEval()
 {
     // nothing to do in this version
 }
-
 /******************************************************************************
 Evaluate the current position, assuming neither king is in check and the 
 position is quiet. This returns alpha or beta in the case of material cutoff
@@ -239,6 +243,20 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     score -= SCORE_DOUBLED_PAWN   * PopCount(black_doubled_pawns);
     score += SCORE_PROTECTED_PAWN * PopCount(white_pawns & white_pawn_attacks);
     score -= SCORE_PROTECTED_PAWN * PopCount(black_pawns & black_pawn_attacks);
+    /**************************************************************************
+    Bishop mobility - very primitive heuristic which penalizes poor bishop
+    mobility. Requires improvement!
+    ***************************************************************************/
+    bitboard b = white_bishops;
+    while (b)
+    {
+        score += BISHOP_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~position->white_pieces)];
+    }
+    b = black_bishops;
+    while (b)
+    {
+        score -= BISHOP_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~position->black_pieces)];
+    }
     if (!is_endgame)
     {
         /**********************************************************************
