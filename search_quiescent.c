@@ -45,6 +45,11 @@ int SearchQuiescent(const Position* src_position,
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
+    else if (score + FUTILITY_CUTOFF_THRESHOLD < alpha)
+    {
+        INCREMENT("quiescent futility cutoffs");
+        return alpha;
+    }
     GeneratePseudoLegalMoves(src_position, moves, false);    
     SortMoves(moves, ply);
     /**************************************************************************
@@ -54,7 +59,7 @@ int SearchQuiescent(const Position* src_position,
     {
         Position position[1];
 #if DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-        if (EvaluateStaticExchange(src_position, move) < 0)
+        if (EvaluateStaticExchange(src_position, move) <= 0)
         {
             INCREMENT("quiescent SEE skips");
             continue;

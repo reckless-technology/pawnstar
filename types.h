@@ -270,7 +270,7 @@ typedef struct
     bitboard    passed_pawns;    // pawns who cannot be stopped by an enemy pawn
     bitboard    blocked_pawns;   // pawns with an enemy pawn ahead on the same file but not on either adjacent file
     bitboard    pawn_holes;      // squares which could not be defended by a pawn
-    bitboard    outposts;       // enemy pawn holes attacked by a friendly pawn
+    bitboard    outposts;        // enemy pawn holes attacked by a friendly pawn
 } PawnStructure;
 
 /******************************************************************************

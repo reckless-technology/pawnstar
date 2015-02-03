@@ -56,7 +56,7 @@ Whether to enable futility pruning at frontier nodes
 Whether to enable late move reductions
 *******************************************************************************/
 #ifndef DO_LATE_MOVE_REDUCTION
-#define DO_LATE_MOVE_REDUCTION 1
+#define DO_LATE_MOVE_REDUCTION 0
 #endif
 /******************************************************************************
 Whether to skip moves in quiescence search which have a negative static
@@ -88,4 +88,4 @@ Global constants
 #define PV_TABLE_SIZE                      4999 // number of entries in the principal variation hashtable (should be prime)
 #define DEBUG_DICT_SIZE                    4999 // number of entries in the debug counts hashtable (should be prime)
 #define ASPIRATION_SEARCH_WINDOW             50 // Alpha beta window width at root node (centipawns)
-#define FUTILITY_CUTOFF_THRESHOLD           900 // Prune frontier nodes where eval is this much below alpha
+#define FUTILITY_CUTOFF_THRESHOLD          1200 // Prune frontier nodes where eval is this much below alpha

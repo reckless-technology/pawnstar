@@ -53,7 +53,7 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
     int        east_delta;
     uchar      piece_type;
     uchar      board_pieces[64]   = { NO_PIECE };
-    const int color              = COLOR_TO_MOVE(position);
+    const int color               = COLOR_TO_MOVE(position);
     const bitboard vacant_squares = ~position->occupied_squares;
     /**************************************************************************
     Determine the pieces on the board once, to save continually looking them up
@@ -72,39 +72,39 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
     ***************************************************************************/
     if (color == WHITE)
     {
-        pawns            = position->pawns           & position->white_pieces;
-        single_pushes     = SHIFT_NORTH(pawns)        & vacant_squares;
-        double_pushes     = SHIFT_NORTH(single_pushes) & vacant_squares & RANK_4;
-        captures_west     = SHIFT_NORTHWEST(pawns)    & position->black_pieces;
-        captures_east     = SHIFT_NORTHEAST(pawns)    & position->black_pieces;
+        pawns              = position->pawns            & position->white_pieces;
+        single_pushes      = SHIFT_NORTH(pawns)         & vacant_squares;
+        double_pushes      = SHIFT_NORTH(single_pushes) & vacant_squares & RANK_4;
+        captures_west      = SHIFT_NORTHWEST(pawns)     & position->black_pieces;
+        captures_east      = SHIFT_NORTHEAST(pawns)     & position->black_pieces;
         en_passant_sources = position->en_passant_index ? PAWN_ATTACKS_BLACK[position->en_passant_index] & pawns : NO_SQUARES;
-        promotions       = single_pushes & RANK_8;
-        promotions_west   = captures_west & RANK_8;
-        promotions_east   = captures_east & RANK_8;   
-        captures_west    ^= promotions_west;
-        captures_east    ^= promotions_east;
-        single_pushes    ^= promotions;
-        push_delta        = 8;
-        west_delta        = 7;
-        east_delta        = 9;
+        promotions         = single_pushes & RANK_8;
+        promotions_west    = captures_west & RANK_8;
+        promotions_east    = captures_east & RANK_8;   
+        captures_west     ^= promotions_west;
+        captures_east     ^= promotions_east;
+        single_pushes     ^= promotions;
+        push_delta         = 8;
+        west_delta         = 7;
+        east_delta         = 9;
     }
     else
     {
-        pawns            = position->pawns           & position->black_pieces;
-        single_pushes     = SHIFT_SOUTH(pawns)        & vacant_squares;
-        double_pushes     = SHIFT_SOUTH(single_pushes) & vacant_squares & RANK_5;
-        captures_west     = SHIFT_SOUTHWEST(pawns)    & position->white_pieces;
-        captures_east     = SHIFT_SOUTHEAST(pawns)    & position->white_pieces;
+        pawns              = position->pawns            & position->black_pieces;
+        single_pushes      = SHIFT_SOUTH(pawns)         & vacant_squares;
+        double_pushes      = SHIFT_SOUTH(single_pushes) & vacant_squares & RANK_5;
+        captures_west      = SHIFT_SOUTHWEST(pawns)     & position->white_pieces;
+        captures_east      = SHIFT_SOUTHEAST(pawns)     & position->white_pieces;
         en_passant_sources = position->en_passant_index ? PAWN_ATTACKS_WHITE[position->en_passant_index] & pawns : NO_SQUARES;
-        promotions       = single_pushes & RANK_1;
-        promotions_west   = captures_west & RANK_1;
-        promotions_east   = captures_east & RANK_1;   
-        captures_west    ^= promotions_west;
-        captures_east    ^= promotions_east;
-        single_pushes    ^= promotions;
-        push_delta        = -8;
-        west_delta        = -9;
-        east_delta        = -7;
+        promotions         = single_pushes & RANK_1;
+        promotions_west    = captures_west & RANK_1;
+        promotions_east    = captures_east & RANK_1;   
+        captures_west     ^= promotions_west;
+        captures_east     ^= promotions_east;
+        single_pushes     ^= promotions;
+        push_delta         = -8;
+        west_delta         = -9;
+        east_delta         = -7;
     }
     while (promotions_west)
     {

@@ -18,7 +18,7 @@ int Search(const Position* src_position,
 {
     Transposition       transposition[1];
     int                 move;   
-    int                 pre_moves[3];
+    int                 pre_moves[4];
     int                 regular_moves[MAX_MOVES_PER_POSITION];
     int                 deferred_moves[MAX_MOVES_PER_POSITION];    
     int                 score;   
@@ -55,7 +55,8 @@ int Search(const Position* src_position,
         INCREMENT("max ply reached");
         return EvaluatePosition(src_position, alpha, beta);
     }
-    if (!(src_position->state_flags & IS_CHECK) && depth <= 0)
+    if (!(src_position->state_flags & IS_CHECK) && 
+        depth <= 0)
     {
         return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
     }
@@ -86,7 +87,7 @@ int Search(const Position* src_position,
                 We don't know the exact score of the best move from this
                 position, but we do know it is at least transposition->score
                 ***************************************************************/
-                INCREMENT("table hit cut");
+                INCREMENT("table hit cut node");
                 if (transposition->score >= beta)
                 {
                     INCREMENT("table hit beta cutoffs");
@@ -99,7 +100,7 @@ int Search(const Position* src_position,
                 We don't know the exact score of the best move from this
                 position, but we do know it is at most transposition->score
                 ***************************************************************/
-                INCREMENT("table hit all");
+                INCREMENT("table hit all node");
                 if (transposition->score <= alpha)
                 {
                     INCREMENT("table hit alpha cutoffs");
@@ -111,7 +112,7 @@ int Search(const Position* src_position,
                 /**************************************************************
                 We know the exact score and the best move from this position.
                 ***************************************************************/
-                INCREMENT("table hit pv");
+                INCREMENT("table hit pv node");
                 if (transposition->score > alpha && transposition->score < beta && transposition->move)
                 {
                     RecordPrincipalVariationMove(src_position->hash, transposition->move);
@@ -134,14 +135,11 @@ int Search(const Position* src_position,
 
     Hopefully this is sufficient to prevent most Zugzwang positions.
 
-    Null move pruning makes a huge improvement to search depth in a given
-    time. I have found it to be the single most useful technique to add to a 
-    standard alpha beta search.
+    Null move pruning makes a huge improvement to search depth / speed. 
     ***************************************************************************/
     if (!(src_position->state_flags & IS_CHECK) &&
         ply != 0                                &&
-        src_position->move                      &&
-        depth > 0)
+        src_position->move)
     {
         const bitboard friendly_pieces = (src_position->occupied_squares ^ src_position->kings) & src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
         if ((friendly_pieces & ~src_position->pawns) && 
@@ -169,9 +167,10 @@ int Search(const Position* src_position,
     /**************************************************************************
     Futility pruning doesn't really achieve much; the idea is to prune frontier
     nodes where the eval is so bad there is no way we can match alpha even with
-    a winning tactical sequence.
+    a great winning tactical sequence.
     ***************************************************************************/
-    if (depth == 1 &&
+    if (depth == 1                              &&
+        !(src_position->state_flags & IS_CHECK) &&
         EvaluatePosition(src_position, alpha, beta) + FUTILITY_CUTOFF_THRESHOLD < alpha)
     {
         INCREMENT("futility cutoffs");
@@ -198,7 +197,7 @@ int Search(const Position* src_position,
         INCREMENT("pre moves - TT");
         *m++ = transposition->move;
     }
-    *m = 0;
+    *m = 0; /* terminate pre moves list */
     if (!is_transposition && depth > 1)
     {
         INCREMENT("nodes without transposition");
@@ -259,7 +258,7 @@ int Search(const Position* src_position,
         *deferred_move = 0; /* terminate deferred moves list */
     }    
     /**************************************************************************
-    End of main loop: we have searched all moves and did not get a cutoff.
+    End of main loop: we searched all moves and did not get a beta cutoff.
     ***************************************************************************/
     if (num_legal_moves == 0)
     {
@@ -350,8 +349,7 @@ int SearchSingleMove(const Position* src_position,
     }
 
 #if DO_RECAPTURE_EXTENSION
-    else if (depth > 1                                    &&
-             MOVE_CAPTURED(move)                          &&
+    else if (MOVE_CAPTURED(move)                          &&
              MOVE_TO(move) == MOVE_TO(src_position->move) &&
              CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
     {
@@ -364,20 +362,14 @@ int SearchSingleMove(const Position* src_position,
     /**************************************************************************
     Reduce the search depth if ALL of the following are true:
     # The move was deferred due to negative SEE
-    # Search depth is greater than or equal to 3      
+    # Search depth is greater than 2    
     # The move is not a capture
     # The move does not give check
-    # The move has not raised alpha at this ply
-
-    Generally I have found LMR does not significantly speed up the search, and
-    in some positions causes the engine to miss a winning or significant line
-    of play, so my inclination is to disable it.
+    # The move has never raised alpha at this ply
     ***************************************************************************/
-    else if (is_deferred_move     &&
-             depth > 2            &&
-             !MOVE_CAPTURED(move) &&
-             !(position->state_flags & IS_CHECK) &&
-             !HasMoveBeenGood(ply, move))
+    else if (is_deferred_move         &&
+             !MOVE_CAPTURED(move)     &&
+             !(position->state_flags & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");
         child_depth = depth - 2;
@@ -392,7 +384,6 @@ int SearchSingleMove(const Position* src_position,
     {
         INCREMENT("pvs attempts");
         score = -Search(position, child_depth, ply + 1, -alpha - 1, -alpha, cancel);
-        INCREMENT_IF(score >= beta, "pvs cutoffs");
         if (score > alpha)
         {
             INCREMENT("pvs fails");
@@ -404,5 +395,5 @@ int SearchSingleMove(const Position* src_position,
         score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel);
     }
     return score;
-    is_deferred_move;
+    (void)is_deferred_move;
 }

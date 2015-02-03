@@ -42,14 +42,14 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         bitboard attacker = ENEMY_PAWN_ATTACKS[color][location] & attacking_pieces & position->pawns;
         if (attacker)
         {
-            attacker &= -attacker; // isolate LSB in case there is more than 1 pawn attacker
+            attacker &= -attacker; /* isolate LSB in case there is more than 1 pawn attacker */
             capturing_piece = PAWN;
             goto FoundAttacker;
         }
         attacker = KNIGHT_ATTACKS[location] & attacking_pieces & position->knights;
         if (attacker)
         {
-            attacker &= -attacker; // isolate LSB in case there is more than 1 knight attacker
+            attacker &= -attacker; /* isolate LSB in case there is more than 1 knight attacker */
             capturing_piece = KNIGHT;
             goto FoundAttacker;
         }
@@ -92,6 +92,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
             capturing_piece = KING;
             goto FoundAttacker;
         }
+
         /* No more attackers - finished first pass */
         scores[ply] = 0;
         break;
@@ -106,13 +107,13 @@ FoundAttacker:
         piece_on_square                         = capturing_piece;
         color                                   = ENEMY(color);
     }
-    /* Now unwind the capture stack and compute values back to the top */
+    /* Now unwind the capture stack and propagate values back to the top */
     for (--ply ; ply >= 0; --ply)
     {
         scores[ply] -= scores[ply + 1];
         if (scores[ply] < 0)
         {
-            scores[ply] = 0; /* we would not initiate a losing capture */
+            scores[ply] = 0; /* would not initiate a losing capture sequence */
         }
     }
     return scores[0];

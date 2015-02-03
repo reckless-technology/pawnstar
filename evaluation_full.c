@@ -96,12 +96,15 @@ static const int MATERIAL_VALUES[8] = {
 #define SCORE_KNIGHT_PAIR          -30  // penalty for the knight pair
 #define SCORE_PAWN_KING_ADJ1        25  // bonus for each pawn standing directly in front of the king after castling
 #define SCORE_PAWN_KING_ADJ2        10  // bonus for each pawn standing on the 3rd rank in front of the king
+#define SCORE_KING_OPEN_FILE       -30  // penalty for king on a file with no friendly pawns
+#define SCORE_KING_ADJ_ATTACKERS   -10  // penalty for each attacker which attacks a square adjacent to our king
 #define SCORE_ISOLATED_PAWN        -20  // penalty for an isolated pawn
+#define SCORE_PASSED_PAWN           25  // bonus for a passed pawn in the endgame
 #define SCORE_DOUBLED_PAWN         -10  // penalty for doubled or triped pawn
 #define SCORE_FORFEIT_CASTLING     -40  // penalty for forfeiting castling rights without castling
 #define SCORE_EIGHT_PAWNS          -20  // penalty for not having exchanged at least one pawn
 #define SCORE_PROTECTED_PAWN         5  // bonus for pawn protected by a friendly pawn
-#define SCORE_MATERIAL_THRESHOLD   150  // threshold for eval cutoff on material balance only
+#define SCORE_MATERIAL_THRESHOLD   400  // threshold for eval cutoff on material balance only
 
 /******************************************************************************
 Added to the materially ahead side, indexed by the total number of knights, 
@@ -114,7 +117,7 @@ static const int TRADE_DOWN_BONUS[32] = { 35, 30, 30, 25, 25, 20, 20, 15, 15, 10
 Bonus / penalty for bishops based on number of available psuedo legal target 
 squares. The rest should be handled by search.
 *******************************************************************************/
-static const int BISHOP_MOBILITY[14] = { -30, -20, 0, 5, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10 };
+static const int BISHOP_MOBILITY[14] = { -30, -10, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10 };
 /******************************************************************************
 Set up the piece square tables
 *******************************************************************************/
@@ -227,20 +230,14 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     /**************************************************************************
     Pawns
     ***************************************************************************/
-    const bitboard white_pawn_attacks   = SHIFT_NORTHWEST(white_pawns) | SHIFT_NORTHEAST(white_pawns);
-    const bitboard black_pawn_attacks   = SHIFT_SOUTHWEST(black_pawns) | SHIFT_SOUTHEAST(black_pawns);
-    const bitboard white_pawn_files     = FillNorthAndSouth(white_pawns);
-    const bitboard black_pawn_files     = FillNorthAndSouth(black_pawns);
-    const bitboard white_isolated_pawns = white_pawns & ~(SHIFT_WEST(white_pawn_files) | SHIFT_EAST(white_pawn_files));
-    const bitboard black_isolated_pawns = black_pawns & ~(SHIFT_WEST(black_pawn_files) | SHIFT_EAST(black_pawn_files));
-    const bitboard white_doubled_pawns  = white_pawns & FillSouth(SHIFT_SOUTH(white_pawns));
-    const bitboard black_doubled_pawns  = black_pawns & FillNorth(SHIFT_NORTH(black_pawns));
-    score += SCORE_ISOLATED_PAWN  * PopCount(white_isolated_pawns);
-    score -= SCORE_ISOLATED_PAWN  * PopCount(black_isolated_pawns);
-    score += SCORE_DOUBLED_PAWN   * PopCount(white_doubled_pawns);
-    score -= SCORE_DOUBLED_PAWN   * PopCount(black_doubled_pawns);
-    score += SCORE_PROTECTED_PAWN * PopCount(white_pawns & white_pawn_attacks);
-    score -= SCORE_PROTECTED_PAWN * PopCount(black_pawns & black_pawn_attacks);
+    PawnStructure ps[2];
+    DeterminePawnStructure(position, ps);
+    score += SCORE_ISOLATED_PAWN  * PopCount(ps[WHITE].isolated_pawns);
+    score -= SCORE_ISOLATED_PAWN  * PopCount(ps[BLACK].isolated_pawns);
+    score += SCORE_DOUBLED_PAWN   * PopCount(ps[WHITE].doubled_pawns);
+    score -= SCORE_DOUBLED_PAWN   * PopCount(ps[BLACK].doubled_pawns);
+    score += SCORE_PROTECTED_PAWN * PopCount(ps[WHITE].defended_pawns);
+    score -= SCORE_PROTECTED_PAWN * PopCount(ps[BLACK].defended_pawns);
     /**************************************************************************
     Bishop mobility - very primitive heuristic which penalizes poor bishop
     mobility. Requires improvement!
@@ -255,15 +252,50 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     {
         score -= BISHOP_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~position->black_pieces)];
     }
-    if (!is_endgame)
+    if (is_endgame)
+    {
+        /********************************************************************** 
+        Award an extra bonus for passed pawns in the endgame 
+        ***********************************************************************/
+        score += SCORE_PASSED_PAWN * PopCount(ps[WHITE].passed_pawns);
+        score -= SCORE_PASSED_PAWN * PopCount(ps[BLACK].passed_pawns);
+    }
+    else
     {
         /**********************************************************************
-        King pawn shield
+        King safety
         ***********************************************************************/
-        score += SCORE_PAWN_KING_ADJ1 * PopCount(KING_PAWN_SHIELD_WHITE  [position->king_location[WHITE]] & white_pawns);
-        score += SCORE_PAWN_KING_ADJ2 * PopCount(KING_PAWN_SHIELD_WHITE_2[position->king_location[WHITE]] & white_pawns);
-        score -= SCORE_PAWN_KING_ADJ1 * PopCount(KING_PAWN_SHIELD_BLACK  [position->king_location[BLACK]] & black_pawns);
-        score -= SCORE_PAWN_KING_ADJ2 * PopCount(KING_PAWN_SHIELD_BLACK_2[position->king_location[BLACK]] & black_pawns);       
+        score += SCORE_PAWN_KING_ADJ1  * PopCount(KING_PAWN_SHIELD_WHITE  [position->king_location[WHITE]] & (white_pawns | white_bishops));
+        score -= SCORE_PAWN_KING_ADJ1  * PopCount(KING_PAWN_SHIELD_BLACK  [position->king_location[BLACK]] & (black_pawns | black_bishops));
+        score += SCORE_PAWN_KING_ADJ2  * PopCount(KING_PAWN_SHIELD_WHITE_2[position->king_location[WHITE]] & white_pawns);        
+        score -= SCORE_PAWN_KING_ADJ2  * PopCount(KING_PAWN_SHIELD_BLACK_2[position->king_location[BLACK]] & black_pawns);  
+#if 0
+        if (!(FILE_BITBOARD(position->king_location[WHITE]) & white_pawns))
+        {
+            score += SCORE_KING_OPEN_FILE;
+        }
+        if (!(FILE_BITBOARD(position->king_location[BLACK]) & black_pawns))
+        {
+            score -= SCORE_KING_OPEN_FILE;
+        }
+#endif
+        /**********************************************************************
+        Enemy attacks to squares adjacent to the king
+        ***********************************************************************/
+        bitboard king_adj = KING_ATTACKS[position->king_location[WHITE]];
+        while (king_adj)
+        {
+            const int locn = FindAndClearLsb(&king_adj);
+            const bitboard attackers = AttacksToSquareByColor(position, locn, BLACK);
+            score += SCORE_KING_ADJ_ATTACKERS * PopCount(attackers);
+        }
+        king_adj = KING_ATTACKS[position->king_location[BLACK]];
+        while (king_adj)
+        {
+            const int locn = FindAndClearLsb(&king_adj);
+            const bitboard attackers = AttacksToSquareByColor(position, locn, WHITE);
+            score -= SCORE_KING_ADJ_ATTACKERS * PopCount(attackers);
+        }
         /**********************************************************************
         Forfeit of castling rights
         ***********************************************************************/
