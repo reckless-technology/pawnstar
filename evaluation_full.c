@@ -98,9 +98,9 @@ static const int MATERIAL_VALUES[8] = {
 #define SCORE_PAWN_KING_ADJ2        10  // bonus for each pawn standing on the 3rd rank in front of the king
 #define SCORE_ISOLATED_PAWN        -20  // penalty for an isolated pawn
 #define SCORE_DOUBLED_PAWN         -10  // penalty for doubled or triped pawn
-#define SCORE_FORFEIT_CASTLING     -30  // penalty for forfeiting castling rights without castling
+#define SCORE_FORFEIT_CASTLING     -40  // penalty for forfeiting castling rights without castling
 #define SCORE_EIGHT_PAWNS          -20  // penalty for not having exchanged at least one pawn
-#define SCORE_PROTECTED_PAWN        10  // bonus for pawn protected by a friendly pawn
+#define SCORE_PROTECTED_PAWN         5  // bonus for pawn protected by a friendly pawn
 #define SCORE_MATERIAL_THRESHOLD   150  // threshold for eval cutoff on material balance only
 
 /******************************************************************************
@@ -109,7 +109,7 @@ bishops, rooks and queens on the board. Encourages the side which is ahead on
 material to exchange pieces but not pawns, i.e. trade down to a hopefully won
 endgame.
 *******************************************************************************/
-static const int TRADE_DOWN_BONUS[32] = { 70, 65, 60, 55, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0, /* ... */ };
+static const int TRADE_DOWN_BONUS[32] = { 35, 30, 30, 25, 25, 20, 20, 15, 15, 10, 10, 5, 5, 0, 0, /* ... */ };
 /******************************************************************************
 Bonus / penalty for bishops based on number of available psuedo legal target 
 squares. The rest should be handled by search.
@@ -124,9 +124,7 @@ void InitializeEval()
 }
 /******************************************************************************
 Evaluate the current position, assuming neither king is in check and the 
-position is quiet. This returns alpha or beta in the case of material cutoff
-and thus requires a fail hard alpha beta framework in which to operate 
-correctly.
+position is quiet. 
 *******************************************************************************/
 int EvaluatePosition(const Position* position, int alpha, int beta)
 {    

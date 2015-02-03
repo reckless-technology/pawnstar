@@ -74,7 +74,7 @@ int SearchQuiescent(const Position* src_position,
         {
             INCREMENT("quiescent pvs attempts");
             score = -SearchQuiescent(position, depth - 1, ply + 1, -alpha - 1, -alpha, cancel);
-            if (score > alpha && score < beta)
+            if (score > alpha)
             {
                 INCREMENT("quiescent pvs fails");
                 score = -SearchQuiescent(position, depth - 1, ply + 1, -beta, -alpha, cancel);

@@ -141,7 +141,7 @@ int Search(const Position* src_position,
     if (!(src_position->state_flags & IS_CHECK) &&
         ply != 0                                &&
         src_position->move                      &&
-        depth > 1)
+        depth > 0)
     {
         const bitboard friendly_pieces = (src_position->occupied_squares ^ src_position->kings) & src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
         if ((friendly_pieces & ~src_position->pawns) && 
@@ -172,7 +172,6 @@ int Search(const Position* src_position,
     a winning tactical sequence.
     ***************************************************************************/
     if (depth == 1 &&
-        //!(src_position->state_flags & IS_CHECK) &&
         EvaluatePosition(src_position, alpha, beta) + FUTILITY_CUTOFF_THRESHOLD < alpha)
     {
         INCREMENT("futility cutoffs");
@@ -394,7 +393,7 @@ int SearchSingleMove(const Position* src_position,
         INCREMENT("pvs attempts");
         score = -Search(position, child_depth, ply + 1, -alpha - 1, -alpha, cancel);
         INCREMENT_IF(score >= beta, "pvs cutoffs");
-        if (score > alpha && score < beta)
+        if (score > alpha)
         {
             INCREMENT("pvs fails");
             score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel);
