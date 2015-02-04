@@ -59,7 +59,7 @@ int SearchQuiescent(const Position* src_position,
     {
         Position position[1];
 #if DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-        if (EvaluateStaticExchange(src_position, move) <= 0)
+        if (EvaluateStaticExchange(src_position, move) < 0)
         {
             INCREMENT("quiescent SEE skips");
             continue;

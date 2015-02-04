@@ -5,7 +5,7 @@
 Inline functions - called many times per move; need to be FAST.
 *******************************************************************************/
 #if _MSC_VER
-#define INLINE static __inline
+#define INLINE static __forceinline
 #else
 #define INLINE static inline
 #endif
@@ -86,9 +86,8 @@ Find the index of and clear the least significant bit set in a bitboard
 INLINE int FindAndClearLsb(bitboard* x)
 {
     const bitboard y = *x;
-    const bitboard lsb = y & -y; /* isolate LSB */
-    *x = y ^ lsb;
-    return Lsb(lsb);
+    *x = y & (y - 1);
+    return Lsb(y);
 }
 /******************************************************************************
 Find the first location of a move in a zero terminated list of moves.
