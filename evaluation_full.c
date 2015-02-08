@@ -111,6 +111,17 @@ static const int* PIECE_SQUARE_TABLE_MIDGAME[8] = {
     NULL,
 };
 
+static const int* PIECE_SQUARE_TABLE_ENDGAME[8] = {
+    NULL,
+    PAWN_SQUARE_ENDGAME,
+    KNIGHT_SQUARE,
+    BISHOP_SQUARE,
+    ROOK_SQUARE,
+    QUEEN_SQUARE,
+    KING_SQUARE_ENDGAME,
+    NULL,
+};
+
 static const int KING_ADJ_ATTACKED_BY[8] = {
      0,
    -10, // pawn
@@ -136,9 +147,10 @@ Evaluation weights are all in centipawns
 #define TOTAL_MATERIAL_SUM        9600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
 #define SCORE_BISHOP_PAIR           50  // bonus for the bishop pair
 #define SCORE_KNIGHT_PAIR          -30  // penalty for the knight pair
-#define SCORE_PAWN_KING_ADJ1        30  // bonus for each pawn standing directly in front of the king after castling
+#define SCORE_PAWN_KING_ADJ1        25  // bonus for each pawn standing directly in front of the king after castling
 #define SCORE_PAWN_KING_ADJ2        10  // bonus for each pawn standing on the 3rd rank in front of the king
-#define SCORE_KING_OPEN_FILE       -50  // penalty for king on a file with no friendly pawns
+#define SCORE_KING_OPEN_FILE       -30  // penalty for king on a file with no friendly pawns
+#define SCORE_KING_ADJ_OPEN_FILE   -20  // penalty for king adjacent file with no friendly pawns
 #define SCORE_ISOLATED_PAWN        -20  // penalty for an isolated pawn
 #define SCORE_DOUBLED_PAWN         -10  // penalty for doubled or triped pawn
 #define SCORE_FORFEIT_CASTLING     -40  // penalty for forfeiting castling rights without castling
@@ -209,7 +221,7 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     {
         material_percent = 100;
     }
-    else if (material_percent < 10)
+    else if (material_percent < 15)
     {
         material_percent = 0;
     }
@@ -311,13 +323,35 @@ static int EvaluateMidgame(const Position* position, const EvalCtx* ctx)
     /**************************************************************************
     King on a file with no friendly pawns in front of him
     ***************************************************************************/
-    if (!(NORTH_OF[position->king_location[WHITE]] & ctx->white_pawns))
+    bitboard king_file      = NORTH_OF[position->king_location[WHITE]];
+    bitboard king_file_west = SHIFT_WEST(king_file);
+    bitboard king_file_east = SHIFT_EAST(king_file);
+    if (!(king_file & ctx->white_pawns))
     {
         score += SCORE_KING_OPEN_FILE;
     }
-    if (!(SOUTH_OF[position->king_location[BLACK]] & ctx->black_pawns))
+    if (king_file_west && !(king_file_west & ctx->white_pawns))
+    {
+        score += SCORE_KING_ADJ_OPEN_FILE;
+    }
+    if (king_file_east && !(king_file_east & ctx->white_pawns))
+    {
+        score += SCORE_KING_ADJ_OPEN_FILE;
+    }
+    king_file      = SOUTH_OF[position->king_location[BLACK]];
+    king_file_west = SHIFT_WEST(king_file);
+    king_file_east = SHIFT_EAST(king_file);
+    if (!(king_file & ctx->black_pawns))
     {
         score -= SCORE_KING_OPEN_FILE;
+    }
+    if (king_file_west && !(king_file_west & ctx->black_pawns))
+    {
+        score -= SCORE_KING_ADJ_OPEN_FILE;
+    }
+    if (king_file_east && !(king_file_east & ctx->black_pawns))
+    {
+        score -= SCORE_KING_ADJ_OPEN_FILE;
     }
     /**************************************************************************
     King safety - pawn shield - treat the bishop as a pseudo pawn for the 
@@ -328,46 +362,6 @@ static int EvaluateMidgame(const Position* position, const EvalCtx* ctx)
     score -= SCORE_PAWN_KING_ADJ1 * PopCount(KING_PAWN_SHIELD_BLACK  [position->king_location[BLACK]] & (ctx->black_pawns | ctx->black_bishops));
     score += SCORE_PAWN_KING_ADJ2 * PopCount(KING_PAWN_SHIELD_WHITE_2[position->king_location[WHITE]] & (ctx->white_pawns | ctx->white_bishops));        
     score -= SCORE_PAWN_KING_ADJ2 * PopCount(KING_PAWN_SHIELD_BLACK_2[position->king_location[BLACK]] & (ctx->black_pawns | ctx->black_bishops)); 
-    /**************************************************************************
-    Enemy attacks to squares adjacent to the king, weighted by attacking piece
-    type
-    ***************************************************************************/
-#if 0
-    bitboard king_adj = KING_ATTACKS[position->king_location[WHITE]];
-    while (king_adj)
-    {
-        bitboard attackers = AttacksToSquareByColor(position, FindAndClearLsb(&king_adj), BLACK);
-        while (attackers)
-        {
-            const int locn = FindAndClearLsb(&attackers);
-            score += KING_ADJ_ATTACKED_BY[PIECE_AT(position, locn)];
-        }
-    }
-    king_adj = KING_ATTACKS[position->king_location[BLACK]];
-    while (king_adj)
-    {
-        bitboard attackers = AttacksToSquareByColor(position, FindAndClearLsb(&king_adj), WHITE);
-        while (attackers)
-        {
-            const int locn = FindAndClearLsb(&attackers);
-            score -= KING_ADJ_ATTACKED_BY[PIECE_AT(position, locn)];
-        }
-    }
-#endif
-    /**************************************************************************
-    Bishop mobility - very primitive heuristic which penalizes poor bishop
-    mobility. TODO: improve this!
-    ***************************************************************************/
-    bitboard b = ctx->white_bishops;
-    while (b)
-    {
-        score += BISHOP_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~position->white_pieces)];
-    }
-    b = ctx->black_bishops;
-    while (b)
-    {
-        score -= BISHOP_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~position->black_pieces)];
-    }  
     return score;
 }
 
@@ -375,22 +369,22 @@ static int EvaluateEndgame(const Position* position, const EvalCtx* ctx)
 {
     /**************************************************************************
     Piece square tables
-    We only care about the locations of pawns and kings in the endgame - the 
-    rest is up to the tactics.
     ***************************************************************************/
     int score = 0;
-    bitboard b = ctx->white_pawns;
-    while (b)
+    for (int piece = PAWN; piece <= KING; ++piece)
     {
-        score += PAWN_SQUARE_ENDGAME[FindAndClearLsb(&b) ^ RANK_FLIP];
+        const int* const table = PIECE_SQUARE_TABLE_ENDGAME[piece];
+        bitboard b = position->pieces[piece] & position->white_pieces;        
+        while (b)
+        {
+            score += table[FindAndClearLsb(&b) ^ RANK_FLIP];
+        }
+        b = position->pieces[piece] & position->black_pieces;
+        while (b)
+        {
+            score -= table[FindAndClearLsb(&b)];
+        }
     }
-    b = ctx->black_pawns;
-    while (b)
-    {
-        score -= PAWN_SQUARE_ENDGAME[FindAndClearLsb(&b)];
-    }
-    score += KING_SQUARE_ENDGAME[position->king_location[WHITE] ^ RANK_FLIP];
-    score -= KING_SQUARE_ENDGAME[position->king_location[BLACK]];
     /**************************************************************************
     Pawn structure
     ***************************************************************************/

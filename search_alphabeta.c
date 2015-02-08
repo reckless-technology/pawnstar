@@ -367,8 +367,9 @@ int SearchSingleMove(const Position* src_position,
     # The move does not give check
     # The move has never raised alpha at this ply
     ***************************************************************************/
-    else if (is_deferred_move         &&
-             !MOVE_CAPTURED(move)     &&
+    else if (is_deferred_move            &&
+             !MOVE_CAPTURED(move)        &&
+             !HasMoveBeenGood(ply, move) &&
              !(position->state_flags & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");

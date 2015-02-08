@@ -44,13 +44,13 @@ Whether to enable null move pruning
 Whether to enable extension on recapture of same value piece
 *******************************************************************************/
 #ifndef DO_RECAPTURE_EXTENSION
-#define DO_RECAPTURE_EXTENSION 0
+#define DO_RECAPTURE_EXTENSION 1
 #endif
 /******************************************************************************
 Whether to enable futility pruning at frontier nodes
 *******************************************************************************/
 #ifndef DO_FUTILITY_PRUNING
-#define DO_FUTILITY_PRUNING 0
+#define DO_FUTILITY_PRUNING 1
 #endif
 /******************************************************************************
 Whether to enable late move reductions
