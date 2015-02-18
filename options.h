@@ -63,7 +63,7 @@ Whether to skip moves in quiescence search which have a negative static
 exchange evaluation (SEE)
 *******************************************************************************/
 #ifndef DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 1
+#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 0
 #endif
 /******************************************************************************
 Global constants
@@ -87,5 +87,6 @@ Global constants
 #define NUM_TASKS_TO_ALLOCATE_AT_ONCE       256 // number of SearchTasks to allocate at a time
 #define PV_TABLE_SIZE                      4999 // number of entries in the principal variation hashtable (should be prime)
 #define DEBUG_DICT_SIZE                    4999 // number of entries in the debug counts hashtable (should be prime)
+#define EVAL_HASHTABLE_SIZE                4999
 #define ASPIRATION_SEARCH_WINDOW             50 // Alpha beta window width at root node (centipawns)
 #define FUTILITY_CUTOFF_THRESHOLD          1200 // Prune frontier nodes where eval is this much below alpha

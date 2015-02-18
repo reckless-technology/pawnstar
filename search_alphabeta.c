@@ -362,10 +362,9 @@ int SearchSingleMove(const Position* src_position,
     /**************************************************************************
     Reduce the search depth if ALL of the following are true:
     # The move was deferred due to negative SEE
-    # Search depth is greater than 2    
-    # The move is not a capture
-    # The move does not give check
+    # The move is not a capture  
     # The move has never raised alpha at this ply
+    # The move does not give check
     ***************************************************************************/
     else if (is_deferred_move            &&
              !MOVE_CAPTURED(move)        &&

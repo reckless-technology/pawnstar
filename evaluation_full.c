@@ -135,7 +135,7 @@ static const int KING_ADJ_ATTACKED_BY[8] = {
 /******************************************************************************
 Small random variations to eval add variety to play style
 *******************************************************************************/
-static const int RANDOM_FACTOR[16] = { -15, -10, -10, -5, -5, 0, 0, 0, 0, 0, 0, 5, 5, 10, 10, 15 };
+static const int RANDOM_FACTOR[16] = { -15, -10, -5, -5, 0, 0, 0, 0, 0, 0, 0, 0, 5, 5, 10, 15 };
 /******************************************************************************
 Evaluation weights are all in centipawns
 *******************************************************************************/
@@ -152,13 +152,14 @@ Evaluation weights are all in centipawns
 #define SCORE_KING_OPEN_FILE       -30  // penalty for king on a file with no friendly pawns
 #define SCORE_KING_ADJ_OPEN_FILE   -20  // penalty for king adjacent file with no friendly pawns
 #define SCORE_ISOLATED_PAWN        -20  // penalty for an isolated pawn
+#define SCORE_ISOLATED_PAWN_END    -10  // penalty for isolated pawn in the endgame
 #define SCORE_DOUBLED_PAWN         -10  // penalty for doubled or triped pawn
 #define SCORE_FORFEIT_CASTLING     -40  // penalty for forfeiting castling rights without castling
 #define SCORE_EIGHT_PAWNS          -20  // penalty for not having exchanged at least one pawn
 #define SCORE_PROTECTED_PAWN         5  // bonus for pawn protected by a friendly pawn
-#define SCORE_PASSED_PAWN_END       25  // bonus for a passed pawn in the endgame
-#define SCORE_PROTECTED_PASSED_PAWN 25  // additional bonus for a passed pawn protected by a friendly pawn in the endgame
-#define SCORE_PROTECTED_PAWN_END    15  // bonus for pawn protected by a friendly pawn in the endgame
+#define SCORE_PASSED_PAWN_END       20  // bonus for a passed pawn in the endgame
+#define SCORE_PROTECTED_PASSED_PAWN 20  // additional bonus for a passed pawn protected by a friendly pawn in the endgame
+#define SCORE_PROTECTED_PAWN_END    10  // bonus for pawn protected by a friendly pawn in the endgame
 #define SCORE_MATERIAL_THRESHOLD   400  // threshold for eval cutoff on material balance only
 /******************************************************************************
 Added to the materially ahead side, indexed by the total number of knights, 
@@ -176,12 +177,26 @@ void InitializeEval()
 {
     /* nothing to do in this version */
 }
+
+typedef struct
+{
+    uint64  hash;
+    int     score;
+} EvalHashEntry;
+
+static EvalHashEntry eval_hashtable[EVAL_HASHTABLE_SIZE];
 /******************************************************************************
 Evaluate the current position, assuming neither king is in check and the 
 position is quiet. 
 *******************************************************************************/
 int EvaluatePosition(const Position* position, int alpha, int beta)
 {    
+    EvalHashEntry* const hash_entry = &eval_hashtable[position->hash % EVAL_HASHTABLE_SIZE];
+    if (hash_entry->hash == position->hash)
+    {
+        INCREMENT("eval hash hits");
+        return hash_entry->score;
+    }
     int material[2];
     if (IsDrawByMaterial(position))
     {
@@ -217,13 +232,13 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
         SCORE_QUEEN  * PopCount(ctx.black_queens);
     
     int material_percent = ((material[WHITE] + material[BLACK]) * 100) / TOTAL_MATERIAL_SUM;
-    if (material_percent > 90)
+    if (material_percent > 60)
     {
-        material_percent = 100;
+        material_percent = 100; /* treat as if all material were on the board */
     }
     else if (material_percent < 15)
     {
-        material_percent = 0;
+        material_percent = 0; /* final endgame eval only */
     }
     if (material[WHITE] > material[BLACK])
     {
@@ -276,8 +291,10 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     const int midgame_score   = material_percent != 0   ? EvaluateMidgame(position, &ctx) : 0;
     const int endgame_score   = material_percent != 100 ? EvaluateEndgame(position, &ctx) : 0;
     const int composite_score = (midgame_score * material_percent + endgame_score * (100 - material_percent)) / 100;
-    const int score           = material_only_score + (composite_score * score_sign);
-    return ((score + RANDOM_FACTOR[NextRandom() & 0x0F]) / 10) * 10;
+    const int score           = ((material_only_score + composite_score * score_sign + RANDOM_FACTOR[NextRandom() & 0x0F]) / 10) * 10;;
+    hash_entry->hash          = position->hash;
+    hash_entry->score         = score;
+    return score;
 }
 
 static int EvaluateMidgame(const Position* position, const EvalCtx* ctx)
@@ -394,8 +411,8 @@ static int EvaluateEndgame(const Position* position, const EvalCtx* ctx)
     score -= SCORE_PASSED_PAWN_END       * PopCount(ctx->ps[BLACK].passed_pawns);
     score += SCORE_PROTECTED_PASSED_PAWN * PopCount(ctx->ps[WHITE].passed_pawns & ctx->ps[WHITE].defended_pawns);
     score -= SCORE_PROTECTED_PASSED_PAWN * PopCount(ctx->ps[BLACK].passed_pawns & ctx->ps[BLACK].defended_pawns);
-    score += SCORE_ISOLATED_PAWN         * PopCount(ctx->ps[WHITE].isolated_pawns);
-    score -= SCORE_ISOLATED_PAWN         * PopCount(ctx->ps[BLACK].isolated_pawns);
+    score += SCORE_ISOLATED_PAWN_END     * PopCount(ctx->ps[WHITE].isolated_pawns);
+    score -= SCORE_ISOLATED_PAWN_END     * PopCount(ctx->ps[BLACK].isolated_pawns);
     return score;
 }
 #endif
