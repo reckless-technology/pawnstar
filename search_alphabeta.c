@@ -139,7 +139,8 @@ int Search(const Position* src_position,
     ***************************************************************************/
     if (!(src_position->state_flags & IS_CHECK) &&
         ply != 0                                &&
-        src_position->move)
+        src_position->move                      &&
+        alpha == beta - 1)
     {
         const bitboard friendly_pieces = (src_position->occupied_squares ^ src_position->kings) & src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
         if ((friendly_pieces & ~src_position->pawns) && 
