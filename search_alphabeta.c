@@ -132,6 +132,7 @@ int Search(const Position* src_position,
     # we are not down to king and pawns
     # we have at least 4 pieces remaining
     # the eval score is high enough for a beta cutoff 
+    # this is not a PV node
 
     Hopefully this is sufficient to prevent most Zugzwang positions.
 

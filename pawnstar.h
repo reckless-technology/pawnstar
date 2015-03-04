@@ -52,7 +52,7 @@ extern const char* const    OPENING_BOOK_MOVES;
 #endif
 
 #if EVAL_DEBUGX
-#define EVAL_INCREMENT(x)       DebugXIncrement("eval: " x)
+#define EVAL_INCREMENT(x)       DebugXIncrement(x)
 #else
 #define EVAL_INCREMENT(x)
 #endif

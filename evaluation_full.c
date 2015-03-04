@@ -31,7 +31,7 @@ static const int PAWN_SQUARE_MIDGAME[64] = {
 };
 static const int PAWN_SQUARE_ENDGAME[64] = {
      0,  0,  0,  0,  0,  0,  0,  0,
-    70, 70, 70, 70, 70, 70, 70, 70,  
+    60, 60, 60, 60, 60, 60, 60, 60,  
     50, 50, 50, 50, 50, 50, 50, 50, 
     40, 40, 40, 40, 40, 40, 40, 40, 
     30, 30, 30, 30, 30, 30, 30, 30, 
@@ -122,16 +122,6 @@ static const int* PIECE_SQUARE_TABLE_ENDGAME[8] = {
     NULL,
 };
 
-static const int KING_ADJ_ATTACKED_BY[8] = {
-     0,
-   -10, // pawn
-   -10, // knight
-   -10, // bishop
-   -30, // rook
-   -50, // queen
-     0,
-     0,
-};
 /******************************************************************************
 Small random variations to eval add variety to play style
 *******************************************************************************/
@@ -171,7 +161,8 @@ static const int TRADE_DOWN_BONUS[32] = { 35, 30, 30, 25, 25, 20, 20, 15, 15, 10
 Bonus / penalty for bishops based on number of available psuedo legal target 
 squares. The rest should be handled by search.
 *******************************************************************************/
-static const int BISHOP_MOBILITY[14] = { -30, -10, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10 };
+static const int BISHOP_MOBILITY[32] = { -30, -10, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10 };
+static const int ROOK_MOBILITY[32]   = { -30, -10, 0, 0, 10, 10, 20, 20, 20, 20, 20, 20, 20, 20, 20, };
 
 void InitializeEval()
 {
@@ -232,13 +223,13 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
         SCORE_QUEEN  * PopCount(ctx.black_queens);
     
     int material_percent = ((material[WHITE] + material[BLACK]) * 100) / TOTAL_MATERIAL_SUM;
-    if (material_percent > 60)
+    if (material_percent > 85)
     {
-        material_percent = 100; /* treat as if all material were on the board */
+        material_percent = 100;
     }
     else if (material_percent < 15)
     {
-        material_percent = 0; /* final endgame eval only */
+        material_percent = 0;
     }
     if (material[WHITE] > material[BLACK])
     {
@@ -379,6 +370,36 @@ static int EvaluateMidgame(const Position* position, const EvalCtx* ctx)
     score -= SCORE_PAWN_KING_ADJ1 * PopCount(KING_PAWN_SHIELD_BLACK  [position->king_location[BLACK]] & (ctx->black_pawns | ctx->black_bishops));
     score += SCORE_PAWN_KING_ADJ2 * PopCount(KING_PAWN_SHIELD_WHITE_2[position->king_location[WHITE]] & (ctx->white_pawns | ctx->white_bishops));        
     score -= SCORE_PAWN_KING_ADJ2 * PopCount(KING_PAWN_SHIELD_BLACK_2[position->king_location[BLACK]] & (ctx->black_pawns | ctx->black_bishops)); 
+    /**************************************************************************
+    Bishop mobility
+    ***************************************************************************/
+    bitboard b = ctx->white_bishops;
+    while (b)
+    {
+        const int locn = FindAndClearLsb(&b);
+        score += BISHOP_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, locn) & ~position->white_pieces)];
+    }
+    b = ctx->black_bishops;
+    while (b)
+    {
+        const int locn = FindAndClearLsb(&b);
+        score -= BISHOP_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, locn) & ~position->black_pieces)];
+    }
+    /**************************************************************************
+    Rook mobility
+    ***************************************************************************/
+    b = ctx->white_rooks;
+    while (b)
+    {
+        const int locn = FindAndClearLsb(&b);
+        score += ROOK_MOBILITY[PopCount(RookAttacks(position->occupied_squares, locn) & ~position->white_pieces)];
+    }
+    b = ctx->black_rooks;
+    while (b)
+    {
+        const int locn = FindAndClearLsb(&b);
+        score -= ROOK_MOBILITY[PopCount(RookAttacks(position->occupied_squares, locn) & ~position->black_pieces)];
+    }
     return score;
 }
 

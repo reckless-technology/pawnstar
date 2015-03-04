@@ -68,13 +68,13 @@ int SearchRootNode(const Position* src_position)
         break;
     
     case INCREMENTAL_CLOCK:
-        ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 20);
+        ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 40);
         timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 3000));
         break;
     }
     InitializeGoodMoveCounts();
     /**************************************************************************
-    For first pass move ordering before we do any search, just use a depth 1 
+    For first pass move ordering before we do any search, just use a 
     search with wide open alpha beta window. Subsequent passes will use the 
     results of the previous iteration to sort the moves (the merge sort is 
     stable).
@@ -82,16 +82,17 @@ int SearchRootNode(const Position* src_position)
     for (i = 0; i != move_count; ++i)
     {
         scored_moves[i].move  = moves[i];
-        scored_moves[i].score = SearchSingleMove(src_position, 1, 0, ALPHA, BETA, moves[i], i, false, &cancel);
+        scored_moves[i].score = SearchSingleMove(src_position, 3, 0, ALPHA, BETA, moves[i], i, false, &cancel);
     }
     DEBUG_STATEMENT(DebugXClear());
     start_ms = GetMilliseconds();
     cancel = false;
     if (timeout_ms)
     {
+        CancelStopThinkingTimer();
         SetStopThinkingTimer(timeout_ms, &cancel);
     }
-    for (depth = 1; depth != MAX_PLY; ++depth)
+    for (depth = 3; depth != MAX_PLY; ++depth)
     {       
         if (globals->time_control.clock_type == FIXED_DEPTH && depth > globals->time_control.fixed_depth)
         {
@@ -102,7 +103,18 @@ int SearchRootNode(const Position* src_position)
         MergeSort(move_count, scored_moves);
         for (i = 0; i != move_count; ++i)
         {
-            scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel);
+            if (i < 2)
+            {
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel);
+            }
+            else
+            {
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, scored_moves[i].move, i, false, &cancel);
+                if (scored_moves[i].score > alpha)
+                {
+                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel);
+                }
+            }            
             if (cancel)
             {
                 return best_move;
@@ -142,7 +154,7 @@ int SearchRootNode(const Position* src_position)
             const int elapsed_ms = stop_ms - start_ms;
             bool is_best_move_consistent = true;
             bool is_score_stable = true;
-            for (i = 1; i != depth; ++i)
+            for (i = 3; i != depth; ++i)
             {
                 if (best_move_at_each_iteration[i].move != best_move_at_each_iteration[depth].move)
                 {
