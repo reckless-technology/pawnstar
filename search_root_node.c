@@ -4,6 +4,8 @@
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 #define ABS(x)   ((x) < 0 ? -(x) : (x))
 
+#define START_DEPTH 3
+
 static volatile bool cancel;
 /******************************************************************************
 If the worker thread is running, set the cancel flag then wait for it to
@@ -74,25 +76,25 @@ int SearchRootNode(const Position* src_position)
     }
     InitializeGoodMoveCounts();
     /**************************************************************************
-    For first pass move ordering before we do any search, just use a 
+    For first pass move ordering before we do any search, just use a shallow
     search with wide open alpha beta window. Subsequent passes will use the 
     results of the previous iteration to sort the moves (the merge sort is 
     stable).
     ***************************************************************************/
+    DEBUG_STATEMENT(DebugXClear());
+    start_ms = GetMilliseconds();
     for (i = 0; i != move_count; ++i)
     {
         scored_moves[i].move  = moves[i];
-        scored_moves[i].score = SearchSingleMove(src_position, 3, 0, ALPHA, BETA, moves[i], i, false, &cancel);
-    }
-    DEBUG_STATEMENT(DebugXClear());
-    start_ms = GetMilliseconds();
+        scored_moves[i].score = SearchSingleMove(src_position, START_DEPTH, 0, ALPHA, BETA, moves[i], i, false, &cancel);
+    }   
     cancel = false;
     if (timeout_ms)
     {
         CancelStopThinkingTimer();
         SetStopThinkingTimer(timeout_ms, &cancel);
     }
-    for (depth = 3; depth != MAX_PLY; ++depth)
+    for (depth = START_DEPTH; depth != MAX_PLY; ++depth)
     {       
         if (globals->time_control.clock_type == FIXED_DEPTH && depth > globals->time_control.fixed_depth)
         {
@@ -109,9 +111,11 @@ int SearchRootNode(const Position* src_position)
             }
             else
             {
+                INCREMENT("pvs root node attempts");
                 scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, scored_moves[i].move, i, false, &cancel);
                 if (scored_moves[i].score > alpha)
                 {
+                    INCREMENT("pvs root node fails");
                     scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel);
                 }
             }            
@@ -154,7 +158,7 @@ int SearchRootNode(const Position* src_position)
             const int elapsed_ms = stop_ms - start_ms;
             bool is_best_move_consistent = true;
             bool is_score_stable = true;
-            for (i = 3; i != depth; ++i)
+            for (i = START_DEPTH; i != depth; ++i)
             {
                 if (best_move_at_each_iteration[i].move != best_move_at_each_iteration[depth].move)
                 {

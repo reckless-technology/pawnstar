@@ -144,7 +144,7 @@ Evaluation weights are all in centipawns
 #define SCORE_ISOLATED_PAWN        -20  // penalty for an isolated pawn
 #define SCORE_ISOLATED_PAWN_END    -10  // penalty for isolated pawn in the endgame
 #define SCORE_DOUBLED_PAWN         -10  // penalty for doubled or triped pawn
-#define SCORE_FORFEIT_CASTLING     -40  // penalty for forfeiting castling rights without castling
+#define SCORE_FORFEIT_CASTLING     -50  // penalty for forfeiting castling rights without castling
 #define SCORE_EIGHT_PAWNS          -20  // penalty for not having exchanged at least one pawn
 #define SCORE_PROTECTED_PAWN         5  // bonus for pawn protected by a friendly pawn
 #define SCORE_PASSED_PAWN_END       20  // bonus for a passed pawn in the endgame
@@ -156,13 +156,12 @@ Added to the materially ahead side, indexed by the total number of knights,
 bishops, rooks and queens on the board. Encourages the side which is ahead on
 material to exchange pieces but not pawns, i.e. trade down to a won endgame.
 *******************************************************************************/
-static const int TRADE_DOWN_BONUS[32] = { 35, 30, 30, 25, 25, 20, 20, 15, 15, 10, 10, 5, 5, 0, 0, /* ... */ };
+static const int TRADE_DOWN_BONUS[32] = { 140, 130, 120, 110, 100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0, /* ... */ };
 /******************************************************************************
-Bonus / penalty for bishops based on number of available psuedo legal target 
-squares. The rest should be handled by search.
+Bonus / penalty for bishops and rooks based on number of available psuedo legal 
+target squares. The rest should be handled by search.
 *******************************************************************************/
-static const int BISHOP_MOBILITY[32] = { -30, -10, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10 };
-static const int ROOK_MOBILITY[32]   = { -30, -10, 0, 0, 10, 10, 20, 20, 20, 20, 20, 20, 20, 20, 20, };
+static const int MOBILITY[15] = { -30, -10, 0, 0, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10 };
 
 void InitializeEval()
 {
@@ -377,13 +376,13 @@ static int EvaluateMidgame(const Position* position, const EvalCtx* ctx)
     while (b)
     {
         const int locn = FindAndClearLsb(&b);
-        score += BISHOP_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, locn) & ~position->white_pieces)];
+        score += MOBILITY[PopCount(BishopAttacks(position->occupied_squares, locn) & ~position->white_pieces)];
     }
     b = ctx->black_bishops;
     while (b)
     {
         const int locn = FindAndClearLsb(&b);
-        score -= BISHOP_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, locn) & ~position->black_pieces)];
+        score -= MOBILITY[PopCount(BishopAttacks(position->occupied_squares, locn) & ~position->black_pieces)];
     }
     /**************************************************************************
     Rook mobility
@@ -392,13 +391,13 @@ static int EvaluateMidgame(const Position* position, const EvalCtx* ctx)
     while (b)
     {
         const int locn = FindAndClearLsb(&b);
-        score += ROOK_MOBILITY[PopCount(RookAttacks(position->occupied_squares, locn) & ~position->white_pieces)];
+        score += MOBILITY[PopCount(RookAttacks(position->occupied_squares, locn) & ~position->white_pieces)];
     }
     b = ctx->black_rooks;
     while (b)
     {
         const int locn = FindAndClearLsb(&b);
-        score -= ROOK_MOBILITY[PopCount(RookAttacks(position->occupied_squares, locn) & ~position->black_pieces)];
+        score -= MOBILITY[PopCount(RookAttacks(position->occupied_squares, locn) & ~position->black_pieces)];
     }
     return score;
 }

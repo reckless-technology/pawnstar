@@ -89,7 +89,7 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
 {
     static int call_count = 0;
     int moves[MAX_MOVES_PER_POSITION];
-#if 1
+#if 0
     MoveGenerator gen;
     int* m = moves;
     int move;
@@ -101,27 +101,6 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
     } while (move);
 #else
     GeneratePseudoLegalMoves(src_position, moves, true);
-    SortMoves(moves, 0);
-#endif
-#if DO_ENHANCED_PERFT
-    /**************************************************************************
-    Check move subset of captures and promotions only when not in check
-    ***************************************************************************/
-    if (!(src_position->state_flags & IS_CHECK))
-    {
-        int subset[MAX_MOVES_PER_POSITION];
-        PerftCounts all_counts = { 0 };
-        PerftCounts sub_counts = { 0 };
-        GeneratePseudoLegalMoves(src_position, subset, false);
-        CategorizeMoves(src_position, moves,  &all_counts);
-        CategorizeMoves(src_position, subset, &sub_counts);
-        if (all_counts.captures   != sub_counts.captures   ||
-            all_counts.ep_captures != sub_counts.ep_captures ||
-            all_counts.promotions != sub_counts.promotions)
-        {
-            printf("\n_eRROR in capture and promotions!\n");
-        }
-    }
 #endif
     if (!(++call_count & 0x3FFFF))
     {
@@ -133,27 +112,11 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
         const int* move;
         for (move = moves; *move; ++move)
         {
-#if DO_ENHANCED_PERFT
-            uint64 hash;
-#endif
             MakeMove(position, src_position, *move);
             if (position->state_flags & MOVED_INTO_CHECK)
             {
                 continue;
             }
-#if DO_ENHANCED_PERFT
-            hash = ComputeHash(position);          
-            if (position->hash != hash)
-            {
-                char fen_string[256];
-                char move_string[8];
-                MoveToSanString(src_position, *move, move_string);
-                PositionToString(position, fen_string);
-                printf("\n_eRROR in hash or piece square scores\n");
-                printf("position: %s\n", fen_string);
-                printf("move:     %s\n", move_string);
-            }
-#endif
             Perft(position, depth - 1, ENEMY(color), counts);
         }
         return counts->legal_moves;

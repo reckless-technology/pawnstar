@@ -366,11 +366,13 @@ int SearchSingleMove(const Position* src_position,
     # The move was deferred due to negative SEE
     # The move is not a capture  
     # The move has never raised alpha at this ply
+    # Depth is at least 3
     # The move does not give check
     ***************************************************************************/
     else if (is_deferred_move            &&
              !MOVE_CAPTURED(move)        &&
              !HasMoveBeenGood(ply, move) &&
+             depth > 2                   &&
              !(position->state_flags & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");

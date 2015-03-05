@@ -74,12 +74,12 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     switch (type)
     {
     case CAPTURE:
-        dst_position->reversible_move_count = 0;
-        dst_position->pieces[captured]      ^= to_BB;
-        dst_position->pieces_of_color[enemy]     ^= to_BB;
-        dst_position->pieces[piece]         ^= from_to_BB;
-        dst_position->pieces_of_color[color]     ^= from_to_BB;
-        dst_position->occupied_squares      ^= from_BB;
+        dst_position->reversible_move_count  = 0;
+        dst_position->pieces[captured]       ^= to_BB;
+        dst_position->pieces_of_color[enemy] ^= to_BB;
+        dst_position->pieces[piece]          ^= from_to_BB;
+        dst_position->pieces_of_color[color] ^= from_to_BB;
+        dst_position->occupied_squares       ^= from_BB;
         dst_position->hash ^=
             PIECE_SQUARE_HASHES[color][piece][to]   ^
             PIECE_SQUARE_HASHES[color][piece][from] ^
@@ -87,29 +87,29 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
         break;
     case NON_CAPTURE:
         ++dst_position->reversible_move_count;
-        dst_position->pieces[piece]     ^= from_to_BB;
+        dst_position->pieces[piece]          ^= from_to_BB;
         dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares  ^= from_to_BB;
+        dst_position->occupied_squares       ^= from_to_BB;
         dst_position->hash ^=
             PIECE_SQUARE_HASHES[color][piece][to] ^
             PIECE_SQUARE_HASHES[color][piece][from];
         break;
     case DOUBLE_PAWN_PUSH:
-        dst_position->en_passant_index = (uchar)((from + to) >> 1);
-        dst_position->reversible_move_count = 0;
-        dst_position->pawns             ^= from_to_BB;
+        dst_position->en_passant_index       = (uchar)((from + to) >> 1);
+        dst_position->reversible_move_count  = 0;
+        dst_position->pawns                  ^= from_to_BB;
         dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares  ^= from_to_BB;
+        dst_position->occupied_squares       ^= from_to_BB;
         dst_position->hash ^=
             PIECE_SQUARE_HASHES[color][PAWN][to]   ^
             PIECE_SQUARE_HASHES[color][PAWN][from] ^
             EN_PASSANT_HASHES[FILE_OF(from)];
         break;
     case SINGLE_PAWN_PUSH:
-        dst_position->reversible_move_count = 0;
-        dst_position->pawns              ^= from_to_BB;
-        dst_position->pieces_of_color[color]  ^= from_to_BB;
-        dst_position->occupied_squares   ^= from_to_BB;
+        dst_position->reversible_move_count  = 0;
+        dst_position->pawns                  ^= from_to_BB;
+        dst_position->pieces_of_color[color] ^= from_to_BB;
+        dst_position->occupied_squares       ^= from_to_BB;
         dst_position->hash ^=
             PIECE_SQUARE_HASHES[color][PAWN][to] ^
             PIECE_SQUARE_HASHES[color][PAWN][from];
@@ -130,12 +130,12 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     case PAWN_PROMOTION_CAPTURE:
         dst_position->reversible_move_count = 0;
         promoted = MOVE_PROMOTED(move);
-        dst_position->pieces[captured]  ^= to_BB;
+        dst_position->pieces[captured]       ^= to_BB;
         dst_position->pieces_of_color[enemy] ^= to_BB;
-        dst_position->pawns             ^= from_BB;
-        dst_position->pieces[promoted]  ^= to_BB;
+        dst_position->pawns                  ^= from_BB;
+        dst_position->pieces[promoted]       ^= to_BB;
         dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares  ^= from_BB;
+        dst_position->occupied_squares       ^= from_BB;
         dst_position->hash ^=
             PIECE_SQUARE_HASHES[color][PAWN][from]   ^
             PIECE_SQUARE_HASHES[color][promoted][to] ^
@@ -144,10 +144,10 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     case PAWN_PROMOTION_NON_CAPTURE:
         dst_position->reversible_move_count = 0;
         promoted = MOVE_PROMOTED(move);
-        dst_position->pawns             ^= from_BB;
-        dst_position->pieces[promoted]  ^= to_BB;
+        dst_position->pawns                  ^= from_BB;
+        dst_position->pieces[promoted]       ^= to_BB;
         dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares  ^= from_to_BB;
+        dst_position->occupied_squares       ^= from_to_BB;
         dst_position->hash ^=
             PIECE_SQUARE_HASHES[color][PAWN][from] ^
             PIECE_SQUARE_HASHES[color][promoted][to];

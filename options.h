@@ -28,13 +28,6 @@ Multithreaded search
 #define DO_PARALLEL_SEARCH 0
 #endif
 /******************************************************************************
-Test Zobrist hash, piece square scores and quiescence move subset generation at 
-every node in the perft test: slow
-*******************************************************************************/
-#ifndef DO_ENHANCED_PERFT
-#define DO_ENHANCED_PERFT 0
-#endif
-/******************************************************************************
 Whether to enable null move pruning
 *******************************************************************************/
 #ifndef DO_NULL_MOVE_PRUNING
