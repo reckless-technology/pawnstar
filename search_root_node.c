@@ -86,7 +86,7 @@ int SearchRootNode(const Position* src_position)
     for (i = 0; i != move_count; ++i)
     {
         scored_moves[i].move  = moves[i];
-        scored_moves[i].score = SearchSingleMove(src_position, START_DEPTH, 0, ALPHA, BETA, moves[i], i, false, &cancel);
+        scored_moves[i].score = SearchSingleMove(src_position, START_DEPTH, 0, ALPHA, BETA, moves[i], i, false, &cancel, true, true);
     }   
     cancel = false;
     if (timeout_ms)
@@ -107,16 +107,16 @@ int SearchRootNode(const Position* src_position)
         {
             if (i < 2)
             {
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel, true, true);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, scored_moves[i].move, i, false, &cancel);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, scored_moves[i].move, i, false, &cancel, true, true);
                 if (scored_moves[i].score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel);
+                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel, true, true);
                 }
             }            
             if (cancel)

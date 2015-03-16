@@ -92,11 +92,13 @@ void DoSomethingUseful(void)
             task->move, 
             task->move_index,
             false,
-            &task->cancel);
+            &task->cancel,
+            true,
+            true);
     }
     else
     {
-        task->score = Search(task->src_position, task->depth, task->ply, task->alpha, task->beta, &task->cancel);
+        task->score = Search(task->src_position, task->depth, task->ply, task->alpha, task->beta, &task->cancel, true, true);
     }
     _InterlockedExchange(&task->task_state, TASK_COMPLETED);
     if (_InterlockedDecrement(&num_running_tasks) == 0)

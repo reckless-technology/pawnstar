@@ -18,9 +18,10 @@ void        WaitForSearchToComplete(void);
 /******************************************************************************
 Search
 *******************************************************************************/
-int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
+int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, bool is_null_ok, bool is_reduce_ok);
 int         SearchQuiescent (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
-int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, int move, int move_index, bool is_deferred_move, volatile bool* cancel);
+int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, int move, 
+                             int move_index, bool is_deferred_move, volatile bool* cancel, bool is_null_ok, bool is_reduce_ok);
 SearchTask* NewSearchTask   (const Position* src_position, int depth, int ply, int alpha, int beta, int move, int move_index);
 int         SearchRootNode  (const Position* position);
 /******************************************************************************

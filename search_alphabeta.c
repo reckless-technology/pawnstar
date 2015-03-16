@@ -14,7 +14,9 @@ int Search(const Position* src_position,
            int ply, 
            int alpha, 
            int beta, 
-           volatile bool* cancel)
+           volatile bool* cancel,
+           bool is_null_ok,
+           bool is_reduce_ok)
 {
     Transposition       transposition[1];
     int                 move;   
@@ -126,9 +128,9 @@ int Search(const Position* src_position,
     /**************************************************************************
     Try null move pruning if ALL of the following are true:
 
+    # we haven't already tried it further up this path in the tree
     # we are not in check 
-    # this is not the root node
-    # the previous move was not a null move    
+    # this is not the root node   
     # we are not down to king and pawns
     # we have at least 4 pieces remaining
     # the eval score is high enough for a beta cutoff 
@@ -138,20 +140,20 @@ int Search(const Position* src_position,
 
     Null move pruning makes a huge improvement to search depth / speed. 
     ***************************************************************************/
-    if (!(src_position->state_flags & IS_CHECK) &&
+    if (is_null_ok                              &&
+        !(src_position->state_flags & IS_CHECK) &&
         ply != 0                                &&
-        src_position->move                      &&
         alpha == beta - 1)
     {
         const bitboard friendly_pieces = (src_position->occupied_squares ^ src_position->kings) & src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
         if ((friendly_pieces & ~src_position->pawns) && 
-            PopCount(friendly_pieces) > 4            && 
+            PopCount(friendly_pieces) >= 4           && 
             EvaluatePosition(src_position, alpha, beta) >= beta)
         {
             Position position[1];
             INCREMENT("null move attempts");
             MakeNullMove(position, src_position);
-            score = -Search(position, depth - 3, ply + 1, -beta, -beta + 1, cancel);
+            score = -Search(position, depth - 3, ply + 1, -beta, -beta + 1, cancel, false, is_reduce_ok);
             if (*cancel)
             {
                 return ILLEGAL_SCORE;
@@ -231,7 +233,7 @@ int Search(const Position* src_position,
                 INCREMENT("deferred moves");
                 continue;
             }
-            score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, num_legal_moves, is_deferred, cancel);
+            score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, num_legal_moves, is_deferred, cancel, is_null_ok, is_reduce_ok);
             if (*cancel)
             {
                 return ILLEGAL_SCORE;
@@ -313,7 +315,9 @@ int SearchSingleMove(const Position* src_position,
                      int move, 
                      int move_index,
                      bool is_deferred_move,
-                     volatile bool* cancel)
+                     volatile bool* cancel,
+                     bool is_null_ok,
+                     bool is_reduce_ok)
 {  
     Position position[1];
     int child_depth;
@@ -332,6 +336,7 @@ int SearchSingleMove(const Position* src_position,
     # We are in check
     # This is a pawn promotion
     # This is a pawn push to the 7th rank 
+    # Recapture of same value piece on same square - optional
     *******************************************************************/
     if (src_position->state_flags & IS_CHECK)
     {
@@ -370,6 +375,7 @@ int SearchSingleMove(const Position* src_position,
     # The move does not give check
     ***************************************************************************/
     else if (is_deferred_move            &&
+             is_reduce_ok                &&
              !MOVE_CAPTURED(move)        &&
              !HasMoveBeenGood(ply, move) &&
              depth > 2                   &&
@@ -377,6 +383,7 @@ int SearchSingleMove(const Position* src_position,
     {
         INCREMENT("extensions reduce LMR");
         child_depth = depth - 2;
+        is_reduce_ok = false;
     }
 #endif
    
@@ -384,19 +391,22 @@ int SearchSingleMove(const Position* src_position,
     {
         child_depth = depth - 1;
     }
-    if (move_index != 0 && !(src_position->state_flags & IS_CHECK))
+
+    if (move_index != 0                         && 
+        !(src_position->state_flags & IS_CHECK) &&
+        beta > alpha + 1)
     {
         INCREMENT("pvs attempts");
-        score = -Search(position, child_depth, ply + 1, -alpha - 1, -alpha, cancel);
+        score = -Search(position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, is_null_ok, is_reduce_ok);
         if (score > alpha)
         {
             INCREMENT("pvs fails");
-            score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel);
+            score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel, is_null_ok, is_reduce_ok);
         }
     }
     else
     {
-        score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel);
+        score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel, is_null_ok, is_reduce_ok);
     }
     return score;
     (void)is_deferred_move;
