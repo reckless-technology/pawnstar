@@ -374,8 +374,8 @@ int SearchSingleMove(const Position* src_position,
     # Depth is at least 3
     # The move does not give check
     ***************************************************************************/
-    else if (is_deferred_move            &&
-             is_reduce_ok                &&
+    else if (is_reduce_ok                &&
+             is_deferred_move            &&
              !MOVE_CAPTURED(move)        &&
              !HasMoveBeenGood(ply, move) &&
              depth > 2                   &&

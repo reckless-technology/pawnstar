@@ -16,7 +16,7 @@ int NextRandom(void)
         i = (lcg % 337) + 337;
         while (--i)
         {
-            lcg = lcg * 6364136223846793005ull + 1442695040888963407ull;
+            lcg = NextRandom();
         }
     }
     lcg = lcg * 6364136223846793005ull + 1442695040888963407ull;
