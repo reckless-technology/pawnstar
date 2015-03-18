@@ -1,12 +1,12 @@
 #pragma once
 #include "options.h"
+#include <stdbool.h>
 /******************************************************************************
 Integral type definitions
 *******************************************************************************/
 typedef unsigned long long  bitboard;
 typedef unsigned long long  uint64;
 typedef unsigned char       uchar;
-typedef unsigned char       bool; /* C90 */
 typedef int (*CompareFn)    (const void*, const void*); /* sort predicate */
 /******************************************************************************
 Piece types
@@ -31,14 +31,6 @@ enum Color
     NEITHER_COLOR,
 };
 /******************************************************************************
-bools - C90 does not support the native bool type
-*******************************************************************************/
-enum Boolean
-{
-    false,
-    true,
-};
-/******************************************************************************
 Move types
 *******************************************************************************/
 enum MoveType
@@ -57,10 +49,10 @@ Time control clock types
 *******************************************************************************/
 enum ClockType
 {
-    STANDARD_CHESS_CLOCK,       // N moves to be made in M minutes  
-    INCREMENTAL_CLOCK,          // M minutes for the game plus N seconds per move
-    FIXED_DEPTH,                // search to depth D on every move
-    FIXED_TIME,                 // search for N seconds on every move
+    CLOCK_STANDARD,     // N moves to be made in M minutes  
+    CLOCK_INCREMENTAL,  // M minutes for the game plus N seconds per move
+    CLOCK_FIXED_DEPTH,  // search to depth D on every move
+    CLOCK_FIXED_TIME,   // search for N seconds on every move
 };
 /******************************************************************************
 Position castling flags (bitset)

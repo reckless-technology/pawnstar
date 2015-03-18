@@ -40,7 +40,7 @@ void RunPositionTests(int depth)
     const char* const * tests;
     int prev_clock_type = globals->time_control.clock_type;
     int prev_depth      = globals->time_control.fixed_depth;
-    globals->time_control.clock_type  = FIXED_DEPTH;
+    globals->time_control.clock_type  = CLOCK_FIXED_DEPTH;
     globals->time_control.fixed_depth = depth;
     globals->do_show_thinking         = true;
     first_start = GetMilliseconds();

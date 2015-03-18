@@ -4,7 +4,7 @@ Context globals[1];
 
 static void InitializeGlobals(void)
 {
-    globals->time_control.clock_type              = STANDARD_CHESS_CLOCK;
+    globals->time_control.clock_type              = CLOCK_STANDARD;
     globals->time_control.base_milliseconds       = 300000;
     globals->time_control.fixed_depth             = 7;
     globals->time_control.fixed_milliseconds      = 5000;

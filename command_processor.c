@@ -161,14 +161,14 @@ static void handle_level(char buffer[])
     }
     if (moves)
     {
-        globals->time_control.clock_type = STANDARD_CHESS_CLOCK;
+        globals->time_control.clock_type = CLOCK_STANDARD;
         globals->time_control.moves_per_period = moves;
         globals->time_control.milliseconds_per_period = minutes * 60000 + seconds * 1000;
         globals->time_control.milliseconds_remaining = globals->time_control.milliseconds_per_period;
     }
     else
     {
-        globals->time_control.clock_type = INCREMENTAL_CLOCK;
+        globals->time_control.clock_type = CLOCK_INCREMENTAL;
         globals->time_control.base_milliseconds = minutes * 60000 + seconds * 1000;
         globals->time_control.increment_milliseconds = increment * 1000;
         globals->time_control.milliseconds_remaining = globals->time_control.base_milliseconds;
@@ -177,13 +177,13 @@ static void handle_level(char buffer[])
 
 static void handle_st(char buffer[])
 {
-    globals->time_control.clock_type = FIXED_TIME;
+    globals->time_control.clock_type = CLOCK_FIXED_TIME;
     globals->time_control.fixed_milliseconds = atoi(buffer) * 1000;
 }
 
 static void handle_sd(char buffer[])
 {
-    globals->time_control.clock_type = FIXED_DEPTH;
+    globals->time_control.clock_type = CLOCK_FIXED_DEPTH;
     globals->time_control.fixed_depth = atoi(buffer);
 }
 
@@ -193,7 +193,7 @@ static void handle_showtime(char buffer[])
 {
     switch (globals->time_control.clock_type)
     {
-    case STANDARD_CHESS_CLOCK:
+    case CLOCK_STANDARD:
         printf("standard clock mode\n");
         printf("moves per period              %5d\n", globals->time_control.moves_per_period);
         printf("time period                   ");
@@ -201,7 +201,7 @@ static void handle_showtime(char buffer[])
         printf("time remaining                ");
         PRINT_MIN_SEC(globals->time_control.milliseconds_remaining);
         break;
-    case INCREMENTAL_CLOCK:
+    case CLOCK_INCREMENTAL:
         printf("incremental clock mode\n");
         printf("base time                     ");
         PRINT_MIN_SEC(globals->time_control.base_milliseconds);
@@ -210,11 +210,11 @@ static void handle_showtime(char buffer[])
         printf("time remaining                ");
         PRINT_MIN_SEC(globals->time_control.milliseconds_remaining);
         break;
-    case FIXED_DEPTH:
+    case CLOCK_FIXED_DEPTH:
         printf("fixed depth mode\n");
         printf("search depth                  %5d\n", globals->time_control.fixed_depth);
         break;
-    case FIXED_TIME:
+    case CLOCK_FIXED_TIME:
         printf("fixed time mode\n");
         printf("search time                   ");
         PRINT_MIN_SEC(globals->time_control.fixed_milliseconds);

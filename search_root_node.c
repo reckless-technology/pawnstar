@@ -52,24 +52,24 @@ int SearchRootNode(const Position* src_position)
     }  
     switch (globals->time_control.clock_type)
     {
-    case STANDARD_CHESS_CLOCK:
+    case CLOCK_STANDARD:
     default:
         moves_to_go  = globals->time_control.moves_per_period - (src_position->full_move_count % globals->time_control.moves_per_period);
         ms_allocated = globals->time_control.milliseconds_remaining / moves_to_go;
         timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 3000));
         break;
     
-    case FIXED_DEPTH:
+    case CLOCK_FIXED_DEPTH:
         timeout_ms   = 0;
         ms_allocated = 0;
         break;
     
-    case FIXED_TIME:
+    case CLOCK_FIXED_TIME:
         timeout_ms   = globals->time_control.fixed_milliseconds;
         ms_allocated = 0;
         break;
     
-    case INCREMENTAL_CLOCK:
+    case CLOCK_INCREMENTAL:
         ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 40);
         timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 3000));
         break;
@@ -96,7 +96,7 @@ int SearchRootNode(const Position* src_position)
     }
     for (depth = START_DEPTH; depth != MAX_PLY; ++depth)
     {       
-        if (globals->time_control.clock_type == FIXED_DEPTH && depth > globals->time_control.fixed_depth)
+        if (globals->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > globals->time_control.fixed_depth)
         {
             break;
         }
@@ -152,8 +152,8 @@ int SearchRootNode(const Position* src_position)
         {
             break;
         }
-        if (globals->time_control.clock_type == STANDARD_CHESS_CLOCK || 
-            globals->time_control.clock_type == INCREMENTAL_CLOCK)
+        if (globals->time_control.clock_type == CLOCK_STANDARD || 
+            globals->time_control.clock_type == CLOCK_INCREMENTAL)
         {
             const int elapsed_ms = stop_ms - start_ms;
             bool is_best_move_consistent = true;

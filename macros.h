@@ -1,5 +1,4 @@
 #pragma once
-#include "options.h"
 #include "bitboard_constants.h"
 /******************************************************************************
 Function like macros

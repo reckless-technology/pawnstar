@@ -80,7 +80,7 @@ Insert a new entry into the transposition table.
 Hash bucket replacement policy (in priority order):
 # replace an entry with the same hash
 # replace an empty slot
-# replace a non PV node with a PV node
+# replace a non PV node
 # replace the entry with the smallest depth
 # replace an entry with no move with one containing a move
 *******************************************************************************/
@@ -97,10 +97,10 @@ void RecordTransposition(uint64 hash, int depth, int score, int move, int node_t
     for (i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
     {
         const int score = 
-           16 * (bucket->transpositions[i].hash == hash)                                                                 +
-            8 * (bucket->transpositions[i].hash == 0)                                                                    +
-            4 * (bucket->transpositions[replace].node_type == NODE_PV && bucket->transpositions[i].node_type != NODE_PV) +
-            2 * (bucket->transpositions[i].depth < bucket->transpositions[replace].depth)                                +            
+           16 * (bucket->transpositions[i].hash == hash)                                  +
+            8 * (bucket->transpositions[i].hash == 0)                                     +
+            4 * (bucket->transpositions[i].node_type != NODE_PV)                          +
+            2 * (bucket->transpositions[i].depth < bucket->transpositions[replace].depth) +            
                 (bucket->transpositions[i].move == 0);
 
         if (score > best_score)

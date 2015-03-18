@@ -16,7 +16,7 @@ Determine whether to use the intrinsic population count instruction on native
 #define USE_INTRINSIC_POPCNT 1
 #endif
 /******************************************************************************
-Use experimental "more sophisticated" eval, probably not a great idea yet...
+Use experimental "more sophisticated" eval
 *******************************************************************************/
 #ifndef DO_EVALUATION_FULL
 #define DO_EVALUATION_FULL 1
@@ -80,6 +80,5 @@ Global constants
 #define NUM_TASKS_TO_ALLOCATE_AT_ONCE       256 // number of SearchTasks to allocate at a time
 #define PV_TABLE_SIZE                      4999 // number of entries in the principal variation hashtable (should be prime)
 #define DEBUG_DICT_SIZE                    4999 // number of entries in the debug counts hashtable (should be prime)
-#define EVAL_HASHTABLE_SIZE                4999
-#define ASPIRATION_SEARCH_WINDOW             50 // Alpha beta window width at root node (centipawns)
+#define EVAL_HASHTABLE_SIZE                4999 // number of entries in the evaluation hashtable (should be prime)
 #define FUTILITY_CUTOFF_THRESHOLD          1200 // Prune frontier nodes where eval is this much below alpha

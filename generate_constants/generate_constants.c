@@ -3,10 +3,7 @@ Generates the file "generated_data.c" which is used by the main program and
 contains various precomputed constants
 *******************************************************************************/
 #include <stdio.h>
-#include <time.h>
 
-#include "../options.h"
-#include "../bitboard_constants.h"
 #include "../macros.h"
 #include "../types.h"
 
@@ -32,15 +29,15 @@ static const DirectionVector DIRECTION_VECTORS[] =
 
 static const char* const DIRECTION_NAMES[] = 
 {
-    "NO DIRECTION",
-    "NORTH",
-    "NORTHEAST",
-    "EAST",
-    "SOUTHEAST",
-    "SOUTH",
-    "SOUTHWEST",
-    "WEST",
-    "NORTHWEST",
+    [DIR_NONE]      = "NO DIRECTION",
+    [DIR_NORTH]     = "NORTH",
+    [DIR_NORTHEAST] = "NORTHEAST",
+    [DIR_EAST]      = "EAST",
+    [DIR_SOUTHEAST] = "SOUTHEAST",
+    [DIR_SOUTH]     = "SOUTH",
+    [DIR_SOUTHWEST] = "SOUTHWEST",
+    [DIR_WEST]      = "WEST",
+    [DIR_NORTHWEST] = "NORTHWEST",
 };
 
 static uint64 NextHashKey()
@@ -161,9 +158,9 @@ static bitboard KnightFill(bitboard b)
     const bitboard west2		= SHIFT_WEST(west1);
     const bitboard east1		= SHIFT_EAST(b);
     const bitboard east2		= SHIFT_EAST(east1);
-    const bitboard eastWest1	= west1 | east1;
-    const bitboard eastWest2	= west2 | east2;
-    return (eastWest1 << 16) | (eastWest1 >> 16) | (eastWest2 << 8) | (eastWest2 >> 8);
+    const bitboard eastwest1	= west1 | east1;
+    const bitboard eastwest2	= west2 | east2;
+    return (eastwest1 << 16) | (eastwest1 >> 16) | (eastwest2 << 8) | (eastwest2 >> 8);
 }
 
 static bitboard KnightAttacks(int location)
@@ -259,10 +256,10 @@ static bitboard InterveningSquares(int from, int to)
     const DirectionVector* dv;
     for (dv = DIRECTION_VECTORS; dv->direction != DIR_NONE; ++dv)
     {
-        const bitboard vectorFrom = VectorFrom(from, dv->direction);
-        if (vectorFrom & BITBOARD(to))
+        const bitboard vector_from = VectorFrom(from, dv->direction);
+        if (vector_from & BITBOARD(to))
         {
-            return vectorFrom ^ VectorFrom(to, dv->direction) ^ BITBOARD(to);
+            return vector_from ^ VectorFrom(to, dv->direction) ^ BITBOARD(to);
         }
     }
     return NO_SQUARES;
@@ -356,9 +353,9 @@ int main()
     for (dv = DIRECTION_VECTORS; dv->direction != DIR_NONE; ++dv)
     {
         fprintf(file, "const signed char %s_FROM[64][8] = {\n", DIRECTION_NAMES[dv->direction]);
-        for (int locn = 0; locn != 64; ++locn)
+        for (i = 0; i != 64; ++i)
         {
-            WriteSquaresFrom(locn, dv->direction, file);
+            WriteSquaresFrom(i, dv->direction, file);
         }
         fprintf(file, "};\n");
     }
