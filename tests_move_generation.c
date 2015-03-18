@@ -17,7 +17,7 @@ Structure to hold a single perft test
 typedef struct
 {
     const char* position;
-    int        depth;
+    int         depth;
     PerftCounts counts;
 } PerftTest;
 /******************************************************************************

@@ -34,6 +34,14 @@ extern const bitboard       KING_PAWN_SHIELD_BLACK[64];
 extern const bitboard       KING_PAWN_SHIELD_WHITE_2[64];
 extern const bitboard       KING_PAWN_SHIELD_BLACK_2[64];
 extern const bitboard       INTERVENING_SQUARES[64][64];            // indexed by [to][from] square locations
+extern const signed char    NORTH_FROM[64][8];
+extern const signed char    NORTHEAST_FROM[64][8];
+extern const signed char    EAST_FROM[64][8];
+extern const signed char    SOUTHEAST_FROM[64][8];
+extern const signed char    SOUTH_FROM[64][8];
+extern const signed char    SOUTHWEST_FROM[64][8];
+extern const signed char    WEST_FROM[64][8];
+extern const signed char    NORTHWEST_FROM[64][8];
 extern const uchar          DIRECTIONS[64][64];                     // indexed by [to][from] square locations 
 extern const uint64         PIECE_SQUARE_HASHES[2][8][64];          // indexed by [color][piece][location]
 extern const uint64         CASTLING_RIGHTS_HASHES[16];             // indexed by 4 bit castling rights

@@ -30,6 +30,19 @@ static const DirectionVector DIRECTION_VECTORS[] =
     { DIR_NONE,       0,  0 },
 };
 
+static const char* const DIRECTION_NAMES[] = 
+{
+    "NO DIRECTION",
+    "NORTH",
+    "NORTHEAST",
+    "EAST",
+    "SOUTHEAST",
+    "SOUTH",
+    "SOUTHWEST",
+    "WEST",
+    "NORTHWEST",
+};
+
 static uint64 NextHashKey()
 {
     static unsigned int lcg = 0;
@@ -62,6 +75,34 @@ static bitboard VectorFrom(int location, int direction)
         }        
     }
     return result;
+}
+
+static void WriteSquaresFrom(int location, int direction, FILE* file)
+{
+    int x = FILE_OF(location);
+    int y = RANK_OF(location);
+    const DirectionVector* dv;
+    for (dv = DIRECTION_VECTORS; dv->direction != DIR_NONE; ++dv)
+    {
+        if (dv->direction == direction)
+        {
+            fprintf(file, "    { ");
+            for (int i = 0; i != 8; ++i)
+            {
+                x += dv->dx;
+                y += dv->dy;
+                if (x >= 0 && x < 8 && y >= 0 && y < 8)
+                {
+                    fprintf(file, "%c%c, ", 'A' + x, '1' + y);
+                }
+                else
+                {
+                    fprintf(file, "-1, ");
+                }
+            }
+            fprintf(file, "}, /* from %c%c */\n", FILE_CHAR(location), RANK_CHAR(location));
+        }
+    }
 }
 
 static bitboard NorthOf(int location)
@@ -273,6 +314,7 @@ int main()
 {
     int i, j, piece, color;
     const BitboardGen* generator;
+    const DirectionVector* dv;
     FILE* file = fopen("../generated_data.c", "w");
     if (!file)
     {
@@ -311,6 +353,15 @@ int main()
         fprintf(file, "\n},");
     }
     fprintf(file, "};\n");
+    for (dv = DIRECTION_VECTORS; dv->direction != DIR_NONE; ++dv)
+    {
+        fprintf(file, "const signed char %s_FROM[64][8] = {\n", DIRECTION_NAMES[dv->direction]);
+        for (int locn = 0; locn != 64; ++locn)
+        {
+            WriteSquaresFrom(locn, dv->direction, file);
+        }
+        fprintf(file, "};\n");
+    }
     fprintf(file, "const uint64 PIECE_SQUARE_HASHES[2][8][64] = \n{\n");
     for (color = 0; color != 2; ++color)
     {

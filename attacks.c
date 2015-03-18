@@ -3,6 +3,8 @@
 const bitboard* const ENEMY_PAWN_ATTACKS[2] = { PAWN_ATTACKS_BLACK, PAWN_ATTACKS_WHITE };
 const bitboard* const PAWN_ATTACKS[2]       = { PAWN_ATTACKS_WHITE, PAWN_ATTACKS_BLACK };
 
+#if 0
+
 bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
     return 
@@ -22,6 +24,98 @@ bitboard RookAttacks(bitboard occupied_squares, int location)
         FillSouth(SHIFT_SOUTH(SOUTH_OF[location] & occupied_squares)) ^
         FillWest (SHIFT_WEST ( WEST_OF[location] & occupied_squares));
 }
+
+#else
+
+bitboard BishopAttacks(bitboard occupied_squares, int location)
+{
+    bitboard result = NO_SQUARES;
+    const signed char* c;
+    for (c = &NORTHEAST_FROM[location][0]; *c != -1; ++c)
+    {
+        const bitboard b = BITBOARD(*c);
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (c = &SOUTHEAST_FROM[location][0]; *c != -1; ++c)
+    {
+        const bitboard b = BITBOARD(*c);
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (c = &SOUTHWEST_FROM[location][0]; *c != -1; ++c)
+    {
+        const bitboard b = BITBOARD(*c);
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (c = &NORTHWEST_FROM[location][0]; *c != -1; ++c)
+    {
+        const bitboard b = BITBOARD(*c);
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    return result;
+}
+
+bitboard RookAttacks(bitboard occupied_squares, int location)
+{
+    bitboard result = NO_SQUARES;
+    const signed char* c;
+    for (c = &NORTH_FROM[location][0]; *c != -1; ++c)
+    {
+        const bitboard b = BITBOARD(*c);
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (c = &EAST_FROM[location][0]; *c != -1; ++c)
+    {
+        const bitboard b = BITBOARD(*c);
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (c = &SOUTH_FROM[location][0]; *c != -1; ++c)
+    {
+        const bitboard b = BITBOARD(*c);
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (c = &WEST_FROM[location][0]; *c != -1; ++c)
+    {
+        const bitboard b = BITBOARD(*c);
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    return result;
+}
+
+
+
+#endif
 
 bitboard QueenAttacks(bitboard occupied_squares, int location)
 {
