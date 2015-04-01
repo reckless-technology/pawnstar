@@ -59,7 +59,7 @@ INLINE int PopCount(bitboard x)
 #else
 INLINE int PopCount(bitboard x)
 {
-    return __popcnt((int)x) + __popcnt((int)(x >> 32));
+    return __popcnt((unsigned int)x) + __popcnt((unsigned int)(x >> 32));
 }
 #endif /* _M_X64 */
 #elif defined (__GNUC__)
