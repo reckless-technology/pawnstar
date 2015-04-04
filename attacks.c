@@ -3,7 +3,23 @@
 const bitboard* const ENEMY_PAWN_ATTACKS[2] = { PAWN_ATTACKS_BLACK, PAWN_ATTACKS_WHITE };
 const bitboard* const PAWN_ATTACKS[2]       = { PAWN_ATTACKS_WHITE, PAWN_ATTACKS_BLACK };
 
-#if 0
+#if DO_MAGIC_BITBOARDS
+
+bitboard BishopAttacks(bitboard occupied_squares, int location)
+{
+    const MagicMoveEntry* const entry = &BISHOP_MAGICS[location];
+    return entry->attacks[((occupied_squares & entry->occupancy_mask) * entry->magic) >> entry->shift];
+}
+
+bitboard RookAttacks(bitboard occupied_squares, int location)
+{
+    const MagicMoveEntry* const entry = &ROOK_MAGICS[location];
+    return entry->attacks[((occupied_squares & entry->occupancy_mask) * entry->magic) >> entry->shift];
+}
+
+#else
+
+#if 1
 
 bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
@@ -27,42 +43,37 @@ bitboard RookAttacks(bitboard occupied_squares, int location)
 
 #else
 
-bitboard BishopAttacks(bitboard occupied_squares, int location)
+bitboard BishopAttacks(uint64 occupied_squares, int location)
 {
-    bitboard result = NO_SQUARES;
-    const signed char* c;
-    for (c = &NORTHEAST_FROM[location][0]; *c != -1; ++c)
+    uint64 result = NO_SQUARES;
+    for (uint64 square = SHIFT_NORTHEAST(BITBOARD(location)); square; square = SHIFT_NORTHEAST(square))
     {
-        const bitboard b = BITBOARD(*c);
-        result |= b;
-        if (b & occupied_squares)
+        result |= square;
+        if (square & occupied_squares)
         {
             break;
         }
     }
-    for (c = &SOUTHEAST_FROM[location][0]; *c != -1; ++c)
+    for (uint64 square = SHIFT_SOUTHEAST(BITBOARD(location)); square; square = SHIFT_SOUTHEAST(square))
     {
-        const bitboard b = BITBOARD(*c);
-        result |= b;
-        if (b & occupied_squares)
+        result |= square;
+        if (square & occupied_squares)
         {
             break;
         }
     }
-    for (c = &SOUTHWEST_FROM[location][0]; *c != -1; ++c)
+    for (uint64 square = SHIFT_SOUTHWEST(BITBOARD(location)); square; square = SHIFT_SOUTHWEST(square))
     {
-        const bitboard b = BITBOARD(*c);
-        result |= b;
-        if (b & occupied_squares)
+        result |= square;
+        if (square & occupied_squares)
         {
             break;
         }
     }
-    for (c = &NORTHWEST_FROM[location][0]; *c != -1; ++c)
+    for (uint64 square = SHIFT_NORTHWEST(BITBOARD(location)); square; square = SHIFT_NORTHWEST(square))
     {
-        const bitboard b = BITBOARD(*c);
-        result |= b;
-        if (b & occupied_squares)
+        result |= square;
+        if (square & occupied_squares)
         {
             break;
         }
@@ -70,42 +81,37 @@ bitboard BishopAttacks(bitboard occupied_squares, int location)
     return result;
 }
 
-bitboard RookAttacks(bitboard occupied_squares, int location)
+bitboard RookAttacks(uint64 occupied_squares, int location)
 {
-    bitboard result = NO_SQUARES;
-    const signed char* c;
-    for (c = &NORTH_FROM[location][0]; *c != -1; ++c)
+    uint64 result = NO_SQUARES;
+    for (uint64 square = SHIFT_NORTH(BITBOARD(location)); square; square = SHIFT_NORTH(square))
     {
-        const bitboard b = BITBOARD(*c);
-        result |= b;
-        if (b & occupied_squares)
+        result |= square;
+        if (square & occupied_squares)
         {
             break;
         }
     }
-    for (c = &EAST_FROM[location][0]; *c != -1; ++c)
+    for (uint64 square = SHIFT_EAST(BITBOARD(location)); square; square = SHIFT_EAST(square))
     {
-        const bitboard b = BITBOARD(*c);
-        result |= b;
-        if (b & occupied_squares)
+        result |= square;
+        if (square & occupied_squares)
         {
             break;
         }
     }
-    for (c = &SOUTH_FROM[location][0]; *c != -1; ++c)
+    for (uint64 square = SHIFT_SOUTH(BITBOARD(location)); square; square = SHIFT_SOUTH(square))
     {
-        const bitboard b = BITBOARD(*c);
-        result |= b;
-        if (b & occupied_squares)
+        result |= square;
+        if (square & occupied_squares)
         {
             break;
         }
     }
-    for (c = &WEST_FROM[location][0]; *c != -1; ++c)
+    for (uint64 square = SHIFT_WEST(BITBOARD(location)); square; square = SHIFT_WEST(square))
     {
-        const bitboard b = BITBOARD(*c);
-        result |= b;
-        if (b & occupied_squares)
+        result |= square;
+        if (square & occupied_squares)
         {
             break;
         }
@@ -113,7 +119,7 @@ bitboard RookAttacks(bitboard occupied_squares, int location)
     return result;
 }
 
-
+#endif
 
 #endif
 

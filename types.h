@@ -209,6 +209,17 @@ typedef struct
     bool            do_all_moves;
 } MoveGenerator;
 /******************************************************************************
+Values for magic bitboard attack generator for one square
+*******************************************************************************/
+#pragma warning(disable:4200)
+typedef struct
+{
+    uint64          magic;
+    bitboard        occupancy_mask;
+    int             shift;
+    const bitboard* attacks;
+} MagicMoveEntry;
+/******************************************************************************
 Clock and time control information
 *******************************************************************************/
 typedef struct
