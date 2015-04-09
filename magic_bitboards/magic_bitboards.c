@@ -11,6 +11,7 @@ h8 is bit 63 (MSB)
 *******************************************************************************/
 
 typedef unsigned long long      uint64;
+typedef unsigned char           uint8;
 
 #define MASK_EAST_1             0x7F7F7F7F7F7F7F7Full 
 #define MASK_WEST_1             0xFEFEFEFEFEFEFEFEull 
@@ -301,14 +302,81 @@ static void FindMagic(int location, bool is_rook, uint64* magic, uint64* mask, u
     }
 }
 
-static uint64 magics[64];
-static uint64 masks[64];
-static uint64 attacks[64][4096];
-static int shifts[64]; 
+/******************************************************************************
+Compress the magic attacks by forming a set of unique attacked squares and 
+replacing the attacks themselves with a set of one byte indicies into the
+unique attack vector. At the cost of one extra indirection we save approx 8x
+the size of the magic tables which reduces cache pressure considerably.
+*******************************************************************************/
+static void CompressAttacks(uint64 attacks[4096], 
+                            int num_attacks_in,  
+                            uint8 indices[4096],
+                            int* num_attacks_out)
+{
+    uint8 out_count = 0;
+    for (int i = 0; i != num_attacks_in; ++i)
+    {
+        const uint64 attack = attacks[i];
+        uint8 j;
+        for (j = 0; j != out_count; ++j)
+        {
+            if (attacks[j] == attack)
+            {
+                indices[i] = j;
+                break;
+            }
+        }
+        if (j == out_count)
+        {
+            /* we didn't find the attack so add it to the set */
+            indices[i] = out_count;
+            attacks[out_count] = attack;
+            if (++out_count == 0)
+            {
+                printf("OVERFLOW!\n");
+                return;
+            }
+        }
+    }
+    *num_attacks_out = out_count;
+}
+
+static struct
+{
+    uint64 magic;
+    uint64 mask;
+    uint64 attacks[4096];
+    uint8  attack_indices[4096];
+    int    shift;
+    int    num_discrete_attacks;
+} magics[64];
+
 
 /******************************************************************************
 Generate the source file containing the magic bitboard data for bishop and rook
-attack sets
+attack sets. The magic bitboard attack generator uses this structure:
+
+typedef struct
+{
+    uint64          magic;              // multiplier
+    bitboard        occupancy_mask;     // pre mask (excl outside squares)  
+    const uchar*    attack_indices;     // lookup index
+    const bitboard* attacks;            // unique attack set
+    int             shift;              // right shift amount
+} MagicMoveEntry;
+
+Then for example we have
+
+MagicMoveEntry rook_magics[64];         // one per square for bishop and rook
+
+To get sliding attacks, given a set of occupied_squares, we compute:
+entry->attacks[entry->attack_indices[((occupied_squares & entry->occupancy_mask) * entry->magic) >> entry->shift]];
+
+I decided to make the attacks a unique set with one byte indices as this
+compresses the overall size of the magic tables by a significant factor and
+helps to reduce pressure on the cache.
+
+It's a shame the MagicMoveEntry struct can't be 64 bytes in size.
 *******************************************************************************/
 int main()
 {
@@ -326,11 +394,12 @@ int main()
        
         for (int j = 0; j != 64; ++j)
         {
-            FindMagic(j, !!i, &magics[j], &masks[j], &attacks[j][0], &shifts[j]);
+            FindMagic(j, !!i, &magics[j].magic, &magics[j].mask, magics[j].attacks, &magics[j].shift);
+            CompressAttacks(magics[j].attacks, 1 << (64 - magics[j].shift), magics[j].attack_indices, &magics[j].num_discrete_attacks);
         }
         for (int j = 0; j != 64; ++j)
         {
-            const int num_entries = 1 << (64 - shifts[j]);
+            const int num_entries = magics[j].num_discrete_attacks;
             fprintf(file, "static const bitboard %s_MAGIC_ATTACKS_%c%c[%d] = {",
                     piece_name,
                     'A' + FILE_OF(j),
@@ -342,20 +411,39 @@ int main()
                 {
                     fprintf(file, "\n    ");
                 }
-                fprintf(file, "0x%016llXull, ", attacks[j][k]);                
+                fprintf(file, "0x%016llXull, ",  magics[j].attacks[k]);                
             }
             fprintf(file, "\n};\n");
+            const int num_indices = 1 << (64 - magics[j].shift);
+            fprintf(file, "static const uchar %s_MAGIC_INDICES_%c%c[%d] = {",
+                    piece_name,
+                    'A' + FILE_OF(j),
+                    '1' + RANK_OF(j),
+                    num_indices);
+            for (int k = 0; k != num_indices; ++k)
+            {
+                if ((k & 0x1F) == 0)
+                {
+                    fprintf(file, "\n    ");
+                }
+                fprintf(file, "0x%02hhX, ",  magics[j].attack_indices[k]);                
+            }
+            fprintf(file, "\n};\n");
+
         }
         fprintf(file, "const MagicMoveEntry %s_MAGICS[64] = {\n", piece_name);
         for (int j = 0; j != 64; ++j)
         {
-            fprintf(file, "    { 0x%016llXull, 0x%016llXull, %d, %s_MAGIC_ATTACKS_%c%c },\n",
-                    magics[j],
-                    masks[j],
-                    shifts[j],
+            fprintf(file, "    { 0x%016llXull, 0x%016llXull, %s_MAGIC_INDICES_%c%c, %s_MAGIC_ATTACKS_%c%c, %d },\n",
+                    magics[j].magic,
+                    magics[j].mask,
                     piece_name,
                     'A' + FILE_OF(j),
-                    '1' + RANK_OF(j));
+                    '1' + RANK_OF(j),
+                    piece_name,
+                    'A' + FILE_OF(j),
+                    '1' + RANK_OF(j),
+                    magics[j].shift);
         }
         fprintf(file, "};\n");
     }

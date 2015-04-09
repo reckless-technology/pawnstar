@@ -211,13 +211,13 @@ typedef struct
 /******************************************************************************
 Values for magic bitboard attack generator for one square
 *******************************************************************************/
-#pragma warning(disable:4200)
 typedef struct
 {
     uint64          magic;
-    bitboard        occupancy_mask;
-    int             shift;
+    bitboard        occupancy_mask;   
+    const uchar*    attack_indices;
     const bitboard* attacks;
+    int             shift;
 } MagicMoveEntry;
 /******************************************************************************
 Clock and time control information

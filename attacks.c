@@ -8,41 +8,21 @@ const bitboard* const PAWN_ATTACKS[2]       = { PAWN_ATTACKS_WHITE, PAWN_ATTACKS
 bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
     const MagicMoveEntry* const entry = &BISHOP_MAGICS[location];
-    return entry->attacks[((occupied_squares & entry->occupancy_mask) * entry->magic) >> entry->shift];
+    return entry->attacks[entry->attack_indices[((occupied_squares & entry->occupancy_mask) * entry->magic) >> entry->shift]];
 }
 
 bitboard RookAttacks(bitboard occupied_squares, int location)
 {
     const MagicMoveEntry* const entry = &ROOK_MAGICS[location];
-    return entry->attacks[((occupied_squares & entry->occupancy_mask) * entry->magic) >> entry->shift];
+    return entry->attacks[entry->attack_indices[((occupied_squares & entry->occupancy_mask) * entry->magic) >> entry->shift]];
 }
 
 #else
 
-#if 1
-
-bitboard BishopAttacks(bitboard occupied_squares, int location)
-{
-    return 
-        BISHOP_ATTACKS[location]                                                  ^
-        FillNorthEast(SHIFT_NORTHEAST(NORTHEAST_OF[location] & occupied_squares)) ^
-        FillSouthEast(SHIFT_SOUTHEAST(SOUTHEAST_OF[location] & occupied_squares)) ^
-        FillSouthWest(SHIFT_SOUTHWEST(SOUTHWEST_OF[location] & occupied_squares)) ^
-        FillNorthWest(SHIFT_NORTHWEST(NORTHWEST_OF[location] & occupied_squares));
-}
-
-bitboard RookAttacks(bitboard occupied_squares, int location)
-{
-    return
-        ROOK_ATTACKS[location]                                        ^
-        FillNorth(SHIFT_NORTH(NORTH_OF[location] & occupied_squares)) ^
-        FillEast (SHIFT_EAST ( EAST_OF[location] & occupied_squares)) ^
-        FillSouth(SHIFT_SOUTH(SOUTH_OF[location] & occupied_squares)) ^
-        FillWest (SHIFT_WEST ( WEST_OF[location] & occupied_squares));
-}
-
-#else
-
+/******************************************************************************
+The naive loop based attack generator performs almost as fast as the magic
+bitboard attack generator when profiled in a release build...
+*******************************************************************************/
 bitboard BishopAttacks(uint64 occupied_squares, int location)
 {
     uint64 result = NO_SQUARES;
@@ -118,8 +98,6 @@ bitboard RookAttacks(uint64 occupied_squares, int location)
     }
     return result;
 }
-
-#endif
 
 #endif
 
