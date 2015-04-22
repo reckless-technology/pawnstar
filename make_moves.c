@@ -45,9 +45,9 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     const int piece             = MOVE_PIECE(move);
     const int captured          = MOVE_CAPTURED(move);
     const int promoted          = MOVE_PROMOTED(move); 
-    const bitboard from_BB      = BITBOARD(from);
-    const bitboard to_BB        = BITBOARD(to);
-    const bitboard from_to_BB   = from_BB | to_BB;
+    const bitboard from_bb      = BITBOARD(from);
+    const bitboard to_bb        = BITBOARD(to);
+    const bitboard from_to_bb   = from_bb | to_bb;
     
     *dst_position = *src_position;
     dst_position->previous = src_position;
@@ -72,13 +72,13 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
             if (!MOVE_IS_SPECIAL(move))
             {
                 /* regular pawn move */
-                dst_position->pawns ^= from_to_BB;
-                dst_position->pieces_of_color[color] ^= from_to_BB;
+                dst_position->pawns ^= from_to_bb;
+                dst_position->pieces_of_color[color] ^= from_to_bb;
                 dst_position->hash ^= PIECE_SQUARE_HASHES[color][PAWN][to] ^ PIECE_SQUARE_HASHES[color][PAWN][from];
                 if (captured)
                 {
-                    dst_position->pieces[captured] ^= to_BB;
-                    dst_position->pieces_of_color[ENEMY(color)] ^= to_BB;
+                    dst_position->pieces[captured] ^= to_bb;
+                    dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
                     dst_position->hash ^= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
                 }
                 else if (!((to - from) & 0x0F)) /* equivalent to (abs(from - to) == 16) in this context */
@@ -93,23 +93,23 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
                 /* en passant capture: capture location is source rank, destination file */
                 const int en_passant_capture_location = (from & 0x38) | (to & 0x07);
                 const bitboard en_passant_capture_BB = BITBOARD(en_passant_capture_location);       
-                dst_position->pieces_of_color[color] ^= from_to_BB;
+                dst_position->pieces_of_color[color] ^= from_to_bb;
                 dst_position->pieces_of_color[ENEMY(color)] ^= en_passant_capture_BB;
-                dst_position->pawns ^= from_to_BB | en_passant_capture_BB;
+                dst_position->pawns ^= from_to_bb | en_passant_capture_BB;
                 dst_position->hash ^= PIECE_SQUARE_HASHES[color][PAWN][to] ^ PIECE_SQUARE_HASHES[color][PAWN][from] ^ PIECE_SQUARE_HASHES[ENEMY(color)][PAWN][en_passant_capture_location];
             }
         }
         else
         {
             /* pawn promotion */
-            dst_position->pawns ^= from_BB;
-            dst_position->pieces[promoted] ^= to_BB;
-            dst_position->pieces_of_color[color] ^= from_to_BB;
+            dst_position->pawns ^= from_bb;
+            dst_position->pieces[promoted] ^= to_bb;
+            dst_position->pieces_of_color[color] ^= from_to_bb;
             dst_position->hash ^= PIECE_SQUARE_HASHES[color][PAWN][from] ^ PIECE_SQUARE_HASHES[color][promoted][to];
             if (captured)
             {
-                dst_position->pieces[captured] ^= to_BB;
-                dst_position->pieces_of_color[ENEMY(color)] ^= to_BB;
+                dst_position->pieces[captured] ^= to_bb;
+                dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
                 dst_position->hash ^= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
             }
         }
@@ -121,14 +121,14 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     case BISHOP:
     case ROOK:
     case QUEEN:
-        dst_position->pieces[piece] ^= from_to_BB;
-        dst_position->pieces_of_color[color] ^= from_to_BB;
+        dst_position->pieces[piece] ^= from_to_bb;
+        dst_position->pieces_of_color[color] ^= from_to_bb;
         dst_position->hash ^= PIECE_SQUARE_HASHES[color][piece][to] ^ PIECE_SQUARE_HASHES[color][piece][from];
         if (captured)
         {
             dst_position->reversible_move_count = 0;
-            dst_position->pieces[captured] ^= to_BB;
-            dst_position->pieces_of_color[ENEMY(color)] ^= to_BB;
+            dst_position->pieces[captured] ^= to_bb;
+            dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
             dst_position->hash ^= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
         }
         break;
