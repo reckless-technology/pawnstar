@@ -262,7 +262,6 @@
     <ClCompile Include="main.c" />
     <ClCompile Include="make_moves.c" />
     <ClCompile Include="move_generation.c" />
-    <ClCompile Include="move_generator.c" />
     <ClCompile Include="move_to_string.c" />
     <ClCompile Include="opening_book.c" />
     <ClCompile Include="opening_book_moves.c" />

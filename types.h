@@ -31,20 +31,6 @@ enum Color
     NEITHER_COLOR,
 };
 /******************************************************************************
-Move types
-*******************************************************************************/
-enum MoveType
-{
-    NON_CAPTURE,                // non capture by knight, bishop, rook, queen or king           
-    SINGLE_PAWN_PUSH,           // pawn moves forward one square
-    DOUBLE_PAWN_PUSH,           // pawn moves forward two squares
-    CASTLING,                   // castling move
-    EN_PASSANT_CAPTURE,         // pawn takes pawn en passant
-    CAPTURE,                    // capture by a knight, bishop, rook, queen or king
-    PAWN_PROMOTION_NON_CAPTURE, // pawn push to promotion
-    PAWN_PROMOTION_CAPTURE,     // pawn captures and simultaneously promotes
-};
-/******************************************************************************
 Time control clock types
 *******************************************************************************/
 enum ClockType
@@ -178,36 +164,6 @@ struct Position
     uchar   reversible_move_count;  // number of consecutive reversible half-moves (plies)
     uchar   full_move_count;        // number of full moves (NB: zero indexed)
 };
-/******************************************************************************
-Move generation context for resumable move generator
-*******************************************************************************/
-typedef struct
-{   
-    const Position* position;  
-    bitboard        promotions_west;
-    bitboard        promotions_east;
-    bitboard        promotions_forward;
-    bitboard        pawn_captures_en_passant;
-    bitboard        pawn_single_pushes;
-    bitboard        pawn_double_pushes;
-    bitboard        friendly_pieces;
-    bitboard        enemy_pieces;
-    bitboard        targets;
-    bitboard        sources;
-    bitboard        attacks_to;
-    bitboard        seventh_rank;
-    int             color;
-    int             resume_line_num;
-    int             pawn_push_delta;
-    int             pawn_west_delta;
-    int             pawn_east_delta;
-    int             captured_piece;
-    int             moving_piece;
-    int             promoted_piece;
-    int             from;
-    int             to;
-    bool            do_all_moves;
-} MoveGenerator;
 /******************************************************************************
 Values for magic bitboard attack generator for one square
 *******************************************************************************/

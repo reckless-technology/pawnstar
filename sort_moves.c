@@ -1,6 +1,6 @@
 #include "pawnstar.h"
 /******************************************************************************
-Moves are contained within the least significant 24 bits of an integer
+Moves are contained within the least significant 22 bits of an integer
 
   Bits      Interpretation
   
@@ -9,7 +9,7 @@ Moves are contained within the least significant 24 bits of an integer
 12 - 14     moving piece type
 15 - 17     captured piece type in the case of capture moves
 18 - 20     promoted piece type in the case of pawn promotions
-21 - 23     move type
+21 - 21     special flag (en passant capture or castling)
 
 A value of 0 terminates a move list
 
@@ -84,7 +84,7 @@ Sort an array of scored moves into best first (descending score) order.
 This uses a stable merge sort algorithm, and is preferred over the use of the 
 built in qsort because it avoids the overhead of the comparison predicate 
 function call, which is non trivial in C. A stable sort is required so that the
-sorting of moves at the root node, where many moves share the same alpha, is
+ordering of moves at the root node, where many moves share the same alpha, is
 preserved through multiple iterations.
 *******************************************************************************/
 void MergeSort(int num_elements, ScoredMove values[])

@@ -3,7 +3,7 @@
 /******************************************************************************
 Function like macros
 
-Moves are contained within the least significant 24 bits of an integer
+Moves are contained within the least significant 22 bits of an integer
 
   Bits      Interpretation
   
@@ -12,24 +12,27 @@ Moves are contained within the least significant 24 bits of an integer
 12 - 14     moving piece type
 15 - 17     captured piece type in the case of capture moves
 18 - 20     promoted piece type in the case of pawn promotions
-21 - 23     move type
+21 - 21     special flag (castling or en passant capture move)
 
 A value of 0 terminates a move list
 *******************************************************************************/
-#define CONSTRUCT_PROMOTION_MOVE(from, to, type, captured, promoted) \
+#define CONSTRUCT_PROMOTION_MOVE(from, to, captured, promoted) \
                                         ((to) | ((from) << 6) | (PAWN << 12) | \
-                                        ((captured) << 15) | ((promoted) << 18) | ((type) << 21))
-#define CONSTRUCT_MOVE(from, to, piece, type, captured) \
+                                        ((captured) << 15) | ((promoted) << 18))
+#define CONSTRUCT_MOVE(from, to, piece, captured) \
                                         ((to) | ((from) << 6) | ((piece) << 12) | \
-                                        ((captured) << 15) | ((type) << 21))
+                                        ((captured) << 15))
 #define CONSTRUCT_NON_CAPTURE_MOVE(from, to, piece) \
                                         ((to) | ((from) << 6) | ((piece) << 12))
+#define CONSTRUCT_SPECIAL_MOVE(from, to, piece, captured) \
+                                        ((to) | ((from) << 6) | ((piece) << 12) | \
+                                        ((captured) << 15) | 0x200000)
 #define MOVE_TO(m)                      ( (m)        & 0x3F)
 #define MOVE_FROM(m)                    (((m) >>  6) & 0x3F)
 #define MOVE_PIECE(m)                   (((m) >> 12) & 0x07)
 #define MOVE_CAPTURED(m)                (((m) >> 15) & 0x07)
 #define MOVE_PROMOTED(m)                (((m) >> 18) & 0x07)
-#define MOVE_TYPE(m)                    (((m) >> 21) & 0x07)
+#define MOVE_IS_SPECIAL(m)              (((m) >> 21))
 #define FILE_OF(locn)                   ((locn) & 7)
 #define RANK_OF(locn)                   ((locn) >> 3)
 #define FILE_CHAR(locn)                 ('a' + ((locn) & 7))

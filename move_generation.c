@@ -5,7 +5,7 @@ Functions to generate pseudo-legal and strictly-legal moves. Pseudo-legal moves
 may leave our king in check; this is tested during search for improved 
 efficiency.
 
-Moves are contained within the least significant 24 bits of an integer
+Moves are contained within the least significant 22 bits of an integer
 
   Bits      Interpretation
   
@@ -14,7 +14,7 @@ Moves are contained within the least significant 24 bits of an integer
 12 - 14     moving piece type
 15 - 17     captured piece type in the case of capture moves
 18 - 20     promoted piece type in the case of pawn promotions
-21 - 23     move type
+21 - 21     special flag (castling or en passant capture move)
 
 A value of 0 terminates a move list
 
@@ -37,8 +37,6 @@ Returns the end of the buffer (one past the last move generated)
 *******************************************************************************/
 int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all_moves)
 { 
-    bitboard   sources;
-    bitboard   dests;
     bitboard   pawns;
     bitboard   promotions_west;
     bitboard   promotions_east;
@@ -109,34 +107,34 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
     while (promotions_west)
     {
         const int to = FindAndClearLsb(&promotions_west);
-        *moves = CONSTRUCT_PROMOTION_MOVE(to - west_delta, to, PAWN_PROMOTION_CAPTURE, board_pieces[to], QUEEN);
+        *moves = CONSTRUCT_PROMOTION_MOVE(to - west_delta, to, board_pieces[to], QUEEN);
         GenerateUnderpromotions(&moves);
     }
     while (promotions_east)
     {
         const int to = FindAndClearLsb(&promotions_east);
-        *moves = CONSTRUCT_PROMOTION_MOVE(to - east_delta, to, PAWN_PROMOTION_CAPTURE, board_pieces[to], QUEEN);
+        *moves = CONSTRUCT_PROMOTION_MOVE(to - east_delta, to, board_pieces[to], QUEEN);
         GenerateUnderpromotions(&moves);
     }
     while (promotions)
     {
         const int to = FindAndClearLsb(&promotions);
-        *moves = CONSTRUCT_PROMOTION_MOVE(to - push_delta, to, PAWN_PROMOTION_NON_CAPTURE, NO_PIECE, QUEEN);
+        *moves = CONSTRUCT_PROMOTION_MOVE(to - push_delta, to, NO_PIECE, QUEEN);
         GenerateUnderpromotions(&moves);
     }
     while (captures_west)
     {
         const int to = FindAndClearLsb(&captures_west);
-        *moves++ = CONSTRUCT_MOVE(to - west_delta, to, PAWN, CAPTURE, board_pieces[to]);
+        *moves++ = CONSTRUCT_MOVE(to - west_delta, to, PAWN, board_pieces[to]);
     }
     while (captures_east)
     {
         const int to = FindAndClearLsb(&captures_east);
-        *moves++ = CONSTRUCT_MOVE(to - east_delta, to, PAWN, CAPTURE, board_pieces[to]);
+        *moves++ = CONSTRUCT_MOVE(to - east_delta, to, PAWN, board_pieces[to]);
     }
     while (en_passant_sources)
     {
-        *moves++ = CONSTRUCT_MOVE(FindAndClearLsb(&en_passant_sources), position->en_passant_index, PAWN, EN_PASSANT_CAPTURE, PAWN);
+        *moves++ = CONSTRUCT_SPECIAL_MOVE(FindAndClearLsb(&en_passant_sources), position->en_passant_index, PAWN, PAWN);
     }
     if (do_all_moves)
     {
@@ -144,20 +142,20 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
         while (double_pushes)
         {
             const int to = FindAndClearLsb(&double_pushes);
-            *moves++ = CONSTRUCT_MOVE(to - push_delta, to, PAWN, DOUBLE_PAWN_PUSH, NO_PIECE);
+            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(to - push_delta, to, PAWN);
         }
         push_delta >>= 1;
         while (single_pushes)
         {
             const int to = FindAndClearLsb(&single_pushes);
-            *moves++ = CONSTRUCT_MOVE(to - push_delta, to, PAWN, SINGLE_PAWN_PUSH, NO_PIECE);
+            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(to - push_delta, to, PAWN);
         }
     }
     /**************************************************************************
     Generate non pawn piece moves
     ***************************************************************************/
-    sources = (position->occupied_squares ^ position->pawns) & position->pieces_of_color[color];
-    dests   = do_all_moves ? ~position->pieces_of_color[color] : position->pieces_of_color[ENEMY(color)];
+    bitboard sources = (position->occupied_squares ^ position->pawns) & position->pieces_of_color[color];
+    const bitboard dests = do_all_moves ? ~position->pieces_of_color[color] : position->pieces_of_color[ENEMY(color)];
     while (sources)
     {
         const int from  = FindAndClearLsb(&sources);
@@ -166,14 +164,7 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
         while (targets)
         {
             const int to = FindAndClearLsb(&targets);
-            if (board_pieces[to])
-            {
-                *moves++ = CONSTRUCT_MOVE(from, to, piece, CAPTURE, board_pieces[to]);
-            }
-            else
-            {
-                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, piece);
-            }
+            *moves++ = CONSTRUCT_MOVE(from, to, piece, board_pieces[to]);
         }
     }
     if (do_all_moves && !(position->state_flags & IS_CHECK))
@@ -188,14 +179,14 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
                 !IsAttacked(position, F1, BLACK)              &&  /* f1 is not attacked by black and                   */
                 !IsAttacked(position, G1, BLACK))                 /* the king's destination is not attacked by black   */
             {
-                *moves++ = CONSTRUCT_MOVE(E1, G1, KING, CASTLING, NO_PIECE);
+                *moves++ = CONSTRUCT_SPECIAL_MOVE(E1, G1, KING, NO_PIECE);
             }
             if ((position->castle_flags & MAY_WHITE_Q)               &&
                 !(position->occupied_squares & (B1BB | C1BB | D1BB)) &&                              
                 !IsAttacked(position, D1, BLACK)                     &&
                 !IsAttacked(position, C1, BLACK))
             {
-                *moves++ = CONSTRUCT_MOVE(E1, C1, KING, CASTLING, NO_PIECE);
+                *moves++ = CONSTRUCT_SPECIAL_MOVE(E1, C1, KING, NO_PIECE);
             }
         }
         else if (color == BLACK && !(position->castle_flags & HAS_BLACK_CASTLED))
@@ -205,14 +196,14 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
                 !IsAttacked(position, F8, WHITE)              &&
                 !IsAttacked(position, G8, WHITE))
             {
-                *moves++ = CONSTRUCT_MOVE(E8, G8, KING, CASTLING, NO_PIECE);
+                *moves++ = CONSTRUCT_SPECIAL_MOVE(E8, G8, KING, NO_PIECE);
             }
             if ((position->castle_flags & MAY_BLACK_Q)               &&
                 !(position->occupied_squares & (B8BB | C8BB | D8BB)) &&                              
                 !IsAttacked(position, D8, WHITE)                     &&
                 !IsAttacked(position, C8, WHITE))
             {
-                *moves++ = CONSTRUCT_MOVE(E8, C8, KING, CASTLING, NO_PIECE);
+                *moves++ = CONSTRUCT_SPECIAL_MOVE(E8, C8, KING, NO_PIECE);
             }
         }
     }

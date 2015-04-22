@@ -9,7 +9,7 @@ With the exception of one-time called FreeAllSearchTasks and InitializeTaskList,
 all functions are thread-safe as they are called from each of the search worker 
 threads.
 *******************************************************************************/
-static volatile int    pending_task_count;
+static volatile int     pending_task_count;
 static SearchTask*      pending_tasks_head;
 static SearchTask*      pending_tasks_tail;
 static SearchTask*      free_tasks;

@@ -56,26 +56,24 @@ static void CategorizeMoves(const Position* src_position, const int moves[], Per
         {
             ++counts->checks;
         }
-        switch (MOVE_TYPE(*move))
+        if (MOVE_CAPTURED(*move))
         {
-        case NON_CAPTURE:
-            break;
-        case CAPTURE:
             ++counts->captures;
-            break;
-        case EN_PASSANT_CAPTURE:
-            ++counts->captures;
-            ++counts->ep_captures;
-            break;
-        case PAWN_PROMOTION_CAPTURE:
-            ++counts->captures;
+        }
+        if (MOVE_PROMOTED(*move))
+        {
             ++counts->promotions;
-            break;
-        case PAWN_PROMOTION_NON_CAPTURE:
-            ++counts->promotions;
-            break;
-        case CASTLING:
-            ++counts->castles;
+        }
+        if (MOVE_IS_SPECIAL(*move))
+        {
+            if (MOVE_PIECE(*move) == PAWN)
+            {
+                ++counts->ep_captures;
+            }
+            else
+            {
+                ++counts->castles;
+            }
         }
     }
 }

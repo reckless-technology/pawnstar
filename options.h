@@ -56,7 +56,7 @@ Whether to enable futility pruning at frontier nodes
 Whether to enable late move reductions
 *******************************************************************************/
 #ifndef DO_LATE_MOVE_REDUCTION
-#define DO_LATE_MOVE_REDUCTION 1
+#define DO_LATE_MOVE_REDUCTION 0
 #endif
 /******************************************************************************
 Whether to skip moves in quiescence search which have a negative static

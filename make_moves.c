@@ -38,188 +38,144 @@ void MakeNullMove(Position* dst_position, const Position* src_position)
 Construct a new position from an old position and a move
 *******************************************************************************/
 void MakeMove(Position* dst_position, const Position* src_position, int move)
-{
-    int en_passant_capture_location;
-    bitboard en_passant_capture_BB;    
-    int promoted;                  
+{                          
     const int color             = COLOR_TO_MOVE(src_position);
-    const int enemy             = ENEMY(color);
     const int from              = MOVE_FROM(move);
     const int to                = MOVE_TO(move);
     const int piece             = MOVE_PIECE(move);
-    const int type              = MOVE_TYPE(move);
     const int captured          = MOVE_CAPTURED(move);
+    const int promoted          = MOVE_PROMOTED(move); 
     const bitboard from_BB      = BITBOARD(from);
     const bitboard to_BB        = BITBOARD(to);
     const bitboard from_to_BB   = from_BB | to_BB;
-    *dst_position               = *src_position;
-    dst_position->previous      = src_position;
-    dst_position->move          = move;
+    
+    *dst_position = *src_position;
+    dst_position->previous = src_position;
+    dst_position->move = move;
     dst_position->castle_flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
     if (dst_position->castle_flags != src_position->castle_flags)
     {
-        dst_position->hash ^=
-            CASTLING_RIGHTS_HASHES[dst_position->castle_flags & ALL_RIGHTS] ^
-            CASTLING_RIGHTS_HASHES[src_position->castle_flags & ALL_RIGHTS];
+        dst_position->hash ^= CASTLING_RIGHTS_HASHES[dst_position->castle_flags & ALL_RIGHTS] ^ CASTLING_RIGHTS_HASHES[src_position->castle_flags & ALL_RIGHTS];
     }
     if (dst_position->en_passant_index)
     {
         dst_position->hash ^= EN_PASSANT_HASHES[FILE_OF(dst_position->en_passant_index)];
         dst_position->en_passant_index = 0;
     }
-    if (piece == KING)
+    ++dst_position->reversible_move_count;
+    switch (piece)
     {
+    case PAWN:
+        dst_position->reversible_move_count = 0;
+        if (!promoted)
+        {
+            if (!MOVE_IS_SPECIAL(move))
+            {
+                /* regular pawn move */
+                dst_position->pawns ^= from_to_BB;
+                dst_position->pieces_of_color[color] ^= from_to_BB;
+                dst_position->hash ^= PIECE_SQUARE_HASHES[color][PAWN][to] ^ PIECE_SQUARE_HASHES[color][PAWN][from];
+                if (captured)
+                {
+                    dst_position->pieces[captured] ^= to_BB;
+                    dst_position->pieces_of_color[ENEMY(color)] ^= to_BB;
+                    dst_position->hash ^= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
+                }
+                else if (!((to - from) & 0x0F)) /* equivalent to (abs(from - to) == 16) in this context */
+                {
+                    /* double pawn push */
+                    dst_position->en_passant_index = (uchar)((from + to) >> 1);
+                    dst_position->hash ^= EN_PASSANT_HASHES[FILE_OF(from)];
+                }
+            }
+            else
+            {
+                /* en passant capture: capture location is source rank, destination file */
+                const int en_passant_capture_location = (from & 0x38) | (to & 0x07);
+                const bitboard en_passant_capture_BB = BITBOARD(en_passant_capture_location);       
+                dst_position->pieces_of_color[color] ^= from_to_BB;
+                dst_position->pieces_of_color[ENEMY(color)] ^= en_passant_capture_BB;
+                dst_position->pawns ^= from_to_BB | en_passant_capture_BB;
+                dst_position->hash ^= PIECE_SQUARE_HASHES[color][PAWN][to] ^ PIECE_SQUARE_HASHES[color][PAWN][from] ^ PIECE_SQUARE_HASHES[ENEMY(color)][PAWN][en_passant_capture_location];
+            }
+        }
+        else
+        {
+            /* pawn promotion */
+            dst_position->pawns ^= from_BB;
+            dst_position->pieces[promoted] ^= to_BB;
+            dst_position->pieces_of_color[color] ^= from_to_BB;
+            dst_position->hash ^= PIECE_SQUARE_HASHES[color][PAWN][from] ^ PIECE_SQUARE_HASHES[color][promoted][to];
+            if (captured)
+            {
+                dst_position->pieces[captured] ^= to_BB;
+                dst_position->pieces_of_color[ENEMY(color)] ^= to_BB;
+                dst_position->hash ^= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
+            }
+        }
+        break;
+
+    RegularMove:
+    default:
+    case KNIGHT:
+    case BISHOP:
+    case ROOK:
+    case QUEEN:
+        dst_position->pieces[piece] ^= from_to_BB;
+        dst_position->pieces_of_color[color] ^= from_to_BB;
+        dst_position->hash ^= PIECE_SQUARE_HASHES[color][piece][to] ^ PIECE_SQUARE_HASHES[color][piece][from];
+        if (captured)
+        {
+            dst_position->reversible_move_count = 0;
+            dst_position->pieces[captured] ^= to_BB;
+            dst_position->pieces_of_color[ENEMY(color)] ^= to_BB;
+            dst_position->hash ^= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
+        }
+        break;
+
+    case KING:
         dst_position->king_location[color] = (uchar)to;
-    }
-    switch (type)
-    {
-    case CAPTURE:
-        dst_position->reversible_move_count  = 0;
-        dst_position->pieces[captured]       ^= to_BB;
-        dst_position->pieces_of_color[enemy] ^= to_BB;
-        dst_position->pieces[piece]          ^= from_to_BB;
-        dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares       ^= from_BB;
-        dst_position->hash ^=
-            PIECE_SQUARE_HASHES[color][piece][to]   ^
-            PIECE_SQUARE_HASHES[color][piece][from] ^
-            PIECE_SQUARE_HASHES[enemy][captured][to];       
-        break;
-    case NON_CAPTURE:
-        ++dst_position->reversible_move_count;
-        dst_position->pieces[piece]          ^= from_to_BB;
-        dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares       ^= from_to_BB;
-        dst_position->hash ^=
-            PIECE_SQUARE_HASHES[color][piece][to] ^
-            PIECE_SQUARE_HASHES[color][piece][from];
-        break;
-    case DOUBLE_PAWN_PUSH:
-        dst_position->en_passant_index       = (uchar)((from + to) >> 1);
-        dst_position->reversible_move_count  = 0;
-        dst_position->pawns                  ^= from_to_BB;
-        dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares       ^= from_to_BB;
-        dst_position->hash ^=
-            PIECE_SQUARE_HASHES[color][PAWN][to]   ^
-            PIECE_SQUARE_HASHES[color][PAWN][from] ^
-            EN_PASSANT_HASHES[FILE_OF(from)];
-        break;
-    case SINGLE_PAWN_PUSH:
-        dst_position->reversible_move_count  = 0;
-        dst_position->pawns                  ^= from_to_BB;
-        dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares       ^= from_to_BB;
-        dst_position->hash ^=
-            PIECE_SQUARE_HASHES[color][PAWN][to] ^
-            PIECE_SQUARE_HASHES[color][PAWN][from];
-        break;
-    case EN_PASSANT_CAPTURE:
-        dst_position->reversible_move_count = 0;
-        en_passant_capture_location = (from & 0x38) | (to & 0x07); // captured location is source rank, destination file
-        en_passant_capture_BB = BITBOARD(en_passant_capture_location);       
-        dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->pieces_of_color[enemy] ^= en_passant_capture_BB;
-        dst_position->pawns             ^= from_to_BB | en_passant_capture_BB;
-        dst_position->occupied_squares  ^= from_to_BB | en_passant_capture_BB;
-        dst_position->hash ^=
-            PIECE_SQUARE_HASHES[color][PAWN][to]   ^
-            PIECE_SQUARE_HASHES[color][PAWN][from] ^
-            PIECE_SQUARE_HASHES[enemy][PAWN][en_passant_capture_location];
-        break;
-    case PAWN_PROMOTION_CAPTURE:
-        dst_position->reversible_move_count = 0;
-        promoted = MOVE_PROMOTED(move);
-        dst_position->pieces[captured]       ^= to_BB;
-        dst_position->pieces_of_color[enemy] ^= to_BB;
-        dst_position->pawns                  ^= from_BB;
-        dst_position->pieces[promoted]       ^= to_BB;
-        dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares       ^= from_BB;
-        dst_position->hash ^=
-            PIECE_SQUARE_HASHES[color][PAWN][from]   ^
-            PIECE_SQUARE_HASHES[color][promoted][to] ^
-            PIECE_SQUARE_HASHES[enemy][captured][to];
-        break;
-    case PAWN_PROMOTION_NON_CAPTURE:
-        dst_position->reversible_move_count = 0;
-        promoted = MOVE_PROMOTED(move);
-        dst_position->pawns                  ^= from_BB;
-        dst_position->pieces[promoted]       ^= to_BB;
-        dst_position->pieces_of_color[color] ^= from_to_BB;
-        dst_position->occupied_squares       ^= from_to_BB;
-        dst_position->hash ^=
-            PIECE_SQUARE_HASHES[color][PAWN][from] ^
-            PIECE_SQUARE_HASHES[color][promoted][to];
-        break;
-    case CASTLING:
-        dst_position->reversible_move_count = 0;
+        if (!MOVE_IS_SPECIAL(move))
+        {
+            goto RegularMove;
+        }
+        /* castling move */
         switch (to)
         {
         case G1:
-            /******************************************************************
-            white castles king side
-            *******************************************************************/
             dst_position->kings ^= E1BB | G1BB;
             dst_position->rooks ^= H1BB | F1BB;
-            dst_position->white_pieces     ^= E1BB | F1BB | G1BB | H1BB;
-            dst_position->occupied_squares ^= E1BB | F1BB | G1BB | H1BB;
-            dst_position->hash ^=
-                PIECE_SQUARE_HASHES[WHITE][KING][E1] ^
-                PIECE_SQUARE_HASHES[WHITE][KING][G1] ^
-                PIECE_SQUARE_HASHES[WHITE][ROOK][H1] ^
-                PIECE_SQUARE_HASHES[WHITE][ROOK][F1];
+            dst_position->white_pieces ^= E1BB | F1BB | G1BB | H1BB;
+            dst_position->hash ^= PIECE_SQUARE_HASHES[WHITE][KING][E1] ^ PIECE_SQUARE_HASHES[WHITE][KING][G1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][H1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][F1];
             dst_position->castle_flags |= HAS_WHITE_CASTLED;
             break;
         case C1:
-            /******************************************************************
-            white castles queen side
-            *******************************************************************/
             dst_position->kings ^= E1BB | C1BB;
             dst_position->rooks ^= A1BB | D1BB;
-            dst_position->white_pieces     ^= A1BB | C1BB | D1BB | E1BB;
-            dst_position->occupied_squares ^= A1BB | C1BB | D1BB | E1BB;
-            dst_position->hash ^=
-                PIECE_SQUARE_HASHES[WHITE][KING][E1] ^
-                PIECE_SQUARE_HASHES[WHITE][KING][C1] ^
-                PIECE_SQUARE_HASHES[WHITE][ROOK][A1] ^
-                PIECE_SQUARE_HASHES[WHITE][ROOK][D1];
+            dst_position->white_pieces ^= A1BB | C1BB | D1BB | E1BB;
+            dst_position->hash ^= PIECE_SQUARE_HASHES[WHITE][KING][E1] ^ PIECE_SQUARE_HASHES[WHITE][KING][C1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][A1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][D1];
             dst_position->castle_flags |= HAS_WHITE_CASTLED;
             break;
         case G8:
-            /******************************************************************
-            black castles king side
-            *******************************************************************/
             dst_position->kings ^= E8BB | G8BB;
             dst_position->rooks ^= H8BB | F8BB;
-            dst_position->black_pieces     ^= E8BB | F8BB | G8BB | H8BB;
-            dst_position->occupied_squares ^= E8BB | F8BB | G8BB | H8BB;
-            dst_position->hash ^=
-                PIECE_SQUARE_HASHES[BLACK][KING][E8] ^
-                PIECE_SQUARE_HASHES[BLACK][KING][G8] ^
-                PIECE_SQUARE_HASHES[BLACK][ROOK][H8] ^
-                PIECE_SQUARE_HASHES[BLACK][ROOK][F8];
+            dst_position->black_pieces ^= E8BB | F8BB | G8BB | H8BB;
+            dst_position->hash ^= PIECE_SQUARE_HASHES[BLACK][KING][E8] ^ PIECE_SQUARE_HASHES[BLACK][KING][G8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][H8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][F8];
             dst_position->castle_flags |= HAS_BLACK_CASTLED;
             break;
         case C8:
-            /******************************************************************
-            black castles queen side
-            *******************************************************************/
             dst_position->kings ^= E8BB | C8BB;
             dst_position->rooks ^= A8BB | D8BB;
-            dst_position->black_pieces     ^= A8BB | C8BB | D8BB | E8BB;
-            dst_position->occupied_squares ^= A8BB | C8BB | D8BB | E8BB;
-            dst_position->hash ^=
-                PIECE_SQUARE_HASHES[BLACK][KING][E8] ^
-                PIECE_SQUARE_HASHES[BLACK][KING][C8] ^
-                PIECE_SQUARE_HASHES[BLACK][ROOK][A8] ^
-                PIECE_SQUARE_HASHES[BLACK][ROOK][D8];
+            dst_position->black_pieces ^= A8BB | C8BB | D8BB | E8BB;
+            dst_position->hash ^= PIECE_SQUARE_HASHES[BLACK][KING][E8] ^ PIECE_SQUARE_HASHES[BLACK][KING][C8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][A8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][D8];
             dst_position->castle_flags |= HAS_BLACK_CASTLED;
             break;
         default:
             break;
-        }
+            }
+        break;
     }
+    dst_position->occupied_squares = dst_position->white_pieces | dst_position->black_pieces;  
     dst_position->state_flags ^= IS_BLACK_TO_MOVE;
     dst_position->hash = ~dst_position->hash;
     dst_position->full_move_count += (color == BLACK);

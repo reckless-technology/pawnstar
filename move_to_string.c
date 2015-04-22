@@ -77,51 +77,73 @@ char* MoveToSanString(const Position* position, int the_move, char move_string[]
     {
         disambiguation[0] = '\0';
     }
-    /**************************************************************************
-    Now generate the SAN string based on the move type
-    ***************************************************************************/
-    switch (MOVE_TYPE(the_move))
+    switch (MOVE_PIECE(the_move))
     {
-    case NON_CAPTURE:
-        move_string += sprintf(move_string, "%c%s%s", "  NBRQK"[MOVE_PIECE(the_move)], disambiguation, to_square);
-        break;
-    case SINGLE_PAWN_PUSH:
-    case DOUBLE_PAWN_PUSH:
-        move_string += sprintf(move_string, "%s", to_square); 
-        break;
-    case CASTLING:
-        switch (MOVE_TO(the_move))
+    RegularMove:
+    default:
+    case KNIGHT:
+    case BISHOP:
+    case ROOK:
+    case QUEEN:
+        if (MOVE_CAPTURED(the_move))
         {
-        case G1:
-        case G8:
-            move_string += sprintf(move_string, "O-O");
-            break;
-        case C1:
-        case C8:
-            move_string += sprintf(move_string, "O-O-O");
-            break;
+            move_string += sprintf(move_string, "%c%sx%s", "  NBRQK"[MOVE_PIECE(the_move)], disambiguation, to_square);
+        }
+        else
+        {
+            move_string += sprintf(move_string, "%c%s%s", "  NBRQK"[MOVE_PIECE(the_move)], disambiguation, to_square);
         }
         break;
-    case EN_PASSANT_CAPTURE:
-        move_string += sprintf(move_string, "%cx%se.p.", from_square[0], to_square);
+    
+    case KING:
+        if (MOVE_IS_SPECIAL(the_move))
+        {
+            switch (MOVE_TO(the_move))
+            {
+            case G1:
+            case G8:
+                move_string += sprintf(move_string, "O-O");
+                break;
+            case C1:
+            case C8:
+                move_string += sprintf(move_string, "O-O-O");
+                break;
+            }
+        }
+        else
+        {
+            goto RegularMove;
+        }
         break;
-    case CAPTURE:
-        if (MOVE_PIECE(the_move) == PAWN)
+
+    case PAWN:
+        if (MOVE_IS_SPECIAL(the_move))
+        {
+            /* ep capture */
+            move_string += sprintf(move_string, "%cx%se.p.", from_square[0], to_square);
+        }
+        else if (MOVE_PROMOTED(the_move))
+        {
+            if (MOVE_CAPTURED(the_move))
+            {
+                move_string += sprintf(move_string, "%cx%s=%c", from_square[0], to_square, "  NBRQ"[MOVE_PROMOTED(the_move)]);
+            }
+            else
+            {
+                move_string += sprintf(move_string, "%s=%c", to_square, "  NBRQ"[MOVE_PROMOTED(the_move)]);
+            }
+        }
+        else if (MOVE_CAPTURED(the_move))
         {
             move_string += sprintf(move_string, "%cx%s", from_square[0], to_square);
         }
         else
         {
-            move_string += sprintf(move_string, "%c%sx%s", "  NBRQK"[MOVE_PIECE(the_move)], disambiguation, to_square);
+            move_string += sprintf(move_string, "%s", to_square); 
         }
         break;
-    case PAWN_PROMOTION_NON_CAPTURE:
-        move_string += sprintf(move_string, "%s=%c", to_square, "  NBRQ"[MOVE_PROMOTED(the_move)]);
-        break;
-    case PAWN_PROMOTION_CAPTURE:
-        move_string += sprintf(move_string, "%cx%s=%c", from_square[0], to_square, "  NBRQ"[MOVE_PROMOTED(the_move)]);
-        break;
-    }
+
+    }    
     /**************************************************************************
     Determine if this move results in check or checkmate
     ***************************************************************************/

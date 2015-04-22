@@ -129,8 +129,7 @@ int Search(const Position* src_position,
     Try null move pruning if ALL of the following are true:
 
     # we haven't already tried it further up this path in the tree
-    # we are not in check 
-    # this is not the root node   
+    # we are not in check   
     # we are not down to king and pawns
     # we have at least 4 pieces remaining
     # the eval score is high enough for a beta cutoff 
@@ -142,7 +141,6 @@ int Search(const Position* src_position,
     ***************************************************************************/
     if (is_null_ok                              &&
         !(src_position->state_flags & IS_CHECK) &&
-        ply != 0                                &&
         alpha == beta - 1)
     {
         const bitboard friendly_pieces = (src_position->occupied_squares ^ src_position->kings) & src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
@@ -153,7 +151,7 @@ int Search(const Position* src_position,
             Position position[1];
             INCREMENT("null move attempts");
             MakeNullMove(position, src_position);
-            score = -Search(position, depth - 3, ply + 1, -beta, -beta + 1, cancel, false, is_reduce_ok);
+            score = -Search(position, depth - 3, ply + 1, -beta, -beta + 1, cancel, is_null_ok, is_reduce_ok);
             if (*cancel)
             {
                 return ILLEGAL_SCORE;
