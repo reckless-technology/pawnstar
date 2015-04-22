@@ -16,7 +16,7 @@ uint64 ComputeHash(const Position* position)
     int piece;
     bitboard b;
     uint64 hash = position->state_flags & IS_BLACK_TO_MOVE ? ~0ull : 0ull;
-    hash ^= CASTLING_RIGHTS_HASHES[position->castle_flags & ALL_RIGHTS];
+    hash ^= CASTLING_RIGHTS_HASHES[position->castle_flags];
     if (position->en_passant_index)
     {
         hash ^= EN_PASSANT_HASHES[FILE_OF(position->en_passant_index)];
@@ -317,7 +317,7 @@ void PositionToString(const Position* position, char fen_string[])
     /**************************************************************************
     Castling rights
     ***************************************************************************/
-    if (!(position->castle_flags & ALL_RIGHTS))
+    if (!position->castle_flags)
     {
         *fen_string++ = '-';
     }

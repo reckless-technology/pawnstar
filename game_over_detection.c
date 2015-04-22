@@ -3,17 +3,6 @@
 Determine if the current position represents a draw by repetition of position
 3 times (i.e. this position has occurred in the history twice previously)
 
-Since a draw by repetition must occur with the same side to move, we only need 
-to consider positions which are 2n plies away from the present position
-
-Since pawn moves and capture moves are irreversible, we only need to consider 
-the last half-move-clock positions (as we can only reach the same position by
-a sequence of reversible moves)
-
-We start looking 4 plies back from the current position, since 2 moves 
-per side is the minimum required to obtain the same position (where each side
-makes then subsequently unmakes a reversible move)
-
 We use position Zobrist hash values to determine position equality - there is a
 tiny chance of hash collision causing an error - I have never seen it happen 
 in practice
@@ -21,22 +10,15 @@ in practice
 bool IsDrawByRepetition(const Position* position, bool is_search)
 {
     const uint64 hash = position->hash;
-    const int reversible_move_count = position->reversible_move_count;
-    int i;
     int repetitions = is_search ? 1 : 2;
-    if (reversible_move_count < 4)
+    for (int i = position->reversible_move_count; i >= 0; --i)
     {
-        return false;
-    }
-    position = position->previous->previous->previous->previous;
-    for (i = 4; i <= reversible_move_count; i += 2)
-    {
+        position = position->previous;
         if (position->hash == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");
             return true;
         }
-        position = position->previous->previous;
     }
     return false;
 }

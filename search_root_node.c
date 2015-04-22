@@ -70,7 +70,7 @@ int SearchRootNode(const Position* src_position)
         break;
     
     case CLOCK_INCREMENTAL:
-        ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 40);
+        ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 30);
         timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 3000));
         break;
     }

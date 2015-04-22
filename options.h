@@ -47,6 +47,12 @@ Whether to enable extension on recapture of same value piece
 #define DO_RECAPTURE_EXTENSION 1
 #endif
 /******************************************************************************
+Whether to enable extension on pawn push to 7th rank
+*******************************************************************************/
+#ifndef DO_PUSH_TO_SEVENTH_RANK_EXTENSION
+#define DO_PUSH_TO_SEVENTH_RANK_EXTENSION 0
+#endif
+/******************************************************************************
 Whether to enable futility pruning at frontier nodes
 *******************************************************************************/
 #ifndef DO_FUTILITY_PRUNING
@@ -56,7 +62,7 @@ Whether to enable futility pruning at frontier nodes
 Whether to enable late move reductions
 *******************************************************************************/
 #ifndef DO_LATE_MOVE_REDUCTION
-#define DO_LATE_MOVE_REDUCTION 0
+#define DO_LATE_MOVE_REDUCTION 1
 #endif
 /******************************************************************************
 Whether to skip moves in quiescence search which have a negative static

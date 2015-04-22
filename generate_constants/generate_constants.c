@@ -195,6 +195,11 @@ static bitboard KingAttacks(int location)
     return KingFill(BITBOARD(location));
 }
 
+static bitboard KingAttacks2(int location)
+{
+    return KingFill(KingAttacks(location));
+}
+
 static bitboard KingPawnShieldWhite(int location)
 {
     const bitboard b = BITBOARD(location);
@@ -289,6 +294,7 @@ static const BitboardGen GENERATORS[] = {
     { "ROOK_ATTACKS",		      RookAttacks		   },
     { "QUEEN_ATTACKS",		      QueenAttacks		   },
     { "KING_ATTACKS",		      KingAttacks		   },
+    { "KING_ATTACKS_2",           KingAttacks2         },
     { "KING_PAWN_SHIELD_WHITE",   KingPawnShieldWhite  },
     { "KING_PAWN_SHIELD_BLACK",   KingPawnShieldBlack  },
     { "KING_PAWN_SHIELD_WHITE_2", KingPawnShield2White },

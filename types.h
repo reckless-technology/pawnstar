@@ -49,9 +49,6 @@ enum CastleFlags
     MAY_WHITE_Q         = 0x02, // white has the right to castle queen side
     MAY_BLACK_K         = 0x04, // black has the right to castle king side
     MAY_BLACK_Q         = 0x08, // black has the right to castle queen side
-    HAS_WHITE_CASTLED   = 0x10, // white has castled
-    HAS_BLACK_CASTLED   = 0x20, // black has castled
-    ALL_RIGHTS          = (MAY_WHITE_K | MAY_WHITE_Q | MAY_BLACK_K | MAY_BLACK_Q),
 };
 /******************************************************************************
 Position state flags (bitset)
@@ -227,11 +224,7 @@ typedef struct
     bitboard    isolated_pawns;  // pawns with no friendly pawn on either adjacent file
     bitboard    doubled_pawns;   // pawns with a friendly pawn ahead on the same file
     bitboard    passed_pawns;    // pawns who cannot be stopped by an enemy pawn
-    bitboard    blocked_pawns;   // pawns with an enemy pawn ahead on the same file but not on either adjacent file
-    bitboard    pawn_holes;      // squares which could not be defended by a pawn
-    bitboard    outposts;        // enemy pawn holes attacked by a friendly pawn
 } PawnStructure;
-
 /******************************************************************************
 The context of a parallel search task - used when searching a move on a worker 
 thread

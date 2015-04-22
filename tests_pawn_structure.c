@@ -74,11 +74,8 @@ void DisplayPawnStructure(const Position* position)
     DeterminePawnStructure(position, ps);
     DisplayBitboard(white_pawns, black_pawns, ps[WHITE].pawn_attacks,      ps[BLACK].pawn_attacks,      "pawn attacks");
     DisplayBitboard(white_pawns, black_pawns, ps[WHITE].defended_pawns,    ps[BLACK].defended_pawns,    "defended pawns");
-    DisplayBitboard(white_pawns, black_pawns, ps[WHITE].pawn_holes,        ps[BLACK].pawn_holes,        "pawn holes");
-    DisplayBitboard(white_pawns, black_pawns, ps[WHITE].outposts,         ps[BLACK].outposts,         "outposts");
     DisplayBitboard(white_pawns, black_pawns, ps[WHITE].isolated_pawns,    ps[BLACK].isolated_pawns,    "isolated pawns");
     DisplayBitboard(white_pawns, black_pawns, ps[WHITE].doubled_pawns,     ps[BLACK].doubled_pawns,     "doubled pawns");
-    DisplayBitboard(white_pawns, black_pawns, ps[WHITE].blocked_pawns,     ps[BLACK].blocked_pawns,     "blocked pawns");
     DisplayBitboard(white_pawns, black_pawns, ps[WHITE].passed_pawns,      ps[BLACK].passed_pawns,      "passed pawns");
 }
 

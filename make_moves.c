@@ -55,7 +55,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     dst_position->castle_flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
     if (dst_position->castle_flags != src_position->castle_flags)
     {
-        dst_position->hash ^= CASTLING_RIGHTS_HASHES[dst_position->castle_flags & ALL_RIGHTS] ^ CASTLING_RIGHTS_HASHES[src_position->castle_flags & ALL_RIGHTS];
+        dst_position->hash ^= CASTLING_RIGHTS_HASHES[dst_position->castle_flags] ^ CASTLING_RIGHTS_HASHES[src_position->castle_flags];
     }
     if (dst_position->en_passant_index)
     {
@@ -147,28 +147,24 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
             dst_position->rooks ^= H1BB | F1BB;
             dst_position->white_pieces ^= E1BB | F1BB | G1BB | H1BB;
             dst_position->hash ^= PIECE_SQUARE_HASHES[WHITE][KING][E1] ^ PIECE_SQUARE_HASHES[WHITE][KING][G1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][H1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][F1];
-            dst_position->castle_flags |= HAS_WHITE_CASTLED;
             break;
         case C1:
             dst_position->kings ^= E1BB | C1BB;
             dst_position->rooks ^= A1BB | D1BB;
             dst_position->white_pieces ^= A1BB | C1BB | D1BB | E1BB;
             dst_position->hash ^= PIECE_SQUARE_HASHES[WHITE][KING][E1] ^ PIECE_SQUARE_HASHES[WHITE][KING][C1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][A1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][D1];
-            dst_position->castle_flags |= HAS_WHITE_CASTLED;
             break;
         case G8:
             dst_position->kings ^= E8BB | G8BB;
             dst_position->rooks ^= H8BB | F8BB;
             dst_position->black_pieces ^= E8BB | F8BB | G8BB | H8BB;
             dst_position->hash ^= PIECE_SQUARE_HASHES[BLACK][KING][E8] ^ PIECE_SQUARE_HASHES[BLACK][KING][G8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][H8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][F8];
-            dst_position->castle_flags |= HAS_BLACK_CASTLED;
             break;
         case C8:
             dst_position->kings ^= E8BB | C8BB;
             dst_position->rooks ^= A8BB | D8BB;
             dst_position->black_pieces ^= A8BB | C8BB | D8BB | E8BB;
             dst_position->hash ^= PIECE_SQUARE_HASHES[BLACK][KING][E8] ^ PIECE_SQUARE_HASHES[BLACK][KING][C8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][A8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][D8];
-            dst_position->castle_flags |= HAS_BLACK_CASTLED;
             break;
         default:
             break;

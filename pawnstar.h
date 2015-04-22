@@ -30,6 +30,7 @@ extern const bitboard       BISHOP_ATTACKS[64];
 extern const bitboard       ROOK_ATTACKS[64];
 extern const bitboard       QUEEN_ATTACKS[64];
 extern const bitboard       KING_ATTACKS[64];
+extern const bitboard       KING_ATTACKS_2[64];
 extern const bitboard       BISHOP_ADJACENT[64];
 extern const bitboard       KING_PAWN_SHIELD_WHITE[64];
 extern const bitboard       KING_PAWN_SHIELD_BLACK[64];

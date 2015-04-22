@@ -172,7 +172,7 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
         /**********************************************************************
         Generate castling moves
         ***********************************************************************/
-        if (color == WHITE && !(position->castle_flags & HAS_WHITE_CASTLED))
+        if (color == WHITE)
         {
             if ((position->castle_flags & MAY_WHITE_K)        &&  /* if white retains the right to castle kingside and */
                 !(position->occupied_squares & (F1BB | G1BB)) &&  /* f1 and g1 are both vacant and                     */      
@@ -189,7 +189,7 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
                 *moves++ = CONSTRUCT_SPECIAL_MOVE(E1, C1, KING, NO_PIECE);
             }
         }
-        else if (color == BLACK && !(position->castle_flags & HAS_BLACK_CASTLED))
+        else
         {
             if ((position->castle_flags & MAY_BLACK_K)        &&
                 !(position->occupied_squares & (F8BB | G8BB)) &&                                     

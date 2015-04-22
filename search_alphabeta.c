@@ -67,60 +67,46 @@ int Search(const Position* src_position,
     position.
     ***************************************************************************/
     is_transposition = FindTransposition(src_position->hash, transposition);
-    if (is_transposition)
+    if (is_transposition && transposition->depth >= depth)
     {
-        Position position[1];
-        MakeMove(position, src_position, transposition->move);
-        if (IsDrawByRepetition(position, true))
+        switch (transposition->node_type)
         {
-            /******************************************************************
-            We cannot trust this transposition table entry since it resulted
-            in a draw by repetition when played here.
-            *******************************************************************/
-            INCREMENT("table hit caused draw by repetition");
-            is_transposition = false;
-        }
-        else if (transposition->depth >= depth)
-        {           
-            switch (transposition->node_type)
+        case NODE_CUT:
+            /**************************************************************
+            We don't know the exact score of the best move from this
+            position, but we do know it is at least transposition->score
+            ***************************************************************/
+            INCREMENT("table hit cut node");
+            if (transposition->score >= beta)
             {
-            case NODE_CUT:
-                /**************************************************************
-                We don't know the exact score of the best move from this
-                position, but we do know it is at least transposition->score
-                ***************************************************************/
-                INCREMENT("table hit cut node");
-                if (transposition->score >= beta)
-                {
-                    INCREMENT("table hit beta cutoffs");
-                    return beta;
-                }
-                break;
-
-            case NODE_ALL:
-                /**************************************************************
-                We don't know the exact score of the best move from this
-                position, but we do know it is at most transposition->score
-                ***************************************************************/
-                INCREMENT("table hit all node");
-                if (transposition->score <= alpha)
-                {
-                    INCREMENT("table hit alpha cutoffs");
-                    return alpha;
-                }
-                break;
-
-            case NODE_PV:
-                /**************************************************************
-                We know the exact score and the best move from this position.
-                ***************************************************************/
-                INCREMENT("table hit pv node");
-                if (transposition->score > alpha && transposition->score < beta && transposition->move)
-                {
-                    RecordPrincipalVariationMove(src_position->hash, transposition->move);
-                }
-                return transposition->score;
+                INCREMENT("table hit beta cutoffs");
+                return beta;
             }
+            break;
+
+        case NODE_ALL:
+            /**************************************************************
+            We don't know the exact score of the best move from this
+            position, but we do know it is at most transposition->score
+            ***************************************************************/
+            INCREMENT("table hit all node");
+            if (transposition->score <= alpha)
+            {
+                INCREMENT("table hit alpha cutoffs");
+                return alpha;
+            }
+            break;
+
+        case NODE_PV:
+            /**************************************************************
+            We know the exact score and the best move from this position.
+            ***************************************************************/
+            INCREMENT("table hit pv node");
+            if (transposition->score > alpha && transposition->score < beta && transposition->move)
+            {
+                RecordPrincipalVariationMove(src_position->hash, transposition->move);
+            }
+            return transposition->score;
         }
     }
  
@@ -130,38 +116,31 @@ int Search(const Position* src_position,
 
     # we haven't already tried it further up this path in the tree
     # we are not in check   
-    # we are not down to king and pawns
-    # we have at least 4 pieces remaining
-    # the eval score is high enough for a beta cutoff 
     # this is not a PV node
-
+    # we are not down to king and pawns
+    # the eval score is high enough for a beta cutoff 
+    
     Hopefully this is sufficient to prevent most Zugzwang positions.
-
-    Null move pruning makes a huge improvement to search depth / speed. 
     ***************************************************************************/
-    if (is_null_ok                              &&
-        !(src_position->state_flags & IS_CHECK) &&
-        alpha == beta - 1)
+    if (is_null_ok                                                                                                  &&
+        !(src_position->state_flags & IS_CHECK)                                                                     &&
+        alpha == beta - 1                                                                                           && 
+        !!(src_position->pieces_of_color[COLOR_TO_MOVE(src_position)] & ~(src_position->pawns | src_position->kings)) &&
+        EvaluatePosition(src_position, alpha, beta) >= beta)
     {
-        const bitboard friendly_pieces = (src_position->occupied_squares ^ src_position->kings) & src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
-        if ((friendly_pieces & ~src_position->pawns) && 
-            PopCount(friendly_pieces) >= 4           && 
-            EvaluatePosition(src_position, alpha, beta) >= beta)
+        Position position[1];
+        INCREMENT("null move attempts");
+        MakeNullMove(position, src_position);
+        score = -Search(position, depth - 4, ply + 1, -beta, -beta + 1, cancel, false, is_reduce_ok);
+        if (*cancel)
         {
-            Position position[1];
-            INCREMENT("null move attempts");
-            MakeNullMove(position, src_position);
-            score = -Search(position, depth - 3, ply + 1, -beta, -beta + 1, cancel, is_null_ok, is_reduce_ok);
-            if (*cancel)
-            {
-                return ILLEGAL_SCORE;
-            }
-            if (score >= beta)
-            {   
-                return beta;
-            }
-            INCREMENT("null move fails");
+            return ILLEGAL_SCORE;
         }
+        if (score >= beta)
+        {
+            return beta;
+        }
+        INCREMENT("null move fails");
     }
 #endif
     
@@ -346,17 +325,18 @@ int SearchSingleMove(const Position* src_position,
         INCREMENT("extensions promotion");
         child_depth = depth;
     }
+
+#if DO_PUSH_TO_SEVENTH_RANK_EXTENSION
     else if (MOVE_PIECE(move) == PAWN && 
              RANK_OF(MOVE_TO(move)) == SEVENTH_RANK[COLOR_TO_MOVE(src_position)])
     {
         INCREMENT("extensions push to 7th");
         child_depth = depth;
     }
+#endif
 
 #if DO_RECAPTURE_EXTENSION
-    else if (MOVE_CAPTURED(move)                          &&
-             MOVE_TO(move) == MOVE_TO(src_position->move) &&
-             CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
+    else if (MOVE_CAPTURED(move) && CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
     {
         INCREMENT("extensions recapture");
         child_depth = depth;
@@ -375,7 +355,7 @@ int SearchSingleMove(const Position* src_position,
     else if (is_reduce_ok                &&
              is_deferred_move            &&
              !MOVE_CAPTURED(move)        &&
-             !HasMoveBeenGood(ply, move) &&
+             /*!HasMoveBeenGood(ply, move) &&*/
              depth > 2                   &&
              !(position->state_flags & IS_CHECK))
     {
