@@ -26,7 +26,7 @@ concepts. Whilst this assumption is questionable in theory, it has been
 empirically confirmed that it does indeed measurably speed up the search on a 
 wide variety of positions.
 *******************************************************************************/
-#define MIN(a,b)    ((a) < (b) ? (a) : (b))
+
 #define MOVE_MASK   0x7FFF                  // piece, from, to fields only
 #define MERIT(move) ((move) & 0x1F8000)     // promoted and captured material only
 
@@ -90,24 +90,21 @@ preserved through multiple iterations.
 void MergeSort(int num_elements, ScoredMove values[])
 {
     ScoredMove work[MAX_MOVES_PER_POSITION];
-    int width;
     ScoredMove* merge_src = values;
     ScoredMove* merge_dst = work;
     ScoredMove* tmp;
-    for (width = 1; width < num_elements; width *= 2)
+    for (int width = 1; width < num_elements; width *= 2)
     {
-        const int twice_width = width * 2;
-        int left;
-        for (left = 0; left < num_elements; left += twice_width)
+        for (int left = 0; left < num_elements; left += width * 2)
         {
             /******************************************************************
             Merge the 2 sub-lists:
-            merge_src[left:left+width], merge_src[left+width:left+twice_width]
+            merge_src[left:left+width], merge_src[left+width:left+width*2]
             to:
-            merge_dst[left:left+twice_width]
+            merge_dst[left:left+width*2]
             *******************************************************************/
-            const int right = MIN(left + width,       num_elements);
-            const int end   = MIN(left + twice_width, num_elements);
+            const int right = min(left + width,     num_elements);
+            const int end   = min(left + width * 2, num_elements);
             int dst = left;
             int j   = left;
             int k   = right;                    

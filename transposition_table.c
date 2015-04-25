@@ -1,18 +1,19 @@
 #include "pawnstar.h"
 
 #define MEGABYTE                    0x100000
-#define TRANSPOSITIONS_PER_BUCKET   16
+#define TRANSPOSITIONS_PER_BUCKET   13
+#define SMALL_HASTABLE_SIZE         4999
 
 static bool IsPrime(int x);
 
 typedef struct HashBucket
 {
-    long            mutex[1];
     Transposition   transpositions[TRANSPOSITIONS_PER_BUCKET];
 } HashBucket;
 
-static HashBucket*  transposition_table;
-static int          table_bucket_count;
+static HashBucket*      transposition_table;
+static int              table_bucket_count;
+static Transposition    small_transposition_table[SMALL_HASTABLE_SIZE]; /* fits in L1 cache */
 /******************************************************************************
 Delete the transposition table
 NB: NOT thread safe
@@ -57,22 +58,25 @@ Find a transposition entry for this position if one exists
 *******************************************************************************/
 bool FindTransposition(uint64 hash, Transposition* transposition)
 {
-    int i;
-    HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
-    while (_InterlockedCompareExchange(bucket->mutex, 1, 0) != 0)
+    Transposition s = small_transposition_table[hash % SMALL_HASTABLE_SIZE];
+    if ((s.hash ^ s.payload) == hash)
     {
-        INCREMENT("transposition lock contention retrieve");
+        INCREMENT("table hit small table");
+        *transposition = s;
+        return true;
     }
-    for (i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
+    HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
+    for (int i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
     {
-        if (bucket->transpositions[i].hash == hash)
+        if ((bucket->transpositions[i].hash ^ bucket->transpositions[i].payload) == hash)
         {
             *transposition = bucket->transpositions[i];
-            _InterlockedExchange(bucket->mutex, 0);
-            return true;
+            if ((transposition->hash ^ transposition->payload) == hash) /* check another thread didn't pre-empt */
+            {
+                return true;
+            }            
         }
     }
-    _InterlockedExchange(bucket->mutex, 0);
     return false;
 }
 /******************************************************************************
@@ -85,21 +89,24 @@ Hash bucket replacement policy (in priority order):
 *******************************************************************************/
 void RecordTransposition(uint64 hash, int depth, int score, int move, int node_type)
 {  
-    int i;
-    int replace  = 0;  
+    Transposition t = 
+    {
+        .depth     = (short)depth,
+        .score     = (short)score,
+        .move      = move,
+        .node_type = node_type
+    };
+    t.hash = hash ^ t.payload;
+    int replace = 0;  
     int best_score = 0;
     HashBucket* const bucket = &transposition_table[hash % table_bucket_count];  
-    while (_InterlockedCompareExchange(bucket->mutex, 1, 0) != 0)
-    {
-        INCREMENT("transposition lock contention record");
-    }
-    for (i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
+    for (int i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
     {
         const int score = 
-            8 * (bucket->transpositions[i].hash == hash)                                  +
-            4 * (bucket->transpositions[i].hash == 0)                                     +
-            2 * (bucket->transpositions[i].node_type != NODE_PV)                          +
-                (bucket->transpositions[i].depth < bucket->transpositions[replace].depth);
+            8 * ((bucket->transpositions[i].hash ^ bucket->transpositions[i].payload) == hash) +
+            4 *  (bucket->transpositions[i].hash == 0)                                         +
+            2 *  (bucket->transpositions[i].node_type != NODE_PV)                              +
+                 (bucket->transpositions[i].depth < bucket->transpositions[replace].depth);
 
         if (score > best_score)
         {
@@ -111,12 +118,8 @@ void RecordTransposition(uint64 hash, int depth, int score, int move, int node_t
             }
         }
     }
-    bucket->transpositions[replace].hash        = hash;
-    bucket->transpositions[replace].depth       = (short)depth;
-    bucket->transpositions[replace].score       = (short)score;
-    bucket->transpositions[replace].move        = move;
-    bucket->transpositions[replace].node_type   = node_type;
-    _InterlockedExchange(bucket->mutex, 0);
+    bucket->transpositions[replace] = t;
+    small_transposition_table[hash % SMALL_HASTABLE_SIZE] = t;
 }
 /******************************************************************************
 We get marginally better dispersion when the hashtable size is a prime number
@@ -124,12 +127,11 @@ Determine if a candidate size is prime (excluding 1 and 2)
 *******************************************************************************/
 static bool IsPrime(int x)
 {
-    int i;
     if (x < 3)
     {
         return false;
     }
-    for (i = 2; i * i <= x; ++i)
+    for (int i = 2; i * i <= x; ++i)
     {
         if (x % i == 0)
         {

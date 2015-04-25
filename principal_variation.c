@@ -6,8 +6,8 @@ Uses Robert Hyatt's XOR trick to do lockless thread safe retrieval
 *******************************************************************************/
 typedef struct
 {
-    uint64  hash;   
-    uint64  payload; /* (move | (random << 32)) */
+    uint64  hash;
+    uint64  payload;
 } PvMove;
 
 static PvMove pv_table[PV_TABLE_SIZE];

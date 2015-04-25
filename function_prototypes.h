@@ -125,6 +125,7 @@ void        RunStaticExchangeTests(void);
 /******************************************************************************
 Simple PRNG
 *******************************************************************************/
+void        InitializeRandom(void);
 int         NextRandom(void);
 /******************************************************************************
 Debugging counts dictionary - DEBUG and RELEASEX configurations only

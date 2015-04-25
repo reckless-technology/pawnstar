@@ -119,8 +119,8 @@ Structure to hold a move and its associated score - used when sorting moves
 *******************************************************************************/
 typedef struct
 {
-    int move;   // the move
-    int score;  // its associated value
+    int move;       // the move
+    int score;      // its associated value
 } ScoredMove;
 /******************************************************************************
 A chess position
@@ -155,7 +155,7 @@ struct Position
     uint64  hash;                   // Zobrist hash of this position
     int     move;                   // the move which led to this position
     uchar   king_location[2];       // square index on which each king sits 
-    uchar   castle_flags;           // castling rights and has-castled flags
+    uchar   castle_flags;           // castling rights
     uchar   state_flags;            // game state-machine flags
     uchar   en_passant_index;       // en passant capture availability square (0 if none)
     uchar   reversible_move_count;  // number of consecutive reversible half-moves (plies)
@@ -166,11 +166,11 @@ Values for magic bitboard attack generator for one square
 *******************************************************************************/
 typedef struct
 {
-    uint64          magic;
-    bitboard        occupancy_mask;   
-    const uchar*    attack_indices;
-    const bitboard* attacks;
-    int             shift;
+    uint64          magic;          // the multiplier
+    bitboard        occupancy_mask; // mask for the pertinent occupied squares excluding outer squares
+    const uchar*    attack_indices; // indices into the attacks set
+    const bitboard* attacks;        // the set of distinct attacks 
+    int             shift;          // right shift amount after multiplication
 } MagicMoveEntry;
 /******************************************************************************
 Clock and time control information
@@ -201,10 +201,17 @@ A transposition (result of a previous search)
 typedef struct
 {
     uint64  hash;
-    short   depth;
-    short   score;
-    int     move        : 24;
-    int     node_type   :  8;
+    union
+    {
+        uint64 payload;
+        struct
+        {
+            short   depth;
+            short   score;
+            int     move        : 24;
+            int     node_type   :  8;
+        };
+    };      
 } Transposition;
 /******************************************************************************
 Information about pinned pieces and their possible move targets

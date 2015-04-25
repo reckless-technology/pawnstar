@@ -47,6 +47,7 @@ int main()
     InitializeTaskList();
     InitializePrincipalVariationTable();
     InitializeThreads(1);
+    InitializeRandom();
     if (!InitializeOpeningBookFromFile("pawnstar.book"))
     {
         printf("NOTE: using built in opening book\n");
