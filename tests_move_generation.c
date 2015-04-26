@@ -32,7 +32,7 @@ static const PerftTest PERFT_TESTS[] =
     { "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -",    5, { 193690690,  35043416,  73365,  4993637,     8392,  3309887 } },
     { "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -",                               7, { 178633661,  14519036, 294874,        0,   140024, 12797406 } },
     { "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq -",        6, { 706045033, 210369132,    212, 10882006, 81102984, 26973664 } },
-    { "rnbqkb1r/pp1p1ppp/2p5/4P3/2B5/8/PPP1NnPP/RNBQK2R w KQkq -",           3, {     53392,      4381,     75,      969,        0,     2269 } },
+    { "rnbqkb1r/pp1p1ppp/2p5/4P3/2B5/8/PPP1NnPP/RNBQK2R w KQkq -",           5, {  70202861,   6440150,  80978,  1006722,     4700,  2856725 } },
     { "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - -", 5, { 164075551,  19528068,    122,        0,        0,  2998608 } },
     { NULL, },
 };
@@ -87,19 +87,7 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
 {
     static int call_count = 0;
     int moves[MAX_MOVES_PER_POSITION];
-#if 0
-    MoveGenerator gen;
-    int* m = moves;
-    int move;
-    InitMoveGen(&gen, src_position, true); 
-    do
-    {
-        move = NextMove(&gen);
-        *m++ = move;
-    } while (move);
-#else
     GeneratePseudoLegalMoves(src_position, moves, true);
-#endif
     if (!(++call_count & 0x3FFFF))
     {
         printf("\rpositions processed %10u", counts->legal_moves);
@@ -111,6 +99,12 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
         for (move = moves; *move; ++move)
         {
             MakeMove(position, src_position, *move);
+#if 0
+            if (position->hash != ComputeHash(position))
+            {
+                printf("ERROR in hash during perft\n");
+            }
+#endif
             if (position->state_flags & MOVED_INTO_CHECK)
             {
                 continue;
