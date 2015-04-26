@@ -2,27 +2,11 @@
 #include <stdio.h>
 #include "types.h"
 /******************************************************************************
-Search task management
-*******************************************************************************/
-void        FreeAllSearchTasks(void);
-void        InitializeTaskList(void);
-SearchTask* ObtainTaskFromPool(void);
-void        ReturnTaskToPool(SearchTask* task);
-void        AddPendingTask(SearchTask* task);
-SearchTask* GetNextPendingTask(void);
-int         GetNumberOfPendingTasks(void);
-void        AbortTask(SearchTask* task);
-void        DoSomethingUseful(void);
-void        InitializeThreads(int num_cpus);
-void        WaitForSearchToComplete(void);
-/******************************************************************************
 Search
 *******************************************************************************/
-int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, bool is_null_ok, bool is_reduce_ok);
 int         SearchQuiescent (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
-int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, int move, 
-                             int move_index, bool is_deferred_move, volatile bool* cancel, bool is_null_ok, bool is_reduce_ok);
-SearchTask* NewSearchTask   (const Position* src_position, int depth, int ply, int alpha, int beta, int move, int move_index);
+int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, int search_flags);
+int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, int search_flags, int move);
 int         SearchRootNode  (const Position* position);
 /******************************************************************************
 Thinking and time control

@@ -1,9 +1,5 @@
 #include "pawnstar.h"
 
-#define MEGABYTE                    0x100000
-#define TRANSPOSITIONS_PER_BUCKET   13
-#define SMALL_HASTABLE_SIZE         4999
-
 static bool IsPrime(int x);
 
 typedef struct HashBucket
@@ -58,11 +54,11 @@ Find a transposition entry for this position if one exists
 *******************************************************************************/
 bool FindTransposition(uint64 hash, Transposition* transposition)
 {
-    Transposition s = small_transposition_table[hash % SMALL_HASTABLE_SIZE];
-    if ((s.hash ^ s.payload) == hash)
+    Transposition t = small_transposition_table[hash % SMALL_HASTABLE_SIZE];
+    if ((t.hash ^ t.payload) == hash)
     {
         INCREMENT("table hit small table");
-        *transposition = s;
+        *transposition = t;
         return true;
     }
     HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
@@ -91,10 +87,10 @@ void RecordTransposition(uint64 hash, int depth, int score, int move, int node_t
 {  
     Transposition t = 
     {
-        .depth     = (short)depth,
+        .depth     = (char)depth,
         .score     = (short)score,
         .move      = move,
-        .node_type = node_type
+        .node_type = (uchar)node_type
     };
     t.hash = hash ^ t.payload;
     int replace = 0;  
@@ -114,6 +110,7 @@ void RecordTransposition(uint64 hash, int depth, int score, int move, int node_t
             replace = i;
             if (score >= 8)
             {
+                INCREMENT("table replacements");
                 break;
             }
         }

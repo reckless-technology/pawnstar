@@ -119,12 +119,6 @@
     <ClCompile Include="opening_book_moves.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="search_parallel.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="task_list.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="timer.c">
       <Filter>Source Files</Filter>
     </ClCompile>

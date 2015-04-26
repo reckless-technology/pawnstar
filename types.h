@@ -67,6 +67,27 @@ enum StateFlags
     IS_GAME_OVER        = (IS_GAME_DRAWN | IS_CHECKMATE),
 };
 /******************************************************************************
+Search option flags (bitset)
+*******************************************************************************/
+enum SearchFlags
+{
+    IS_NULL_MOVE_OK     = 0x01, // is null move pruning permitted in this subtree
+    IS_LMR_OK           = 0x02, // is late move reduction permitted in this subtree 
+    IS_PVS_OK           = 0x04, // is PVS null window search permitted in this subtree
+    IS_FOLLOWING_PV     = 0x08, // are we following the PV from the root node
+    IS_DEFERRED_MOVE    = 0x10, // is this a deferred move with a negative SEE
+    SEARCH_FLAG_ROOT    = IS_NULL_MOVE_OK | IS_LMR_OK | IS_FOLLOWING_PV,
+};
+/******************************************************************************
+Phases of move search
+*******************************************************************************/
+enum MovePhase
+{
+    PHASE_PRE_MOVES,        // moves from the PV or TT (before move gen)
+    PHASE_REGULAR_MOVES,    // regular moves with a non negative SEE
+    PHASE_DEFERRED_MOVES,   // moves with a negative SEE
+};
+/******************************************************************************
 Individual square indices (little endian rank file mapping)
 *******************************************************************************/
 enum Squares
@@ -115,7 +136,7 @@ enum NodeType
     NODE_PV,        // principal variation node
 };
 /******************************************************************************
-Structure to hold a move and its associated score - used when sorting moves
+A move / score pair - used when sorting moves
 *******************************************************************************/
 typedef struct
 {
@@ -187,7 +208,7 @@ typedef struct
     int     fixed_milliseconds;      // how many milliseconds to spend on each move when using fixed time
 } TimeControl;
 /******************************************************************************
-A game i.e. a sequence of positions
+A game of chess represented as a sequence of positions
 *******************************************************************************/
 typedef struct
 {
@@ -195,7 +216,7 @@ typedef struct
     Position    stack[MAX_GAME_LENGTH];
 } Game;
 /******************************************************************************
-A transposition (result of a previous search)
+A transposition (encompasses brief results of a previous search)
 16 bytes in size, should ideally be cache aligned
 *******************************************************************************/
 typedef struct
@@ -206,10 +227,10 @@ typedef struct
         uint64 payload;
         struct
         {
-            short   depth;
+            int     move;
             short   score;
-            int     move        : 24;
-            int     node_type   :  8;
+            char    depth;
+            uchar   node_type;
         };
     };      
 } Transposition;
@@ -232,26 +253,6 @@ typedef struct
     bitboard    doubled_pawns;   // pawns with a friendly pawn ahead on the same file
     bitboard    passed_pawns;    // pawns who cannot be stopped by an enemy pawn
 } PawnStructure;
-/******************************************************************************
-The context of a parallel search task - used when searching a move on a worker 
-thread
-*******************************************************************************/
-typedef struct SearchTask SearchTask;
-struct SearchTask
-{
-    SearchTask*     next;
-    SearchTask*     prev;
-    const Position* src_position; 
-    volatile long   task_state;
-    int             move;
-    int             move_index; 
-    int             depth; 
-    int             ply; 
-    int             alpha; 
-    int             beta;          
-    int             score; 
-    volatile bool   cancel;
-};
 /******************************************************************************
 XBoard input command handling support
 *******************************************************************************/

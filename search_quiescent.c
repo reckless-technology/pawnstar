@@ -32,7 +32,7 @@ int SearchQuiescent(const Position* src_position,
         /**********************************************************************
         Standing pat is not allowed in check - we must do a full search
         ***********************************************************************/
-        return Search(src_position, depth, ply, alpha, beta, cancel, false, false);
+        return Search(src_position, depth, ply, alpha, beta, cancel, IS_PVS_OK);
     }
     score = EvaluatePosition(src_position, alpha, beta);
     if (score >= beta)

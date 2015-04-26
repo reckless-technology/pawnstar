@@ -22,12 +22,6 @@ Use experimental "more sophisticated" eval
 #define DO_EVALUATION_FULL 1
 #endif
 /******************************************************************************
-Multithreaded search
-*******************************************************************************/
-#ifndef DO_PARALLEL_SEARCH
-#define DO_PARALLEL_SEARCH 0
-#endif
-/******************************************************************************
 Whether to enable magic bitboard attacks for bishops and rooks (marginally 
 faster on machines with a large L1 cache)
 *******************************************************************************/
@@ -89,9 +83,12 @@ Global constants
 #define ILLEGAL_SCORE                  12345678 // you should never see this score in any search result - returned only when cancel flag was set
 #define MOVED_INTO_CHECK_SCORE        -23456789 // returned when a pseudo-legal move placed us into check
 #define SCORE_INSTABILITY_THRESHOLD          50 // deviation of score this amount between iterations triggers deeper search
-#define MUTEX_SPIN_COUNT                  10000 // default spin count for entering a critical section
-#define NUM_TASKS_TO_ALLOCATE_AT_ONCE       256 // number of SearchTasks to allocate at a time
 #define PV_TABLE_SIZE                      4999 // number of entries in the principal variation hashtable (should be prime)
 #define DEBUG_DICT_SIZE                    4999 // number of entries in the debug counts hashtable (should be prime)
 #define EVAL_HASHTABLE_SIZE                4999 // number of entries in the evaluation hashtable (should be prime)
 #define FUTILITY_CUTOFF_THRESHOLD          1200 // Prune frontier nodes where eval is this much below alpha
+#define MEGABYTE                       0x100000
+#define TRANSPOSITIONS_PER_BUCKET            13 // number of transpositions per hastable bucket
+#define SMALL_HASTABLE_SIZE                4999 // number of transpositions in the small auxiliary (cached = fast) TT
+#define STARTING_SEARCH_DEPTH                 3 // depth to do full width alpha beta pre-search for move ordering at the root node
+#define NUM_ROOT_MOVES_BEFORE_PVS             2 // number of moves to search with full width alpha beta window at the root node

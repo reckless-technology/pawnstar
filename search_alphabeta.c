@@ -14,9 +14,8 @@ int Search(const Position* src_position,
            int ply, 
            int alpha, 
            int beta, 
-           volatile bool* cancel,
-           bool is_null_ok,
-           bool is_reduce_ok)
+           volatile bool* cancel, 
+           int search_flags)
 {
     Transposition       transposition[1];
     int                 move;   
@@ -29,8 +28,12 @@ int Search(const Position* src_position,
     int                 num_legal_moves   = 0;
     int                 best_move         = 0;
     bool                has_raised_alpha  = false;
-    const int* const    move_phases[4]    = { pre_moves, regular_moves, deferred_moves, NULL };
-    const int* const *  move_phase;
+    const int* const    move_phases[]     = 
+    { 
+        [PHASE_PRE_MOVES]       = pre_moves,
+        [PHASE_REGULAR_MOVES]   = regular_moves,
+        [PHASE_DEFERRED_MOVES]  = deferred_moves,
+    };
 
     if (*cancel)
     {
@@ -122,16 +125,16 @@ int Search(const Position* src_position,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     ***************************************************************************/
-    if (is_null_ok                                                                                                  &&
+    if ((search_flags & IS_NULL_MOVE_OK)                                                                            &&
         !(src_position->state_flags & IS_CHECK)                                                                     &&
         alpha == beta - 1                                                                                           && 
-        !!(src_position->pieces_of_color[COLOR_TO_MOVE(src_position)] & ~(src_position->pawns | src_position->kings)) &&
+        (src_position->pieces_of_color[COLOR_TO_MOVE(src_position)] & ~(src_position->pawns | src_position->kings)) &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         Position position[1];
         INCREMENT("null move attempts");
         MakeNullMove(position, src_position);
-        score = -Search(position, depth - 4, ply + 1, -beta, -beta + 1, cancel, false, is_reduce_ok);
+        score = -Search(position, depth - 4, ply + 1, -beta, -beta + 1, cancel, search_flags & ~IS_NULL_MOVE_OK);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -171,6 +174,10 @@ int Search(const Position* src_position,
         INCREMENT("pre moves - PV");
         *m++ = move;
     }
+    else
+    {
+        search_flags &= ~IS_FOLLOWING_PV;
+    }
     if (is_transposition           && 
         transposition->move        && 
         transposition->move != move)
@@ -192,25 +199,39 @@ int Search(const Position* src_position,
 
     Move generation is deferred until after pre moves have been searched.
     ***************************************************************************/
-    for (move_phase = move_phases; *move_phase; ++move_phase)
-    {       
-        const int* moves_this_phase = *move_phase;
-        const bool is_deferred = (*move_phase == deferred_moves);
-        if (*move_phase == regular_moves)
+    for (int phase = PHASE_PRE_MOVES; phase <= PHASE_DEFERRED_MOVES; ++phase)
+    {            
+        switch (phase)
         {
+        case PHASE_PRE_MOVES:
+            search_flags &= ~(IS_DEFERRED_MOVE | IS_PVS_OK);
+            break;
+
+        case PHASE_REGULAR_MOVES:
             GeneratePseudoLegalMoves(src_position, regular_moves, true);
             SortMoves(regular_moves, ply);
+            break;
+
+        case PHASE_DEFERRED_MOVES:
+            *deferred_move = 0; /* terminate deferred moves list */
+            search_flags |= IS_DEFERRED_MOVE;
+            break;
+
+        default:
+            printf("ERROR: illegal move phase\n");
+            break;
         }
+        const int* moves_this_phase = move_phases[phase];
         while ((move = *moves_this_phase++) != 0)
         {
-            if (*move_phase == regular_moves && EvaluateStaticExchange(src_position, move) < 0)
+            if (phase == PHASE_REGULAR_MOVES && EvaluateStaticExchange(src_position, move) < 0)
             {
                 /* defer moves with a negative static exchange evaluation for later consideration */
                 *deferred_move++ = move;
                 INCREMENT("deferred moves");
                 continue;
             }
-            score = SearchSingleMove(src_position, depth, ply, alpha, beta, move, num_legal_moves, is_deferred, cancel, is_null_ok, is_reduce_ok);
+            score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, search_flags, move);
             if (*cancel)
             {
                 return ILLEGAL_SCORE;
@@ -220,6 +241,7 @@ int Search(const Position* src_position,
                 continue;
             }
             ++num_legal_moves;
+            search_flags |= IS_PVS_OK; /* allow PVS after first legal move */
             if (score >= beta)
             {
                 INCREMENT("beta cutoffs");
@@ -235,8 +257,7 @@ int Search(const Position* src_position,
                 best_move = move;
                 RecordGoodMove(ply, move);
             }
-        }
-        *deferred_move = 0; /* terminate deferred moves list */
+        }       
     }    
     /**************************************************************************
     End of main loop: we searched all moves and did not get a beta cutoff.
@@ -289,12 +310,9 @@ int SearchSingleMove(const Position* src_position,
                      int ply, 
                      int alpha, 
                      int beta, 
-                     int move, 
-                     int move_index,
-                     bool is_deferred_move,
-                     volatile bool* cancel,
-                     bool is_null_ok,
-                     bool is_reduce_ok)
+                     volatile bool* cancel, 
+                     int search_flags, 
+                     int move)
 {  
     Position position[1];
     int child_depth;
@@ -309,17 +327,25 @@ int SearchSingleMove(const Position* src_position,
         return MOVED_INTO_CHECK_SCORE;
     }
     /******************************************************************
-    Extend the search depth if ANY of the following are true:
+    Extend the search depth if any of the following are true:    
     # We are in check
+    # We have been following the principal variation from the root node
     # This is a pawn promotion
     # This is a pawn push to the 7th rank 
-    # Recapture of same value piece on same square - optional
+    # Recapture of same value piece
     *******************************************************************/
     if (src_position->state_flags & IS_CHECK)
     {
         INCREMENT("extensions check");
         child_depth = depth;
     }
+
+    else if ((search_flags & IS_FOLLOWING_PV) && depth == 1)
+    {
+        INCREMENT("extensions following PV");
+        child_depth = depth;
+    }
+
     else if (MOVE_PROMOTED(move))
     {
         INCREMENT("extensions promotion");
@@ -346,22 +372,21 @@ int SearchSingleMove(const Position* src_position,
 #if DO_LATE_MOVE_REDUCTION
     /**************************************************************************
     Reduce the search depth if ALL of the following are true:
+    # We did not already do LMR further up the tree
     # The move was deferred due to negative SEE
     # The move is not a capture  
-    # The move has never raised alpha at this ply
     # Depth is at least 3
     # The move does not give check
     ***************************************************************************/
-    else if (is_reduce_ok                &&
-             is_deferred_move            &&
-             !MOVE_CAPTURED(move)        &&
-             /*!HasMoveBeenGood(ply, move) &&*/
-             depth > 2                   &&
+    else if ((search_flags & IS_LMR_OK)        &&
+             (search_flags & IS_DEFERRED_MOVE) &&
+             !MOVE_CAPTURED(move)              &&
+             depth > 2                         &&
              !(position->state_flags & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");
         child_depth = depth - 2;
-        is_reduce_ok = false;
+        search_flags &= ~IS_LMR_OK;
     }
 #endif
    
@@ -370,22 +395,21 @@ int SearchSingleMove(const Position* src_position,
         child_depth = depth - 1;
     }
 
-    if (move_index != 0                         && 
+    if ((search_flags & IS_PVS_OK)              && 
         !(src_position->state_flags & IS_CHECK) &&
         beta > alpha + 1)
     {
         INCREMENT("pvs attempts");
-        score = -Search(position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, is_null_ok, is_reduce_ok);
+        score = -Search(position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, search_flags);
         if (score > alpha)
         {
             INCREMENT("pvs fails");
-            score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel, is_null_ok, is_reduce_ok);
+            score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags);
         }
     }
     else
     {
-        score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel, is_null_ok, is_reduce_ok);
+        score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags);
     }
     return score;
-    (void)is_deferred_move;
 }

@@ -269,13 +269,11 @@
     <ClCompile Include="pins.c" />
     <ClCompile Include="principal_variation.c" />
     <ClCompile Include="search_alphabeta.c" />
-    <ClCompile Include="search_parallel.c" />
     <ClCompile Include="search_quiescent.c" />
     <ClCompile Include="search_root_node.c" />
     <ClCompile Include="search_start_stop.c" />
     <ClCompile Include="sort_moves.c" />
     <ClCompile Include="static_exchange_evaluation.c" />
-    <ClCompile Include="task_list.c" />
     <ClCompile Include="tests_bratko_kopec.c" />
     <ClCompile Include="tests_move_generation.c" />
     <ClCompile Include="tests_pawn_structure.c" />

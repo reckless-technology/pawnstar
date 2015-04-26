@@ -11,7 +11,7 @@ bool IsDrawByRepetition(const Position* position, bool is_search)
 {
     const uint64 hash = position->hash;
     int repetitions = is_search ? 1 : 2;
-    for (int i = position->reversible_move_count; i >= 0; --i)
+    for (int i = position->reversible_move_count; i != 0; --i)
     {
         position = position->previous;
         if (position->hash == hash && --repetitions == 0)

@@ -1,11 +1,5 @@
 #include "pawnstar.h"
 
-#define MIN(x,y) ((x) < (y) ? (x) : (y))
-#define MAX(x,y) ((x) > (y) ? (x) : (y))
-#define ABS(x)   ((x) < 0 ? -(x) : (x))
-
-#define START_DEPTH 3
-
 static volatile bool cancel;
 /******************************************************************************
 If the worker thread is running, set the cancel flag then wait for it to
@@ -23,7 +17,7 @@ int SearchRootNode(const Position* src_position)
 {
     int         i;
     ScoredMove  scored_moves[MAX_MOVES_PER_POSITION];
-    ScoredMove  best_move_at_each_iteration[MAX_PLY];
+    ScoredMove  best_moves[MAX_PLY];
     int         moves[MAX_MOVES_PER_POSITION];
     int         principal_variation[MAX_PLY];
     int         move_count;
@@ -56,7 +50,7 @@ int SearchRootNode(const Position* src_position)
     default:
         moves_to_go  = globals->time_control.moves_per_period - (src_position->full_move_count % globals->time_control.moves_per_period);
         ms_allocated = globals->time_control.milliseconds_remaining / moves_to_go;
-        timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 3000));
+        timeout_ms   = max(100, min(ms_allocated * 4, globals->time_control.milliseconds_remaining - 3000));
         break;
     
     case CLOCK_FIXED_DEPTH:
@@ -70,8 +64,8 @@ int SearchRootNode(const Position* src_position)
         break;
     
     case CLOCK_INCREMENTAL:
-        ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 30);
-        timeout_ms   = MAX(100, MIN(ms_allocated * 3, globals->time_control.milliseconds_remaining - 3000));
+        ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 20);
+        timeout_ms   = max(100, min(ms_allocated * 4, globals->time_control.milliseconds_remaining - 3000));
         break;
     }
     InitializeGoodMoveCounts();
@@ -83,18 +77,18 @@ int SearchRootNode(const Position* src_position)
     ***************************************************************************/
     DEBUG_STATEMENT(DebugXClear());
     start_ms = GetMilliseconds();
+    cancel = false;
     for (i = 0; i != move_count; ++i)
     {
         scored_moves[i].move  = moves[i];
-        scored_moves[i].score = SearchSingleMove(src_position, START_DEPTH, 0, ALPHA, BETA, moves[i], i, false, &cancel, true, true);
-    }   
-    cancel = false;
+        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
+    }      
     if (timeout_ms)
     {
         CancelStopThinkingTimer();
         SetStopThinkingTimer(timeout_ms, &cancel);
     }
-    for (depth = START_DEPTH; depth != MAX_PLY; ++depth)
+    for (depth = STARTING_SEARCH_DEPTH; depth != MAX_PLY; ++depth)
     {       
         if (globals->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > globals->time_control.fixed_depth)
         {
@@ -105,18 +99,18 @@ int SearchRootNode(const Position* src_position)
         MergeSort(move_count, scored_moves);
         for (i = 0; i != move_count; ++i)
         {
-            if (i < 2)
+            if (i < NUM_ROOT_MOVES_BEFORE_PVS)
             {
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel, true, true);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, scored_moves[i].move, i, false, &cancel, true, true);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
                 if (scored_moves[i].score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, scored_moves[i].move, i, false, &cancel, true, true);
+                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
                 }
             }            
             if (cancel)
@@ -125,10 +119,9 @@ int SearchRootNode(const Position* src_position)
             }
             if (scored_moves[i].score > alpha)
             {
-                alpha                                    = scored_moves[i].score;
-                best_move                                = scored_moves[i].move;
-                best_move_at_each_iteration[depth].move  = scored_moves[i].move;
-                best_move_at_each_iteration[depth].score = scored_moves[i].score;
+                alpha                   = scored_moves[i].score;
+                best_move               = scored_moves[i].move;
+                best_moves[depth]       = scored_moves[i];
                 RecordGoodMove(0, scored_moves[i].move);
                 RecordPrincipalVariationMove(src_position->hash, scored_moves[i].move);
                 RecordTransposition(src_position->hash, depth, scored_moves[i].score, scored_moves[i].move, NODE_PV);            
@@ -145,7 +138,7 @@ int SearchRootNode(const Position* src_position)
         {
             char move_string[256];
             MoveSequenceToSanString(src_position, principal_variation, move_string);
-            printf("%2u %5d %4u %8u %s\n", depth, best_move_at_each_iteration[depth].score, (stop_ms - start_ms) / 10, globals->node_count, move_string);
+            printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score, (stop_ms - start_ms) / 10, globals->node_count, move_string);
         }
         if (alpha > WIN_THRESHOLD || 
             alpha < LOSE_THRESHOLD)
@@ -158,22 +151,22 @@ int SearchRootNode(const Position* src_position)
             const int elapsed_ms = stop_ms - start_ms;
             bool is_best_move_consistent = true;
             bool is_score_stable = true;
-            for (i = START_DEPTH; i != depth; ++i)
+            for (i = STARTING_SEARCH_DEPTH; i != depth; ++i)
             {
-                if (best_move_at_each_iteration[i].move != best_move_at_each_iteration[depth].move)
+                if (best_moves[i].move != best_moves[depth].move)
                 {
                     is_best_move_consistent = false;
                 }
-                if (ABS(best_move_at_each_iteration[i].score - best_move_at_each_iteration[depth].score) > SCORE_INSTABILITY_THRESHOLD)
+                if (abs(best_moves[i].score - best_moves[depth].score) > SCORE_INSTABILITY_THRESHOLD)
                 {
                     is_score_stable = false;
                 }
             }
-            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 9) > ms_allocated)
+            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 4) > ms_allocated)
             {
                 break;
             }
-            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 3) > ms_allocated)
+            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 2) > ms_allocated)
             {
                 break;
             }
