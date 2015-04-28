@@ -130,3 +130,7 @@ Bitboards of useful square sets
 #define CTR_16_SQUARES  0x00003C3C3C3C0000ull
 #define CTR_4_SQUARES   0x0000001818000000ull
 #define A1H8BB          0x8000000000000001ull /* A1 and H8 - used for sliding attack detection */
+/******************************************************************************
+Hash value for black to move - nothing special just a big random number
+*******************************************************************************/
+#define BLACK_MOVE_HASH 0xB92B78FCCF92F8CDull

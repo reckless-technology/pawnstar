@@ -227,10 +227,10 @@ typedef struct
         uint64 payload;
         struct
         {
-            int     move;
-            short   score;
-            char    depth;
-            uchar   node_type;
+            int         move;
+            short       score;
+            signed char depth;
+            uchar       node_type;
         };
     };      
 } Transposition;

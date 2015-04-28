@@ -15,23 +15,23 @@ uint64 ComputeHash(const Position* position)
 {
     int piece;
     bitboard b;
-    uint64 hash = position->state_flags & IS_BLACK_TO_MOVE ? ~0ull : 0ull;
-    hash ^= CASTLING_RIGHTS_HASHES[position->castle_flags];
+    uint64 hash = position->state_flags & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
+    hash += CASTLING_RIGHTS_HASHES[position->castle_flags];
     if (position->en_passant_index)
     {
-        hash ^= EN_PASSANT_HASHES[FILE_OF(position->en_passant_index)];
+        hash += EN_PASSANT_HASHES[FILE_OF(position->en_passant_index)];
     }
     for (piece = PAWN; piece <= KING; ++piece)
     {
         b = position->pieces[piece] & position->white_pieces;
         while (b)
         {
-            hash ^= PIECE_SQUARE_HASHES[WHITE][piece][FindAndClearLsb(&b)];
+            hash += PIECE_SQUARE_HASHES[WHITE][piece][FindAndClearLsb(&b)];
         }
         b = position->pieces[piece] & position->black_pieces;
         while (b)
         {
-            hash ^= PIECE_SQUARE_HASHES[BLACK][piece][FindAndClearLsb(&b)];
+            hash += PIECE_SQUARE_HASHES[BLACK][piece][FindAndClearLsb(&b)];
         }
     }
     return hash;

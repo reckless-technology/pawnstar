@@ -28,11 +28,18 @@ void MakeNullMove(Position* dst_position, const Position* src_position)
     dst_position->move = 0;
     if (dst_position->en_passant_index)
     {
-        dst_position->hash ^= EN_PASSANT_HASHES[FILE_OF(dst_position->en_passant_index)];
+        dst_position->hash -= EN_PASSANT_HASHES[FILE_OF(dst_position->en_passant_index)];
         dst_position->en_passant_index = 0;
     }
     dst_position->state_flags ^= IS_BLACK_TO_MOVE;
-    dst_position->hash = ~dst_position->hash;
+    if (dst_position->state_flags & IS_BLACK_TO_MOVE)
+    {
+        dst_position->hash += BLACK_MOVE_HASH;
+    }
+    else
+    {
+        dst_position->hash -= BLACK_MOVE_HASH;
+    }
 }
 /******************************************************************************
 Construct a new position from an old position and a move
@@ -55,11 +62,11 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     dst_position->castle_flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
     if (dst_position->castle_flags != src_position->castle_flags)
     {
-        dst_position->hash ^= CASTLING_RIGHTS_HASHES[dst_position->castle_flags] ^ CASTLING_RIGHTS_HASHES[src_position->castle_flags];
+        dst_position->hash += CASTLING_RIGHTS_HASHES[dst_position->castle_flags] - CASTLING_RIGHTS_HASHES[src_position->castle_flags];
     }
     if (dst_position->en_passant_index)
     {
-        dst_position->hash ^= EN_PASSANT_HASHES[FILE_OF(dst_position->en_passant_index)];
+        dst_position->hash -= EN_PASSANT_HASHES[FILE_OF(dst_position->en_passant_index)];
         dst_position->en_passant_index = 0;
     }
     ++dst_position->reversible_move_count;
@@ -74,18 +81,18 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
                 /* regular pawn move */
                 dst_position->pawns ^= from_to_bb;
                 dst_position->pieces_of_color[color] ^= from_to_bb;
-                dst_position->hash ^= PIECE_SQUARE_HASHES[color][PAWN][to] ^ PIECE_SQUARE_HASHES[color][PAWN][from];
+                dst_position->hash += PIECE_SQUARE_HASHES[color][PAWN][to] - PIECE_SQUARE_HASHES[color][PAWN][from];
                 if (captured)
                 {
                     dst_position->pieces[captured] ^= to_bb;
                     dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
-                    dst_position->hash ^= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
+                    dst_position->hash -= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
                 }
                 else if (!((to - from) & 0x0F)) /* equivalent to (abs(from - to) == 16) in this context */
                 {
                     /* double pawn push */
                     dst_position->en_passant_index = (uchar)((from + to) >> 1);
-                    dst_position->hash ^= EN_PASSANT_HASHES[FILE_OF(from)];
+                    dst_position->hash += EN_PASSANT_HASHES[FILE_OF(from)];
                 }
             }
             else
@@ -96,7 +103,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
                 dst_position->pieces_of_color[color] ^= from_to_bb;
                 dst_position->pieces_of_color[ENEMY(color)] ^= en_passant_capture_BB;
                 dst_position->pawns ^= from_to_bb | en_passant_capture_BB;
-                dst_position->hash ^= PIECE_SQUARE_HASHES[color][PAWN][to] ^ PIECE_SQUARE_HASHES[color][PAWN][from] ^ PIECE_SQUARE_HASHES[ENEMY(color)][PAWN][en_passant_capture_location];
+                dst_position->hash += PIECE_SQUARE_HASHES[color][PAWN][to] - PIECE_SQUARE_HASHES[color][PAWN][from] - PIECE_SQUARE_HASHES[ENEMY(color)][PAWN][en_passant_capture_location];
             }
         }
         else
@@ -105,12 +112,12 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
             dst_position->pawns ^= from_bb;
             dst_position->pieces[promoted] ^= to_bb;
             dst_position->pieces_of_color[color] ^= from_to_bb;
-            dst_position->hash ^= PIECE_SQUARE_HASHES[color][PAWN][from] ^ PIECE_SQUARE_HASHES[color][promoted][to];
+            dst_position->hash += PIECE_SQUARE_HASHES[color][promoted][to] - PIECE_SQUARE_HASHES[color][PAWN][from];
             if (captured)
             {
                 dst_position->pieces[captured] ^= to_bb;
                 dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
-                dst_position->hash ^= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
+                dst_position->hash -= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
             }
         }
         break;
@@ -123,13 +130,13 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     case QUEEN:
         dst_position->pieces[piece] ^= from_to_bb;
         dst_position->pieces_of_color[color] ^= from_to_bb;
-        dst_position->hash ^= PIECE_SQUARE_HASHES[color][piece][to] ^ PIECE_SQUARE_HASHES[color][piece][from];
+        dst_position->hash += PIECE_SQUARE_HASHES[color][piece][to] - PIECE_SQUARE_HASHES[color][piece][from];
         if (captured)
         {
             dst_position->reversible_move_count = 0;
             dst_position->pieces[captured] ^= to_bb;
             dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
-            dst_position->hash ^= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
+            dst_position->hash -= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
         }
         break;
 
@@ -146,25 +153,25 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
             dst_position->kings ^= E1BB | G1BB;
             dst_position->rooks ^= H1BB | F1BB;
             dst_position->white_pieces ^= E1BB | F1BB | G1BB | H1BB;
-            dst_position->hash ^= PIECE_SQUARE_HASHES[WHITE][KING][E1] ^ PIECE_SQUARE_HASHES[WHITE][KING][G1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][H1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][F1];
+            dst_position->hash += PIECE_SQUARE_HASHES[WHITE][KING][G1] - PIECE_SQUARE_HASHES[WHITE][KING][E1] + PIECE_SQUARE_HASHES[WHITE][ROOK][F1] - PIECE_SQUARE_HASHES[WHITE][ROOK][H1];
             break;
         case C1:
             dst_position->kings ^= E1BB | C1BB;
             dst_position->rooks ^= A1BB | D1BB;
             dst_position->white_pieces ^= A1BB | C1BB | D1BB | E1BB;
-            dst_position->hash ^= PIECE_SQUARE_HASHES[WHITE][KING][E1] ^ PIECE_SQUARE_HASHES[WHITE][KING][C1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][A1] ^ PIECE_SQUARE_HASHES[WHITE][ROOK][D1];
+            dst_position->hash += PIECE_SQUARE_HASHES[WHITE][KING][C1] - PIECE_SQUARE_HASHES[WHITE][KING][E1] + PIECE_SQUARE_HASHES[WHITE][ROOK][D1] - PIECE_SQUARE_HASHES[WHITE][ROOK][A1];
             break;
         case G8:
             dst_position->kings ^= E8BB | G8BB;
             dst_position->rooks ^= H8BB | F8BB;
             dst_position->black_pieces ^= E8BB | F8BB | G8BB | H8BB;
-            dst_position->hash ^= PIECE_SQUARE_HASHES[BLACK][KING][E8] ^ PIECE_SQUARE_HASHES[BLACK][KING][G8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][H8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][F8];
+            dst_position->hash += PIECE_SQUARE_HASHES[BLACK][KING][G8] - PIECE_SQUARE_HASHES[BLACK][KING][E8] + PIECE_SQUARE_HASHES[BLACK][ROOK][F8] - PIECE_SQUARE_HASHES[BLACK][ROOK][H8];
             break;
         case C8:
             dst_position->kings ^= E8BB | C8BB;
             dst_position->rooks ^= A8BB | D8BB;
             dst_position->black_pieces ^= A8BB | C8BB | D8BB | E8BB;
-            dst_position->hash ^= PIECE_SQUARE_HASHES[BLACK][KING][E8] ^ PIECE_SQUARE_HASHES[BLACK][KING][C8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][A8] ^ PIECE_SQUARE_HASHES[BLACK][ROOK][D8];
+            dst_position->hash += PIECE_SQUARE_HASHES[BLACK][KING][C8] - PIECE_SQUARE_HASHES[BLACK][KING][E8] + PIECE_SQUARE_HASHES[BLACK][ROOK][D8] - PIECE_SQUARE_HASHES[BLACK][ROOK][A8];
             break;
         default:
             break;
@@ -173,7 +180,14 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     }
     dst_position->occupied_squares = dst_position->white_pieces | dst_position->black_pieces;  
     dst_position->state_flags ^= IS_BLACK_TO_MOVE;
-    dst_position->hash = ~dst_position->hash;
+    if (dst_position->state_flags & IS_BLACK_TO_MOVE)
+    {
+        dst_position->hash += BLACK_MOVE_HASH;
+    }
+    else
+    {
+        dst_position->hash -= BLACK_MOVE_HASH;
+    }
     dst_position->full_move_count += (color == BLACK);
     if (IS_IN_CHECK(dst_position, color))
     {

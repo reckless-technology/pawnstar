@@ -16,10 +16,10 @@ Determine whether to use the intrinsic population count instruction on native
 #define USE_INTRINSIC_POPCNT 1
 #endif
 /******************************************************************************
-Use experimental "more sophisticated" eval
+Use experimental "more sophisticated" eval (probably not a great idea)
 *******************************************************************************/
 #ifndef DO_EVALUATION_FULL
-#define DO_EVALUATION_FULL 1
+#define DO_EVALUATION_FULL 0
 #endif
 /******************************************************************************
 Whether to enable magic bitboard attacks for bishops and rooks (marginally 
