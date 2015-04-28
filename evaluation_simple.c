@@ -110,11 +110,9 @@ Set up the piece square tables
 *******************************************************************************/
 void InitializeEval()
 {
-    int location;
-    for (location = A1; location <= H8; ++location)
+    for (int location = A1; location <= H8; ++location)
     {
-        int piece;
-        for (piece = PAWN; piece <= KING; ++piece)
+        for (int piece = PAWN; piece <= KING; ++piece)
         {
             piece_square_values[WHITE][piece][location] = MATERIAL_VALUES[piece] + PIECE_SQUARES[piece][location ^ RANK_FLIP];
             piece_square_values[BLACK][piece][location] = MATERIAL_VALUES[piece] + PIECE_SQUARES[piece][location];
@@ -131,24 +129,21 @@ position is quiet.
 int EvaluatePosition(const Position* position, int alpha, int beta)
 {    
     int score = 0;
-    int piece;
     if (IsDrawByMaterial(position))
     {
         return DRAW_SCORE;
     }
-    for (piece = PAWN; piece <= QUEEN; ++piece)
+    for (int piece = PAWN; piece <= QUEEN; ++piece)
     {
         bitboard b = position->pieces[piece] & position->white_pieces;
         while (b)
         {
-            const int locn = FindAndClearLsb(&b);
-            score += piece_square_values[WHITE][piece][locn];
+            score += piece_square_values[WHITE][piece][FindAndClearLsb(&b)];
         }
         b = position->pieces[piece] & position->black_pieces;
         while (b)
         {
-            const int locn = FindAndClearLsb(&b);
-            score -= piece_square_values[BLACK][piece][locn];
+            score -= piece_square_values[BLACK][piece][FindAndClearLsb(&b)];
         }
     }    
     /**************************************************************************
