@@ -47,7 +47,7 @@ static uint64 NextHashKey()
     int i;
     for (i = 0; i != 64; ++i)
     {
-        lcg = lcg * 1664525 + 1013904223;
+        lcg = lcg * 1103515245 + 12345;
         key = (key << 1) | (lcg >> 31);
     }
     return key;

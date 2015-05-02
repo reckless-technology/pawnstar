@@ -99,7 +99,7 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
         for (move = moves; *move; ++move)
         {
             MakeMove(position, src_position, *move);
-#if 0
+#if 1
             if (position->hash != ComputeHash(position))
             {
                 printf("ERROR in hash during perft\n");

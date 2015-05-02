@@ -99,18 +99,19 @@ int SearchRootNode(const Position* src_position)
         MergeSort(move_count, scored_moves);
         for (i = 0; i != move_count; ++i)
         {
+            int depth_reduction = i > 4 && i * 2 > move_count ? 1 : 0;
             if (i < NUM_ROOT_MOVES_BEFORE_PVS)
             {
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
+                scored_moves[i].score = SearchSingleMove(src_position, depth - depth_reduction, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
+                scored_moves[i].score = SearchSingleMove(src_position, depth - depth_reduction, 0, alpha, alpha + 1, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
                 if (scored_moves[i].score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
+                    scored_moves[i].score = SearchSingleMove(src_position, depth - depth_reduction, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
                 }
             }            
             if (cancel)
@@ -124,7 +125,7 @@ int SearchRootNode(const Position* src_position)
                 best_moves[depth]       = scored_moves[i];
                 RecordGoodMove(0, scored_moves[i].move);
                 RecordPrincipalVariationMove(src_position->hash, scored_moves[i].move);
-                RecordTransposition(src_position->hash, depth, scored_moves[i].score, scored_moves[i].move, NODE_PV);            
+                RecordTransposition(src_position->hash, depth - depth_reduction, scored_moves[i].score, scored_moves[i].move, NODE_PV);            
             }
         }        
         stop_ms = GetMilliseconds();
