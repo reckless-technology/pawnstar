@@ -314,8 +314,7 @@ int SearchSingleMove(const Position* src_position,
                      int search_flags, 
                      int move)
 {  
-    Position position[1];
-    int child_depth;
+    Position position[1];   
     int score;
     if (*cancel)
     {
@@ -326,6 +325,7 @@ int SearchSingleMove(const Position* src_position,
     {
         return MOVED_INTO_CHECK_SCORE;
     }
+    int child_depth = depth - 1;
     /******************************************************************
     Extend the search depth if any of the following are true:    
     # We are in check
@@ -337,19 +337,19 @@ int SearchSingleMove(const Position* src_position,
     if (src_position->state_flags & IS_CHECK)
     {
         INCREMENT("extensions check");
-        child_depth = depth;
+        ++child_depth;
     }
 
     else if ((search_flags & IS_FOLLOWING_PV) && depth == 1)
     {
         INCREMENT("extensions following PV");
-        child_depth = depth;
+        ++child_depth;
     }
 
     else if (MOVE_PROMOTED(move))
     {
         INCREMENT("extensions promotion");
-        child_depth = depth;
+        ++child_depth;
     }
 
 #if DO_PUSH_TO_SEVENTH_RANK_EXTENSION
@@ -357,7 +357,7 @@ int SearchSingleMove(const Position* src_position,
              RANK_OF(MOVE_TO(move)) == SEVENTH_RANK[COLOR_TO_MOVE(src_position)])
     {
         INCREMENT("extensions push to 7th");
-        child_depth = depth;
+        ++child_depth;
     }
 #endif
 
@@ -365,7 +365,7 @@ int SearchSingleMove(const Position* src_position,
     else if (MOVE_CAPTURED(move) && CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
     {
         INCREMENT("extensions recapture");
-        child_depth = depth;
+        ++child_depth;
     }
 #endif
 
@@ -380,21 +380,16 @@ int SearchSingleMove(const Position* src_position,
     ***************************************************************************/
     else if ((search_flags & IS_LMR_OK)        &&
              (search_flags & IS_DEFERRED_MOVE) &&
-             !MOVE_CAPTURED(move)              &&
-             depth > 2                         &&
+             /*!MOVE_CAPTURED(move)              &&*/
+             /*depth > 2                         &&*/
              !(position->state_flags & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");
-        child_depth = depth - 2;
+        --child_depth;
         search_flags &= ~IS_LMR_OK;
     }
 #endif
    
-    else
-    {
-        child_depth = depth - 1;
-    }
-
     if ((search_flags & IS_PVS_OK)              && 
         !(src_position->state_flags & IS_CHECK) &&
         beta > alpha + 1)

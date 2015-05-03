@@ -19,7 +19,7 @@ Determine whether to use the intrinsic population count instruction on native
 Use experimental "more sophisticated" eval (probably not a great idea)
 *******************************************************************************/
 #ifndef DO_EVALUATION_FULL
-#define DO_EVALUATION_FULL 1
+#define DO_EVALUATION_FULL 0
 #endif
 /******************************************************************************
 Whether to enable magic bitboard attacks for bishops and rooks (marginally 
@@ -44,7 +44,7 @@ Whether to enable extension on recapture of same value piece
 Whether to enable extension on pawn push to 7th rank
 *******************************************************************************/
 #ifndef DO_PUSH_TO_SEVENTH_RANK_EXTENSION
-#define DO_PUSH_TO_SEVENTH_RANK_EXTENSION 0
+#define DO_PUSH_TO_SEVENTH_RANK_EXTENSION 1
 #endif
 /******************************************************************************
 Whether to enable futility pruning at frontier nodes
@@ -56,7 +56,7 @@ Whether to enable futility pruning at frontier nodes
 Whether to enable late move reductions
 *******************************************************************************/
 #ifndef DO_LATE_MOVE_REDUCTION
-#define DO_LATE_MOVE_REDUCTION 1
+#define DO_LATE_MOVE_REDUCTION 0
 #endif
 /******************************************************************************
 Whether to skip moves in quiescence search which have a negative static
@@ -88,7 +88,6 @@ Global constants
 #define EVAL_HASHTABLE_SIZE                4999 // number of entries in the evaluation hashtable (should be prime)
 #define FUTILITY_CUTOFF_THRESHOLD          1200 // Prune frontier nodes where eval is this much below alpha
 #define MEGABYTE                       0x100000
-#define TRANSPOSITIONS_PER_BUCKET            13 // number of transpositions per hastable bucket
 #define SMALL_HASTABLE_SIZE                4999 // number of transpositions in the small auxiliary (cached = fast) TT
 #define STARTING_SEARCH_DEPTH                 3 // depth to do full width alpha beta pre-search for move ordering at the root node
 #define NUM_ROOT_MOVES_BEFORE_PVS             2 // number of moves to search with full width alpha beta window at the root node

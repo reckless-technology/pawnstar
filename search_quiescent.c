@@ -50,6 +50,24 @@ int SearchQuiescent(const Position* src_position,
         INCREMENT("quiescent futility cutoffs");
         return alpha;
     }
+    Transposition t[1];
+    if (FindTransposition(src_position->hash, t) && t->move)
+    {
+        INCREMENT("quiescent tt hits");
+        if (t->score >= beta)
+        {
+            INCREMENT("quiescent tt beta cutoffs");
+            return beta;
+        }
+        moves[0] = t->move;
+        GeneratePseudoLegalMoves(src_position, moves + 1, false);
+        SortMoves(moves + 1, ply);
+    }
+    else
+    {
+        GeneratePseudoLegalMoves(src_position, moves, false);    
+        SortMoves(moves, ply);
+    }
     GeneratePseudoLegalMoves(src_position, moves, false);    
     SortMoves(moves, ply);
     /**************************************************************************
@@ -92,6 +110,8 @@ int SearchQuiescent(const Position* src_position,
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
+            RecordGoodMove(ply, move);
+            RecordTransposition(src_position->hash, depth, beta, move, NODE_CUT);
             return beta;
         }
         if (score > alpha)
