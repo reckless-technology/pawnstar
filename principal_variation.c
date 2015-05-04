@@ -24,6 +24,7 @@ Record a new PV move (thread safe)
 *******************************************************************************/
 void RecordPrincipalVariationMove(uint64 hash, int move)
 { 
+    INCREMENT("pv moves recorded");
     const int idx = hash % PV_TABLE_SIZE;
     while (_InterlockedCompareExchange(&pv_table[idx].lock, 1, 0) != 0)
     {
