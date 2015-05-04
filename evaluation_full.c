@@ -12,12 +12,9 @@ The evaluation unit is centipawns (1/100 of a pawn)
 
 typedef struct
 {
-    uint64  hash;
-    union
-    {
-        uint64  payload;
-        int     score;
-    };   
+    uint64          hash;
+    int             score;
+    volatile long   lock;  
 } EvalHashEntry;
 
 static EvalHashEntry eval_hashtable[EVAL_HASHTABLE_SIZE];
@@ -191,11 +188,18 @@ position is quiet.
 int EvaluatePosition(const Position* position, int alpha, int beta)
 {    
     EvalHashEntry* const hash_entry = &eval_hashtable[position->hash % EVAL_HASHTABLE_SIZE];
+    while (_InterlockedCompareExchange(&hash_entry->lock, 1, 0) != 0)
+    {
+        INCREMENT("lock contention eval retrieve");
+    }
     if (hash_entry->hash == position->hash)
     {
         INCREMENT("eval hash hits");
-        return hash_entry->score;
+        const int result = hash_entry->score;
+        _InterlockedExchange(&hash_entry->lock, 0);
+        return result;
     }
+    _InterlockedExchange(&hash_entry->lock, 0);
     if (IsDrawByMaterial(position))
     {
         return DRAW_SCORE;
@@ -242,8 +246,13 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     final_score *= score_sign;
     final_score /= 10;
     final_score *= 10; /* quantize score - helps search stability */
+    while (_InterlockedCompareExchange(&hash_entry->lock, 1, 0) != 0)
+    {
+        INCREMENT("lock contention eval record");
+    }
     hash_entry->hash  = position->hash;
     hash_entry->score = final_score;
+    _InterlockedExchange(&hash_entry->lock, 0);
     return final_score;
     (void)alpha;
     (void)beta;

@@ -6,6 +6,7 @@ static Transposition*   main_table;
 static size_t           main_table_size;
 static Transposition    small_transposition_table[SMALL_HASTABLE_SIZE];
 static Transposition    pv_table[SMALL_HASTABLE_SIZE];
+static volatile long    locks[SMALL_HASTABLE_SIZE];
 /******************************************************************************
 Delete the transposition table
 NB: NOT thread safe
@@ -50,26 +51,32 @@ Find a transposition entry for this position if one exists
 bool FindTransposition(uint64 hash, Transposition* transposition)
 {
     const int idx = hash % SMALL_HASTABLE_SIZE;
-    Transposition t = small_transposition_table[idx];
-    if ((t.hash ^ t.payload) == hash)
+    while (_InterlockedCompareExchange(&locks[idx], 1, 0) != 0)
     {
-        INCREMENT("table hit small table");
-        *transposition = t;
-        return true;
+        INCREMENT("lock contention find");
     }
-    t = pv_table[idx];
-    if ((t.hash ^ t.payload) == hash)
+    if (pv_table[idx].hash == hash)
     {
         INCREMENT("table hit pv table");
-        *transposition = t;
-        return true;
-    }    
-    t = main_table[hash % main_table_size];
-    if ((t.hash ^ t.payload) == hash)
-    {
-        *transposition = t;
+        *transposition = pv_table[idx];
+        _InterlockedExchange(&locks[idx], 0);
         return true;
     }
+    if (small_transposition_table[idx].hash == hash)
+    {
+        INCREMENT("table hit small table");
+        *transposition = small_transposition_table[idx];
+        _InterlockedExchange(&locks[idx], 0);
+        return true;
+    }
+    const uint64 idx2 = hash % main_table_size;
+    if (main_table[idx2].hash == hash)
+    {
+        *transposition = main_table[idx2];
+        _InterlockedExchange(&locks[idx], 0);
+        return true;
+    }
+    _InterlockedExchange(&locks[idx], 0);
     return false;
 }
 /******************************************************************************
@@ -77,21 +84,26 @@ Insert a new entry into the transposition table.
 *******************************************************************************/
 void RecordTransposition(uint64 hash, int depth, int score, int move, int node_type)
 {  
-    Transposition t = 
+    const Transposition t = 
     {
+        .hash      = hash,
         .depth     = (char)depth,
         .score     = (short)score,
         .move      = move,
         .node_type = (uchar)node_type
     };
-    t.hash = hash ^ t.payload;
     const int idx = hash % SMALL_HASTABLE_SIZE;
+    while (_InterlockedCompareExchange(&locks[idx], 1, 0) != 0)
+    {
+        INCREMENT("lock contention record");
+    }
     small_transposition_table[idx] = t;
     if (node_type == NODE_PV)
     {
         pv_table[idx] = t;
     }
     main_table[hash % main_table_size] = t; 
+    _InterlockedExchange(&locks[idx], 0);
 }
 /******************************************************************************
 We get marginally better dispersion when the hashtable size is a prime number

@@ -2,12 +2,12 @@
 #include <Windows.h>
 /******************************************************************************
 Functions to record and subsequently retrieve the principal variation (PV)
-Uses Robert Hyatt's XOR trick to do lockless thread safe retrieval
 *******************************************************************************/
 typedef struct
 {
-    uint64  hash;
-    uint64  payload;
+    uint64          hash;
+    int             move;
+    volatile long   lock;
 } PvMove;
 
 static PvMove pv_table[PV_TABLE_SIZE];
@@ -24,10 +24,14 @@ Record a new PV move (thread safe)
 *******************************************************************************/
 void RecordPrincipalVariationMove(uint64 hash, int move)
 { 
-        PvMove entry;
-        entry.payload = (uint64)move | ((uint64)NextRandom() << 32);
-        entry.hash    = hash ^ entry.payload;
-        pv_table[hash % PV_TABLE_SIZE] = entry;
+    const int idx = hash % PV_TABLE_SIZE;
+    while (_InterlockedCompareExchange(&pv_table[idx].lock, 1, 0) != 0)
+    {
+        INCREMENT("lock contention pv record");
+    }
+    pv_table[idx].hash = hash;
+    pv_table[idx].move = move;
+    _InterlockedExchange(&pv_table[idx].lock, 0);
 }
 /******************************************************************************
 Get the PV from the PV hashtable, given the root position Zobrist hash
@@ -61,10 +65,17 @@ Retrieve the PV move for the given hash (if any)
 *******************************************************************************/
 int GetPrincipalVariationMove(uint64 hash)
 {
-    const PvMove entry = pv_table[hash % PV_TABLE_SIZE];
-    if ((entry.hash ^ entry.payload) == hash)
+    const int idx = hash % PV_TABLE_SIZE;
+    while (_InterlockedCompareExchange(&pv_table[idx].lock, 1, 0) != 0)
     {
-        return (int)entry.payload;
+        INCREMENT("lock contention pv retrieve");
     }
+    if (pv_table[idx].hash == hash)
+    {
+        const int result = pv_table[idx].move;
+        _InterlockedExchange(&pv_table[idx].lock, 0);
+        return result;
+    }
+    _InterlockedExchange(&pv_table[idx].lock, 0);
     return 0;
 }
