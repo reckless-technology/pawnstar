@@ -64,7 +64,7 @@ int SearchRootNode(const Position* src_position)
         break;
     
     case CLOCK_INCREMENTAL:
-        ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 20);
+        ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 30);
         timeout_ms   = max(100, min(ms_allocated * 4, globals->time_control.milliseconds_remaining - 3000));
         break;
     }
@@ -81,8 +81,10 @@ int SearchRootNode(const Position* src_position)
     for (i = 0; i != move_count; ++i)
     {
         scored_moves[i].move  = moves[i];
-        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
-    }      
+        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);    
+    }   
+    MergeSort(move_count, scored_moves);
+    best_move = scored_moves[0].move;
     if (timeout_ms)
     {
         CancelStopThinkingTimer();

@@ -14,7 +14,6 @@ int SearchQuiescent(const Position* src_position,
     const int*  pmove = moves;
     int         move;
     int         score;
-    bool        is_first_move = true;
     
     INCREMENT("quiescent calls");
     if (*cancel)
@@ -29,10 +28,7 @@ int SearchQuiescent(const Position* src_position,
     if (src_position->state_flags & IS_CHECK)
     {
         INCREMENT("quiescent checks");
-        /**********************************************************************
-        Standing pat is not allowed in check - we must do a full search
-        ***********************************************************************/
-        return Search(src_position, depth, ply, alpha, beta, cancel, IS_PVS_OK);
+        return Search(src_position, depth, ply, alpha, beta, cancel, 0);
     }
     score = EvaluatePosition(src_position, alpha, beta);
     if (score >= beta)
@@ -50,32 +46,16 @@ int SearchQuiescent(const Position* src_position,
         INCREMENT("quiescent futility cutoffs");
         return alpha;
     }
-    Transposition t[1];
-    if (FindTransposition(src_position->hash, t) && t->move)
-    {
-        INCREMENT("quiescent tt hits");
-        if (t->score >= beta)
-        {
-            INCREMENT("quiescent tt beta cutoffs");
-            return beta;
-        }
-        moves[0] = t->move;
-        GeneratePseudoLegalMoves(src_position, moves + 1, false);
-        SortMoves(moves + 1, ply);
-    }
-    else
-    {
-        GeneratePseudoLegalMoves(src_position, moves, false);    
-        SortMoves(moves, ply);
-    }
     GeneratePseudoLegalMoves(src_position, moves, false);    
     SortMoves(moves, ply);
     /**************************************************************************
     Main loop
     ***************************************************************************/
+    int legal_move_count = 0;
     while ((move = *pmove++) != 0)
     {
         Position position[1];
+
 #if DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
         if (EvaluateStaticExchange(src_position, move) < 0)
         {
@@ -83,26 +63,27 @@ int SearchQuiescent(const Position* src_position,
             continue;
         }
 #endif
+
         MakeMove(position, src_position, move);
         if (position->state_flags & MOVED_INTO_CHECK)
         {
             continue;
         }
-        if (is_first_move)
-        {
-            score = -SearchQuiescent(position, depth - 1, ply + 1, -beta, -alpha, cancel);
-            is_first_move = false;
-        }
-        else
+        if (beta > alpha + 1 && legal_move_count)
         {
             INCREMENT("quiescent pvs attempts");
             score = -SearchQuiescent(position, depth - 1, ply + 1, -alpha - 1, -alpha, cancel);
-            if (score > alpha && beta > alpha + 1)
+            if (score > alpha)
             {
                 INCREMENT("quiescent pvs fails");
                 score = -SearchQuiescent(position, depth - 1, ply + 1, -beta, -alpha, cancel);
             }
         }
+        else
+        {
+            score = -SearchQuiescent(position, depth - 1, ply + 1, -beta, -alpha, cancel);
+        }
+        ++legal_move_count;
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -110,8 +91,6 @@ int SearchQuiescent(const Position* src_position,
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            RecordGoodMove(ply, move);
-            RecordTransposition(src_position->hash, depth, beta, move, NODE_CUT);
             return beta;
         }
         if (score > alpha)

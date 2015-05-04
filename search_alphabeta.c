@@ -41,14 +41,6 @@ int Search(const Position* src_position,
     }
     ++globals->node_count;
     INCREMENT("alpha beta calls");
-    INCREMENT_IF(src_position->state_flags & IS_CHECK, "checks");
-    /**************************************************************************
-    This is a leaf node which requires no further searching if either of the 
-    following are true: 
-
-    # it is a drawn position by repetition, material or the 50-move rule
-    # we have reached the absolute maximum ply of search
-    ***************************************************************************/
     if (IsDrawByRepetition(src_position, true) || 
         IsDrawByMaterial(src_position)         || 
         IsDrawByFiftyMoves(src_position))
@@ -60,10 +52,22 @@ int Search(const Position* src_position,
         INCREMENT("max ply reached");
         return EvaluatePosition(src_position, alpha, beta);
     }
-    if (!(src_position->state_flags & IS_CHECK) && 
-        depth <= 0)
+    if (!(src_position->state_flags & IS_CHECK))
     {
-        return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
+        if (depth <= 0)
+        {
+            return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
+        }
+    }
+    else
+    {
+        INCREMENT("checks");
+        if (!(search_flags & HAS_CHECK_EXTENDED))
+        {
+            INCREMENT("extensions check");
+            ++depth;
+            search_flags |= HAS_CHECK_EXTENDED;
+        }
     }
     /**************************************************************************
     Determine if there is an entry in the transposition table for this 
@@ -328,33 +332,25 @@ int SearchSingleMove(const Position* src_position,
     int child_depth = depth - 1;
     /******************************************************************
     Extend the search depth if any of the following are true:    
-    # We are in check
     # We have been following the principal variation from the root node
     # This is a pawn promotion
     # This is a pawn push to the 7th rank 
     # Recapture of same value piece
     *******************************************************************/
-    if (src_position->state_flags & IS_CHECK)
-    {
-        INCREMENT("extensions check");
-        ++child_depth;
-    }
-
-    else if ((search_flags & IS_FOLLOWING_PV) && depth == 1)
+    if ((search_flags & IS_FOLLOWING_PV) && depth == 1)
     {
         INCREMENT("extensions following PV");
         ++child_depth;
     }
 
-    else if (MOVE_PROMOTED(move))
+    if (MOVE_PROMOTED(move))
     {
         INCREMENT("extensions promotion");
         ++child_depth;
     }
 
 #if DO_PUSH_TO_SEVENTH_RANK_EXTENSION
-    else if (MOVE_PIECE(move) == PAWN && 
-             RANK_OF(MOVE_TO(move)) == SEVENTH_RANK[COLOR_TO_MOVE(src_position)])
+    if (MOVE_PIECE(move) == PAWN && RANK_OF(MOVE_TO(move)) == SEVENTH_RANK[COLOR_TO_MOVE(src_position)])
     {
         INCREMENT("extensions push to 7th");
         ++child_depth;
@@ -362,7 +358,7 @@ int SearchSingleMove(const Position* src_position,
 #endif
 
 #if DO_RECAPTURE_EXTENSION
-    else if (MOVE_CAPTURED(move) && CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
+    if (MOVE_CAPTURED(move) && CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
     {
         INCREMENT("extensions recapture");
         ++child_depth;
@@ -378,11 +374,12 @@ int SearchSingleMove(const Position* src_position,
     # Depth is at least 3
     # The move does not give check
     ***************************************************************************/
-    else if ((search_flags & IS_LMR_OK)        &&
-             (search_flags & IS_DEFERRED_MOVE) &&
-             /*!MOVE_CAPTURED(move)              &&*/
-             /*depth > 2                         &&*/
-             !(position->state_flags & IS_CHECK))
+    if ((search_flags & IS_LMR_OK)        &&
+        (search_flags & IS_DEFERRED_MOVE) &&
+        !MOVE_CAPTURED(move)              &&
+        depth > 2                         &&
+        !HasMoveBeenGood(ply, move)       &&
+        !(position->state_flags & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");
         --child_depth;
