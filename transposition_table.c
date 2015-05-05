@@ -1,23 +1,29 @@
 #include "pawnstar.h"
 
-static bool IsPrime(size_t x);
+#define MEGABYTE                    0x100000
+#define TRANSPOSITIONS_PER_BUCKET   8
 
-static Transposition*   main_table;
-static size_t           main_table_size;
-static Transposition    small_transposition_table[SMALL_HASTABLE_SIZE];
-static Transposition    pv_table[SMALL_HASTABLE_SIZE];
-static volatile long    locks[SMALL_HASTABLE_SIZE];
+static bool IsPrime(int x);
+
+typedef struct HashBucket
+{
+    long            mutex[1];
+    Transposition   transpositions[TRANSPOSITIONS_PER_BUCKET];
+} HashBucket;
+
+static HashBucket*  transposition_table;
+static int          table_bucket_count;
 /******************************************************************************
 Delete the transposition table
 NB: NOT thread safe
 *******************************************************************************/
 void FreeTranspositionTable(void)
 {
-    if (main_table)
+    if (transposition_table)
     {
-        free(main_table);
-        main_table      = NULL;
-        main_table_size = 0;
+        free(transposition_table);
+        transposition_table = NULL;
+        table_bucket_count   = 0;
     } 
 }
 /******************************************************************************
@@ -27,20 +33,21 @@ NB: NOT thread safe
 bool InitializeTranspositionTable(int megabytes)
 {
     FreeTranspositionTable();
-    main_table_size = (megabytes * MEGABYTE) / sizeof(Transposition);
-    if ((main_table_size & 1) == 0)
+    table_bucket_count = (megabytes * MEGABYTE) / sizeof(HashBucket);
+    /* Find the next smallest prime number and make the table that size */
+    if ((table_bucket_count & 1) == 0)
     {
-        --main_table_size;
+        --table_bucket_count;
     }
-    while (!IsPrime(main_table_size))
+    while (!IsPrime(table_bucket_count))
     {
-        main_table_size -= 2;
+        table_bucket_count -= 2;
     }
-    main_table = calloc(main_table_size, sizeof(Transposition));
-    if (!main_table)
+    transposition_table = calloc(table_bucket_count, sizeof(HashBucket));
+    if (!transposition_table)
     {
-        printf("ERROR: unable to create transposition main_table of %u megabytes\n", megabytes);
-        main_table_size = 0;
+        printf("ERROR: unable to create transposition transposition_table of %u megabytes\n", megabytes);
+        table_bucket_count = 0;
         return false;
     }
     return true;
@@ -50,72 +57,79 @@ Find a transposition entry for this position if one exists
 *******************************************************************************/
 bool FindTransposition(uint64 hash, Transposition* transposition)
 {
-    const int idx = hash % SMALL_HASTABLE_SIZE;
-    while (_InterlockedCompareExchange(&locks[idx], 1, 0) != 0)
+    int i;
+    HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
+    while (_InterlockedCompareExchange(bucket->mutex, 1, 0) != 0)
     {
-        INCREMENT("lock contention find");
+        INCREMENT("transposition lock contention retrieve");
     }
-    if (small_transposition_table[idx].hash == hash)
+    for (i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
     {
-        INCREMENT("table hit small table");
-        *transposition = small_transposition_table[idx];
-        _InterlockedExchange(&locks[idx], 0);
-        return true;
+        if (bucket->transpositions[i].hash == hash)
+        {
+            *transposition = bucket->transpositions[i];
+            _InterlockedExchange(bucket->mutex, 0);
+            return true;
+        }
     }
-    if (pv_table[idx].hash == hash)
-    {
-        INCREMENT("table hit pv table");
-        *transposition = pv_table[idx];
-        _InterlockedExchange(&locks[idx], 0);
-        return true;
-    }
-    const Transposition* const t = &main_table[hash % main_table_size];
-    if (t->hash == hash)
-    {
-        *transposition = *t;
-        _InterlockedExchange(&locks[idx], 0);
-        return true;
-    }
-    _InterlockedExchange(&locks[idx], 0);
+    _InterlockedExchange(bucket->mutex, 0);
     return false;
 }
 /******************************************************************************
 Insert a new entry into the transposition table.
+Hash bucket replacement policy (in priority order):
+# replace an entry with the same hash
+# replace an empty slot
+# replace a non PV node
+# replace the entry with the smallest depth
 *******************************************************************************/
 void RecordTransposition(uint64 hash, int depth, int score, int move, int node_type)
 {  
-    const Transposition t = 
+    int i;
+    int replace  = 0;  
+    int best_score = 0;
+    HashBucket* const bucket = &transposition_table[hash % table_bucket_count];  
+    while (_InterlockedCompareExchange(bucket->mutex, 1, 0) != 0)
     {
-        .hash      = hash,
-        .depth     = (char)depth,
-        .score     = (short)score,
-        .move      = move,
-        .node_type = (uchar)node_type
-    };
-    const int idx = hash % SMALL_HASTABLE_SIZE;
-    while (_InterlockedCompareExchange(&locks[idx], 1, 0) != 0)
-    {
-        INCREMENT("lock contention record");
+        INCREMENT("transposition lock contention record");
     }
-    small_transposition_table[idx] = t;
-    if (node_type == NODE_PV)
+    for (i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
     {
-        pv_table[idx] = t;
+        const int score = 
+            8 * (bucket->transpositions[i].hash == hash)                                  +
+            4 * (bucket->transpositions[i].hash == 0)                                     +
+            2 * (bucket->transpositions[i].node_type != NODE_PV)                          +
+                (bucket->transpositions[i].depth < bucket->transpositions[replace].depth);
+
+        if (score > best_score)
+        {
+            best_score = score;
+            replace = i;
+            if (score >= 8)
+            {
+                break;
+            }
+        }
     }
-    main_table[hash % main_table_size] = t; 
-    _InterlockedExchange(&locks[idx], 0);
+    bucket->transpositions[replace].hash        = hash;
+    bucket->transpositions[replace].depth       = (char)depth;
+    bucket->transpositions[replace].score       = (short)score;
+    bucket->transpositions[replace].move        = move;
+    bucket->transpositions[replace].node_type   = (uchar)node_type;
+    _InterlockedExchange(bucket->mutex, 0);
 }
 /******************************************************************************
 We get marginally better dispersion when the hashtable size is a prime number
-Determine if a candidate size is prime
+Determine if a candidate size is prime (excluding 1 and 2)
 *******************************************************************************/
-static bool IsPrime(size_t x)
+static bool IsPrime(int x)
 {
+    int i;
     if (x < 3)
     {
         return false;
     }
-    for (size_t i = 2; i * i <= x; ++i)
+    for (i = 2; i * i <= x; ++i)
     {
         if (x % i == 0)
         {
