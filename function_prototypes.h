@@ -41,8 +41,6 @@ bitboard    AttacksToSquare(const Position* position, int location);
 bitboard    AttacksToSquareByColor(const Position* position, int location, int color);
 bitboard    AttacksToSquareByType(const Position* position, int location, int color, int piece);
 bool        IsAttacked(const Position* position, int location, int color);
-void        DetermineAttackMap(Position* position);
-void        UpdateAttackMap(Position* position);
 /******************************************************************************
 Opening book
 *******************************************************************************/

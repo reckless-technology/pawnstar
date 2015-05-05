@@ -103,31 +103,6 @@ enum Squares
     A8, B8, C8, D8, E8, F8, G8, H8,
 };
 /******************************************************************************
-Compass directions - North is forward from white's perspective.
-*******************************************************************************/
-enum Direction
-{
-    DIR_NONE,
-    DIR_NORTH,
-    DIR_NORTHEAST,
-    DIR_EAST,
-    DIR_SOUTHEAST,
-    DIR_SOUTH,
-    DIR_SOUTHWEST,
-    DIR_WEST,
-    DIR_NORTHWEST,
-};
-/******************************************************************************
-States of a search task
-*******************************************************************************/
-enum TaskState
-{
-    TASK_PENDING,   // task is waiting to be scheduled
-    TASK_RUNNING,   // task is running
-    TASK_COMPLETED, // task completed
-    TASK_ABORTED,   // task was pre-emptively aborted (due to cutoff)
-};
-/******************************************************************************
 Search node types (used in transposition table entries)
 *******************************************************************************/
 enum NodeType
@@ -172,16 +147,16 @@ struct Position
             bitboard white_pieces;
             bitboard black_pieces;
         };
-    };
-    const Position* previous;       // position immediately prior to this
-    uint64  hash;                   // Zobrist hash of this position
-    int     move;                   // the move which led to this position
-    uchar   king_location[2];       // square index on which each king sits 
-    uchar   castle_flags;           // castling rights
-    uchar   state_flags;            // game state-machine flags
-    uchar   en_passant_index;       // en passant capture availability square (0 if none)
-    uchar   reversible_move_count;  // number of consecutive reversible half-moves (plies)
-    uchar   full_move_count;        // number of full moves (NB: zero indexed)
+    };    
+    uint64          hash;                   // Zobrist hash of this position
+    const Position* previous;               // position immediately prior to this
+    int             move;                   // the move which led to this position
+    uchar           king_location[2];       // kings square indices
+    uchar           castle_flags;           // castling rights
+    uchar           state_flags;            // game state-machine flags
+    uchar           en_passant_index;       // en passant capture availability square (0 if none)
+    uchar           reversible_move_count;  // number of consecutive reversible half-moves (plies)
+    uchar           full_move_count;        // number of full moves (zero indexed)
 };
 /******************************************************************************
 Values for magic bitboard attack generator for one square

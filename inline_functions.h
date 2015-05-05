@@ -120,9 +120,6 @@ These functions shift in the specified direction by 1, 2 and 4 squares
 successively, masking off the appropriate edge files to avoid wraparound in the
 larger shifts, and ORing in the results, which "fills" the bitboard to the edge
 of the board in the specified direction in 3 successive shift-or operations.
-These functions are used to determine sliding piece attacks in the presence of 
-blocking pieces. NB: masking is not required when shifting north and south, 
-since the files remain unchanged in these directions.
 *******************************************************************************/
 INLINE bitboard FillNorth(bitboard b)
 {

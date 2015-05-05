@@ -62,12 +62,7 @@ int Search(const Position* src_position,
     else
     {
         INCREMENT("checks");
-        if (!(search_flags & HAS_CHECK_EXTENDED))
-        {
-            INCREMENT("extensions check");
-            ++depth;
-            search_flags |= HAS_CHECK_EXTENDED;
-        }
+        ++depth;
     }
     /**************************************************************************
     Determine if there is an entry in the transposition table for this 
