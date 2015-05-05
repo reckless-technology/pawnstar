@@ -2,11 +2,7 @@
 #include <ctype.h>
 
 #define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
-/******************************************************************************
-Used so that during draw by repetition detection, positions with no predecessor 
-can be sent into harmless loop rather than trying to dereference a null pointer 
-*******************************************************************************/
-static Position null_position[1];
+
 static bool IsNumeric(const char buffer[]);
 /******************************************************************************
 Compute the Zobrist hash of a position
@@ -70,10 +66,8 @@ bool PositionFromString(const char fen_string[], Position* position)
         printf("ERROR: FEN string does not contain board definition\n");
         return false;
     }
-    memset(null_position, 0, sizeof(Position));
     memset(position, 0, sizeof(Position));
-    null_position->previous = null_position; // prevents null pointer dereferencing in draw by repetition detection
-    position->previous      = null_position;
+    position->previous = position;
     /**************************************************************************
     Pieces on the board
     ***************************************************************************/

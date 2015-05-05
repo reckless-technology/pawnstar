@@ -35,7 +35,7 @@ Run the standard Bratko-Kopec test suite at fixed search depth
 *******************************************************************************/
 void RunPositionTests(int depth)
 {
-    Position position[1];
+    Position position;
     int first_start;
     const char* const * tests;
     int prev_clock_type = globals->time_control.clock_type;
@@ -46,16 +46,15 @@ void RunPositionTests(int depth)
     first_start = GetMilliseconds();
     for (tests = POSITION_TESTS; *tests; ++tests)
     {
-        if (!PositionFromString(*tests, position))
+        if (!PositionFromString(*tests, &position))
         {
             printf("ERROR: unable to parse FEN string:\n%s\n", *tests);
             return;
         }
         printf("\n%s\n", *tests);
         DEBUG_STATEMENT(DebugXClear());
-        SearchRootNode(position);
+        SearchRootNode(&position);
         DEBUG_STATEMENT(DebugXWrite(stdout));
-        //DisplayClientsAndWorkers();
     }
     printf("total elapsed milliseconds                        %10d\n", GetMilliseconds() - first_start);
     globals->time_control.clock_type  = prev_clock_type;

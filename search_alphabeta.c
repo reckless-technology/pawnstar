@@ -17,7 +17,7 @@ int Search(const Position* src_position,
            volatile bool* cancel, 
            int search_flags)
 {
-    Transposition       transposition[1];
+    Transposition       transposition;
     int                 move;   
     int                 pre_moves[4];
     int                 regular_moves[MAX_MOVES_PER_POSITION];
@@ -73,10 +73,10 @@ int Search(const Position* src_position,
     Determine if there is an entry in the transposition table for this 
     position.
     ***************************************************************************/
-    is_transposition = FindTransposition(src_position->hash, transposition);
-    if (is_transposition && transposition->depth >= depth)
+    is_transposition = FindTransposition(src_position->hash, &transposition);
+    if (is_transposition && transposition.depth >= depth)
     {
-        switch (transposition->node_type)
+        switch (transposition.node_type)
         {
         case NODE_CUT:
             /**************************************************************
@@ -84,7 +84,7 @@ int Search(const Position* src_position,
             position, but we do know it is at least transposition->score
             ***************************************************************/
             INCREMENT("table hit cut node");
-            if (transposition->score >= beta)
+            if (transposition.score >= beta)
             {
                 INCREMENT("table hit beta cutoffs");
                 return beta;
@@ -97,7 +97,7 @@ int Search(const Position* src_position,
             position, but we do know it is at most transposition->score
             ***************************************************************/
             INCREMENT("table hit all node");
-            if (transposition->score <= alpha)
+            if (transposition.score <= alpha)
             {
                 INCREMENT("table hit alpha cutoffs");
                 return alpha;
@@ -109,11 +109,11 @@ int Search(const Position* src_position,
             We know the exact score and the best move from this position.
             ***************************************************************/
             INCREMENT("table hit pv node");
-            if (transposition->score > alpha && transposition->score < beta && transposition->move)
+            if (transposition.score > alpha && transposition.score < beta && transposition.move)
             {
-                RecordPrincipalVariationMove(src_position->hash, transposition->move);
+                RecordPrincipalVariationMove(src_position->hash, transposition.move);
             }
-            return transposition->score;
+            return transposition.score;
         }
     }
  
@@ -135,10 +135,10 @@ int Search(const Position* src_position,
         (src_position->pieces_of_color[COLOR_TO_MOVE(src_position)] & ~(src_position->pawns | src_position->kings)) &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
-        Position position[1];
+        Position position;
         INCREMENT("null move attempts");
-        MakeNullMove(position, src_position);
-        score = -Search(position, depth - 3, ply + 1, -beta, -beta + 1, cancel, search_flags & ~IS_NULL_MOVE_OK);
+        MakeNullMove(&position, src_position);
+        score = -Search(&position, depth - 3, ply + 1, -beta, -beta + 1, cancel, search_flags & ~IS_NULL_MOVE_OK);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -167,7 +167,7 @@ int Search(const Position* src_position,
 #endif
 
     /**************************************************************************
-    Before we generate any moves, try any principal variation table and 
+    Before we generate any moves, try any principal variation table or 
     transposition table moves first. This might save us the cost of move 
     generation, or provide better alpha beta bounds for the main search.
     In any case, it's always a good idea to search the PV first.
@@ -181,14 +181,12 @@ int Search(const Position* src_position,
     else
     {
         search_flags &= ~IS_FOLLOWING_PV;
-    }
-    if (is_transposition           && 
-        transposition->move        && 
-        transposition->move != move)
-    {
-        INCREMENT("pre moves - TT");
-        *m++ = transposition->move;
-    }
+        if (is_transposition && transposition.move)
+        {
+            INCREMENT("pre moves - TT");
+            *m++ = transposition.move;
+        }
+    }    
     *m = 0; /* terminate pre moves list */
     if (!is_transposition && depth > 1)
     {
@@ -197,7 +195,7 @@ int Search(const Position* src_position,
     /**************************************************************************
     Start of main loop - we go through the following move phases:
 
-    1) Pre moves from the PV and TT
+    1) Pre move from the PV or TT
     2) Regular moves with a SEE >= 0 (sorted best first)
     3) Deferred moves with a SEE < 0
 
@@ -318,14 +316,14 @@ int SearchSingleMove(const Position* src_position,
                      int search_flags, 
                      int move)
 {  
-    Position position[1];   
+    Position position;   
     int score;
     if (*cancel)
     {
         return ILLEGAL_SCORE;
     }
-    MakeMove(position, src_position, move);
-    if (position->state_flags & MOVED_INTO_CHECK)
+    MakeMove(&position, src_position, move);
+    if (position.state_flags & MOVED_INTO_CHECK)
     {
         return MOVED_INTO_CHECK_SCORE;
     }
@@ -379,7 +377,7 @@ int SearchSingleMove(const Position* src_position,
         !MOVE_CAPTURED(move)              &&
         depth > 2                         &&
         !HasMoveBeenGood(ply, move)       &&
-        !(position->state_flags & IS_CHECK))
+        !(position.state_flags & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");
         --child_depth;
@@ -392,16 +390,16 @@ int SearchSingleMove(const Position* src_position,
         beta > alpha + 1)
     {
         INCREMENT("pvs attempts");
-        score = -Search(position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, search_flags);
+        score = -Search(&position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, search_flags);
         if (score > alpha)
         {
             INCREMENT("pvs fails");
-            score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags);
+            score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags);
         }
     }
     else
     {
-        score = -Search(position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags);
+        score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags);
     }
     return score;
 }

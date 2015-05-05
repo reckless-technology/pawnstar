@@ -54,7 +54,7 @@ int SearchQuiescent(const Position* src_position,
     int legal_move_count = 0;
     while ((move = *pmove++) != 0)
     {
-        Position position[1];
+        Position position;
 
 #if DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
         if (EvaluateStaticExchange(src_position, move) < 0)
@@ -64,24 +64,24 @@ int SearchQuiescent(const Position* src_position,
         }
 #endif
 
-        MakeMove(position, src_position, move);
-        if (position->state_flags & MOVED_INTO_CHECK)
+        MakeMove(&position, src_position, move);
+        if (position.state_flags & MOVED_INTO_CHECK)
         {
             continue;
         }
         if (beta > alpha + 1 && legal_move_count)
         {
             INCREMENT("quiescent pvs attempts");
-            score = -SearchQuiescent(position, depth - 1, ply + 1, -alpha - 1, -alpha, cancel);
+            score = -SearchQuiescent(&position, depth - 1, ply + 1, -alpha - 1, -alpha, cancel);
             if (score > alpha)
             {
                 INCREMENT("quiescent pvs fails");
-                score = -SearchQuiescent(position, depth - 1, ply + 1, -beta, -alpha, cancel);
+                score = -SearchQuiescent(&position, depth - 1, ply + 1, -beta, -alpha, cancel);
             }
         }
         else
         {
-            score = -SearchQuiescent(position, depth - 1, ply + 1, -beta, -alpha, cancel);
+            score = -SearchQuiescent(&position, depth - 1, ply + 1, -beta, -alpha, cancel);
         }
         ++legal_move_count;
         if (*cancel)

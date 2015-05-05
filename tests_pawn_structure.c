@@ -81,12 +81,12 @@ void DisplayPawnStructure(const Position* position)
 
 void RunPawnStructureTests(void)
 {
-    Position position[1];
+    Position position;
     int i;
     for (i = 0; POSITION_TESTS[i] != NULL; ++i)
     {
-        PositionFromString(POSITION_TESTS[i], position);
+        PositionFromString(POSITION_TESTS[i], &position);
         printf("\n%s\n", POSITION_TESTS[i]);
-        DisplayPawnStructure(position);
+        DisplayPawnStructure(&position);
     }
 }

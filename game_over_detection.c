@@ -1,11 +1,10 @@
 #include "pawnstar.h"
 /******************************************************************************
-Determine if the current position represents a draw by repetition of position
-3 times (i.e. this position has occurred in the history twice previously)
+Determine if the current position represents a draw by repetition.
 
 We use position Zobrist hash values to determine position equality - there is a
-tiny chance of hash collision causing an error - I have never seen it happen 
-in practice
+tiny chance of hash collision causing an error - I have not seen it happen 
+in practice.
 *******************************************************************************/
 bool IsDrawByRepetition(const Position* position, bool is_search)
 {

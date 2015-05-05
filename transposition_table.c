@@ -16,8 +16,8 @@ void FreeTranspositionTable(void)
     if (main_table)
     {
         free(main_table);
-        main_table = NULL;
-        main_table_size   = 0;
+        main_table      = NULL;
+        main_table_size = 0;
     } 
 }
 /******************************************************************************
@@ -55,13 +55,6 @@ bool FindTransposition(uint64 hash, Transposition* transposition)
     {
         INCREMENT("lock contention find");
     }
-    if (pv_table[idx].hash == hash)
-    {
-        INCREMENT("table hit pv table");
-        *transposition = pv_table[idx];
-        _InterlockedExchange(&locks[idx], 0);
-        return true;
-    }
     if (small_transposition_table[idx].hash == hash)
     {
         INCREMENT("table hit small table");
@@ -69,10 +62,17 @@ bool FindTransposition(uint64 hash, Transposition* transposition)
         _InterlockedExchange(&locks[idx], 0);
         return true;
     }
-    const uint64 idx2 = hash % main_table_size;
-    if (main_table[idx2].hash == hash)
+    if (pv_table[idx].hash == hash)
     {
-        *transposition = main_table[idx2];
+        INCREMENT("table hit pv table");
+        *transposition = pv_table[idx];
+        _InterlockedExchange(&locks[idx], 0);
+        return true;
+    }
+    const Transposition* const t = &main_table[hash % main_table_size];
+    if (t->hash == hash)
+    {
+        *transposition = *t;
         _InterlockedExchange(&locks[idx], 0);
         return true;
     }

@@ -42,17 +42,17 @@ moves of various types, storing the result in counts
 *******************************************************************************/
 static void CategorizeMoves(const Position* src_position, const int moves[], PerftCounts* counts)
 {
-    Position position[1];
+    Position position;
     const int* move;
     for (move = moves; *move; ++move)
     {
-        MakeMove(position, src_position, *move);
-        if (position->state_flags & MOVED_INTO_CHECK)
+        MakeMove(&position, src_position, *move);
+        if (position.state_flags & MOVED_INTO_CHECK)
         {
             continue;
         }
         ++counts->legal_moves;
-        if (position->state_flags & IS_CHECK)
+        if (position.state_flags & IS_CHECK)
         {
             ++counts->checks;
         }
@@ -94,22 +94,22 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
     }
     if (depth > 1)
     {
-        Position position[1];
+        Position position;
         const int* move;
         for (move = moves; *move; ++move)
         {
-            MakeMove(position, src_position, *move);
+            MakeMove(&position, src_position, *move);
 #if 1
-            if (position->hash != ComputeHash(position))
+            if (position.hash != ComputeHash(&position))
             {
                 printf("ERROR in hash during perft\n");
             }
 #endif
-            if (position->state_flags & MOVED_INTO_CHECK)
+            if (position.state_flags & MOVED_INTO_CHECK)
             {
                 continue;
             }
-            Perft(position, depth - 1, ENEMY(color), counts);
+            Perft(&position, depth - 1, ENEMY(color), counts);
         }
         return counts->legal_moves;
     }
@@ -122,7 +122,7 @@ Run perft test on the standard test positions
 void RunPerftTests()
 {
     PerftCounts counts;
-    Position position[1];
+    Position position;
     int start, first_start, stop = 0;
     bool is_good = true;
     int total_nodes = 0;
@@ -131,7 +131,7 @@ void RunPerftTests()
     for (test = PERFT_TESTS; test->position; ++test)
     {
         printf("\n%s\n", test->position);
-        if (!PositionFromString(test->position, position))
+        if (!PositionFromString(test->position, &position))
         {
             printf("ERROR: cannot create position from FEN string\n");
             continue;
@@ -139,7 +139,7 @@ void RunPerftTests()
         memset(&counts, 0, sizeof(counts));
         total_nodes += test->counts.legal_moves;
         start = GetMilliseconds();
-        Perft(position, test->depth, COLOR_TO_MOVE(position), &counts);
+        Perft(&position, test->depth, COLOR_TO_MOVE(&position), &counts);
         stop = GetMilliseconds();
         if (stop == start)
         {

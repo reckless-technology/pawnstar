@@ -13,15 +13,15 @@ Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
 *******************************************************************************/
 int EvaluateStaticExchange(const Position* src_position, int move)
 {
-    Position position[1];
-    MakeMove(position, src_position, move);
+    Position position;
+    MakeMove(&position, src_position, move);
     if (MOVE_PROMOTED(move))
     {
         return PIECE_VALUES[MOVE_CAPTURED(move)] + PIECE_VALUES[MOVE_PROMOTED(move)] - PIECE_VALUES[PAWN] - 
-            EvaluateSwapOff(position, MOVE_TO(move), COLOR_TO_MOVE(position), MOVE_PROMOTED(move));
+            EvaluateSwapOff(&position, MOVE_TO(move), COLOR_TO_MOVE(&position), MOVE_PROMOTED(move));
     }
     return PIECE_VALUES[MOVE_CAPTURED(move)] - 
-        EvaluateSwapOff(position, MOVE_TO(move), COLOR_TO_MOVE(position), MOVE_PIECE(move));
+        EvaluateSwapOff(&position, MOVE_TO(move), COLOR_TO_MOVE(&position), MOVE_PIECE(move));
 }
 /******************************************************************************
 Determine the swap off value of a capture move onto a fixed square. This 
