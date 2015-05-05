@@ -128,9 +128,6 @@
     <ClCompile Include="evaluation_full.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="generated_magics.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="engine_protocol.html">

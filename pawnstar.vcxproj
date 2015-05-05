@@ -258,7 +258,6 @@
     <ClCompile Include="forsyth_edwards.c" />
     <ClCompile Include="game_over_detection.c" />
     <ClCompile Include="generated_data.c" />
-    <ClCompile Include="generated_magics.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="make_moves.c" />
     <ClCompile Include="move_generation.c" />
