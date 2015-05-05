@@ -1,7 +1,7 @@
 #include "pawnstar.h"
 
 #define MEGABYTE                    0x100000
-#define TRANSPOSITIONS_PER_BUCKET   8
+#define TRANSPOSITIONS_PER_BUCKET   16
 
 static bool IsPrime(int x);
 
@@ -63,11 +63,12 @@ bool FindTransposition(uint64 hash, Transposition* transposition)
     {
         INCREMENT("transposition lock contention retrieve");
     }
-    for (i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
+    Transposition* t = bucket->transpositions;
+    for (i = TRANSPOSITIONS_PER_BUCKET; i != 0; --i, ++t)
     {
-        if (bucket->transpositions[i].hash == hash)
+        if (t->hash == hash)
         {
-            *transposition = bucket->transpositions[i];
+            *transposition = *t;
             _InterlockedExchange(bucket->mutex, 0);
             return true;
         }
@@ -85,37 +86,40 @@ Hash bucket replacement policy (in priority order):
 *******************************************************************************/
 void RecordTransposition(uint64 hash, int depth, int score, int move, int node_type)
 {  
-    int i;
-    int replace  = 0;  
-    int best_score = 0;
-    HashBucket* const bucket = &transposition_table[hash % table_bucket_count];  
+    const Transposition transposition = 
+    {
+        .hash      = hash,
+        .move      = move,
+        .score     = (short)score,
+        .depth     = (char)depth,       
+        .node_type = (uchar)node_type
+    };    
+    HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
+    int best_score           = 0;
+    Transposition* candidate = bucket->transpositions;
+    Transposition* t         = bucket->transpositions;
     while (_InterlockedCompareExchange(bucket->mutex, 1, 0) != 0)
     {
         INCREMENT("transposition lock contention record");
     }
-    for (i = TRANSPOSITIONS_PER_BUCKET - 1; i >= 0; --i)
+    for (int i = TRANSPOSITIONS_PER_BUCKET; i != 0; --i, ++t)
     {
         const int score = 
-            8 * (bucket->transpositions[i].hash == hash)                                  +
-            4 * (bucket->transpositions[i].hash == 0)                                     +
-            2 * (bucket->transpositions[i].node_type != NODE_PV)                          +
-                (bucket->transpositions[i].depth < bucket->transpositions[replace].depth);
-
+            8 * (t->hash == hash)         +
+            4 * (t->hash == 0)            +
+            2 * (t->node_type != NODE_PV) +
+                (t->depth < candidate->depth);
         if (score > best_score)
         {
             best_score = score;
-            replace = i;
+            candidate  = t;
             if (score >= 8)
             {
                 break;
             }
         }
     }
-    bucket->transpositions[replace].hash        = hash;
-    bucket->transpositions[replace].depth       = (char)depth;
-    bucket->transpositions[replace].score       = (short)score;
-    bucket->transpositions[replace].move        = move;
-    bucket->transpositions[replace].node_type   = (uchar)node_type;
+    *candidate = transposition;
     _InterlockedExchange(bucket->mutex, 0);
 }
 /******************************************************************************

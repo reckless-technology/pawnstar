@@ -125,20 +125,19 @@ int Search(const Position* src_position,
     # we are not in check   
     # this is not a PV node
     # we are not down to king and pawns
-    # the eval score is high enough for a beta cutoff 
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     ***************************************************************************/
-    if ((search_flags & IS_NULL_MOVE_OK)                                                                            &&
-        !(src_position->state_flags & IS_CHECK)                                                                     &&
-        alpha == beta - 1                                                                                           && 
+    if ((search_flags & IS_NULL_MOVE_OK)        &&
+        !(src_position->state_flags & IS_CHECK) &&
+        alpha == beta - 1                       && 
         (src_position->pieces_of_color[COLOR_TO_MOVE(src_position)] & ~(src_position->pawns | src_position->kings)) &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         Position position;
         INCREMENT("null move attempts");
         MakeNullMove(&position, src_position);
-        score = -Search(&position, depth - 3, ply + 1, -beta, -beta + 1, cancel, search_flags & ~IS_NULL_MOVE_OK);
+        score = -Search(&position, depth - 4, ply + 1, -beta, -beta + 1, cancel, search_flags & ~IS_NULL_MOVE_OK);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -368,15 +367,12 @@ int SearchSingleMove(const Position* src_position,
     Reduce the search depth if ALL of the following are true:
     # We did not already do LMR further up the tree
     # The move was deferred due to negative SEE
-    # The move is not a capture  
-    # Depth is at least 3
+    # We won't descend directly into quiescence search
     # The move does not give check
     ***************************************************************************/
     if ((search_flags & IS_LMR_OK)        &&
         (search_flags & IS_DEFERRED_MOVE) &&
-        !MOVE_CAPTURED(move)              &&
-        depth > 2                         &&
-        !HasMoveBeenGood(ply, move)       &&
+        child_depth > 1                   &&
         !(position.state_flags & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");

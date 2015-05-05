@@ -25,14 +25,33 @@ Record a new PV move (thread safe)
 void RecordPrincipalVariationMove(uint64 hash, int move)
 { 
     INCREMENT("pv moves recorded");
-    const int idx = hash % PV_TABLE_SIZE;
-    while (_InterlockedCompareExchange(&pv_table[idx].lock, 1, 0) != 0)
+    PvMove* const p = &pv_table[hash % PV_TABLE_SIZE];
+    while (_InterlockedCompareExchange(&p->lock, 1, 0) != 0)
     {
         INCREMENT("lock contention pv record");
     }
-    pv_table[idx].hash = hash;
-    pv_table[idx].move = move;
-    _InterlockedExchange(&pv_table[idx].lock, 0);
+    p->hash = hash;
+    p->move = move;
+    _InterlockedExchange(&p->lock, 0);
+}
+/******************************************************************************
+Retrieve the PV move for the given hash (if any) 
+*******************************************************************************/
+int GetPrincipalVariationMove(uint64 hash)
+{
+    PvMove* const p = &pv_table[hash % PV_TABLE_SIZE];
+    while (_InterlockedCompareExchange(&p->lock, 1, 0) != 0)
+    {
+        INCREMENT("lock contention pv retrieve");
+    }
+    if (p->hash == hash)
+    {
+        const int result = p->move;
+        _InterlockedExchange(&p->lock, 0);
+        return result;
+    }
+    _InterlockedExchange(&p->lock, 0);
+    return 0;
 }
 /******************************************************************************
 Get the PV from the PV hashtable, given the root position Zobrist hash
@@ -60,23 +79,4 @@ void FindPrincipalVariation(const Position* root_position, int principal_variati
             break;
         }
     }
-}
-/******************************************************************************
-Retrieve the PV move for the given hash (if any) 
-*******************************************************************************/
-int GetPrincipalVariationMove(uint64 hash)
-{
-    const int idx = hash % PV_TABLE_SIZE;
-    while (_InterlockedCompareExchange(&pv_table[idx].lock, 1, 0) != 0)
-    {
-        INCREMENT("lock contention pv retrieve");
-    }
-    if (pv_table[idx].hash == hash)
-    {
-        const int result = pv_table[idx].move;
-        _InterlockedExchange(&pv_table[idx].lock, 0);
-        return result;
-    }
-    _InterlockedExchange(&pv_table[idx].lock, 0);
-    return 0;
 }

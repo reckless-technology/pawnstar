@@ -143,7 +143,7 @@ static const int RANDOM_FACTOR[16] = { -10, -5, -5, -5, 0, 0, 0, 0, 0, 0, 0, 0, 
 #define SCORE_QUEEN                       1200
 #define TOTAL_MATERIAL_SUM                9600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
 #define SCORE_MATERIAL_THRESHOLD           400  // threshold for eval cutoff on material balance only
-#define SCORE_CASTLING_RIGHTS               50  // bonus for retaining the right to castle
+#define SCORE_CASTLING_RIGHTS               60  // bonus for retaining the right to castle
 #define SCORE_PAWN_KING_ADJ1                25  // bonus for each pawn standing directly in front of the king after castling
 #define SCORE_PAWN_KING_ADJ2                15  // bonus for each pawn standing on the 3rd rank in front of the king
 #define SCORE_KING_OPEN_FILE               -30  // penalty for king on a file with no friendly pawns

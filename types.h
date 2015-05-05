@@ -222,18 +222,11 @@ A transposition (encompasses brief results of a previous search)
 *******************************************************************************/
 typedef struct
 {
-    uint64  hash;
-    union
-    {
-        uint64 payload;
-        struct
-        {
-            int         move;
-            short       score;
-            signed char depth;
-            uchar       node_type;
-        };
-    };      
+    uint64      hash;
+    int         move;
+    short       score;
+    signed char depth;
+    uchar       node_type;    
 } Transposition;
 /******************************************************************************
 Information about pinned pieces and their possible move targets
