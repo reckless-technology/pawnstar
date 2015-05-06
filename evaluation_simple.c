@@ -29,7 +29,7 @@ static const int KNIGHT_SQUARE[64] = {
     -30,  0, 15, 20, 20, 15,  0,-30,
     -30,  5, 10, 15, 15, 10,  5,-30,
     -40,-20,  0,  5,  5,  0,-20,-40,
-    -50,-40,-30,-30,-30,-30,-40,-50,
+    -50,-40,-30,-30,-30,-30,-40,-50
 };
 static const int BISHOP_SQUARE[64] = {
     -20,-10,-10,-10,-10,-10,-10,-20,
@@ -39,7 +39,7 @@ static const int BISHOP_SQUARE[64] = {
     -10,  0, 10, 10, 10, 10,  0,-10,
     -10, 10, 10, 10, 10, 10, 10,-10,
     -10,  5,  0,  0,  0,  0,  5,-10,
-    -20,-10,-10,-10,-10,-10,-10,-20,
+    -20,-10,-10,-10,-10,-10,-10,-20
 };
 static const int ROOK_SQUARE[64] = {
       0,  0,  0,  0,  0,  0,  0,  0,
@@ -94,8 +94,8 @@ static const int* const PIECE_SQUARES[8] = {
 static const int MATERIAL_VALUES[8] = {
       0,
     100, // pawn
-    330, // knight
-    340, // bishop
+    320, // knight
+    330, // bishop
     500, // rook
     900, // queen
       0, // king

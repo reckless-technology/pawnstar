@@ -83,7 +83,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
                     dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
                     dst_position->hash -= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
                 }
-                else if (((to - from) & 0x0F) == 0) /* equivalent to (abs(from - to) == 16) in this context */
+                else if (abs(to - from) == 16)
                 {
                     /* double pawn push */
                     dst_position->en_passant_index = (uchar)((from + to) >> 1);
