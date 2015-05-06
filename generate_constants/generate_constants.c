@@ -287,10 +287,10 @@ static uint64 PseudoRandom64(void)
 {
     static uint64 lcg = 0;
     uint64 result = 0;
-    for (int i = 0; i != 64; ++i)
+    for (int i = 0; i != 8; ++i)
     {
         lcg = lcg * 6364136223846793005ull + 1442695040888963407ull;
-        result = (result << 1) | (lcg >> 63);
+        result = (result << 8) | (lcg >> 56);
     }
     return result;
 }
@@ -436,7 +436,7 @@ static void GenerateMagics(void)
         for (int j = 0; j != 64; ++j)
         {
             const int num_entries = magics[j].num_discrete_attacks;
-            printf("static const bitboard %s_MAGIC_ATTACKS_%c%c[%d] = {",
+            printf("static const bitboard %s_MAGIC_ATTACKS_%c%c[%d] = \n{",
                     piece_name,
                     'A' + FILE_OF(j),
                     '1' + RANK_OF(j),
@@ -451,7 +451,7 @@ static void GenerateMagics(void)
             }
             printf("\n};\n");
             const int num_indices = 1 << (64 - magics[j].shift);
-            printf("static const uchar %s_MAGIC_INDICES_%c%c[%d] = {",
+            printf("static const uchar %s_MAGIC_INDICES_%c%c[%d] = \n{",
                     piece_name,
                     'A' + FILE_OF(j),
                     '1' + RANK_OF(j),
@@ -467,7 +467,7 @@ static void GenerateMagics(void)
             printf("\n};\n");
 
         }
-        printf("const MagicMoveEntry %s_MAGICS[64] = {\n", piece_name);
+        printf("const MagicMoveEntry %s_MAGICS[64] = \n{\n", piece_name);
         for (int j = 0; j != 64; ++j)
         {
             printf("    { 0x%016llXull, 0x%016llXull, %s_MAGIC_INDICES_%c%c, %s_MAGIC_ATTACKS_%c%c, %d },\n",

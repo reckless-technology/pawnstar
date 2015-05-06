@@ -94,8 +94,8 @@ static const int* const PIECE_SQUARES[8] = {
 static const int MATERIAL_VALUES[8] = {
       0,
     100, // pawn
-    320, // knight
-    330, // bishop
+    330, // knight
+    340, // bishop
     500, // rook
     900, // queen
       0, // king

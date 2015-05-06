@@ -116,23 +116,22 @@ int Search(const Position* src_position,
     /**************************************************************************
     Try null move pruning if ALL of the following are true:
 
-    # we haven't already tried it further up this path in the tree
+    # the previous move was not a null move
     # we are not in check   
     # this is not a PV node
     # we are not down to king and pawns
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     ***************************************************************************/
-    if ((search_flags & IS_NULL_MOVE_OK)        &&
+    if ((src_position->move)                    &&
         !(src_position->state_flags & IS_CHECK) &&
-        alpha == beta - 1                       && 
         (src_position->pieces_of_color[COLOR_TO_MOVE(src_position)] & ~(src_position->pawns | src_position->kings)) &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         Position position;
         INCREMENT("null move attempts");
         MakeNullMove(&position, src_position);
-        score = -Search(&position, depth - 4, ply + 1, -beta, -beta + 1, cancel, search_flags & ~IS_NULL_MOVE_OK);
+        score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, search_flags & ~IS_NULL_MOVE_OK);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -350,7 +349,8 @@ int SearchSingleMove(const Position* src_position,
 #endif
 
 #if DO_RECAPTURE_EXTENSION
-    if (MOVE_CAPTURED(move) && CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
+    if (MOVE_CAPTURED(move) && 
+        CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
     {
         INCREMENT("extensions recapture");
         ++child_depth;
