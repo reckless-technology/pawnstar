@@ -23,7 +23,7 @@ static int EvaluateMaterial         (const Position* position, bitboard friendly
 static int EvaluatePieceSquare      (const Position* position, int color, bitboard friendly_pieces, int material_percent);
 static int EvaluateMobility         (const Position* position, bitboard friendly_pieces);
 static int EvaluateKingSafety       (const Position* position, int color, bitboard friendly_pieces, int material_percent);
-static int EvaluatePawnStructure    (const PawnStructure* ps, int material_percent);
+static int EvaluatePawnStructure    (const Position* position, const PawnStructure* ps, bitboard friendly_pieces, int color, int material_percent);
 
 static const bitboard* const FORWARD_OF[2] = { NORTH_OF,                  SOUTH_OF                  };
 static const bitboard* const KPS1[2]       = { KING_PAWN_SHIELD_WHITE,    KING_PAWN_SHIELD_BLACK    };
@@ -38,7 +38,7 @@ static const int PAWN_SQUARE[64] =
     10, 10, 20, 30, 30, 20, 10, 10,
      5,  5, 10, 25, 25, 10,  5,  5,
      0,  0,  0, 20, 20,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0, 10, 10,  0,  0,  0,
      0,  0,  0,-20,-20,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0
 };
@@ -86,6 +86,17 @@ static const int QUEEN_SQUARE[64] =
     -10,  0,  5,  0,  0,  0,  0,-10,
     -20,-10,-10, -5, -5,-10,-10,-20
 };
+static const int KING_SQUARE_MIDGAME[64] = 
+{
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -30,-40,-40,-50,-50,-40,-40,-30,
+    -20,-30,-30,-40,-40,-30,-30,-20,
+    -10,-20,-20,-20,-20,-20,-20,-10,
+     20, 20,  0,  0,  0,  0, 20, 20,
+     20, 30, 10,  0,  0, 10, 30, 20,
+};
 static const int KING_SQUARE_ENDGAME[64] = 
 {
       0, 10, 20, 30, 30, 20, 10,  0,
@@ -116,8 +127,8 @@ static const int* const PIECE_SQUARE_TABLE[8] =
 #define SCORE_QUEEN                       1000
 #define TOTAL_MATERIAL_SUM                8200  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
 #define SCORE_MATERIAL_THRESHOLD           400  // threshold for eval cutoff on material balance only
-#define SCORE_CASTLING_RIGHTS               50  // bonus for retaining the right to castle
-#define SCORE_PAWN_KING_ADJ1                25  // bonus for each pawn standing directly in front of the king after castling
+#define SCORE_CASTLING_RIGHTS               60  // bonus for retaining the right to castle
+#define SCORE_PAWN_KING_ADJ1                30  // bonus for each pawn standing directly in front of the king after castling
 #define SCORE_PAWN_KING_ADJ2                10  // bonus for each pawn standing on the 3rd rank in front of the king
 #define SCORE_KING_OPEN_FILE               -20  // penalty for king on a file with no friendly pawns
 #define SCORE_KING_ADJ_OPEN_FILE           -10  // penalty for king adjacent file with no friendly pawns
@@ -129,6 +140,7 @@ static const int* const PIECE_SQUARE_TABLE[8] =
 #define SCORE_PROTECTED_PAWN                 5  // bonus for pawn protected by a friendly pawn in the midgame
 #define SCORE_PROTECTED_PAWN_END            20  // bonus for pawn protected by a friendly pawn in the endgame
 #define SCORE_PROTECTED_PASSED_PAWN_END     25  // additional bonus for a passed pawn protected by a friendly pawn in the endgame
+#define SCORE_ROOK_BEHIND_PASSED_PAWN_END   20  // bonus for a rook behind a passed pawn in the end game
 /******************************************************************************
 Bonus / penalty for bishops and rooks based on number of available psuedo legal 
 target squares. The rest should be handled by search.
@@ -199,11 +211,15 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
         return material_score;
     }
     int material_percent = ((material_white + material_black) * 100) / TOTAL_MATERIAL_SUM;
-    if (material_percent >= 80)
+    if (material_percent >= 90)
     {
         material_percent = 100;
     }
     else if (material_percent <= 10)
+    {
+        material_percent = 0;
+    }
+    if (!position->queens)
     {
         material_percent = 0;
     }
@@ -219,13 +235,13 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
         EvaluateMobility(position, position->white_pieces) - 
         EvaluateMobility(position, position->black_pieces);
     const int pawn_structure_score = 
-        EvaluatePawnStructure(&ps[WHITE], material_percent) - 
-        EvaluatePawnStructure(&ps[BLACK], material_percent);
+        EvaluatePawnStructure(position, &ps[WHITE], position->white_pieces, WHITE, material_percent) - 
+        EvaluatePawnStructure(position, &ps[BLACK], position->black_pieces, BLACK, material_percent);
     const int non_material_score = 
-        piece_square_score + 
-        mobility_score     + 
-        king_safety_score  + 
-        pawn_structure_score;
+        (piece_square_score + 
+         mobility_score     + 
+         king_safety_score  + 
+         pawn_structure_score);
     INCREMENT_IF(abs(non_material_score) > 100, "eval non material exceeds pawn");
     int final_score = 
         material_white - material_black + 
@@ -245,19 +261,20 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
 
 static int EvaluateMaterial(const Position* position, bitboard friendly_pieces)
 {
-    int score = 
+    return 
         SCORE_PAWN   * PopCount(position->pawns   & friendly_pieces) +
         SCORE_KNIGHT * PopCount(position->knights & friendly_pieces) +
         SCORE_BISHOP * PopCount(position->bishops & friendly_pieces) +
         SCORE_ROOK   * PopCount(position->rooks   & friendly_pieces) +
         SCORE_QUEEN  * PopCount(position->queens  & friendly_pieces);
-    return score;
 }
 
 static int EvaluatePieceSquare(const Position* position, int color, bitboard friendly_pieces, int material_percent)
 { 
     const uchar rank_flip = FLIP_BOARD[color];   
-    int score = (KING_SQUARE_ENDGAME[position->king_location[color] ^ rank_flip] * (100 - material_percent)) / 100;
+    int score = 
+        ((KING_SQUARE_MIDGAME[position->king_location[color] ^ rank_flip] *        material_percent) + 
+         (KING_SQUARE_ENDGAME[position->king_location[color] ^ rank_flip] * (100 - material_percent))) / 100;
     for (int piece = PAWN; piece <= QUEEN; ++piece)
     {
         const int* const table = PIECE_SQUARE_TABLE[piece];
@@ -356,19 +373,32 @@ static int EvaluateKingSafety(const Position* position, int color, bitboard frie
     return (score * material_percent) / 100;
 }
 
-static int EvaluatePawnStructure(const PawnStructure* ps, int material_percent)
+static int EvaluatePawnStructure(const Position* position, const PawnStructure* ps, bitboard friendly_pieces, int color, int material_percent)
 {
     const int midgame_score =
         SCORE_ISOLATED_PAWN  * PopCount(ps->isolated_pawns) +
         SCORE_DOUBLED_PAWN   * PopCount(ps->doubled_pawns)  +
         SCORE_PROTECTED_PAWN * PopCount(ps->defended_pawns) +
         SCORE_PASSED_PAWN    * PopCount(ps->passed_pawns);
-    const int endgame_score =
+    int endgame_score =
         SCORE_DOUBLED_PAWN              * PopCount(ps->doubled_pawns)                     +
         SCORE_PROTECTED_PAWN_END        * PopCount(ps->defended_pawns)                    +
         SCORE_PASSED_PAWN_END           * PopCount(ps->passed_pawns)                      +
         SCORE_PROTECTED_PASSED_PAWN_END * PopCount(ps->passed_pawns & ps->defended_pawns) +
         SCORE_ISOLATED_PAWN_END         * PopCount(ps->isolated_pawns);
+    bitboard friendly_rooks = position->rooks & friendly_pieces;
+    while (friendly_rooks)
+    {
+        const int rook_locn = FindAndClearLsb(&friendly_rooks);
+        bitboard pp = FORWARD_OF[color][rook_locn] & ps->passed_pawns;
+        while (pp)
+        {
+            if (!(INTERVENING_SQUARES[rook_locn][FindAndClearLsb(&pp)] & position->occupied_squares))
+            {
+                endgame_score += SCORE_ROOK_BEHIND_PASSED_PAWN_END;
+            }
+        }
+    }
     return (midgame_score * material_percent + endgame_score * (100 - material_percent)) / 100;
 }
 #endif

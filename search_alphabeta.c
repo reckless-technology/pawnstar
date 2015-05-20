@@ -125,6 +125,7 @@ int Search(const Position* src_position,
     ***************************************************************************/
     if ((src_position->move)                    &&
         !(src_position->state_flags & IS_CHECK) &&
+        beta == alpha + 1                       &&
         (src_position->pieces_of_color[COLOR_TO_MOVE(src_position)] & ~(src_position->pawns | src_position->kings)) &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
