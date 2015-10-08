@@ -128,6 +128,9 @@
     <ClCompile Include="evaluation_full.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="search_single_move.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="engine_protocol.html">

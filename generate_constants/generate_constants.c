@@ -326,7 +326,13 @@ a bishop or a rook standing on location
 Refer to:
 http://chessprogramming.wikispaces.com/Magic+Bitboards
 *******************************************************************************/
-static void FindMagic(int location, bool is_rook, uint64* magic, uint64* mask, uint64 attacks[4096], int* shift)
+static void 
+FindMagic(int       location, 
+          bool      is_rook, 
+          uint64*   magic, 
+          uint64*   mask, 
+          uint64    attacks[4096], 
+          int*      shift)
 {   
     uint64 occupancies[4096];
     uint64 actual_attacks[4096];
@@ -370,10 +376,11 @@ replacing the attacks themselves with a set of one byte indices into the
 unique attack vector. At the cost of one extra indirection we save approx 8x
 the size of the magic tables which reduces cache pressure considerably.
 *******************************************************************************/
-static void CompressAttacks(uint64 attacks[4096], 
-                            int num_attacks_in,  
-                            uint8 indices[4096],
-                            int* num_attacks_out)
+static void 
+CompressAttacks(uint64  attacks[4096], 
+                int     num_attacks_in,  
+                uint8   indices[4096],
+                int*    num_attacks_out)
 {
     uint8 out_count = 0;
     for (int i = 0; i != num_attacks_in; ++i)
