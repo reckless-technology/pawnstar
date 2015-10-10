@@ -6,7 +6,8 @@ Integral type definitions
 *******************************************************************************/
 typedef unsigned long long  bitboard;
 typedef unsigned long long  uint64;
-typedef unsigned char       uchar;
+typedef unsigned char       uint8;
+typedef signed char         int8;
 typedef int (*CompareFn)    (const void*, const void*); /* sort predicate */
 /******************************************************************************
 Piece types
@@ -151,12 +152,12 @@ struct Position
     uint64          hash;                   // Zobrist hash of this position
     const Position* previous;               // position immediately prior to this
     int             move;                   // the move which led to this position
-    uchar           king_location[2];       // kings square indices
-    uchar           castle_flags;           // castling rights
-    uchar           state_flags;            // game state-machine flags
-    uchar           en_passant_index;       // en passant capture availability square (0 if none)
-    uchar           reversible_move_count;  // number of consecutive reversible half-moves (plies)
-    uchar           full_move_count;        // number of full moves (zero indexed)
+    uint8           king_location[2];       // kings square indices
+    uint8           castle_flags;           // castling rights
+    uint8           state_flags;            // game state-machine flags
+    uint8           en_passant_index;       // en passant capture availability square (0 if none)
+    uint8           reversible_move_count;  // number of consecutive reversible half-moves (plies)
+    uint8           full_move_count;        // number of full moves (zero indexed)
 };
 /******************************************************************************
 Values for magic bitboard attack generator for one square
@@ -165,9 +166,10 @@ typedef struct
 {
     uint64          magic;          // the multiplier
     bitboard        occupancy_mask; // mask for the pertinent occupied squares excluding outer squares
-    const uchar*    attack_indices; // indices into the attacks set
+    const uint8*    attack_indices; // indices into the attacks set
     const bitboard* attacks;        // the set of distinct attacks 
     int             shift;          // right shift amount after multiplication
+    int             padding;        // make the entry a multiple of 8 bytes in size
 } MagicMoveEntry;
 /******************************************************************************
 Clock and time control information
@@ -193,15 +195,14 @@ typedef struct
 } Game;
 /******************************************************************************
 A transposition (encompasses brief results of a previous search)
-16 bytes in size, should ideally be cache aligned
 *******************************************************************************/
 typedef struct
 {
     uint64      hash;
     int         move;
     short       score;
-    signed char depth;
-    uchar       node_type;    
+    int8        depth;
+    uint8       node_type;    
 } Transposition;
 /******************************************************************************
 Information about pinned pieces and their possible move targets
@@ -222,6 +223,14 @@ typedef struct
     bitboard    doubled_pawns;   // pawns with a friendly pawn ahead on the same file
     bitboard    passed_pawns;    // pawns who cannot be stopped by an enemy pawn
 } PawnStructure;
+/******************************************************************************
+A sequence of moves for a (possibly principal) variation, i.e. line of play
+*******************************************************************************/
+typedef struct
+{
+    int         num_moves;      // number of moves in this line
+    int         moves[MAX_PLY]; // the moves
+} Variation;
 /******************************************************************************
 XBoard input command handling support
 *******************************************************************************/

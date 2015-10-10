@@ -2,8 +2,6 @@
 #include <ctype.h>
 
 #define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
-
-static bool IsNumeric(const char buffer[]);
 /******************************************************************************
 Compute the Zobrist hash of a position
 *******************************************************************************/
@@ -127,6 +125,8 @@ bool PositionFromString(const char fen_string[], Position* position)
         return false;
     }
     position->occupied_squares = position->white_pieces | position->black_pieces;
+    position->king_location[WHITE] = (uint8)Lsb(position->kings & position->white_pieces);
+    position->king_location[BLACK] = (uint8)Lsb(position->kings & position->black_pieces);
     /**************************************************************************
     Side to move
     ***************************************************************************/
@@ -160,8 +160,7 @@ bool PositionFromString(const char fen_string[], Position* position)
     }
     else
     {
-        const char* c;
-        for (c = token; *c; ++c)
+        for (const char* c = token; *c; ++c)
         {
             switch (*c)
             {
@@ -211,12 +210,13 @@ bool PositionFromString(const char fen_string[], Position* position)
     token = strtok(NULL, " ");
     if (token)
     {
-        if (!IsNumeric(token))
+        int hmc = 0;
+        if (sscanf(token, "%d", &hmc) != 1)
         {
             printf("ERROR: FEN string specifies illegal half move clock '%s'\n", token);
             return false;
         }
-        position->reversible_move_count = (uchar)atoi(token);
+        position->reversible_move_count = (uint8)hmc;
     }
     /**************************************************************************
     Full move number - optional
@@ -224,16 +224,18 @@ bool PositionFromString(const char fen_string[], Position* position)
     token = strtok(NULL, " ");
     if (token)
     {
-        if (!IsNumeric(token))
+        int fmc = 0;
+        if (sscanf(token, "%d", &fmc) != 1)
         {
             printf("ERROR: FEN string specifies illegal full move number '%s'\n", token);
             return false;
         }
-        position->full_move_count = (uchar)atoi(token) - 1;
+        position->full_move_count = (uint8)fmc - 1;
     }
-    position->king_location[WHITE] = (uchar)Lsb(position->kings & position->white_pieces);
-    position->king_location[BLACK] = (uchar)Lsb(position->kings & position->black_pieces);
     position->hash = ComputeHash(position);
+    /**************************************************************************
+    Legality of position
+    ***************************************************************************/
     if (!IsPositionLegal(position))
     {
         printf("ERROR: FEN string specifies an illegal chess position\n");
@@ -372,22 +374,4 @@ void InitializeGame(Game* game)
 {
     game->position = game->stack;
     NewGame(game->position);
-}
-/******************************************************************************
-Does a C string contain a positive integral numeric value?
-*******************************************************************************/
-static bool IsNumeric(const char buffer[])
-{
-    if (!buffer || !strlen(buffer))
-    {
-        return false;
-    }
-    while (*buffer)
-    {
-        if (!isdigit(*buffer++))
-        {
-            return false;
-        }
-    }
-    return true;
 }

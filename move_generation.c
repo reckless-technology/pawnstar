@@ -49,8 +49,8 @@ int* GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all
     int        push_delta;
     int        west_delta;
     int        east_delta;
-    uchar      piece_type;
-    uchar      board_pieces[64]   = { NO_PIECE };
+    uint8      piece_type;
+    uint8      board_pieces[64]   = { 0 };
     const int color               = COLOR_TO_MOVE(position);
     const bitboard vacant_squares = ~position->occupied_squares;
     /**************************************************************************

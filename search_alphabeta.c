@@ -15,9 +15,11 @@ Search(const Position*  src_position,
        int              alpha, 
        int              beta, 
        volatile bool*   cancel, 
-       int              search_flags)
+       int              search_flags,
+       Variation*       parent_pv)
 {
     Transposition       transposition;
+    Variation           pv;
     int                 move;   
     int                 pre_moves[4];
     int                 regular_moves[MAX_MOVES_PER_POSITION];
@@ -38,6 +40,7 @@ Search(const Position*  src_position,
     {
         return ILLEGAL_SCORE;
     }
+    InitVariation(&pv);
     ++globals->node_count;
     INCREMENT("alpha beta calls");
     if (IsDrawByRepetition(src_position, true) || 
@@ -106,8 +109,9 @@ Search(const Position*  src_position,
             if (transposition.score > alpha && transposition.score < beta && transposition.move)
             {
                 RecordPrincipalVariationMove(src_position->hash, transposition.move);
+                CopyVariation(parent_pv, &pv, transposition.move);
             }
-            return transposition.score;
+            //return transposition.score;
         }
     }
  
@@ -132,7 +136,7 @@ Search(const Position*  src_position,
         Position position;
         INCREMENT("null move attempts");
         MakeNullMove(&position, src_position);
-        score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, search_flags & ~IS_NULL_MOVE_OK);
+        score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, search_flags & ~IS_NULL_MOVE_OK, NULL);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -227,7 +231,7 @@ Search(const Position*  src_position,
                 INCREMENT("deferred moves");
                 continue;
             }
-            score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, search_flags, move);
+            score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, search_flags, move, &pv);
             if (*cancel)
             {
                 return ILLEGAL_SCORE;
@@ -284,7 +288,8 @@ Search(const Position*  src_position,
         INCREMENT("pv nodes");
         RecordPrincipalVariationMove(src_position->hash, best_move);
         RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);
-        RecordGoodMove(ply, best_move);       
+        RecordGoodMove(ply, best_move);
+        CopyVariation(parent_pv, &pv, best_move);
     }
     else
     {

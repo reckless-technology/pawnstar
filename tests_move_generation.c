@@ -26,7 +26,7 @@ Refer to:
 http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
 *******************************************************************************/
-static const PerftTest PERFT_TESTS[] =
+static const PerftTest perft_tests[] =
 {//    position                                                          depth        nodes   captures      ep   castles promotions   checks
     { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",                6, { 119060324,   2812008,   5248,        0,        0,   809099 } },
     { "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -",    5, { 193690690,  35043416,  73365,  4993637,     8392,  3309887 } },
@@ -40,7 +40,10 @@ static const PerftTest PERFT_TESTS[] =
 Categorize a null-terminated set of pseudo-legal moves into strictly-legal
 moves of various types, storing the result in counts
 *******************************************************************************/
-static void CategorizeMoves(const Position* src_position, const int moves[], PerftCounts* counts)
+static void 
+CategorizeMoves(const Position* src_position, 
+                const int       moves[], 
+                PerftCounts*    counts)
 {
     Position position;
     const int* move;
@@ -83,7 +86,11 @@ Refer to:
 http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
 *******************************************************************************/
-static int Perft(const Position* src_position, int depth, int color, PerftCounts* counts)
+static int 
+Perft(const Position* src_position, 
+      int             depth, 
+      int             color, 
+      PerftCounts*    counts)
 {
     static int call_count = 0;
     int moves[MAX_MOVES_PER_POSITION];
@@ -99,7 +106,7 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
         for (move = moves; *move; ++move)
         {
             MakeMove(&position, src_position, *move);
-#if 1
+#if DO_TEST_HASH_DURING_PERFT
             if (position.hash != ComputeHash(&position))
             {
                 printf("ERROR in hash during perft\n");
@@ -119,7 +126,8 @@ static int Perft(const Position* src_position, int depth, int color, PerftCounts
 /******************************************************************************
 Run perft test on the standard test positions
 *******************************************************************************/
-void RunPerftTests()
+void 
+RunPerftTests(void)
 {
     PerftCounts counts;
     Position position;
@@ -128,7 +136,7 @@ void RunPerftTests()
     int total_nodes = 0;
     const PerftTest* test;
     first_start = GetMilliseconds();
-    for (test = PERFT_TESTS; test->position; ++test)
+    for (test = perft_tests; test->position; ++test)
     {
         printf("\n%s\n", test->position);
         if (!PositionFromString(test->position, &position))

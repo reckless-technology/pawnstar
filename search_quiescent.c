@@ -28,7 +28,7 @@ int SearchQuiescent(const Position* src_position,
     if (src_position->state_flags & IS_CHECK)
     {
         INCREMENT("quiescent checks");
-        return Search(src_position, depth, ply, alpha, beta, cancel, 0);
+        return Search(src_position, depth, ply, alpha, beta, cancel, 0, NULL);
     }
     score = EvaluatePosition(src_position, alpha, beta);
     if (score >= beta)

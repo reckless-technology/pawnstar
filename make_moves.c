@@ -7,7 +7,7 @@ destination squares to determine new castling rights following a move
 
 Only moves involving squares a1, e1, h1, a8, e8 or h8 affect castling rights
 *******************************************************************************/
-static const uchar CASTLING_RIGHTS_MASKS[64] =
+static const uint8 CASTLING_RIGHTS_MASKS[64] =
 {
     0xFD, 0xFF, 0xFF, 0xFF, 0xFC, 0xFF, 0xFF, 0xFE, // 1
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 2
@@ -46,7 +46,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     const int to                = MOVE_TO(move);
     const int piece             = MOVE_PIECE(move);
     const int captured          = MOVE_CAPTURED(move);
-    const int promoted          = MOVE_PROMOTED(move); 
+    
     const bitboard from_bb      = BITBOARD(from);
     const bitboard to_bb        = BITBOARD(to);
     const bitboard from_to_bb   = from_bb | to_bb;
@@ -69,7 +69,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     {
     case PAWN:
         dst_position->reversible_move_count = 0;
-        if (!promoted)
+        if (!MOVE_PROMOTED(move))
         {
             if (!MOVE_IS_SPECIAL(move))
             {
@@ -86,7 +86,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
                 else if (abs(to - from) == 16)
                 {
                     /* double pawn push */
-                    dst_position->en_passant_index = (uchar)((from + to) >> 1);
+                    dst_position->en_passant_index = (uint8)((from + to) >> 1);
                     dst_position->hash += EN_PASSANT_HASHES[FILE_OF(from)];
                 }
             }
@@ -104,6 +104,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
         else
         {
             /* pawn promotion */
+            const int promoted = MOVE_PROMOTED(move); 
             dst_position->pawns ^= from_bb;
             dst_position->pieces[promoted] ^= to_bb;
             dst_position->pieces_of_color[color] ^= from_to_bb;
@@ -136,7 +137,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
         break;
 
     case KING:
-        dst_position->king_location[color] = (uchar)to;
+        dst_position->king_location[color] = (uint8)to;
         if (!MOVE_IS_SPECIAL(move))
         {
             goto RegularMove;
@@ -148,45 +149,45 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
             dst_position->kings ^= E1BB | G1BB;
             dst_position->rooks ^= H1BB | F1BB;
             dst_position->white_pieces ^= E1BB | F1BB | G1BB | H1BB;
-            dst_position->hash += 
-                PIECE_SQUARE_HASHES[WHITE][KING][G1] - 
-                PIECE_SQUARE_HASHES[WHITE][KING][E1] + 
-                PIECE_SQUARE_HASHES[WHITE][ROOK][F1] - 
+            dst_position->hash +=
+                PIECE_SQUARE_HASHES[WHITE][KING][G1] -
+                PIECE_SQUARE_HASHES[WHITE][KING][E1] +
+                PIECE_SQUARE_HASHES[WHITE][ROOK][F1] -
                 PIECE_SQUARE_HASHES[WHITE][ROOK][H1];
             break;
         case C1:
             dst_position->kings ^= E1BB | C1BB;
             dst_position->rooks ^= A1BB | D1BB;
             dst_position->white_pieces ^= A1BB | C1BB | D1BB | E1BB;
-            dst_position->hash += 
-                PIECE_SQUARE_HASHES[WHITE][KING][C1] - 
-                PIECE_SQUARE_HASHES[WHITE][KING][E1] + 
-                PIECE_SQUARE_HASHES[WHITE][ROOK][D1] - 
+            dst_position->hash +=
+                PIECE_SQUARE_HASHES[WHITE][KING][C1] -
+                PIECE_SQUARE_HASHES[WHITE][KING][E1] +
+                PIECE_SQUARE_HASHES[WHITE][ROOK][D1] -
                 PIECE_SQUARE_HASHES[WHITE][ROOK][A1];
             break;
         case G8:
             dst_position->kings ^= E8BB | G8BB;
             dst_position->rooks ^= H8BB | F8BB;
             dst_position->black_pieces ^= E8BB | F8BB | G8BB | H8BB;
-            dst_position->hash += 
-                PIECE_SQUARE_HASHES[BLACK][KING][G8] - 
-                PIECE_SQUARE_HASHES[BLACK][KING][E8] + 
-                PIECE_SQUARE_HASHES[BLACK][ROOK][F8] - 
+            dst_position->hash +=
+                PIECE_SQUARE_HASHES[BLACK][KING][G8] -
+                PIECE_SQUARE_HASHES[BLACK][KING][E8] +
+                PIECE_SQUARE_HASHES[BLACK][ROOK][F8] -
                 PIECE_SQUARE_HASHES[BLACK][ROOK][H8];
             break;
         case C8:
             dst_position->kings ^= E8BB | C8BB;
             dst_position->rooks ^= A8BB | D8BB;
             dst_position->black_pieces ^= A8BB | C8BB | D8BB | E8BB;
-            dst_position->hash += 
-                PIECE_SQUARE_HASHES[BLACK][KING][C8] - 
-                PIECE_SQUARE_HASHES[BLACK][KING][E8] + 
-                PIECE_SQUARE_HASHES[BLACK][ROOK][D8] - 
+            dst_position->hash +=
+                PIECE_SQUARE_HASHES[BLACK][KING][C8] -
+                PIECE_SQUARE_HASHES[BLACK][KING][E8] +
+                PIECE_SQUARE_HASHES[BLACK][ROOK][D8] -
                 PIECE_SQUARE_HASHES[BLACK][ROOK][A8];
             break;
         default:
             break;
-            }
+        }
         break;
     }
     dst_position->occupied_squares = dst_position->white_pieces | dst_position->black_pieces;  

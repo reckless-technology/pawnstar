@@ -5,8 +5,8 @@
 Search
 *******************************************************************************/
 int         SearchQuiescent (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
-int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, int search_flags);
-int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, int search_flags, int move);
+int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, int search_flags, Variation* parent_pv);
+int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, int search_flags, int move, Variation* pv);
 int         SearchRootNode  (const Position* position);
 /******************************************************************************
 Thinking and time control

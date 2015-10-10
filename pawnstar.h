@@ -45,7 +45,7 @@ extern const signed char    SOUTH_FROM[64][8];
 extern const signed char    SOUTHWEST_FROM[64][8];
 extern const signed char    WEST_FROM[64][8];
 extern const signed char    NORTHWEST_FROM[64][8];
-extern const uchar          DIRECTIONS[64][64];                     // indexed by [to][from] square locations 
+extern const uint8          DIRECTIONS[64][64];                     // indexed by [to][from] square locations 
 extern const uint64         PIECE_SQUARE_HASHES[2][8][64];          // indexed by [color][piece][location]
 extern const uint64         CASTLING_RIGHTS_HASHES[16];             // indexed by 4 bit castling rights
 extern const uint64         EN_PASSANT_HASHES[8];                   // indexed by en passant file (if any)

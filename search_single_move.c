@@ -15,7 +15,8 @@ SearchSingleMove(const Position*    src_position,
                  int                beta, 
                  volatile bool*     cancel, 
                  int                search_flags, 
-                 int                move)
+                 int                move,
+                 Variation*         pv)
 {  
     Position position;   
     int score;
@@ -91,16 +92,16 @@ SearchSingleMove(const Position*    src_position,
         beta > alpha + 1)
     {
         INCREMENT("pvs attempts");
-        score = -Search(&position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, search_flags);
+        score = -Search(&position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, search_flags, pv);
         if (score > alpha)
         {
             INCREMENT("pvs fails");
-            score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags);
+            score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags, pv);
         }
     }
     else
     {
-        score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags);
+        score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags, pv);
     }
     return score;
 }

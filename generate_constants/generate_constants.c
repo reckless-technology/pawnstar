@@ -81,7 +81,7 @@ typedef struct
     BitboardFn	function;
 } BitboardGen;
 
-static const DirectionVector DIRECTION_VECTORS[] =
+static const DirectionVector direction_vectors[] =
 {/*   direction      dx  dy */
     { DIR_NORTH,      0,  1 },
     { DIR_NORTHEAST,  1,  1 },
@@ -107,7 +107,8 @@ static struct
 /******************************************************************************
 Determine the population count (Hamming weight) of x
 *******************************************************************************/
-static int PopCount(uint64 x)
+static int 
+PopCount(uint64 x)
 {
     int count = 0;
     while (x)
@@ -119,26 +120,24 @@ static int PopCount(uint64 x)
 }
 /******************************************************************************
 Find the index of the least significant bit set in x (x is non zero)
+This is the slow brute force way since we don't care about performance here.
 *******************************************************************************/
-static int Lsb(uint64 x) 
+static int 
+Lsb(uint64 x) 
 {
-    static const int de_bruijn[64] = 
+    int result = 0;
+    while (!(x & 1))
     {
-        0, 47,  1, 56, 48, 27,  2, 60,
-       57, 49, 41, 37, 28, 16,  3, 61,
-       54, 58, 35, 52, 50, 42, 21, 44,
-       38, 32, 29, 23, 17, 11,  4, 62,
-       46, 55, 26, 59, 40, 36, 15, 53,
-       34, 51, 20, 43, 31, 22, 10, 45,
-       25, 39, 14, 33, 19, 30,  9, 24,
-       13, 18,  8, 12,  7,  6,  5, 63
-    };
-   return de_bruijn[((x ^ (x - 1)) * 0x03F79D71B4CB0A89ull) >> 58];
+        ++result;
+        x >>= 1;
+    }
+    return result;
 }
 /******************************************************************************
 Find the index of and then clear the least significant bit set in *x
 *******************************************************************************/
-static int FindAndClearLsb(uint64* x)
+static int 
+FindAndClearLsb(uint64* x)
 {    
     const uint64 y = *x;
     *x = y & (y - 1);
@@ -148,7 +147,8 @@ static int FindAndClearLsb(uint64* x)
 Determine the occupancy mask for bishop attacks for a bishop standing on 
 location (excluding outer squares as they do no affect attack set)
 *******************************************************************************/
-static uint64 BishopOccupancyMask(int location)
+static uint64 
+BishopOccupancyMask(int location)
 {
     uint64 result = NO_SQUARES;
     int x, y;
@@ -174,7 +174,8 @@ static uint64 BishopOccupancyMask(int location)
 Determine the occupancy mask for rook attacks for a rook standing on 
 location (excluding outer squares as they do no affect attack set)
 *******************************************************************************/
-static uint64 RookOccupancyMask(int location)
+static uint64 
+RookOccupancyMask(int location)
 {
     uint64 result = NO_SQUARES;
     int x, y;
@@ -202,7 +203,9 @@ static uint64 RookOccupancyMask(int location)
 Compute attacks for a bishop standing on location in the presence of possible 
 blockers
 *******************************************************************************/
-static uint64 BishopActualAttacks(uint64 occupied_squares, int location)
+static uint64 
+BishopActualAttacks(uint64 occupied_squares, 
+                    int    location)
 {
     uint64 result = NO_SQUARES;
     for (uint64 square = SHIFT_NORTHEAST(BITBOARD(location)); square; square = SHIFT_NORTHEAST(square))
@@ -243,7 +246,9 @@ static uint64 BishopActualAttacks(uint64 occupied_squares, int location)
 Compute attacks for a rook standing on location in the presence of possible 
 blockers
 *******************************************************************************/
-static uint64 RookActualAttacks(uint64 occupied_squares, int location)
+static uint64 
+RookActualAttacks(uint64 occupied_squares, 
+                  int    location)
 {
     uint64 result = NO_SQUARES;
     for (uint64 square = SHIFT_NORTH(BITBOARD(location)); square; square = SHIFT_NORTH(square))
@@ -283,7 +288,8 @@ static uint64 RookActualAttacks(uint64 occupied_squares, int location)
 /******************************************************************************
 Generate a pseudo random 64 bit value
 *******************************************************************************/
-static uint64 PseudoRandom64(void)
+static uint64 
+PseudoRandom64(void)
 {
     static uint64 lcg = 0;
     uint64 result = 0;
@@ -298,7 +304,9 @@ static uint64 PseudoRandom64(void)
 Given a bit set in mask, determine all the subsets of this set, i.e. determine
 all combinations of occupancy from an occupancy mask value.
 *******************************************************************************/
-static uint64 EnumerateMaskCombinations(uint64 mask, uint64 values[])
+static uint64 
+EnumerateMaskCombinations(uint64 mask, 
+                          uint64 values[])
 {   
     const int num_bits_in_mask = PopCount(mask);
     const uint64 num_values = 1ull << num_bits_in_mask;    
@@ -417,7 +425,7 @@ typedef struct
 {
     uint64          magic;              // multiplier
     bitboard        occupancy_mask;     // pre mask (excl outside squares)  
-    const uchar*    attack_indices;     // lookup index
+    const uint8*    attack_indices;     // lookup index
     const bitboard* attacks;            // unique attack set
     int             shift;              // right shift amount
 } MagicMoveEntry;
@@ -427,9 +435,10 @@ Then for example we have:
 MagicMoveEntry rook_magics[64];         // one per square for bishop and rook
 
 To get sliding attacks, given a set of occupied_squares, we compute:
-entry->attacks[entry->attack_indices[((occupied_squares & entry->occupancy_mask) * entry->magic) >> entry->shift]];
+x->attacks[x->attack_indices[((occupied_squares & x->occupancy_mask) * x->magic) >> x->shift]];
 *******************************************************************************/
-static void GenerateMagics(void)
+static void 
+GenerateMagics(void)
 {
     for (int piece = BISHOP; piece <= ROOK; ++piece)
     {
@@ -454,11 +463,11 @@ static void GenerateMagics(void)
                 {
                     printf("\n    ");
                 }
-                printf("0x%016llXull, ",  magics[j].attacks[k]);                
+                printf("0x%016llXull,",  magics[j].attacks[k]);                
             }
             printf("\n};\n");
             const int num_indices = 1 << (64 - magics[j].shift);
-            printf("static const uchar %s_MAGIC_INDICES_%c%c[%d] = \n{",
+            printf("static const uint8 %s_MAGIC_INDICES_%c%c[%d] = \n{",
                     piece_name,
                     'A' + FILE_OF(j),
                     '1' + RANK_OF(j),
@@ -469,7 +478,7 @@ static void GenerateMagics(void)
                 {
                     printf("\n    ");
                 }
-                printf("0x%02hhX, ",  magics[j].attack_indices[k]);                
+                printf("0x%02hhX,",  magics[j].attack_indices[k]);                
             }
             printf("\n};\n");
 
@@ -477,7 +486,7 @@ static void GenerateMagics(void)
         printf("const MagicMoveEntry %s_MAGICS[64] = \n{\n", piece_name);
         for (int j = 0; j != 64; ++j)
         {
-            printf("    { 0x%016llXull, 0x%016llXull, %s_MAGIC_INDICES_%c%c, %s_MAGIC_ATTACKS_%c%c, %d },\n",
+            printf("    { 0x%016llXull,0x%016llXull,%s_MAGIC_INDICES_%c%c,%s_MAGIC_ATTACKS_%c%c,%d },\n",
                     magics[j].magic,
                     magics[j].mask,
                     piece_name,
@@ -498,7 +507,7 @@ static uint64 VectorFrom(int location, int direction)
 {
     uint64 result = NO_SQUARES;
     const DirectionVector* dv;
-    for (dv = DIRECTION_VECTORS; dv->direction != DIR_NONE; ++dv)
+    for (dv = direction_vectors; dv->direction != DIR_NONE; ++dv)
     {
         if (dv->direction == direction)
         {
@@ -672,7 +681,7 @@ static uint64 KingPawnShield2Black(int location)
 static uint64 InterveningSquares(int from, int to)
 {
     const DirectionVector* dv;
-    for (dv = DIRECTION_VECTORS; dv->direction != DIR_NONE; ++dv)
+    for (dv = direction_vectors; dv->direction != DIR_NONE; ++dv)
     {
         const uint64 vector_from = VectorFrom(from, dv->direction);
         if (vector_from & BITBOARD(to))
@@ -683,7 +692,7 @@ static uint64 InterveningSquares(int from, int to)
     return NO_SQUARES;
 }
 
-static const BitboardGen GENERATORS[] = {
+static const BitboardGen bitboard_generators[] = {
     { "NORTH_OF",			      NorthOf			   },
     { "NORTHEAST_OF",		      NortheastOf		   },
     { "EAST_OF",			      EastOf			   },
@@ -713,7 +722,7 @@ int main()
     const BitboardGen* generator;
     printf("/* This file was generated on " __DATE__ " at " __TIME__ " */\n"); 
     printf("#include \"types.h\"\n");
-    for (generator = GENERATORS; generator->name; ++generator)
+    for (generator = bitboard_generators; generator->name; ++generator)
     {
         int location;
         printf("const bitboard %s[64] = \n{\n", generator->name);

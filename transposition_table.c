@@ -1,7 +1,7 @@
 #include "pawnstar.h"
 
 #define MEGABYTE                    0x100000
-#define TRANSPOSITIONS_PER_BUCKET   16
+#define TRANSPOSITIONS_PER_BUCKET   8
 
 static bool IsPrime(int x);
 
@@ -84,7 +84,12 @@ Hash bucket replacement policy (in priority order):
 # replace a non PV node
 # replace the entry with the smallest depth
 *******************************************************************************/
-void RecordTransposition(uint64 hash, int depth, int score, int move, int node_type)
+void 
+RecordTransposition(uint64 hash, 
+                    int    depth, 
+                    int    score, 
+                    int    move, 
+                    int    node_type)
 {  
     const Transposition transposition = 
     {
@@ -92,7 +97,7 @@ void RecordTransposition(uint64 hash, int depth, int score, int move, int node_t
         .move      = move,
         .score     = (short)score,
         .depth     = (char)depth,       
-        .node_type = (uchar)node_type
+        .node_type = (uint8)node_type
     };    
     HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
     int best_score           = 0;

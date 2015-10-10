@@ -184,3 +184,25 @@ INLINE bitboard FillNorthAndSouth(bitboard b)
     b |= (b << 32) | (b >> 32);
     return b;
 }
+
+INLINE void InitVariation(Variation* v)
+{
+    v->num_moves = 0;
+}
+
+INLINE void CopyVariation(Variation* dst, const Variation* src, int move)
+{
+    if (dst)
+    {
+        dst->moves[0] = move;
+        if (src)
+        {
+            memcpy(&dst->moves[1], src->moves, src->num_moves * sizeof(int));
+            dst->num_moves = src->num_moves + 1;
+        }
+        else
+        {
+            dst->num_moves = 1;
+        }
+    }
+}

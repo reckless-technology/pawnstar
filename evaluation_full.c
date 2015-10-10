@@ -28,8 +28,8 @@ static int EvaluatePawnStructure    (const Position* position, const PawnStructu
 static const bitboard* const FORWARD_OF[2] = { NORTH_OF,                  SOUTH_OF                  };
 static const bitboard* const KPS1[2]       = { KING_PAWN_SHIELD_WHITE,    KING_PAWN_SHIELD_BLACK    };
 static const bitboard* const KPS2[2]       = { KING_PAWN_SHIELD_WHITE_2,  KING_PAWN_SHIELD_BLACK_2  };
-static const uchar CASTLE_RIGHTS_MASK[2]   = { MAY_WHITE_K | MAY_WHITE_Q, MAY_BLACK_K | MAY_BLACK_Q };
-static const uchar FLIP_BOARD[2]           = { RANK_FLIP,                 0 };
+static const uint8 CASTLE_RIGHTS_MASK[2]   = { MAY_WHITE_K | MAY_WHITE_Q, MAY_BLACK_K | MAY_BLACK_Q };
+static const uint8 FLIP_BOARD[2]           = { RANK_FLIP,                 0 };
 
 static const int PAWN_SQUARE[64] = 
 {
@@ -271,7 +271,7 @@ static int EvaluateMaterial(const Position* position, bitboard friendly_pieces)
 
 static int EvaluatePieceSquare(const Position* position, int color, bitboard friendly_pieces, int material_percent)
 { 
-    const uchar rank_flip = FLIP_BOARD[color];   
+    const uint8 rank_flip = FLIP_BOARD[color];   
     int score = 
         ((KING_SQUARE_MIDGAME[position->king_location[color] ^ rank_flip] *        material_percent) + 
          (KING_SQUARE_ENDGAME[position->king_location[color] ^ rank_flip] * (100 - material_percent))) / 100;

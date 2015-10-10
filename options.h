@@ -22,6 +22,12 @@ Use experimental "more sophisticated" eval (probably not a great idea)
 #define DO_EVALUATION_FULL 1
 #endif
 /******************************************************************************
+Whether to test the Zobrist hash value at every node of a perft move gen test
+*******************************************************************************/
+#ifndef DO_TEST_HASH_DURING_PERFT
+#define DO_TEST_HASH_DURING_PERFT 0
+#endif
+/******************************************************************************
 Whether to enable magic bitboard attacks for bishops and rooks (marginally 
 faster on machines with a large L1 cache)
 *******************************************************************************/
@@ -89,5 +95,5 @@ Global constants
 #define SMALL_HASTABLE_SIZE                4999 // number of transpositions in the small auxiliary (cached = fast) TT
 #define FUTILITY_CUTOFF_THRESHOLD          1200 // Prune frontier nodes where eval is this much below alpha
 #define STARTING_SEARCH_DEPTH                 3 // depth to do full width alpha beta pre-search for move ordering at the root node
-#define NUM_ROOT_MOVES_BEFORE_PVS             2 // number of moves to search with full width alpha beta window at the root node
+#define NUM_ROOT_MOVES_BEFORE_PVS            2000 // number of moves to search with full width alpha beta window at the root node
 #define MEGABYTE                       0x100000

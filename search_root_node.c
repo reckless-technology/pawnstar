@@ -19,7 +19,7 @@ int SearchRootNode(const Position* src_position)
     ScoredMove  scored_moves[MAX_MOVES_PER_POSITION];
     ScoredMove  best_moves[MAX_PLY];
     int         moves[MAX_MOVES_PER_POSITION];
-    int         principal_variation[MAX_PLY];
+    Variation   principal_variation;
     int         move_count;
     int         depth;
     int         start_ms;
@@ -31,6 +31,7 @@ int SearchRootNode(const Position* src_position)
     int         moves_to_go;
     int         alpha;
 
+    InitVariation(&principal_variation);
     if (src_position->state_flags & IS_GAME_OVER)
     {
         return 0;
@@ -81,7 +82,7 @@ int SearchRootNode(const Position* src_position)
     for (i = 0; i != move_count; ++i)
     {
         scored_moves[i].move  = moves[i];
-        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);    
+        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, NULL);    
     }   
     MergeSort(move_count, scored_moves);
     best_move = scored_moves[0].move;
@@ -92,6 +93,8 @@ int SearchRootNode(const Position* src_position)
     }
     for (depth = STARTING_SEARCH_DEPTH; depth != MAX_PLY; ++depth)
     {       
+        Variation pv;
+        InitVariation(&pv);
         if (globals->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > globals->time_control.fixed_depth)
         {
             break;
@@ -101,18 +104,19 @@ int SearchRootNode(const Position* src_position)
         MergeSort(move_count, scored_moves);
         for (i = 0; i != move_count; ++i)
         {
+            InitVariation(&principal_variation);
             if (i < NUM_ROOT_MOVES_BEFORE_PVS)
             {
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, &principal_variation);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, &principal_variation);
                 if (scored_moves[i].score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move);
+                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, &principal_variation);
                 }
             }            
             if (cancel)
@@ -129,16 +133,14 @@ int SearchRootNode(const Position* src_position)
             }
         }        
         stop_ms = GetMilliseconds();
-        FindPrincipalVariation(src_position, principal_variation);
-        if (principal_variation[0] == 0)
-        {
-            principal_variation[0] = best_move;
-            principal_variation[1] = 0;
-        }
         if (globals->do_show_thinking)
         {
             char move_string[256];
-            MoveSequenceToSanString(src_position, principal_variation, move_string);
+            int move_sequence[MAX_PLY];
+            move_sequence[0] = best_move;
+            memcpy(&move_sequence[1], principal_variation.moves, principal_variation.num_moves * sizeof(int));
+            move_sequence[principal_variation.num_moves + 1] = 0;
+            MoveSequenceToSanString(src_position, move_sequence, move_string);
             printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score, (stop_ms - start_ms) / 10, globals->node_count, move_string);
         }
         if (alpha > WIN_THRESHOLD || 
