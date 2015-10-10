@@ -26,7 +26,8 @@ int EvaluateStaticExchange(const Position* src_position, int move)
 /******************************************************************************
 Determine the swap off value of a capture move onto a fixed square. This 
 function destroys its position during execution, and does not update flags etc
-for speed.
+for speed, since it is called for every move at every node in the tree it must
+be super fast.
 *******************************************************************************/
 static int EvaluateSwapOff(Position* position, int location, int color, int piece_on_square)
 {
@@ -34,10 +35,11 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
     const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
     int scores[32];
     int ply;
+    /* First pass: perform all the captures onto the square least valuable piece first */
     for (ply = 0; ply != 32; ++ply)
     {
-        int capturing_piece;
         /* Find the least valuable piece of color which directly attacks location */
+        int capturing_piece;       
         const bitboard attacking_pieces = position->pieces_of_color[color];
         bitboard attacker = ENEMY_PAWN_ATTACKS[color][location] & attacking_pieces & position->pawns;
         if (attacker)
@@ -107,7 +109,8 @@ FoundAttacker:
         piece_on_square                         = capturing_piece;
         color                                   = ENEMY(color);
     }
-    /* Now unwind the capture stack and propagate values back to the top */
+    /* Second pass: unwind the capture stack and propagate values 
+       back to the top for material winning sequences */
     for (--ply ; ply >= 0; --ply)
     {
         scores[ply] -= scores[ply + 1];

@@ -69,7 +69,8 @@ int SearchQuiescent(const Position* src_position,
         {
             continue;
         }
-        if (beta > alpha + 1 && legal_move_count)
+        if (legal_move_count &&
+            beta > alpha + 1)
         {
             INCREMENT("quiescent pvs attempts");
             score = -SearchQuiescent(&position, depth - 1, ply + 1, -alpha - 1, -alpha, cancel);

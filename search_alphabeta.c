@@ -120,21 +120,24 @@ Search(const Position*  src_position,
     # the previous move was not a null move
     # we are not in check   
     # this is not a PV node
+    # we have at least 5 pieces on the board
     # we are not down to king and pawns
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     ***************************************************************************/
-    if ((search_flags & IS_NULL_MOVE_OK)        &&
-        (src_position->move)                    &&
-        !(src_position->state_flags & IS_CHECK) &&
-        beta == alpha + 1                       &&
-        (src_position->pieces_of_color[COLOR_TO_MOVE(src_position)] & ~(src_position->pawns | src_position->kings)) &&
+    const bitboard friendly_pieces = src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
+    if ((search_flags & IS_NULL_MOVE_OK)                                   &&
+        (src_position->move)                                               &&
+        !(src_position->state_flags & IS_CHECK)                            &&
+        beta == alpha + 1                                                  &&
+        PopCount(friendly_pieces) > 4                                      &&
+        !!(friendly_pieces & ~(src_position->pawns | src_position->kings)) &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
-        Position position;
         INCREMENT("null move attempts");
+        Position position;       
         MakeNullMove(&position, src_position);
-        score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, search_flags & ~IS_NULL_MOVE_OK, NULL);
+        score = -Search(&position, depth - 3, ply + 1, -beta, -alpha, cancel, search_flags & ~IS_NULL_MOVE_OK, NULL);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -242,6 +245,7 @@ Search(const Position*  src_position,
             if (score >= beta)
             {
                 INCREMENT("beta cutoffs");
+                INCREMENT_IF(phase == PHASE_PRE_MOVES, "beta cutoffs without move gen");
                 RecordTransposition(src_position->hash, depth, beta, move, NODE_CUT);
                 RecordGoodMove(ply, move);
                 return beta;

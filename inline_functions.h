@@ -185,7 +185,14 @@ INLINE bitboard FillNorthAndSouth(bitboard b)
     return b;
 }
 
-INLINE void CopyVariation(Variation* dst, const Variation* src, int move)
+/******************************************************************************
+Propagate a principal variation up to the parent node, prepending a 
+"best move" before copying the child PV.
+*******************************************************************************/
+INLINE void 
+CopyVariation(Variation*       dst, 
+              const Variation* src, 
+              int              move)
 {
     if (dst)
     {
