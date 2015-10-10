@@ -266,7 +266,6 @@
     <ClCompile Include="opening_book_moves.c" />
     <ClCompile Include="pawn_structure.c" />
     <ClCompile Include="pins.c" />
-    <ClCompile Include="principal_variation.c" />
     <ClCompile Include="search_alphabeta.c" />
     <ClCompile Include="search_quiescent.c" />
     <ClCompile Include="search_root_node.c" />

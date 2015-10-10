@@ -19,7 +19,7 @@ int SearchRootNode(const Position* src_position)
     ScoredMove  scored_moves[MAX_MOVES_PER_POSITION];
     ScoredMove  best_moves[MAX_PLY];
     int         moves[MAX_MOVES_PER_POSITION];
-    Variation   principal_variation;
+    Variation   pv;
     int         move_count;
     int         depth;
     int         start_ms;
@@ -31,7 +31,7 @@ int SearchRootNode(const Position* src_position)
     int         moves_to_go;
     int         alpha;
 
-    InitVariation(&principal_variation);
+    pv.num_moves = 0;
     if (src_position->state_flags & IS_GAME_OVER)
     {
         return 0;
@@ -93,8 +93,6 @@ int SearchRootNode(const Position* src_position)
     }
     for (depth = STARTING_SEARCH_DEPTH; depth != MAX_PLY; ++depth)
     {       
-        Variation pv;
-        InitVariation(&pv);
         if (globals->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > globals->time_control.fixed_depth)
         {
             break;
@@ -102,21 +100,21 @@ int SearchRootNode(const Position* src_position)
         globals->node_count = 0;
         alpha = ALPHA;
         MergeSort(move_count, scored_moves);
+        pv.num_moves = 0;
         for (i = 0; i != move_count; ++i)
-        {
-            InitVariation(&principal_variation);
+        {          
             if (i < NUM_ROOT_MOVES_BEFORE_PVS)
             {
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, &principal_variation);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, &pv);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, &principal_variation);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, &pv);
                 if (scored_moves[i].score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, &principal_variation);
+                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, SEARCH_FLAG_ROOT, scored_moves[i].move, &pv);
                 }
             }            
             if (cancel)
@@ -128,7 +126,6 @@ int SearchRootNode(const Position* src_position)
                 alpha             = scored_moves[i].score;
                 best_move         = scored_moves[i].move;
                 best_moves[depth] = scored_moves[i];
-                RecordPrincipalVariationMove(src_position->hash, scored_moves[i].move);
                 RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);            
             }
         }        
@@ -138,8 +135,8 @@ int SearchRootNode(const Position* src_position)
             char move_string[256];
             int move_sequence[MAX_PLY];
             move_sequence[0] = best_move;
-            memcpy(&move_sequence[1], principal_variation.moves, principal_variation.num_moves * sizeof(int));
-            move_sequence[principal_variation.num_moves + 1] = 0;
+            memcpy(&move_sequence[1], pv.moves, pv.num_moves * sizeof(int));
+            move_sequence[pv.num_moves + 1] = 0;
             MoveSequenceToSanString(src_position, move_sequence, move_string);
             printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score, (stop_ms - start_ms) / 10, globals->node_count, move_string);
         }

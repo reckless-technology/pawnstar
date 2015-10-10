@@ -77,9 +77,6 @@
     <ClCompile Include="pins.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="principal_variation.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="search_alphabeta.c">
       <Filter>Source Files</Filter>
     </ClCompile>

@@ -57,13 +57,6 @@ void        FreeTranspositionTable(void);
 void        RecordTransposition(uint64 hash, int depth, int score, int move, int node_type);
 bool        FindTransposition(uint64 hash, Transposition* transposition);
 /******************************************************************************
-Principal variation table
-*******************************************************************************/
-void        InitializePrincipalVariationTable(void);
-void        RecordPrincipalVariationMove(uint64 hash, int move);
-void        FindPrincipalVariation(const Position* root_position, int principal_variation[]);
-int         GetPrincipalVariationMove(uint64 hash);
-/******************************************************************************
 Generation and ordering of moves
 *******************************************************************************/
 void        InitializeGoodMoveCounts(void);

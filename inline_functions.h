@@ -185,11 +185,6 @@ INLINE bitboard FillNorthAndSouth(bitboard b)
     return b;
 }
 
-INLINE void InitVariation(Variation* v)
-{
-    v->num_moves = 0;
-}
-
 INLINE void CopyVariation(Variation* dst, const Variation* src, int move)
 {
     if (dst)

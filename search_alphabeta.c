@@ -21,7 +21,7 @@ Search(const Position*  src_position,
     Transposition       transposition;
     Variation           pv;
     int                 move;   
-    int                 pre_moves[4];
+    int                 pre_move[2];
     int                 regular_moves[MAX_MOVES_PER_POSITION];
     int                 deferred_moves[MAX_MOVES_PER_POSITION];    
     int                 score;   
@@ -29,10 +29,11 @@ Search(const Position*  src_position,
     int*                deferred_move     = deferred_moves;
     int                 num_legal_moves   = 0;
     int                 best_move         = 0;
+    int                 best_score        = ALPHA;
     bool                has_raised_alpha  = false;
     const int* const    move_phases[]     = 
     { 
-        [PHASE_PRE_MOVES]       = pre_moves,
+        [PHASE_PRE_MOVES]       = pre_move,
         [PHASE_REGULAR_MOVES]   = regular_moves,
         [PHASE_DEFERRED_MOVES]  = deferred_moves,
     };
@@ -40,7 +41,7 @@ Search(const Position*  src_position,
     {
         return ILLEGAL_SCORE;
     }
-    InitVariation(&pv);
+    pv.num_moves = 0;
     ++globals->node_count;
     INCREMENT("alpha beta calls");
     if (IsDrawByRepetition(src_position, true) || 
@@ -104,14 +105,11 @@ Search(const Position*  src_position,
         case NODE_PV:
             /**************************************************************
             We know the exact score and the best move from this position.
+            However, do the full search to get the PV. The extra time 
+            searching these few nodes is trivial.
             ***************************************************************/
-            INCREMENT("table hit pv node");
-            if (transposition.score > alpha && transposition.score < beta && transposition.move)
-            {
-                RecordPrincipalVariationMove(src_position->hash, transposition.move);
-                CopyVariation(parent_pv, &pv, transposition.move);
-            }
-            //return transposition.score;
+            INCREMENT("table hit pv node");            
+            break;
         }
     }
  
@@ -165,26 +163,25 @@ Search(const Position*  src_position,
 #endif
 
     /**************************************************************************
-    Before we generate any moves, try any principal variation table or 
-    transposition table moves first. This might save us the cost of move 
-    generation, or provide better alpha beta bounds for the main search.
+    Before we generate any moves, try any transposition table move first. 
+    This might save us the cost of move generation, or provide better alpha 
+    beta bounds for the main search.
     In any case, it's always a good idea to search the PV first.
     ***************************************************************************/
-    int* m = pre_moves;
-    if ((move = GetPrincipalVariationMove(src_position->hash)) != 0)
+    int* m = pre_move;
+    if (is_transposition && transposition.move)
     {
-        INCREMENT("pre moves - PV");
-        *m++ = move;
-    }
+        INCREMENT("pre moves - TT");
+        *m++ = transposition.move;
+        if (transposition.node_type != NODE_PV)
+        {
+            search_flags &= ~IS_FOLLOWING_PV;
+        }
+    }   
     else
     {
         search_flags &= ~IS_FOLLOWING_PV;
-        if (is_transposition && transposition.move)
-        {
-            INCREMENT("pre moves - TT");
-            *m++ = transposition.move;
-        }
-    }    
+    }
     *m = 0; /* terminate pre moves list */
     if (!is_transposition && depth > 1)
     {
@@ -249,13 +246,17 @@ Search(const Position*  src_position,
                 RecordGoodMove(ply, move);
                 return beta;
             }
-            if (score > alpha)
+            if (score > best_score)
             {
-                INCREMENT("pv changed");
-                has_raised_alpha = true;
-                alpha = score;
-                best_move = move;
-                RecordGoodMove(ply, move);
+                best_score = score;
+                best_move  = move;
+                if (score > alpha)
+                {
+                    INCREMENT("pv changed");
+                    has_raised_alpha = true;
+                    RecordGoodMove(ply, move);
+                    alpha = score;
+                }
             }
         }       
     }    
@@ -286,7 +287,6 @@ Search(const Position*  src_position,
         We raised alpha but did not cutoff; this was a PV node
         ***********************************************************************/
         INCREMENT("pv nodes");
-        RecordPrincipalVariationMove(src_position->hash, best_move);
         RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);
         RecordGoodMove(ply, best_move);
         CopyVariation(parent_pv, &pv, best_move);
