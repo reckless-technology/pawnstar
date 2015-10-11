@@ -108,7 +108,7 @@ Search(const Position*  src_position,
             However, do the full search to get the PV. The extra time 
             searching these few nodes is trivial.
             ***************************************************************/
-            INCREMENT("table hit pv node");            
+            INCREMENT("table hit pv node");
             break;
         }
     }

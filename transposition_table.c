@@ -1,6 +1,5 @@
 #include "pawnstar.h"
 
-#define MEGABYTE                    0x100000
 #define TRANSPOSITIONS_PER_BUCKET   8
 
 static bool IsPrime(int x);
@@ -63,7 +62,7 @@ bool FindTransposition(uint64 hash, Transposition* transposition)
     {
         INCREMENT("transposition lock contention retrieve");
     }
-    Transposition* t = bucket->transpositions;
+    const Transposition* t = bucket->transpositions;
     for (i = TRANSPOSITIONS_PER_BUCKET; i != 0; --i, ++t)
     {
         if (t->hash == hash)
@@ -90,15 +89,7 @@ RecordTransposition(uint64 hash,
                     int    score, 
                     int    move, 
                     int    node_type)
-{  
-    const Transposition transposition = 
-    {
-        .hash      = hash,
-        .move      = move,
-        .score     = (short)score,
-        .depth     = (char)depth,       
-        .node_type = (uint8)node_type
-    };    
+{   
     HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
     int best_score           = 0;
     Transposition* candidate = bucket->transpositions;
@@ -124,7 +115,11 @@ RecordTransposition(uint64 hash,
             }
         }
     }
-    *candidate = transposition;
+    candidate->hash      = hash;
+    candidate->move      = move;
+    candidate->score     = (short)score;
+    candidate->depth     = (int8)depth;
+    candidate->node_type = (uint8)node_type;
     _InterlockedExchange(bucket->mutex, 0);
 }
 /******************************************************************************
