@@ -77,8 +77,8 @@ enum SearchFlags
     IS_PVS_OK           = 0x04, // is PVS null window search permitted in this subtree
     IS_FOLLOWING_PV     = 0x08, // are we following the PV from the root node
     IS_DEFERRED_MOVE    = 0x10, // is this a deferred move with a negative SEE
-    HAS_CHECK_EXTENDED  = 0x20, // have we extended search depth due to check
-    SEARCH_FLAG_ROOT    = IS_NULL_MOVE_OK | IS_LMR_OK | IS_FOLLOWING_PV,
+    IS_PV_EXTN_OK       = 0x20, // is full window depth extension permitted in this subtree
+    SEARCH_FLAG_ROOT    = IS_NULL_MOVE_OK | IS_LMR_OK | IS_FOLLOWING_PV | IS_PV_EXTN_OK,
 };
 /******************************************************************************
 Phases of move search

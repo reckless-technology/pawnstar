@@ -61,12 +61,19 @@ Search(const Position*  src_position,
         {
             return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
         }
+        if ((search_flags & IS_PV_EXTN_OK) &&
+            beta > alpha + 1)
+        {
+            INCREMENT("extensions full window");
+            ++depth;
+            search_flags &= ~IS_PV_EXTN_OK;
+        }
     }
     else
     {
         INCREMENT("checks");
         ++depth;
-    }
+    }    
     /**************************************************************************
     Determine if there is an entry in the transposition table for this 
     position.
@@ -137,7 +144,7 @@ Search(const Position*  src_position,
         INCREMENT("null move attempts");
         Position position;       
         MakeNullMove(&position, src_position);
-        score = -Search(&position, depth - 3, ply + 1, -beta, -alpha, cancel, search_flags & ~IS_NULL_MOVE_OK, NULL);
+        score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, search_flags & ~IS_NULL_MOVE_OK, NULL);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -185,7 +192,7 @@ Search(const Position*  src_position,
     {
         search_flags &= ~IS_FOLLOWING_PV;
     }
-    *m = 0; /* terminate pre moves list */
+    *m = 0;
     if (!is_transposition && depth > 1)
     {
         INCREMENT("nodes without transposition");
@@ -209,7 +216,7 @@ Search(const Position*  src_position,
 
         case PHASE_REGULAR_MOVES:
             GeneratePseudoLegalMoves(src_position, regular_moves, true);
-            SortMoves(regular_moves, ply);
+            SortMoves(regular_moves, ply);           
             break;
 
         case PHASE_DEFERRED_MOVES:
@@ -224,7 +231,8 @@ Search(const Position*  src_position,
         const int* moves_this_phase = move_phases[phase];
         while ((move = *moves_this_phase++) != 0)
         {
-            if (phase == PHASE_REGULAR_MOVES && EvaluateStaticExchange(src_position, move) < 0)
+            if (phase == PHASE_REGULAR_MOVES && 
+                EvaluateStaticExchange(src_position, move) < 0)
             {
                 /* defer moves with a negative static exchange evaluation for later consideration */
                 *deferred_move++ = move;

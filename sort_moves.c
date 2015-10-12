@@ -79,13 +79,35 @@ void SortMoves(int moves[], int ply)
         moves[i] = scored_moves[i].move;
     }
 }
+
+void 
+SortNextMove(int moves[], 
+             int ply)
+{
+    const int* const counts = &good_move_counts[ply][0];
+    int move;
+    int best_score = INT_MIN;
+    int best_move_index = 0;
+    for (int i = 0; (move = moves[i]) != 0; ++i)
+    {
+        const int score = MERIT(move) + counts[move & MOVE_MASK];
+        if (score > best_score)
+        {
+            best_score = score;
+            best_move_index = i;
+        }
+    }
+    int tmp = moves[0];
+    moves[0] = moves[best_move_index];
+    moves[best_move_index] = tmp;
+}
 /******************************************************************************
 Sort an array of scored moves into best first (descending score) order.
 This uses a stable merge sort algorithm, and is preferred over the use of the 
 built in qsort because it avoids the overhead of the comparison predicate 
 function call, which is non trivial in C. A stable sort is required so that the
-ordering of moves at the root node, where many moves share the same alpha, is
-preserved through multiple iterations.
+ordering of moves at the root node, where many moves share the same alpha 
+value, is preserved through multiple iterations.
 *******************************************************************************/
 void MergeSort(int num_elements, ScoredMove values[])
 {
@@ -97,41 +119,31 @@ void MergeSort(int num_elements, ScoredMove values[])
     {
         for (int left = 0; left < num_elements; left += width * 2)
         {
-            /******************************************************************
-            Merge the 2 sub-lists:
-            merge_src[left:left+width], merge_src[left+width:left+width*2]
-            to:
-            merge_dst[left:left+width*2]
-            *******************************************************************/
-            const int right = min(left + width,     num_elements);
-            const int end   = min(left + width * 2, num_elements);
-            int dst = left;
-            int j   = left;
-            int k   = right;                    
+            ScoredMove* dst         = &merge_dst[left];
+            const ScoredMove* right = &merge_src[min(left + width,     num_elements)];
+            const ScoredMove* end   = &merge_src[min(left + width * 2, num_elements)];           
+            const ScoredMove* j     = &merge_src[left];
+            const ScoredMove* k     = right;                    
             while (j < right && k < end)
             {
-                if (merge_src[j].score >= merge_src[k].score)
+                if (j->score >= k->score)
                 {
-                    merge_dst[dst++] = merge_src[j++];
+                    *dst++ = *j++;
                 }
                 else
                 {
-                    merge_dst[dst++] = merge_src[k++];
+                    *dst++ = *k++;
                 }
             }
             while (j < right)
             {
-                merge_dst[dst++] = merge_src[j++];
+                *dst++ = *j++;
             }
             while (k < end)
             {
-                merge_dst[dst++] = merge_src[k++];
+                *dst++ = *k++;
             }
         }
-        /**********************************************************************
-        Toggle merge source and dest between successive runs to avoid copy
-        overhead.
-        ***********************************************************************/
         tmp       = merge_src;
         merge_src = merge_dst;
         merge_dst = tmp;

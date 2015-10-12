@@ -66,6 +66,7 @@ int         GenerateLegalMoves(const Position* position, int moves[]);
 int*        GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all_moves);
 int         EvaluateStaticExchange(const Position* src_position, int move);
 void        SortMoves(int moves[], int ply);
+void        SortNextMove(int moves[], int ply);
 void        MergeSort(int num_elements, ScoredMove values[]);
 /******************************************************************************
 Positional evaluation
