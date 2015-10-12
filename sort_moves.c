@@ -35,13 +35,17 @@ static int good_move_counts[MAX_PLY][8 * 64 * 64];
 This function gets called by the search when we find an interesting move, i.e.
 one which raises alpha or causes a beta cutoff. 
 *******************************************************************************/
-void RecordGoodMove(int ply, int move)
+void 
+RecordGoodMove(int ply, 
+               int move)
 {
     INCREMENT("good moves");
     _InterlockedIncrement(&good_move_counts[ply][move & MOVE_MASK]);
 }
 
-bool HasMoveBeenGood(int ply, int move)
+bool 
+HasMoveBeenGood(int ply, 
+                int move)
 {
     return !!good_move_counts[ply][move & MOVE_MASK];
 }
@@ -58,7 +62,9 @@ Sort moves into "best first" order. The heuristic for ranking moves is:
 # Captured material value, then
 # Total number of times this move has cutoff or raised alpha at this ply
 *******************************************************************************/
-void SortMoves(int moves[], int ply)
+void 
+SortMoves(int moves[], 
+          int ply)
 {   
     int i;
     ScoredMove scored_moves[MAX_MOVES_PER_POSITION];    
@@ -79,15 +85,17 @@ void SortMoves(int moves[], int ply)
         moves[i] = scored_moves[i].move;
     }
 }
-
+/******************************************************************************
+Find the best move and bring it to the front (partial selection sort).
+*******************************************************************************/
 void 
-SortNextMove(int moves[], 
-             int ply)
+SelectNextMove(int moves[], 
+               int ply)
 {
-    const int* const counts = &good_move_counts[ply][0];
-    int move;
-    int best_score = INT_MIN;
+    const int* const counts = &good_move_counts[ply][0];   
+    int best_score = -1;
     int best_move_index = 0;
+    int move;
     for (int i = 0; (move = moves[i]) != 0; ++i)
     {
         const int score = MERIT(move) + counts[move & MOVE_MASK];
@@ -97,19 +105,22 @@ SortNextMove(int moves[],
             best_move_index = i;
         }
     }
-    int tmp = moves[0];
-    moves[0] = moves[best_move_index];
-    moves[best_move_index] = tmp;
+    if (best_move_index != 0)
+    {
+        int tmp = moves[0];
+        moves[0] = moves[best_move_index];
+        moves[best_move_index] = tmp;
+    }
 }
 /******************************************************************************
 Sort an array of scored moves into best first (descending score) order.
-This uses a stable merge sort algorithm, and is preferred over the use of the 
-built in qsort because it avoids the overhead of the comparison predicate 
-function call, which is non trivial in C. A stable sort is required so that the
+This uses a stable merge sort algorithm. A stable sort is required so that the
 ordering of moves at the root node, where many moves share the same alpha 
-value, is preserved through multiple iterations.
+value, is preserved through multiple iterations / sort operations.
 *******************************************************************************/
-void MergeSort(int num_elements, ScoredMove values[])
+void 
+MergeSort(int        num_elements, 
+          ScoredMove values[])
 {
     ScoredMove work[MAX_MOVES_PER_POSITION];
     ScoredMove* merge_src = values;

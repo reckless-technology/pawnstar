@@ -88,8 +88,8 @@ int SearchRootNode(const Position* src_position)
     best_move = scored_moves[0].move;
     if (timeout_ms)
     {
-        CancelStopThinkingTimer();
-        SetStopThinkingTimer(timeout_ms, &cancel);
+        CancelThinkingTimer();
+        SetThinkingTimer(timeout_ms, &cancel);
     }
     for (depth = STARTING_SEARCH_DEPTH; depth != MAX_PLY; ++depth)
     {       
@@ -176,6 +176,6 @@ int SearchRootNode(const Position* src_position)
             }
         }             
     }  
-    CancelStopThinkingTimer();
+    CancelThinkingTimer();
     return best_move;
 }

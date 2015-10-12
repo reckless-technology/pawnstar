@@ -8,8 +8,6 @@ needs some refinement.
 The evaluation unit is centipawns (1/100 of a pawn)
 *******************************************************************************/
 
-#define MANHATTAN_DISTANCE(x, y) (abs(FILE_OF(x) - FILE_OF(y)) + abs(RANK_OF(x) - RANK_OF(y)))
-
 typedef struct
 {
     uint64          hash;
@@ -22,6 +20,7 @@ static EvalHashEntry eval_hashtable[EVAL_HASHTABLE_SIZE];
 static int EvaluateMaterial         (const Position* position, bitboard friendly_pieces);
 static int EvaluatePieceSquare      (const Position* position, int color, bitboard friendly_pieces, int material_percent);
 static int EvaluateMobility         (const Position* position, bitboard friendly_pieces);
+static int EvaluateEnPrise          (const Position* position, bitboard friendly_pieces);
 static int EvaluateKingSafety       (const Position* position, int color, bitboard friendly_pieces, int material_percent);
 static int EvaluatePawnStructure    (const Position* position, const PawnStructure* ps, bitboard friendly_pieces, int color, int material_percent);
 
@@ -121,12 +120,13 @@ static const int* const PIECE_SQUARE_TABLE[8] =
     NULL,
 };
 #define SCORE_PAWN                         100
-#define SCORE_KNIGHT                       320
-#define SCORE_BISHOP                       330
-#define SCORE_ROOK                         500
-#define SCORE_QUEEN                       1000
-#define TOTAL_MATERIAL_SUM                8200  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
+#define SCORE_KNIGHT                       400
+#define SCORE_BISHOP                       400
+#define SCORE_ROOK                         600
+#define SCORE_QUEEN                       1200
+#define TOTAL_MATERIAL_SUM                9600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
 #define SCORE_MATERIAL_THRESHOLD           400  // threshold for eval cutoff on material balance only
+#define SCORE_BISHOP_PAIR                   50  // bonus for the bishop pair
 #define SCORE_CASTLING_RIGHTS               60  // bonus for retaining the right to castle
 #define SCORE_PAWN_KING_ADJ1                30  // bonus for each pawn standing directly in front of the king after castling
 #define SCORE_PAWN_KING_ADJ2                10  // bonus for each pawn standing on the 3rd rank in front of the king
@@ -151,7 +151,7 @@ static const int MOBILITY[15] =
 Penalty for enemy queen proximity (Manhattan distance) to friendly king
 *******************************************************************************/
 static const int QUEEN_KING_PROXIMITY[15] = 
-{ -20, -20, -20, -20, -15, -10, -5, 0, 0, 0, 0, 0, 0, 0, 0 };
+{ -25, -25, -25, -20, -15, -10, -5, 0, 5, 10, 0, 0, 0, 0, 0 };
 /******************************************************************************
 Bonus / penalty for number of enemy pieces within 2 squares of the friendly 
 king
@@ -164,6 +164,11 @@ friendly king
 *******************************************************************************/
 static const int FRIENDLY_PIECES_NEAR_KING[17] = 
 { -15, -10, -5, 0, 5, 10, 15, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20 };
+/******************************************************************************
+Penalty for having a piece en prise
+*******************************************************************************/
+static const int EN_PRISE_PIECE[7] = 
+{ 0, -10, -25, -25, -30, -35, 0 };
 
 void InitializeEval()
 {
@@ -219,10 +224,6 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     {
         material_percent = 0;
     }
-    if (!position->queens)
-    {
-        material_percent = 0;
-    }
     PawnStructure ps[2];
     DeterminePawnStructure(position, ps);    
     const int piece_square_score = 
@@ -237,11 +238,15 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     const int pawn_structure_score = 
         EvaluatePawnStructure(position, &ps[WHITE], position->white_pieces, WHITE, material_percent) - 
         EvaluatePawnStructure(position, &ps[BLACK], position->black_pieces, BLACK, material_percent);
+    const int en_prise_score = 
+        EvaluateEnPrise(position, position->white_pieces) -
+        EvaluateEnPrise(position, position->black_pieces);
     const int non_material_score = 
-        (piece_square_score + 
-         mobility_score     + 
-         king_safety_score  + 
-         pawn_structure_score);
+        (piece_square_score   + 
+         mobility_score       + 
+         king_safety_score    + 
+         pawn_structure_score +
+         en_prise_score);
     INCREMENT_IF(abs(non_material_score) > 100, "eval non material exceeds pawn");
     int final_score = 
         material_white - material_black + 
@@ -261,12 +266,18 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
 
 static int EvaluateMaterial(const Position* position, bitboard friendly_pieces)
 {
-    return 
+    int score = 
         SCORE_PAWN   * PopCount(position->pawns   & friendly_pieces) +
         SCORE_KNIGHT * PopCount(position->knights & friendly_pieces) +
         SCORE_BISHOP * PopCount(position->bishops & friendly_pieces) +
         SCORE_ROOK   * PopCount(position->rooks   & friendly_pieces) +
         SCORE_QUEEN  * PopCount(position->queens  & friendly_pieces);
+    if ((position->bishops & friendly_pieces & WHITE_SQUARES) &&
+        (position->bishops & friendly_pieces & BLACK_SQUARES))
+    {
+        score += SCORE_BISHOP_PAIR;
+    }
+    return score;
 }
 
 static int EvaluatePieceSquare(const Position* position, int color, bitboard friendly_pieces, int material_percent)
@@ -352,8 +363,7 @@ static int EvaluateKingSafety(const Position* position, int color, bitboard frie
     bitboard q = position->queens & ~friendly_pieces;
     while (q)
     {
-        const int queen_locn = FindAndClearLsb(&q);
-        score += QUEEN_KING_PROXIMITY[MANHATTAN_DISTANCE(queen_locn, king_locn)];
+        score += QUEEN_KING_PROXIMITY[MANHATTAN_DISTANCE[king_locn][FindAndClearLsb(&q)]];
     }
     /**************************************************************************
     King safety - number of enemy pieces close to our king
@@ -400,5 +410,23 @@ static int EvaluatePawnStructure(const Position* position, const PawnStructure* 
         }
     }
     return (midgame_score * material_percent + endgame_score * (100 - material_percent)) / 100;
+}
+
+static int 
+EvaluateEnPrise(const Position* position, 
+                bitboard friendly_pieces)
+{
+    int score = 0;
+    bitboard b = friendly_pieces;
+    while (b)
+    {
+        const int locn = FindAndClearLsb(&b);
+        const bitboard attacks_to = AttacksToSquare(position, locn);
+        if (attacks_to && !(attacks_to & friendly_pieces))
+        {
+            score += EN_PRISE_PIECE[PIECE_AT(position, locn)];
+        }
+    }
+    return score;
 }
 #endif

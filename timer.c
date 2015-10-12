@@ -22,7 +22,7 @@ static DWORD WINAPI TimerLoop(LPVOID arg)
 /******************************************************************************
 Set the absolute maximum thinking time for next search
 *******************************************************************************/
-void SetStopThinkingTimer(int milliseconds, volatile bool* cancel)
+void SetThinkingTimer(int milliseconds, volatile bool* cancel)
 {
     LARGE_INTEGER timeout;
     cancel_flag = cancel;
@@ -41,7 +41,7 @@ void SetStopThinkingTimer(int milliseconds, volatile bool* cancel)
 Cancel the thinking timer - typically if it was not required, we don't want it
 going off in the middle of the thinking time for the next move!
 *******************************************************************************/
-void CancelStopThinkingTimer(void)
+void CancelThinkingTimer(void)
 {
     if (timer)
     {

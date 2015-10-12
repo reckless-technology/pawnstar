@@ -181,7 +181,7 @@ void MoveSequenceToSanString(const Position* position, const int moves[], char m
         is_first_move = false;
     }
 }
-static const char* const STRINGS_TO_REMOVE[] = {
+static const char* const strings_to_remove[] = {
     "+",
     "#",
     "ep",
@@ -202,7 +202,7 @@ bool AreMoveStringsEqual(char* str1, char* str2)
     {
         return false;
     }
-    for (x = STRINGS_TO_REMOVE; *x; ++x)
+    for (x = strings_to_remove; *x; ++x)
     {
         char* y;
         if ((y = strstr(str1, *x)) != NULL)

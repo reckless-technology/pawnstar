@@ -6,6 +6,7 @@ contains various precomputed constants
 #include <stdbool.h>
 #include <memory.h>
 #include <string.h>
+#include <math.h>
 
 typedef unsigned long long      uint64;
 typedef unsigned char           uint8;
@@ -692,6 +693,11 @@ static uint64 InterveningSquares(int from, int to)
     return NO_SQUARES;
 }
 
+static int ManhattanDistance(int x, int y)
+{
+    return abs(FILE_OF(x) - FILE_OF(y)) + abs(RANK_OF(x) - RANK_OF(y));
+}
+
 static const BitboardGen bitboard_generators[] = {
     { "NORTH_OF",			      NorthOf			   },
     { "NORTHEAST_OF",		      NortheastOf		   },
@@ -737,6 +743,21 @@ int main()
         }
         printf("};\n");
     }
+    printf("const uint8 MANHATTAN_DISTANCE[64][64] = \n{");
+    for (i = 0; i != 64; ++i)
+    {
+        printf("\n{");
+        for (j = 0; j != 64; ++j)
+        {
+            if ((j & 7) == 0)
+            {
+                printf("\n    ");
+            }
+            printf("%2d,", ManhattanDistance(i, j));
+        }
+        printf("\n},");
+    }
+    printf("};\n");
     printf("const uint64 INTERVENING_SQUARES[64][64] = \n{");
     for (i = 0; i != 64; ++i)
     {

@@ -9,12 +9,7 @@ int SearchQuiescent(const Position* src_position,
                     int alpha, 
                     int beta, 
                     volatile bool* cancel)
-{
-    int         moves[MAX_MOVES_PER_POSITION];
-    const int*  pmove = moves;
-    int         move;
-    int         score;
-    
+{    
     INCREMENT("quiescent calls");
     if (*cancel)
     {
@@ -30,7 +25,7 @@ int SearchQuiescent(const Position* src_position,
         INCREMENT("quiescent checks");
         return Search(src_position, depth, ply, alpha, beta, cancel, 0, NULL);
     }
-    score = EvaluatePosition(src_position, alpha, beta);
+    int score = EvaluatePosition(src_position, alpha, beta);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
@@ -46,14 +41,17 @@ int SearchQuiescent(const Position* src_position,
         INCREMENT("quiescent futility cutoffs");
         return alpha;
     }
+    int moves[MAX_MOVES_PER_POSITION];
     GeneratePseudoLegalMoves(src_position, moves, false);    
-    SortMoves(moves, ply);
     /**************************************************************************
     Main loop
     ***************************************************************************/
     int legal_move_count = 0;
-    while ((move = *pmove++) != 0)
+    int* pmove = moves;
+    while (*pmove)
     {
+        SelectNextMove(pmove, ply);
+        int move = *pmove++;
         Position position;
 
 #if DO_QUIESCENCE_STATIC_EXCHANGE_EVAL

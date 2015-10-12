@@ -25,13 +25,12 @@ Search(const Position*  src_position,
     int                 regular_moves[MAX_MOVES_PER_POSITION];
     int                 deferred_moves[MAX_MOVES_PER_POSITION];    
     int                 score;   
-    bool                is_transposition  = false;
     int*                deferred_move     = deferred_moves;
     int                 num_legal_moves   = 0;
     int                 best_move         = 0;
     int                 best_score        = ALPHA;
     bool                has_raised_alpha  = false;
-    const int* const    move_phases[]     = 
+    int* const          move_phases[]     = 
     { 
         [PHASE_PRE_MOVES]       = pre_move,
         [PHASE_REGULAR_MOVES]   = regular_moves,
@@ -72,13 +71,17 @@ Search(const Position*  src_position,
     else
     {
         INCREMENT("checks");
-        ++depth;
+        if (search_flags & IS_CHECK_EXTN_OK)
+        {
+            ++depth;
+            search_flags &= ~IS_CHECK_EXTN_OK;
+        }
     }    
     /**************************************************************************
     Determine if there is an entry in the transposition table for this 
     position.
     ***************************************************************************/
-    is_transposition = FindTransposition(src_position->hash, &transposition);
+    const bool is_transposition = FindTransposition(src_position->hash, &transposition);
     if (is_transposition && transposition.depth >= depth)
     {
         switch (transposition.node_type)
@@ -178,11 +181,11 @@ Search(const Position*  src_position,
     beta bounds for the main search.
     In any case, it's always a good idea to search the PV first.
     ***************************************************************************/
-    int* m = pre_move;
     if (is_transposition && transposition.move)
     {
         INCREMENT("pre moves - TT");
-        *m++ = transposition.move;
+        pre_move[0] = transposition.move;
+        pre_move[1] = 0;
         if (transposition.node_type != NODE_PV)
         {
             search_flags &= ~IS_FOLLOWING_PV;
@@ -190,9 +193,9 @@ Search(const Position*  src_position,
     }   
     else
     {
+        pre_move[0] = 0;
         search_flags &= ~IS_FOLLOWING_PV;
     }
-    *m = 0;
     if (!is_transposition && depth > 1)
     {
         INCREMENT("nodes without transposition");
@@ -201,10 +204,10 @@ Search(const Position*  src_position,
     Start of main loop - we go through the following move phases:
 
     1) Pre move from the PV or TT
-    2) Regular moves with a SEE >= 0 (sorted best first)
+    2) Regular moves with a SEE >= 0 (sorted "best first")
     3) Deferred moves with a SEE < 0
 
-    Move generation is deferred until after pre moves have been searched.
+    Move generation is deferred until after the pre move has been searched.
     ***************************************************************************/
     for (int phase = PHASE_PRE_MOVES; phase <= PHASE_DEFERRED_MOVES; ++phase)
     {            
@@ -215,8 +218,7 @@ Search(const Position*  src_position,
             break;
 
         case PHASE_REGULAR_MOVES:
-            GeneratePseudoLegalMoves(src_position, regular_moves, true);
-            SortMoves(regular_moves, ply);           
+            GeneratePseudoLegalMoves(src_position, regular_moves, true);        
             break;
 
         case PHASE_DEFERRED_MOVES:
@@ -228,17 +230,25 @@ Search(const Position*  src_position,
             printf("ERROR: illegal move phase\n");
             break;
         }
-        const int* moves_this_phase = move_phases[phase];
-        while ((move = *moves_this_phase++) != 0)
+        int* moves_this_phase = move_phases[phase];
+        while (*moves_this_phase)
         {
-            if (phase == PHASE_REGULAR_MOVES && 
-                EvaluateStaticExchange(src_position, move) < 0)
+            if (phase == PHASE_REGULAR_MOVES)
             {
-                /* defer moves with a negative static exchange evaluation for later consideration */
-                *deferred_move++ = move;
-                INCREMENT("deferred moves");
-                continue;
+                SelectNextMove(moves_this_phase, ply);
+                move = *moves_this_phase++;
+                if (EvaluateStaticExchange(src_position, move) < 0)
+                {
+                    /* defer moves with a negative static exchange evaluation for later consideration */
+                    *deferred_move++ = move;
+                    INCREMENT("deferred moves");
+                    continue;
+                }
             }
+            else
+            {
+                move = *moves_this_phase++;
+            }               
             score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, search_flags, move, &pv);
             if (*cancel)
             {
