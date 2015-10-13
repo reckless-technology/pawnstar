@@ -120,13 +120,13 @@ static const int* const PIECE_SQUARE_TABLE[8] =
     NULL,
 };
 #define SCORE_PAWN                         100
-#define SCORE_KNIGHT                       400
-#define SCORE_BISHOP                       400
-#define SCORE_ROOK                         600
-#define SCORE_QUEEN                       1200
-#define TOTAL_MATERIAL_SUM                9600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
+#define SCORE_KNIGHT                       350
+#define SCORE_BISHOP                       350
+#define SCORE_ROOK                         550
+#define SCORE_QUEEN                       1000
+#define TOTAL_MATERIAL_SUM                8600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
 #define SCORE_MATERIAL_THRESHOLD           400  // threshold for eval cutoff on material balance only
-#define SCORE_BISHOP_PAIR                   50  // bonus for the bishop pair
+#define SCORE_BISHOP_PAIR                   25  // bonus for the bishop pair
 #define SCORE_CASTLING_RIGHTS               60  // bonus for retaining the right to castle
 #define SCORE_PAWN_KING_ADJ1                30  // bonus for each pawn standing directly in front of the king after castling
 #define SCORE_PAWN_KING_ADJ2                10  // bonus for each pawn standing on the 3rd rank in front of the king
@@ -167,8 +167,8 @@ static const int FRIENDLY_PIECES_NEAR_KING[17] =
 /******************************************************************************
 Penalty for having a piece en prise
 *******************************************************************************/
-static const int EN_PRISE_PIECE[7] = 
-{ 0, -10, -25, -25, -30, -35, 0 };
+static const int EN_PRISE_PIECE[8] = 
+{ 0, -10, -25, -25, -30, -35, 0, 0 };
 
 void InitializeEval()
 {
@@ -417,7 +417,7 @@ EvaluateEnPrise(const Position* position,
                 bitboard friendly_pieces)
 {
     int score = 0;
-    bitboard b = friendly_pieces;
+    bitboard b = friendly_pieces & ~(position->pawns | position->kings);
     while (b)
     {
         const int locn = FindAndClearLsb(&b);
