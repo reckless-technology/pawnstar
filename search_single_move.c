@@ -72,9 +72,10 @@ SearchSingleMove(const Position*    src_position,
     # We won't descend directly into quiescence search
     # The move does not give check
     ***************************************************************************/
-    if ((search_flags & IS_LMR_OK)        &&
-        (search_flags & IS_DEFERRED_MOVE) &&
-        child_depth > 1                   &&
+    if ((search_flags & IS_LMR_OK)              &&
+        (search_flags & IS_DEFERRED_MOVE)       &&
+        child_depth > 1                         &&
+        !(src_position->state_flags & IS_CHECK) &&
         !(position.state_flags & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");

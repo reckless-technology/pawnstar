@@ -29,7 +29,8 @@ static const bitboard* const KPS1[2]       = { KING_PAWN_SHIELD_WHITE,    KING_P
 static const bitboard* const KPS2[2]       = { KING_PAWN_SHIELD_WHITE_2,  KING_PAWN_SHIELD_BLACK_2  };
 static const uint8 CASTLE_RIGHTS_MASK[2]   = { MAY_WHITE_K | MAY_WHITE_Q, MAY_BLACK_K | MAY_BLACK_Q };
 static const uint8 FLIP_BOARD[2]           = { RANK_FLIP,                 0 };
-static const bitboard OPPOSITE_HALF[2]     = { RANK_5 | RANK_6 | RANK_7 | RANK_8, RANK_1 | RANK_2 | RANK_3 | RANK_4 };
+static const bitboard OPPOSITE_HALF[2]     = { RANK_5 | RANK_6 | RANK_7 | RANK_8, 
+                                               RANK_1 | RANK_2 | RANK_3 | RANK_4 };
 
 static const int KING_SQUARE_MIDGAME[64] = 
 {
@@ -62,7 +63,7 @@ static const int KING_SQUARE_ENDGAME[64] =
 #define TOTAL_MATERIAL_SUM                8600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
 #define SCORE_MATERIAL_THRESHOLD           400  // threshold for eval cutoff on material balance only
 #define SCORE_NON_MATERIAL_LIMIT           300  // max contribution of positional features to eval score 
-#define SCORE_BISHOP_PAIR                   25  // bonus for the bishop pair
+#define SCORE_BISHOP_PAIR                   50  // bonus for the bishop pair
 #define SCORE_KNIGHT_CENTER                 20  // bonus for a knight standing in the central 16 squares
 #define SCORE_KNIGHT_EDGE                  -20  // penalty for a knight standing at the edge of the board
 #define SCORE_CASTLING_RIGHTS               60  // bonus for retaining the right to castle
@@ -76,10 +77,10 @@ static const int KING_SQUARE_ENDGAME[64] =
 #define SCORE_DOUBLED_PAWN                 -10  // penalty for doubled or triped pawn
 #define SCORE_PASSED_PAWN                   10  // bonus for passed pawn in the midgame
 #define SCORE_PASSED_PAWN_END               20  // bonus for a passed pawn in the endgame
-#define SCORE_PROTECTED_PAWN                10  // bonus for pawn protected by a friendly pawn in the midgame
-#define SCORE_PROTECTED_PAWN_END            20  // bonus for pawn protected by a friendly pawn in the endgame
-#define SCORE_PROTECTED_PASSED_PAWN_END     20  // additional bonus for a passed pawn protected by a friendly pawn in the endgame
-#define SCORE_ROOK_BEHIND_PASSED_PAWN_END   20  // bonus for a rook behind a passed pawn in the end game
+#define SCORE_PROTECTED_PAWN                 5  // bonus for pawn protected by a friendly pawn in the midgame
+#define SCORE_PROTECTED_PAWN_END            10  // bonus for pawn protected by a friendly pawn in the endgame
+#define SCORE_PROTECTED_PASSED_PAWN_END     10  // additional bonus for a passed pawn protected by a friendly pawn in the endgame
+#define SCORE_ROOK_BEHIND_PASSED_PAWN_END   10  // bonus for a rook behind a passed pawn in the end game
 /******************************************************************************
 Bonus / penalty for bishops and rooks based on number of available pseudo legal 
 target squares. The rest should be handled by search.
@@ -108,13 +109,13 @@ Bonus / penalty for number of friendly non pawn pieces within 2 squares of the
 friendly king
 *******************************************************************************/
 static const int FRIENDLY_PIECES_NEAR_KING[17] = 
-{ -15, -10, -5, 0, 5, 10, 15, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20 };
+{ -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 30, 30, 30, 30, 30, 30, 30 };
 /******************************************************************************
 Penalty for having a piece en prise
 *******************************************************************************/
 static const int EN_PRISE_PIECE[8] = 
-/*     P    N    B    R    Q        */
-{ 0, -10, -25, -25, -30, -35, 0, 0 };
+/*    P    N    B    R    Q        */
+{ 0,  0, -10, -10, -20, -30, 0, 0 };
 /******************************************************************************
 Bonus awarded to the side ahead on material based on the total number of
 knights, bishops, rooks and queens on the board. Encourages the side ahead to 
@@ -180,11 +181,11 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     }
     if (material_white > material_black)
     {
-        material_white += TRADE_DOWN_BONUS[PopCount(position->occupied_squares & ~position->kings & ~position->pawns)];
+        material_white += TRADE_DOWN_BONUS[PopCount(position->occupied_squares & ~(position->kings | position->pawns))];
     }
     else if (material_black > material_white)
     {
-        material_black += TRADE_DOWN_BONUS[PopCount(position->occupied_squares & ~position->kings & ~position->pawns)];
+        material_black += TRADE_DOWN_BONUS[PopCount(position->occupied_squares & ~(position->kings | position->pawns))];
     }
     PawnStructure ps[2];
     DeterminePawnStructure(position, ps);    
@@ -200,11 +201,17 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     const int pawn_structure_score = 
         EvaluatePawnStructure(position, &ps[WHITE], position->white_pieces, WHITE, material_percent) - 
         EvaluatePawnStructure(position, &ps[BLACK], position->black_pieces, BLACK, material_percent);
+    /*
+    const int en_prise_score = 
+        EvaluateEnPrise(position, position->white_pieces) -
+        EvaluateEnPrise(position, position->black_pieces);
+        */
     int non_material_score = 
         (piece_square_score   +
          mobility_score       + 
+         /* en_prise_score       + */
          king_safety_score    + 
-         pawn_structure_score);
+         pawn_structure_score );
     INCREMENT_IF(abs(non_material_score) > SCORE_PAWN, "eval non material exceeds 100");
     if (abs(non_material_score) > SCORE_NON_MATERIAL_LIMIT)
     {
@@ -245,13 +252,14 @@ static int EvaluateMaterial(const Position* position, bitboard friendly_pieces)
 
 static int EvaluatePieceSquare(const Position* position, int color, bitboard friendly_pieces, int material_percent)
 { 
-    const int rank_flip = FLIP_BOARD[color];   
+    const int king_index = position->king_location[color] ^ FLIP_BOARD[color];     
     int score = 
-        ((KING_SQUARE_MIDGAME[position->king_location[color] ^ rank_flip] *        material_percent) + 
-         (KING_SQUARE_ENDGAME[position->king_location[color] ^ rank_flip] * (100 - material_percent))) / 100;
-    score += SCORE_PAWN_IN_OPPONENTS_HALF * PopCount(position->pawns   & friendly_pieces & OPPOSITE_HALF[color]);
-    score += SCORE_KNIGHT_CENTER          * PopCount(position->knights & friendly_pieces & CTR_16_SQUARES);
-    score += SCORE_KNIGHT_EDGE            * PopCount(position->knights & friendly_pieces & BORDER_SQUARES);
+        ((KING_SQUARE_MIDGAME[king_index] *        material_percent) + 
+         (KING_SQUARE_ENDGAME[king_index] * (100 - material_percent))) / 100;   
+    const bitboard friendly_knights = position->knights & friendly_pieces;
+    score += SCORE_KNIGHT_CENTER          * PopCount(friendly_knights & CTR_16_SQUARES);
+    score += SCORE_KNIGHT_EDGE            * PopCount(friendly_knights & BORDER_SQUARES);
+    score += SCORE_PAWN_IN_OPPONENTS_HALF * PopCount(position->pawns & friendly_pieces & OPPOSITE_HALF[color]);
     return score;
 }
 
@@ -337,7 +345,7 @@ static int EvaluateKingSafety(const Position* position, int color, bitboard frie
     /**************************************************************************
     King safety - number of friendly pieces close to our king
     ***************************************************************************/
-    score += FRIENDLY_PIECES_NEAR_KING[PopCount(KING_ATTACKS_2[king_locn] & friendly_pieces & ~position->kings & ~position->pawns)];  
+    score += FRIENDLY_PIECES_NEAR_KING[PopCount(KING_ATTACKS_2[king_locn] & friendly_pieces & ~(position->kings | position->pawns))];  
     /**************************************************************************
     Bonus for retaining the right to castle
     ***************************************************************************/
