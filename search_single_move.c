@@ -76,7 +76,7 @@ SearchSingleMove(const Position*    src_position,
         (search_flags & IS_DEFERRED_MOVE)       &&
         child_depth > 1                         &&
         !(src_position->state_flags & IS_CHECK) &&
-        !(position.state_flags & IS_CHECK))
+        !(position.state_flags      & IS_CHECK))
     {
         INCREMENT("extensions reduce LMR");
         --child_depth;
@@ -85,9 +85,9 @@ SearchSingleMove(const Position*    src_position,
 #endif
    
     int score;
-    if ((search_flags & IS_PVS_OK)              && 
-        !(src_position->state_flags & IS_CHECK) &&
-        beta > alpha + 1)
+    if (beta > alpha + 1           &&
+        (search_flags & IS_PVS_OK) && 
+        !(src_position->state_flags & IS_CHECK))
     {
         INCREMENT("pvs attempts");
         score = -Search(&position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, search_flags, pv);

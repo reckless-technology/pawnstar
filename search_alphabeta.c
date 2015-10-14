@@ -6,8 +6,6 @@ Refer to:
 http://chessprogramming.wikispaces.com/Alpha-Beta
 http://chessprogramming.wikispaces.com/Principal+Variation+Search
 *******************************************************************************/
-
-
 int 
 Search(const Position*  src_position, 
        int              depth, 
@@ -74,12 +72,7 @@ Search(const Position*  src_position,
     else
     {
         INCREMENT("checks");
-        if (search_flags & IS_CHECK_EXTN_OK)
-        {
-            INCREMENT("extensions check");
-            ++depth;
-            search_flags &= ~IS_CHECK_EXTN_OK;
-        }
+        ++depth;
     }    
     /**************************************************************************
     Determine if there is an entry in the transposition table for this 
@@ -121,7 +114,7 @@ Search(const Position*  src_position,
             /**************************************************************
             We know the exact score and the best move from this position.
             However, do the full search to get the PV. The extra time 
-            searching these few nodes is trivial.
+            searching these few principal variation nodes is trivial.
             ***************************************************************/
             INCREMENT("table hit pv node");
             break;

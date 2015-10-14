@@ -61,7 +61,7 @@ static const int KING_SQUARE_ENDGAME[64] =
 #define SCORE_ROOK                         550
 #define SCORE_QUEEN                       1000
 #define TOTAL_MATERIAL_SUM                8600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
-#define SCORE_MATERIAL_THRESHOLD           400  // threshold for eval cutoff on material balance only
+#define SCORE_MATERIAL_THRESHOLD           600  // threshold for eval cutoff on material balance only
 #define SCORE_NON_MATERIAL_LIMIT           300  // max contribution of positional features to eval score 
 #define SCORE_BISHOP_PAIR                   50  // bonus for the bishop pair
 #define SCORE_KNIGHT_CENTER                 20  // bonus for a knight standing in the central 16 squares
@@ -136,6 +136,7 @@ position is quiet.
 *******************************************************************************/
 int EvaluatePosition(const Position* position, int alpha, int beta)
 {    
+    INCREMENT("eval calls");
     EvalHashEntry* const hash_entry = &eval_hashtable[position->hash % EVAL_HASHTABLE_SIZE];
     while (_InterlockedCompareExchange(&hash_entry->lock, 1, 0) != 0)
     {
@@ -201,29 +202,20 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     const int pawn_structure_score = 
         EvaluatePawnStructure(position, &ps[WHITE], position->white_pieces, WHITE, material_percent) - 
         EvaluatePawnStructure(position, &ps[BLACK], position->black_pieces, BLACK, material_percent);
-    /*
-    const int en_prise_score = 
-        EvaluateEnPrise(position, position->white_pieces) -
-        EvaluateEnPrise(position, position->black_pieces);
-        */
     int non_material_score = 
         (piece_square_score   +
          mobility_score       + 
-         /* en_prise_score       + */
          king_safety_score    + 
-         pawn_structure_score );
+         pawn_structure_score) / 2;
     INCREMENT_IF(abs(non_material_score) > SCORE_PAWN, "eval non material exceeds 100");
     if (abs(non_material_score) > SCORE_NON_MATERIAL_LIMIT)
     {
         INCREMENT("eval non material exceeds 300");
         non_material_score = non_material_score > 0 ? SCORE_NON_MATERIAL_LIMIT : -SCORE_NON_MATERIAL_LIMIT;
     }
-    int final_score = 
-        material_white - material_black + 
-        non_material_score;
-    final_score *= score_sign;
+    int final_score = (material_white - material_black) + non_material_score;
     final_score /= 5;
-    final_score *= 5; /* quantize score - helps search stability */
+    final_score *= 5 * score_sign; /* quantize score - helps search stability */
     while (_InterlockedCompareExchange(&hash_entry->lock, 1, 0) != 0)
     {
         INCREMENT("lock contention eval record");

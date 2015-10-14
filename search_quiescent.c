@@ -51,7 +51,7 @@ int SearchQuiescent(const Position* src_position,
     while (*pmove)
     {
         SelectNextMove(pmove, ply);
-        int move = *pmove++;
+        const int move = *pmove++;
         Position position;
 
 #if DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
@@ -67,8 +67,8 @@ int SearchQuiescent(const Position* src_position,
         {
             continue;
         }
-        if (legal_move_count &&
-            beta > alpha + 1)
+        if (beta > alpha + 1 && 
+            legal_move_count)
         {
             INCREMENT("quiescent pvs attempts");
             score = -SearchQuiescent(&position, depth - 1, ply + 1, -alpha - 1, -alpha, cancel);

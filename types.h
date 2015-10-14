@@ -78,8 +78,7 @@ enum SearchFlags
     IS_FOLLOWING_PV     = 0x08, // are we following the PV from the root node
     IS_DEFERRED_MOVE    = 0x10, // is this a deferred move with a negative SEE
     IS_PV_EXTN_OK       = 0x20, // is full window depth extension permitted in this subtree
-    IS_CHECK_EXTN_OK    = 0x40, // is search depth extension due to check permitted
-    SEARCH_FLAG_ROOT    = IS_NULL_MOVE_OK | IS_LMR_OK | IS_FOLLOWING_PV | IS_PV_EXTN_OK | IS_CHECK_EXTN_OK,
+    SEARCH_FLAG_ROOT    = IS_NULL_MOVE_OK | IS_LMR_OK | IS_FOLLOWING_PV | IS_PV_EXTN_OK,
 };
 /******************************************************************************
 Phases of move search
