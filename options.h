@@ -44,13 +44,19 @@ Whether to enable null move pruning
 Whether to enable extension on recapture of same value piece
 *******************************************************************************/
 #ifndef DO_RECAPTURE_EXTENSION
-#define DO_RECAPTURE_EXTENSION 1
+#define DO_RECAPTURE_EXTENSION 0
 #endif
 /******************************************************************************
 Whether to enable extension on pawn push to 7th rank
 *******************************************************************************/
 #ifndef DO_PUSH_TO_SEVENTH_RANK_EXTENSION
 #define DO_PUSH_TO_SEVENTH_RANK_EXTENSION 1
+#endif
+/******************************************************************************
+Whether to enable extension on first non null window search in subtree
+*******************************************************************************/
+#ifndef DO_FULL_WINDOW_EXTENSION
+#define DO_FULL_WINDOW_EXTENSION 0
 #endif
 /******************************************************************************
 Whether to enable futility pruning at frontier nodes

@@ -1,8 +1,5 @@
 #include "pawnstar.h"
 
-
-
-
 /******************************************************************************
 Search a single move and return its score, or MOVED_INTO_CHECK_SCORE if the 
 move was not legal.
@@ -17,13 +14,12 @@ SearchSingleMove(const Position*    src_position,
                  int                search_flags, 
                  int                move,
                  Variation*         pv)
-{  
-    Position position;   
-    int score;
+{      
     if (*cancel)
     {
         return ILLEGAL_SCORE;
     }
+    Position position;
     MakeMove(&position, src_position, move);
     if (position.state_flags & MOVED_INTO_CHECK)
     {
@@ -87,6 +83,7 @@ SearchSingleMove(const Position*    src_position,
     }
 #endif
    
+    int score;
     if ((search_flags & IS_PVS_OK)              && 
         !(src_position->state_flags & IS_CHECK) &&
         beta > alpha + 1)

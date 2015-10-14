@@ -17,24 +17,23 @@ Search(const Position*  src_position,
        volatile bool*   cancel, 
        int              search_flags,
        Variation*       parent_pv)
-{
-    Transposition       transposition;
-    Variation           pv;
-    int                 move;   
-    int                 pre_move[2];
-    int                 regular_moves[MAX_MOVES_PER_POSITION];
-    int                 deferred_moves[MAX_MOVES_PER_POSITION];    
-    int                 score;   
-    int*                deferred_move     = deferred_moves;
-    int                 num_legal_moves   = 0;
-    int                 best_move         = 0;
-    int                 best_score        = ALPHA;
-    bool                has_raised_alpha  = false;
-    int* const          move_phases[]     = 
+{    
+    Variation   pv;
+    int         move;   
+    int         pre_move[2];
+    int         regular_moves[MAX_MOVES_PER_POSITION];
+    int         deferred_moves[MAX_MOVES_PER_POSITION];    
+    int         score;   
+    int*        deferred_move    = deferred_moves;
+    int         num_legal_moves  = 0;
+    int         best_move        = 0;
+    int         best_score       = ALPHA;
+    bool        has_raised_alpha = false;
+    int* const  move_phases[]    = 
     { 
-        [PHASE_PRE_MOVES]       = pre_move,
-        [PHASE_REGULAR_MOVES]   = regular_moves,
-        [PHASE_DEFERRED_MOVES]  = deferred_moves,
+        [PHASE_PRE_MOVES]        = pre_move,
+        [PHASE_REGULAR_MOVES]    = regular_moves,
+        [PHASE_DEFERRED_MOVES]   = deferred_moves,
     };
     if (*cancel)
     {
@@ -60,6 +59,8 @@ Search(const Position*  src_position,
         {
             return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
         }
+
+#if DO_FULL_WINDOW_EXTENSION
         if ((search_flags & IS_PV_EXTN_OK) &&
             beta > alpha + 1)
         {
@@ -67,12 +68,15 @@ Search(const Position*  src_position,
             ++depth;
             search_flags &= ~IS_PV_EXTN_OK;
         }
+#endif
+
     }
     else
     {
         INCREMENT("checks");
         if (search_flags & IS_CHECK_EXTN_OK)
         {
+            INCREMENT("extensions check");
             ++depth;
             search_flags &= ~IS_CHECK_EXTN_OK;
         }
@@ -81,6 +85,7 @@ Search(const Position*  src_position,
     Determine if there is an entry in the transposition table for this 
     position.
     ***************************************************************************/
+    Transposition transposition;
     const bool is_transposition = FindTransposition(src_position->hash, &transposition);
     if (is_transposition && transposition.depth >= depth)
     {
@@ -163,8 +168,8 @@ Search(const Position*  src_position,
 #if DO_FUTILITY_PRUNING
     /**************************************************************************
     Futility pruning doesn't really achieve much; the idea is to prune frontier
-    nodes where the eval is so bad there is no way we can match alpha even with
-    a great winning tactical sequence.
+    nodes (depth 1) where the eval is so bad there is no way we can match alpha 
+    even with a great winning tactical sequence.
     ***************************************************************************/
     if (depth == 1                              &&
         !(src_position->state_flags & IS_CHECK) &&
@@ -263,7 +268,7 @@ Search(const Position*  src_position,
             if (score >= beta)
             {
                 INCREMENT("beta cutoffs");
-                INCREMENT_IF(phase == PHASE_PRE_MOVES, "beta cutoffs without move gen");
+                INCREMENT_IF(phase == PHASE_PRE_MOVES, "beta cutoffs from TT move");
                 RecordTransposition(src_position->hash, depth, beta, move, NODE_CUT);
                 RecordGoodMove(ply, move);
                 return beta;

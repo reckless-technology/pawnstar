@@ -29,70 +29,16 @@ static const bitboard* const KPS1[2]       = { KING_PAWN_SHIELD_WHITE,    KING_P
 static const bitboard* const KPS2[2]       = { KING_PAWN_SHIELD_WHITE_2,  KING_PAWN_SHIELD_BLACK_2  };
 static const uint8 CASTLE_RIGHTS_MASK[2]   = { MAY_WHITE_K | MAY_WHITE_Q, MAY_BLACK_K | MAY_BLACK_Q };
 static const uint8 FLIP_BOARD[2]           = { RANK_FLIP,                 0 };
+static const bitboard OPPOSITE_HALF[2]     = { RANK_5 | RANK_6 | RANK_7 | RANK_8, RANK_1 | RANK_2 | RANK_3 | RANK_4 };
 
-static const int PAWN_SQUARE[64] = 
-{
-     0,  0,  0,  0,  0,  0,  0,  0,
-    50, 50, 50, 50, 50, 50, 50, 50,
-    10, 10, 20, 30, 30, 20, 10, 10,
-     5,  5, 10, 25, 25, 10,  5,  5,
-     0,  0,  0, 20, 20,  0,  0,  0,
-     0,  0,  0, 10, 10,  0,  0,  0,
-     0,  0,  0,-20,-20,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0
-};
-static const int KNIGHT_SQUARE[64] = 
-{
-    -50,-40,-30,-30,-30,-30,-40,-50,
-    -40,-20,  0,  0,  0,  0,-20,-40,
-    -30,  0, 10, 15, 15, 10,  0,-30,
-    -30,  5, 15, 20, 20, 15,  5,-30,
-    -30,  0, 15, 20, 20, 15,  0,-30,
-    -30,  5, 10, 15, 15, 10,  5,-30,
-    -40,-20,  0,  5,  5,  0,-20,-40,
-    -50,-40,-30,-30,-30,-30,-40,-50,   
-};
-static const int BISHOP_SQUARE[64] = 
-{
-    -20,-10,-10,-10,-10,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5, 10, 10,  5,  0,-10,
-    -10,  5,  5, 10, 10,  5,  5,-10,
-    -10,  0, 10, 10, 10, 10,  0,-10,
-    -10, 10, 10, 10, 10, 10, 10,-10,
-    -10,  5,  0,  0,  0,  0,  5,-10,
-    -20,-10,-10,-10,-10,-10,-10,-20,
-};
-static const int ROOK_SQUARE[64] = 
-{
-      0,  0,  0,  0,  0,  0,  0,  0,
-      5, 10, 10, 10, 10, 10, 10,  5,
-     -5,  0,  0,  0,  0,  0,  0, -5,
-     -5,  0,  0,  0,  0,  0,  0, -5,
-     -5,  0,  0,  0,  0,  0,  0, -5,
-     -5,  0,  0,  0,  0,  0,  0, -5,
-     -5,  0,  0,  0,  0,  0,  0, -5,
-      0,  0,  0,  5,  5,  0,  0,  0,
-};
-static const int QUEEN_SQUARE[64] = 
-{
-    -20,-10,-10, -5, -5,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5,  5,  5,  5,  0,-10,
-     -5,  0,  5,  5,  5,  5,  0, -5,
-      0,  0,  5,  5,  5,  5,  0, -5,
-    -10,  5,  5,  5,  5,  5,  0,-10,
-    -10,  0,  5,  0,  0,  0,  0,-10,
-    -20,-10,-10, -5, -5,-10,-10,-20
-};
 static const int KING_SQUARE_MIDGAME[64] = 
 {
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -20,-30,-30,-40,-40,-30,-30,-20,
-    -10,-20,-20,-20,-20,-20,-20,-10,
+      0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,
+      0,  0,  0,  0,  0,  0,  0,  0,
      20, 20,  0,  0,  0,  0, 20, 20,
      20, 30, 10,  0,  0, 10, 30, 20,
 };
@@ -108,17 +54,6 @@ static const int KING_SQUARE_ENDGAME[64] =
       0, 10, 20, 30, 30, 20, 10,  0,
 };
 
-static const int* const PIECE_SQUARE_TABLE[8] = 
-{
-    NULL,
-    PAWN_SQUARE,
-    KNIGHT_SQUARE,
-    BISHOP_SQUARE,
-    ROOK_SQUARE,
-    QUEEN_SQUARE,
-    NULL,
-    NULL,
-};
 #define SCORE_PAWN                         100
 #define SCORE_KNIGHT                       350
 #define SCORE_BISHOP                       350
@@ -126,8 +61,12 @@ static const int* const PIECE_SQUARE_TABLE[8] =
 #define SCORE_QUEEN                       1000
 #define TOTAL_MATERIAL_SUM                8600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
 #define SCORE_MATERIAL_THRESHOLD           400  // threshold for eval cutoff on material balance only
+#define SCORE_NON_MATERIAL_LIMIT           300  // max contribution of positional features to eval score 
 #define SCORE_BISHOP_PAIR                   25  // bonus for the bishop pair
+#define SCORE_KNIGHT_CENTER                 20  // bonus for a knight standing in the central 16 squares
+#define SCORE_KNIGHT_EDGE                  -20  // penalty for a knight standing at the edge of the board
 #define SCORE_CASTLING_RIGHTS               60  // bonus for retaining the right to castle
+#define SCORE_PAWN_IN_OPPONENTS_HALF        20  // bonus for a pawn in enemy half of the board
 #define SCORE_PAWN_KING_ADJ1                30  // bonus for each pawn standing directly in front of the king after castling
 #define SCORE_PAWN_KING_ADJ2                10  // bonus for each pawn standing on the 3rd rank in front of the king
 #define SCORE_KING_OPEN_FILE               -20  // penalty for king on a file with no friendly pawns
@@ -137,27 +76,33 @@ static const int* const PIECE_SQUARE_TABLE[8] =
 #define SCORE_DOUBLED_PAWN                 -10  // penalty for doubled or triped pawn
 #define SCORE_PASSED_PAWN                   10  // bonus for passed pawn in the midgame
 #define SCORE_PASSED_PAWN_END               20  // bonus for a passed pawn in the endgame
-#define SCORE_PROTECTED_PAWN                 5  // bonus for pawn protected by a friendly pawn in the midgame
+#define SCORE_PROTECTED_PAWN                10  // bonus for pawn protected by a friendly pawn in the midgame
 #define SCORE_PROTECTED_PAWN_END            20  // bonus for pawn protected by a friendly pawn in the endgame
-#define SCORE_PROTECTED_PASSED_PAWN_END     25  // additional bonus for a passed pawn protected by a friendly pawn in the endgame
+#define SCORE_PROTECTED_PASSED_PAWN_END     20  // additional bonus for a passed pawn protected by a friendly pawn in the endgame
 #define SCORE_ROOK_BEHIND_PASSED_PAWN_END   20  // bonus for a rook behind a passed pawn in the end game
 /******************************************************************************
-Bonus / penalty for bishops and rooks based on number of available psuedo legal 
+Bonus / penalty for bishops and rooks based on number of available pseudo legal 
 target squares. The rest should be handled by search.
 *******************************************************************************/
-static const int MOBILITY[15] = 
-{ -10, -5, 0, 5, 10, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 };
+static const int BISHOP_ROOK_MOBILITY[15] = 
+{ -30, -15, 0, 10, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20 };
+/******************************************************************************
+Bonus / penalty for knights based on number of available pseudo legal 
+target squares. The rest should be handled by search.
+*******************************************************************************/
+static const int KNIGHT_MOBILITY[9] =
+{ -40, -30, -20, -10, 0, 10, 20, 30, 40 };
 /******************************************************************************
 Penalty for enemy queen proximity (Manhattan distance) to friendly king
 *******************************************************************************/
 static const int QUEEN_KING_PROXIMITY[15] = 
-{ -25, -25, -25, -20, -15, -10, -5, 0, 5, 10, 0, 0, 0, 0, 0 };
+{ -25, -25, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 20, 20, 20 };
 /******************************************************************************
 Bonus / penalty for number of enemy pieces within 2 squares of the friendly 
 king
 *******************************************************************************/
 static const int ENEMY_PIECES_NEAR_KING[17] = 
-{ 10, 5, 0, -5, -10, -15, -20, -25, -30, -35, -35, -35, -35, -35, -35, -35, -35 };
+{ 20, 15, 10, 5, 0, -5, -10, -15, -20, -20, -20, -20, -20, -20, -20, -20, -20 };
 /******************************************************************************
 Bonus / penalty for number of friendly non pawn pieces within 2 squares of the 
 friendly king
@@ -168,7 +113,16 @@ static const int FRIENDLY_PIECES_NEAR_KING[17] =
 Penalty for having a piece en prise
 *******************************************************************************/
 static const int EN_PRISE_PIECE[8] = 
+/*     P    N    B    R    Q        */
 { 0, -10, -25, -25, -30, -35, 0, 0 };
+/******************************************************************************
+Bonus awarded to the side ahead on material based on the total number of
+knights, bishops, rooks and queens on the board. Encourages the side ahead to 
+trade down pieces but not pawns.
+*******************************************************************************/
+static const int TRADE_DOWN_BONUS[32] = 
+{ 100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0, };
+
 
 void InitializeEval()
 {
@@ -202,9 +156,9 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     /**************************************************************************
     Material
     ***************************************************************************/
-    const int material_white = EvaluateMaterial(position, position->white_pieces);
-    const int material_black = EvaluateMaterial(position, position->black_pieces);
-    const int material_score = (material_white - material_black) * score_sign;
+    int material_white = EvaluateMaterial(position, position->white_pieces);
+    int material_black = EvaluateMaterial(position, position->black_pieces);
+    int material_score = (material_white - material_black) * score_sign;
     if (material_score > beta + SCORE_MATERIAL_THRESHOLD)
     {
         INCREMENT("eval cutoff beta");
@@ -224,6 +178,14 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     {
         material_percent = 0;
     }
+    if (material_white > material_black)
+    {
+        material_white += TRADE_DOWN_BONUS[PopCount(position->occupied_squares & ~position->kings & ~position->pawns)];
+    }
+    else if (material_black > material_white)
+    {
+        material_black += TRADE_DOWN_BONUS[PopCount(position->occupied_squares & ~position->kings & ~position->pawns)];
+    }
     PawnStructure ps[2];
     DeterminePawnStructure(position, ps);    
     const int piece_square_score = 
@@ -238,22 +200,23 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     const int pawn_structure_score = 
         EvaluatePawnStructure(position, &ps[WHITE], position->white_pieces, WHITE, material_percent) - 
         EvaluatePawnStructure(position, &ps[BLACK], position->black_pieces, BLACK, material_percent);
-    const int en_prise_score = 
-        EvaluateEnPrise(position, position->white_pieces) -
-        EvaluateEnPrise(position, position->black_pieces);
-    const int non_material_score = 
-        (piece_square_score   + 
+    int non_material_score = 
+        (piece_square_score   +
          mobility_score       + 
          king_safety_score    + 
-         pawn_structure_score +
-         en_prise_score);
-    INCREMENT_IF(abs(non_material_score) > 100, "eval non material exceeds pawn");
+         pawn_structure_score);
+    INCREMENT_IF(abs(non_material_score) > SCORE_PAWN, "eval non material exceeds 100");
+    if (abs(non_material_score) > SCORE_NON_MATERIAL_LIMIT)
+    {
+        INCREMENT("eval non material exceeds 300");
+        non_material_score = non_material_score > 0 ? SCORE_NON_MATERIAL_LIMIT : -SCORE_NON_MATERIAL_LIMIT;
+    }
     int final_score = 
         material_white - material_black + 
         non_material_score;
     final_score *= score_sign;
-    final_score /= 10;
-    final_score *= 10; /* quantize score - helps search stability */
+    final_score /= 5;
+    final_score *= 5; /* quantize score - helps search stability */
     while (_InterlockedCompareExchange(&hash_entry->lock, 1, 0) != 0)
     {
         INCREMENT("lock contention eval record");
@@ -282,19 +245,13 @@ static int EvaluateMaterial(const Position* position, bitboard friendly_pieces)
 
 static int EvaluatePieceSquare(const Position* position, int color, bitboard friendly_pieces, int material_percent)
 { 
-    const uint8 rank_flip = FLIP_BOARD[color];   
+    const int rank_flip = FLIP_BOARD[color];   
     int score = 
         ((KING_SQUARE_MIDGAME[position->king_location[color] ^ rank_flip] *        material_percent) + 
          (KING_SQUARE_ENDGAME[position->king_location[color] ^ rank_flip] * (100 - material_percent))) / 100;
-    for (int piece = PAWN; piece <= QUEEN; ++piece)
-    {
-        const int* const table = PIECE_SQUARE_TABLE[piece];
-        bitboard b = position->pieces[piece] & friendly_pieces;       
-        while (b)
-        {
-            score += table[FindAndClearLsb(&b) ^ rank_flip];
-        }
-    }
+    score += SCORE_PAWN_IN_OPPONENTS_HALF * PopCount(position->pawns   & friendly_pieces & OPPOSITE_HALF[color]);
+    score += SCORE_KNIGHT_CENTER          * PopCount(position->knights & friendly_pieces & CTR_16_SQUARES);
+    score += SCORE_KNIGHT_EDGE            * PopCount(position->knights & friendly_pieces & BORDER_SQUARES);
     return score;
 }
 
@@ -307,7 +264,7 @@ static int EvaluateMobility(const Position* position, bitboard friendly_pieces)
     bitboard b = position->bishops & friendly_pieces;
     while (b)
     {
-        score += MOBILITY[PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~friendly_pieces)];
+        score += BISHOP_ROOK_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~friendly_pieces)];
     }
     /**************************************************************************
     Rook mobility
@@ -315,7 +272,15 @@ static int EvaluateMobility(const Position* position, bitboard friendly_pieces)
     b = position->rooks & friendly_pieces;
     while (b)
     {
-        score += MOBILITY[PopCount(RookAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~friendly_pieces)];
+        score += BISHOP_ROOK_MOBILITY[PopCount(RookAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~friendly_pieces)];
+    }
+    /**************************************************************************
+    Knight mobility
+    ***************************************************************************/
+    b = position->knights & friendly_pieces;
+    while (b)
+    {
+        score += KNIGHT_MOBILITY[PopCount(KNIGHT_ATTACKS[FindAndClearLsb(&b)] & ~friendly_pieces)];
     }
     return score;
 }
@@ -337,7 +302,7 @@ static int EvaluateKingSafety(const Position* position, int color, bitboard frie
     const bitboard king_file      = FORWARD_OF[color][king_locn];
     const bitboard king_file_west = SHIFT_WEST(king_file);
     const bitboard king_file_east = SHIFT_EAST(king_file);
-    if (!(king_file & friendly_pawns))
+    if (king_file && !(king_file & friendly_pawns))
     {
         score += SCORE_KING_OPEN_FILE;
     }
