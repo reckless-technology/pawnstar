@@ -36,11 +36,15 @@ int SearchQuiescent(const Position* src_position,
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
+
+#if DO_FUTILITY_PRUNING
     else if (score + FUTILITY_CUTOFF_THRESHOLD < alpha)
     {
         INCREMENT("quiescent futility cutoffs");
         return alpha;
     }
+#endif
+
     int moves[MAX_MOVES_PER_POSITION];
     GeneratePseudoLegalMoves(src_position, moves, false);    
     /**************************************************************************
