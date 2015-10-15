@@ -29,9 +29,8 @@ static const bitboard* const KPS1[2]       = { KING_PAWN_SHIELD_WHITE,    KING_P
 static const bitboard* const KPS2[2]       = { KING_PAWN_SHIELD_WHITE_2,  KING_PAWN_SHIELD_BLACK_2  };
 static const uint8 CASTLE_RIGHTS_MASK[2]   = { MAY_WHITE_K | MAY_WHITE_Q, MAY_BLACK_K | MAY_BLACK_Q };
 static const uint8 FLIP_BOARD[2]           = { RANK_FLIP,                 0 };
-static const bitboard OPPOSITE_HALF[2]     = { RANK_5 | RANK_6 | RANK_7 | RANK_8, 
-                                               RANK_1 | RANK_2 | RANK_3 | RANK_4 };
-static const bitboard PAWN_RANKS[2][5]     = { { RANK_3, RANK_4, RANK_5, RANK_6, RANK_7 }, { RANK_6, RANK_5, RANK_4, RANK_3, RANK_2 } };
+static const bitboard PAWN_RANKS[2][6]     = { { RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, NO_SQUARES }, 
+                                               { RANK_6, RANK_5, RANK_4, RANK_3, RANK_2, NO_SQUARES } };
 
 static const int KING_SQUARE_MIDGAME[64] = 
 {
@@ -266,17 +265,17 @@ static int EvaluatePieceSquare(const Position* position, int color, bitboard fri
         ((KING_SQUARE_MIDGAME[king_index] *        material_percent) + 
          (KING_SQUARE_ENDGAME[king_index] * (100 - material_percent))) / 100;   
     const bitboard friendly_knights = position->knights & friendly_pieces;
-    score += SCORE_KNIGHT_CENTER          * PopCount(friendly_knights & CTR_16_SQUARES);
-    score += SCORE_KNIGHT_EDGE            * PopCount(friendly_knights & BORDER_SQUARES);
+    score += SCORE_KNIGHT_CENTER * PopCount(friendly_knights & CTR_16_SQUARES);
+    score += SCORE_KNIGHT_EDGE   * PopCount(friendly_knights & BORDER_SQUARES);
     /* Pawn advancement bonus */
     const bitboard friendly_pawns = position->pawns & friendly_pieces;
     int pawn_advancement_bonus = SCORE_PAWN_ADVANCEMENT;
     const bitboard* pawn_rank = &PAWN_RANKS[color][0];
-    for (int i = 5; i != 0; --i)
+    while (*pawn_rank)
     {
-        score += pawn_advancement_bonus * PopCount(friendly_pawns & *pawn_rank);
-        ++pawn_rank;
+        score += pawn_advancement_bonus * PopCount(friendly_pawns & *pawn_rank);       
         pawn_advancement_bonus += SCORE_PAWN_ADVANCEMENT;
+        ++pawn_rank;
     }
     return score;
 }
