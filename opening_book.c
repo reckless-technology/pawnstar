@@ -132,7 +132,7 @@ void DisplayAvailableBookMoves(const Position* position)
     printf("move   count\n");
     for (i = 0; i != next_move; ++i)
     {
-        char buffer[8];
+        char buffer[16];
         MoveToSanString(position, book_moves[i], buffer);
         printf("%-8s %3u\n", buffer, move_counts[i]);
     }

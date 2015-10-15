@@ -31,6 +31,7 @@ static const uint8 CASTLE_RIGHTS_MASK[2]   = { MAY_WHITE_K | MAY_WHITE_Q, MAY_BL
 static const uint8 FLIP_BOARD[2]           = { RANK_FLIP,                 0 };
 static const bitboard OPPOSITE_HALF[2]     = { RANK_5 | RANK_6 | RANK_7 | RANK_8, 
                                                RANK_1 | RANK_2 | RANK_3 | RANK_4 };
+static const bitboard PAWN_RANKS[2][5]     = { { RANK_3, RANK_4, RANK_5, RANK_6, RANK_7 }, { RANK_6, RANK_5, RANK_4, RANK_3, RANK_2 } };
 
 static const int KING_SQUARE_MIDGAME[64] = 
 {
@@ -81,6 +82,7 @@ static const int KING_SQUARE_ENDGAME[64] =
 #define SCORE_PROTECTED_PAWN_END            10  // bonus for pawn protected by a friendly pawn in the endgame
 #define SCORE_PROTECTED_PASSED_PAWN_END     10  // additional bonus for a passed pawn protected by a friendly pawn in the endgame
 #define SCORE_ROOK_BEHIND_PASSED_PAWN_END   10  // bonus for a rook behind a passed pawn in the end game
+#define SCORE_PAWN_ADVANCEMENT               5  // bonus for pawn advancing a rank
 /******************************************************************************
 Bonus / penalty for bishops and rooks based on number of available pseudo legal 
 target squares. The rest should be handled by search.
@@ -121,9 +123,15 @@ Bonus awarded to the side ahead on material based on the total number of
 knights, bishops, rooks and queens on the board. Encourages the side ahead to 
 trade down pieces but not pawns.
 *******************************************************************************/
-static const int TRADE_DOWN_BONUS[32] = 
-{ 100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0, };
-
+static const int TRADE_DOWN_BONUS[33] = 
+{ 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0, /* ... */ };
+/******************************************************************************
+Bonus awarded to the side ahead on material based on the total number of
+pawns on the board. Encourages the side ahead to trade down pieces but not 
+pawns.
+*******************************************************************************/
+static const int TRADE_DOWN_PAWN_BONUS[17] = 
+{ 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80 };
 
 void InitializeEval()
 {
@@ -182,11 +190,25 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     }
     if (material_white > material_black)
     {
-        material_white += TRADE_DOWN_BONUS[PopCount(position->occupied_squares & ~(position->kings | position->pawns))];
+        material_white += 
+            TRADE_DOWN_BONUS     [PopCount(position->knights | position->bishops | position->rooks | position->queens)] +
+            TRADE_DOWN_PAWN_BONUS[PopCount(position->pawns)];
     }
     else if (material_black > material_white)
     {
-        material_black += TRADE_DOWN_BONUS[PopCount(position->occupied_squares & ~(position->kings | position->pawns))];
+        material_black += 
+            TRADE_DOWN_BONUS     [PopCount(position->knights | position->bishops | position->rooks | position->queens)] + 
+            TRADE_DOWN_PAWN_BONUS[PopCount(position->pawns)];
+    }
+    if ((position->bishops & position->white_pieces & WHITE_SQUARES) &&
+        (position->bishops & position->white_pieces & BLACK_SQUARES))
+    {
+        material_white += SCORE_BISHOP_PAIR;
+    }
+    if ((position->bishops & position->black_pieces & WHITE_SQUARES) &&
+        (position->bishops & position->black_pieces & BLACK_SQUARES))
+    {
+        material_black += SCORE_BISHOP_PAIR;
     }
     PawnStructure ps[2];
     DeterminePawnStructure(position, ps);    
@@ -234,11 +256,6 @@ static int EvaluateMaterial(const Position* position, bitboard friendly_pieces)
         SCORE_BISHOP * PopCount(position->bishops & friendly_pieces) +
         SCORE_ROOK   * PopCount(position->rooks   & friendly_pieces) +
         SCORE_QUEEN  * PopCount(position->queens  & friendly_pieces);
-    if ((position->bishops & friendly_pieces & WHITE_SQUARES) &&
-        (position->bishops & friendly_pieces & BLACK_SQUARES))
-    {
-        score += SCORE_BISHOP_PAIR;
-    }
     return score;
 }
 
@@ -251,7 +268,16 @@ static int EvaluatePieceSquare(const Position* position, int color, bitboard fri
     const bitboard friendly_knights = position->knights & friendly_pieces;
     score += SCORE_KNIGHT_CENTER          * PopCount(friendly_knights & CTR_16_SQUARES);
     score += SCORE_KNIGHT_EDGE            * PopCount(friendly_knights & BORDER_SQUARES);
-    score += SCORE_PAWN_IN_OPPONENTS_HALF * PopCount(position->pawns & friendly_pieces & OPPOSITE_HALF[color]);
+    /* Pawn advancement bonus */
+    const bitboard friendly_pawns = position->pawns & friendly_pieces;
+    int pawn_advancement_bonus = SCORE_PAWN_ADVANCEMENT;
+    const bitboard* pawn_rank = &PAWN_RANKS[color][0];
+    for (int i = 5; i != 0; --i)
+    {
+        score += pawn_advancement_bonus * PopCount(friendly_pawns & *pawn_rank);
+        ++pawn_rank;
+        pawn_advancement_bonus += SCORE_PAWN_ADVANCEMENT;
+    }
     return score;
 }
 

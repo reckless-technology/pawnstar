@@ -23,7 +23,7 @@ void RunStaticExchangeTests(void)
             printf("ERROR: unable to produce position from string\n");
             continue;
         }
-        char move_string[8];
+        char move_string[16];
         MoveToSanString(&position, test->move, move_string);
         int score = EvaluateStaticExchange(&position, test->move);
         printf("\n%s\nSEE for %s = %d\n", test->fen_string, move_string, score);
