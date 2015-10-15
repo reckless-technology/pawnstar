@@ -23,7 +23,7 @@ char* MoveToSanString(const Position* position, int the_move, char move_string[]
 {
     int legal_moves[MAX_MOVES_PER_POSITION];
     Position dst_position[1];
-    char disambiguation[4];
+    char disambiguation[4] = { 0 };
     char from_square[4];
     char to_square[4];
     const int* move;
@@ -72,10 +72,6 @@ char* MoveToSanString(const Position* position, int the_move, char move_string[]
         {
             strcpy(disambiguation, from_square);
         }
-    }
-    else
-    {
-        disambiguation[0] = '\0';
     }
     switch (MOVE_PIECE(the_move))
     {

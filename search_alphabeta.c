@@ -181,7 +181,7 @@ Search(const Position*  src_position,
     ***************************************************************************/
     if (is_transposition && transposition.move)
     {
-        INCREMENT("pre moves - TT");
+        INCREMENT("table moves");
         pre_move[0] = transposition.move;
         pre_move[1] = 0;
         if (transposition.node_type != NODE_PV)

@@ -50,7 +50,6 @@ int SearchQuiescent(const Position* src_position,
     /**************************************************************************
     Main loop
     ***************************************************************************/
-    int legal_move_count = 0;
     int* pmove = moves;
     while (*pmove)
     {
@@ -71,22 +70,7 @@ int SearchQuiescent(const Position* src_position,
         {
             continue;
         }
-        if (beta > alpha + 1 && 
-            legal_move_count)
-        {
-            INCREMENT("quiescent pvs attempts");
-            score = -SearchQuiescent(&position, depth - 1, ply + 1, -alpha - 1, -alpha, cancel);
-            if (score > alpha)
-            {
-                INCREMENT("quiescent pvs fails");
-                score = -SearchQuiescent(&position, depth - 1, ply + 1, -beta, -alpha, cancel);
-            }
-        }
-        else
-        {
-            score = -SearchQuiescent(&position, depth - 1, ply + 1, -beta, -alpha, cancel);
-        }
-        ++legal_move_count;
+        score = -SearchQuiescent(&position, depth - 1, ply + 1, -beta, -alpha, cancel);
         if (*cancel)
         {
             return ILLEGAL_SCORE;

@@ -62,7 +62,7 @@ Whether to enable extension on first non null window search in subtree
 Whether to enable futility pruning at frontier nodes
 *******************************************************************************/
 #ifndef DO_FUTILITY_PRUNING
-#define DO_FUTILITY_PRUNING 1
+#define DO_FUTILITY_PRUNING 0
 #endif
 /******************************************************************************
 Whether to enable late move reductions
