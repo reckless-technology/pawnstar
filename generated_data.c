@@ -1,4 +1,4 @@
-/* This file was generated on Oct 12 2015 at 15:32:00 */
+/* This file was generated on Oct 15 2015 at 12:49:26 */
 #include "types.h"
 const bitboard NORTH_OF[64] = 
 {
@@ -1071,6 +1071,73 @@ const bitboard KING_ATTACKS_2[64] =
     0xF8F8F80000000000ull, /* f8 popcnt 15 */
     0xF0F0F00000000000ull, /* g8 popcnt 12 */
     0xE0E0E00000000000ull, /* h8 popcnt 9 */
+};
+const bitboard KING_ATTACKS_3[64] = 
+{
+    0x000000000F0F0F0Full, /* a1 popcnt 16 */
+    0x000000001F1F1F1Full, /* b1 popcnt 20 */
+    0x000000003F3F3F3Full, /* c1 popcnt 24 */
+    0x000000007F7F7F7Full, /* d1 popcnt 28 */
+    0x00000000FEFEFEFEull, /* e1 popcnt 28 */
+    0x00000000FCFCFCFCull, /* f1 popcnt 24 */
+    0x00000000F8F8F8F8ull, /* g1 popcnt 20 */
+    0x00000000F0F0F0F0ull, /* h1 popcnt 16 */
+    0x0000000F0F0F0F0Full, /* a2 popcnt 20 */
+    0x0000001F1F1F1F1Full, /* b2 popcnt 25 */
+    0x0000003F3F3F3F3Full, /* c2 popcnt 30 */
+    0x0000007F7F7F7F7Full, /* d2 popcnt 35 */
+    0x000000FEFEFEFEFEull, /* e2 popcnt 35 */
+    0x000000FCFCFCFCFCull, /* f2 popcnt 30 */
+    0x000000F8F8F8F8F8ull, /* g2 popcnt 25 */
+    0x000000F0F0F0F0F0ull, /* h2 popcnt 20 */
+    0x00000F0F0F0F0F0Full, /* a3 popcnt 24 */
+    0x00001F1F1F1F1F1Full, /* b3 popcnt 30 */
+    0x00003F3F3F3F3F3Full, /* c3 popcnt 36 */
+    0x00007F7F7F7F7F7Full, /* d3 popcnt 42 */
+    0x0000FEFEFEFEFEFEull, /* e3 popcnt 42 */
+    0x0000FCFCFCFCFCFCull, /* f3 popcnt 36 */
+    0x0000F8F8F8F8F8F8ull, /* g3 popcnt 30 */
+    0x0000F0F0F0F0F0F0ull, /* h3 popcnt 24 */
+    0x000F0F0F0F0F0F0Full, /* a4 popcnt 28 */
+    0x001F1F1F1F1F1F1Full, /* b4 popcnt 35 */
+    0x003F3F3F3F3F3F3Full, /* c4 popcnt 42 */
+    0x007F7F7F7F7F7F7Full, /* d4 popcnt 49 */
+    0x00FEFEFEFEFEFEFEull, /* e4 popcnt 49 */
+    0x00FCFCFCFCFCFCFCull, /* f4 popcnt 42 */
+    0x00F8F8F8F8F8F8F8ull, /* g4 popcnt 35 */
+    0x00F0F0F0F0F0F0F0ull, /* h4 popcnt 28 */
+    0x0F0F0F0F0F0F0F00ull, /* a5 popcnt 28 */
+    0x1F1F1F1F1F1F1F00ull, /* b5 popcnt 35 */
+    0x3F3F3F3F3F3F3F00ull, /* c5 popcnt 42 */
+    0x7F7F7F7F7F7F7F00ull, /* d5 popcnt 49 */
+    0xFEFEFEFEFEFEFE00ull, /* e5 popcnt 49 */
+    0xFCFCFCFCFCFCFC00ull, /* f5 popcnt 42 */
+    0xF8F8F8F8F8F8F800ull, /* g5 popcnt 35 */
+    0xF0F0F0F0F0F0F000ull, /* h5 popcnt 28 */
+    0x0F0F0F0F0F0F0000ull, /* a6 popcnt 24 */
+    0x1F1F1F1F1F1F0000ull, /* b6 popcnt 30 */
+    0x3F3F3F3F3F3F0000ull, /* c6 popcnt 36 */
+    0x7F7F7F7F7F7F0000ull, /* d6 popcnt 42 */
+    0xFEFEFEFEFEFE0000ull, /* e6 popcnt 42 */
+    0xFCFCFCFCFCFC0000ull, /* f6 popcnt 36 */
+    0xF8F8F8F8F8F80000ull, /* g6 popcnt 30 */
+    0xF0F0F0F0F0F00000ull, /* h6 popcnt 24 */
+    0x0F0F0F0F0F000000ull, /* a7 popcnt 20 */
+    0x1F1F1F1F1F000000ull, /* b7 popcnt 25 */
+    0x3F3F3F3F3F000000ull, /* c7 popcnt 30 */
+    0x7F7F7F7F7F000000ull, /* d7 popcnt 35 */
+    0xFEFEFEFEFE000000ull, /* e7 popcnt 35 */
+    0xFCFCFCFCFC000000ull, /* f7 popcnt 30 */
+    0xF8F8F8F8F8000000ull, /* g7 popcnt 25 */
+    0xF0F0F0F0F0000000ull, /* h7 popcnt 20 */
+    0x0F0F0F0F00000000ull, /* a8 popcnt 16 */
+    0x1F1F1F1F00000000ull, /* b8 popcnt 20 */
+    0x3F3F3F3F00000000ull, /* c8 popcnt 24 */
+    0x7F7F7F7F00000000ull, /* d8 popcnt 28 */
+    0xFEFEFEFE00000000ull, /* e8 popcnt 28 */
+    0xFCFCFCFC00000000ull, /* f8 popcnt 24 */
+    0xF8F8F8F800000000ull, /* g8 popcnt 20 */
+    0xF0F0F0F000000000ull, /* h8 popcnt 16 */
 };
 const bitboard KING_PAWN_SHIELD_WHITE[64] = 
 {

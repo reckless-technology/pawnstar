@@ -623,6 +623,11 @@ static uint64 KingAttacks2(int location)
     return KingFill(KingAttacks(location));
 }
 
+static uint64 KingAttacks3(int location)
+{
+    return KingFill(KingAttacks2(location));
+}
+
 static uint64 KingPawnShieldWhite(int location)
 {
     const uint64 b = BITBOARD(location);
@@ -715,6 +720,7 @@ static const BitboardGen bitboard_generators[] = {
     { "QUEEN_ATTACKS",		      QueenAttacks		   },
     { "KING_ATTACKS",		      KingAttacks		   },
     { "KING_ATTACKS_2",           KingAttacks2         },
+    { "KING_ATTACKS_3",           KingAttacks3         },
     { "KING_PAWN_SHIELD_WHITE",   KingPawnShieldWhite  },
     { "KING_PAWN_SHIELD_BLACK",   KingPawnShieldBlack  },
     { "KING_PAWN_SHIELD_WHITE_2", KingPawnShield2White },
