@@ -66,25 +66,21 @@ static const int KING_SQUARE_ENDGAME[64] =
 #define SCORE_BISHOP                       350
 #define SCORE_ROOK                         550
 #define SCORE_QUEEN                       1000
-#define TOTAL_MATERIAL_SUM                8600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
+#define SCORE_MATERIAL_SUM                8600  // 2 x Q + 4 x R + 4 x B + 4 x N + 16 x P
 #define SCORE_MATERIAL_THRESHOLD           400  // threshold for eval cutoff on material balance only
 #define SCORE_NON_MATERIAL_LIMIT           300  // max contribution of positional features to eval score 
 #define SCORE_BISHOP_PAIR                   50  // bonus for the bishop pair
 #define SCORE_KNIGHT_CENTER                 20  // bonus for a knight standing in the central 16 squares
 #define SCORE_KNIGHT_EDGE                  -20  // penalty for a knight standing at the edge of the board
 #define SCORE_CASTLING_RIGHTS               40  // bonus for retaining the right to castle
-#define SCORE_PAWN_IN_OPPONENTS_HALF        20  // bonus for a pawn in enemy half of the board
 #define SCORE_PAWN_KING_ADJ1                35  // bonus for each pawn standing directly in front of the king after castling
 #define SCORE_PAWN_KING_ADJ2                15  // bonus for each pawn standing on the 3rd rank in front of the king
-#define SCORE_ISOLATED_PAWN                -20  // penalty for an isolated pawn in the midgame
-#define SCORE_ISOLATED_PAWN_END            -20  // penalty for isolated pawn in the endgame
+#define SCORE_ISOLATED_PAWN                -20  // penalty for an isolated pawn
 #define SCORE_DOUBLED_PAWN                 -10  // penalty for doubled or triped pawn
-#define SCORE_PASSED_PAWN                   10  // bonus for passed pawn in the midgame
-#define SCORE_PASSED_PAWN_END               20  // bonus for a passed pawn in the endgame
-#define SCORE_PROTECTED_PAWN                 5  // bonus for pawn protected by a friendly pawn in the midgame
-#define SCORE_PROTECTED_PAWN_END            10  // bonus for pawn protected by a friendly pawn in the endgame
-#define SCORE_PROTECTED_PASSED_PAWN_END     10  // additional bonus for a passed pawn protected by a friendly pawn in the endgame
-#define SCORE_ROOK_BEHIND_PASSED_PAWN_END   10  // bonus for a rook behind a passed pawn in the end game
+#define SCORE_PASSED_PAWN                   10  // bonus for passed pawn
+#define SCORE_PROTECTED_PAWN                 5  // bonus for pawn protected by a friendly pawn
+#define SCORE_PROTECTED_PASSED_PAWN         10  // additional bonus for a passed pawn protected by a friendly pawn
+#define SCORE_ROOK_BEHIND_PASSED_PAWN       10  // bonus for a rook behind a passed pawn
 #define SCORE_PAWN_ADVANCEMENT               5  // bonus for pawn advancing a rank
 /******************************************************************************
 Bonus / penalty for bishops and rooks based on number of available pseudo legal 
@@ -237,7 +233,7 @@ EvaluateMaterial(const Position* position,
         SCORE_BISHOP * PopCount(position->bishops & position->black_pieces) +
         SCORE_ROOK   * PopCount(position->rooks   & position->black_pieces) +
         SCORE_QUEEN  * PopCount(position->queens  & position->black_pieces);
-    material->percent = ((material->white + material->black) * 100) / TOTAL_MATERIAL_SUM;
+    material->percent = ((material->white + material->black) * 100) / SCORE_MATERIAL_SUM;
     if (material->percent >= 90)
     {
         material->percent = 100;
@@ -388,17 +384,12 @@ EvaluatePawnStructure(const Position*      position,
                       int                  material_percent, 
                       const PawnStructure* ps)
 {
-    const int midgame_score =
-        SCORE_ISOLATED_PAWN  * PopCount(ps->isolated_pawns) +
-        SCORE_DOUBLED_PAWN   * PopCount(ps->doubled_pawns)  +
-        SCORE_PROTECTED_PAWN * PopCount(ps->defended_pawns) +
-        SCORE_PASSED_PAWN    * PopCount(ps->passed_pawns);
-    int endgame_score =
-        SCORE_DOUBLED_PAWN              * PopCount(ps->doubled_pawns)                     +
-        SCORE_PROTECTED_PAWN_END        * PopCount(ps->defended_pawns)                    +
-        SCORE_PASSED_PAWN_END           * PopCount(ps->passed_pawns)                      +
-        SCORE_PROTECTED_PASSED_PAWN_END * PopCount(ps->passed_pawns & ps->defended_pawns) +
-        SCORE_ISOLATED_PAWN_END         * PopCount(ps->isolated_pawns);
+    int score =
+        SCORE_ISOLATED_PAWN         * PopCount(ps->isolated_pawns)                    +
+        SCORE_DOUBLED_PAWN          * PopCount(ps->doubled_pawns)                     +
+        SCORE_PROTECTED_PAWN        * PopCount(ps->defended_pawns)                    +
+        SCORE_PROTECTED_PASSED_PAWN * PopCount(ps->defended_pawns & ps->passed_pawns) +
+        SCORE_PASSED_PAWN           * PopCount(ps->passed_pawns);
     bitboard friendly_rooks = position->rooks & friendly_pieces;
     while (friendly_rooks)
     {
@@ -408,10 +399,11 @@ EvaluatePawnStructure(const Position*      position,
         {
             if (!(INTERVENING_SQUARES[rook_locn][FindAndClearLsb(&pp)] & position->occupied_squares))
             {
-                endgame_score += SCORE_ROOK_BEHIND_PASSED_PAWN_END;
+                score += SCORE_ROOK_BEHIND_PASSED_PAWN;
             }
         }
     }
-    return (midgame_score * material_percent + endgame_score * (100 - material_percent)) / 100;
+    return score;
+    (void)material_percent;
 }
 #endif
