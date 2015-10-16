@@ -22,7 +22,8 @@ void DeterminePins(const Position* position, Pins* pins)
             const bitboard intervening_squares       = intervening_squares_arr[slider_location];
             const bitboard intervening_pieces        = intervening_squares & position->occupied_squares;
             const bitboard intervening_friendly_piece = intervening_pieces & friendly_pieces;           
-            if (intervening_friendly_piece && HAS_SINGLE_BIT_SET(intervening_pieces))
+            if (intervening_friendly_piece && 
+                PopCount(intervening_pieces) == 1)
             {
                 pins->pinned_pieces |= intervening_friendly_piece;
                 pins->allowed_squares[Lsb(intervening_friendly_piece)] = intervening_squares | BITBOARD(slider_location);

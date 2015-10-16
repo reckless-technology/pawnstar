@@ -136,8 +136,7 @@ Search(const Position*  src_position,
     Hopefully this is sufficient to prevent most Zugzwang positions.
     ***************************************************************************/
     const bitboard friendly_pieces = src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
-    if ((search_flags & IS_NULL_MOVE_OK)                                   &&
-        (src_position->move)                                               &&
+    if ((src_position->move)                                               &&
         !(src_position->state_flags & IS_CHECK)                            &&
         beta == alpha + 1                                                  &&
         PopCount(friendly_pieces) > 4                                      &&
@@ -147,7 +146,7 @@ Search(const Position*  src_position,
         INCREMENT("null move attempts");
         Position position;       
         MakeNullMove(&position, src_position);
-        score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, search_flags & ~IS_NULL_MOVE_OK, NULL);
+        score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, search_flags, NULL);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -209,12 +208,13 @@ Search(const Position*  src_position,
 
     Move generation is deferred until after the pre move has been searched.
     ***************************************************************************/
+    int search_depth = depth;
     for (int phase = PHASE_PRE_MOVES; phase <= PHASE_DEFERRED_MOVES; ++phase)
     {            
         switch (phase)
         {
         case PHASE_PRE_MOVES:
-            search_flags &= ~(IS_DEFERRED_MOVE | IS_PVS_OK);
+            search_flags &= ~IS_PVS_OK;
             break;
 
         case PHASE_CAPTURES:
@@ -226,7 +226,14 @@ Search(const Position*  src_position,
 
         case PHASE_DEFERRED_MOVES:
             *deferred_move = 0; /* terminate deferred moves list */
-            search_flags |= IS_DEFERRED_MOVE;
+
+#if DO_LATE_MOVE_REDUCTION
+            if (!(src_position->state_flags & IS_CHECK))
+            {
+                INCREMENT("lmr");
+                --search_depth;
+            }
+#endif
             break;
 
         default:
@@ -244,7 +251,7 @@ Search(const Position*  src_position,
                 move = *moves_this_phase++;
                 if (EvaluateStaticExchange(src_position, move) < 0)
                 {
-                    /* defer moves with a negative static exchange evaluation for later consideration */
+                    /* defer moves with a negative static exchange evaluation */
                     *deferred_move++ = move;
                     INCREMENT("deferred moves");
                     continue;
@@ -255,7 +262,7 @@ Search(const Position*  src_position,
                 move = *moves_this_phase++;
                 break;
             }              
-            score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, search_flags, move, &pv);
+            score = SearchSingleMove(src_position, search_depth, ply, alpha, beta, cancel, search_flags, move, &pv);
             if (*cancel)
             {
                 return ILLEGAL_SCORE;

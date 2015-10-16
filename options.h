@@ -44,7 +44,7 @@ Whether to enable null move pruning
 Whether to enable extension on recapture of same value piece
 *******************************************************************************/
 #ifndef DO_RECAPTURE_EXTENSION
-#define DO_RECAPTURE_EXTENSION 0
+#define DO_RECAPTURE_EXTENSION 1
 #endif
 /******************************************************************************
 Whether to enable extension on pawn push to 7th rank

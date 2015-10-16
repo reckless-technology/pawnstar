@@ -72,13 +72,10 @@ Search option flags (bitset)
 *******************************************************************************/
 enum SearchFlags
 {
-    IS_NULL_MOVE_OK     = 0x01, // is null move pruning permitted in this subtree
-    IS_LMR_OK           = 0x02, // is late move reduction permitted in this subtree 
-    IS_PVS_OK           = 0x04, // is PVS null window search permitted in this subtree
-    IS_FOLLOWING_PV     = 0x08, // are we following the PV from the root node
-    IS_DEFERRED_MOVE    = 0x10, // is this a deferred move with a negative SEE
-    IS_PV_EXTN_OK       = 0x20, // is full window depth extension permitted in this subtree
-    SEARCH_FLAG_ROOT    = IS_NULL_MOVE_OK | IS_LMR_OK | IS_FOLLOWING_PV | IS_PV_EXTN_OK,
+    IS_PVS_OK           = 0x01, // is PVS null window search permitted in this subtree
+    IS_FOLLOWING_PV     = 0x02, // are we following the PV from the root node
+    IS_PV_EXTN_OK       = 0x04, // is full window depth extension permitted in this subtree
+    SEARCH_FLAG_ROOT    = IS_FOLLOWING_PV | IS_PV_EXTN_OK,
 };
 /******************************************************************************
 Phases of move search
@@ -86,7 +83,7 @@ Phases of move search
 enum MovePhase
 {
     PHASE_PRE_MOVES,        // moves from the PV or TT (before move gen)
-    PHASE_CAPTURES,         // capture and promotion moves with a non negative SEE
+    PHASE_CAPTURES,         // capture and promotion moves with a non negative static exchange eval
     PHASE_NON_CAPTURES,     // non captures moves with a non negative SEE
     PHASE_DEFERRED_MOVES,   // moves with a negative SEE
 };

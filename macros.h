@@ -52,6 +52,3 @@ A value of 0 terminates a move list
 #define ENEMY(color)                    (!(color))
 #define COLOR_TO_MOVE(position)         (((position)->state_flags & IS_BLACK_TO_MOVE) ? BLACK : WHITE)
 #define COLOR_NOT_TO_MOVE(position)     (((position)->state_flags & IS_BLACK_TO_MOVE) ? WHITE : BLACK)
-#define HAS_SINGLE_BIT_SET(x)           ((x) && !((x) & ((x) - 1)))
-#define COLOR_AT(position, location)    ((BITBOARD(location) & (position)->white_pieces) ? WHITE : \
-                                        ( BITBOARD(location) & (position)->black_pieces) ? BLACK : NEITHER_COLOR)

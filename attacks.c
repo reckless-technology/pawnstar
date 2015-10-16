@@ -159,7 +159,7 @@ bitboard AttacksFromSquare(const Position* position, int location, int piece)
     case NO_PIECE:
         return NO_SQUARES;
     case PAWN:
-        return COLOR_AT(position, location) == WHITE ? PAWN_ATTACKS_WHITE[location] : PAWN_ATTACKS_BLACK[location];
+        return ColorAt(position, location) == WHITE ? PAWN_ATTACKS_WHITE[location] : PAWN_ATTACKS_BLACK[location];
     case KNIGHT:
         return KNIGHT_ATTACKS[location];
     case BISHOP:

@@ -223,3 +223,13 @@ PieceAt(const Position* position,
         (square & position->kings)   ? KING   : NO_PIECE;
 
 }
+
+INLINE int
+ColorAt(const Position* position,
+        int             location)
+{
+    const bitboard square = BITBOARD(location);
+    return 
+        (square & position->white_pieces) ? WHITE :
+        (square & position->black_pieces) ? BLACK : NEITHER_COLOR;
+}
