@@ -45,12 +45,12 @@ int SearchQuiescent(const Position* src_position,
     }
 #endif
 
-    int moves[MAX_MOVES_PER_POSITION];
-    GeneratePseudoLegalMoves(src_position, moves, false);    
+    int captures[MAX_MOVES_PER_POSITION];
+    GeneratePseudoLegalMoves(src_position, captures, NULL, false);    
     /**************************************************************************
     Main loop
     ***************************************************************************/
-    int* pmove = moves;
+    int* pmove = captures;
     while (*pmove)
     {
         SelectNextMove(pmove, ply);

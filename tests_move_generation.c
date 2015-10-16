@@ -86,42 +86,47 @@ Refer to:
 http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
 *******************************************************************************/
-static int 
+#pragma warning(disable:4221)
+static void 
 Perft(const Position* src_position, 
       int             depth, 
       int             color, 
       PerftCounts*    counts)
 {
     static int call_count = 0;
-    int moves[MAX_MOVES_PER_POSITION];
-    GeneratePseudoLegalMoves(src_position, moves, true);
+    int captures[MAX_MOVES_PER_POSITION];
+    int non_captures[MAX_MOVES_PER_POSITION];
+    const int* move_phases[] = { captures, non_captures, NULL };
+    GeneratePseudoLegalMoves(src_position, captures, non_captures, true);
     if (!(++call_count & 0x3FFFF))
     {
         printf("\rpositions processed %10u", counts->legal_moves);
     }
     if (depth > 1)
     {
-        Position position;
-        const int* move;
-        for (move = moves; *move; ++move)
+        for (const int** phase = move_phases; *phase; ++phase)
         {
-            MakeMove(&position, src_position, *move);
+            for (const int* move = *phase; *move; ++move)
+            {
+                Position position;
+                MakeMove(&position, src_position, *move);
 #if DO_TEST_HASH_DURING_PERFT
-            if (position.hash != ComputeHash(&position))
-            {
-                printf("ERROR in hash during perft\n");
-            }
+                if (position.hash != ComputeHash(&position))
+                {
+                    printf("ERROR in hash during perft\n");
+                }
 #endif
-            if (position.state_flags & MOVED_INTO_CHECK)
-            {
-                continue;
-            }
-            Perft(&position, depth - 1, ENEMY(color), counts);
+                if (position.state_flags & MOVED_INTO_CHECK)
+                {
+                    continue;
+                }
+                Perft(&position, depth - 1, ENEMY(color), counts);
+            }           
         }
-        return counts->legal_moves;
+        return;
     }
-    CategorizeMoves(src_position, moves, counts);
-    return counts->legal_moves;
+    CategorizeMoves(src_position, captures, counts);
+    CategorizeMoves(src_position, non_captures, counts);
 }
 /******************************************************************************
 Run perft test on the standard test positions

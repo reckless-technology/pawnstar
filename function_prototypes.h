@@ -63,7 +63,7 @@ void        InitializeGoodMoveCounts(void);
 void        RecordGoodMove(int ply, int move);
 bool        HasMoveBeenGood(int ply, int move);
 int         GenerateLegalMoves(const Position* position, int moves[]);
-int*        GeneratePseudoLegalMoves(const Position* position, int moves[], bool do_all_moves);
+void        GeneratePseudoLegalMoves(const Position* position, int captures[], int non_captures[], bool do_non_captures);
 int         EvaluateStaticExchange(const Position* src_position, int move);
 void        SortMoves(int moves[], int ply);
 void        SelectNextMove(int moves[], int ply);

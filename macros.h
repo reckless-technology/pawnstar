@@ -55,9 +55,3 @@ A value of 0 terminates a move list
 #define HAS_SINGLE_BIT_SET(x)           ((x) && !((x) & ((x) - 1)))
 #define COLOR_AT(position, location)    ((BITBOARD(location) & (position)->white_pieces) ? WHITE : \
                                         ( BITBOARD(location) & (position)->black_pieces) ? BLACK : NEITHER_COLOR)
-#define PIECE_AT(position, location)    (((position)->pawns   & BITBOARD(location)) ? PAWN   : \
-                                        ( (position)->knights & BITBOARD(location)) ? KNIGHT : \
-                                        ( (position)->bishops & BITBOARD(location)) ? BISHOP : \
-                                        ( (position)->rooks   & BITBOARD(location)) ? ROOK   : \
-                                        ( (position)->queens  & BITBOARD(location)) ? QUEEN  : \
-                                        ( (position)->kings   & BITBOARD(location)) ? KING   : NO_PIECE)

@@ -19,7 +19,8 @@ Search(const Position*  src_position,
     Variation   pv;
     int         move;   
     int         pre_move[2];
-    int         regular_moves[MAX_MOVES_PER_POSITION];
+    int         captures[MAX_MOVES_PER_POSITION];
+    int         non_captures[MAX_MOVES_PER_POSITION];
     int         deferred_moves[MAX_MOVES_PER_POSITION];    
     int         score;   
     int*        deferred_move    = deferred_moves;
@@ -30,7 +31,8 @@ Search(const Position*  src_position,
     int* const  move_phases[]    = 
     { 
         [PHASE_PRE_MOVES]        = pre_move,
-        [PHASE_REGULAR_MOVES]    = regular_moves,
+        [PHASE_CAPTURES]         = captures,
+        [PHASE_NON_CAPTURES]     = non_captures,
         [PHASE_DEFERRED_MOVES]   = deferred_moves,
     };
     if (*cancel)
@@ -215,8 +217,11 @@ Search(const Position*  src_position,
             search_flags &= ~(IS_DEFERRED_MOVE | IS_PVS_OK);
             break;
 
-        case PHASE_REGULAR_MOVES:
-            GeneratePseudoLegalMoves(src_position, regular_moves, true);        
+        case PHASE_CAPTURES:
+            GeneratePseudoLegalMoves(src_position, captures, non_captures, true);        
+            break;
+
+        case PHASE_NON_CAPTURES:
             break;
 
         case PHASE_DEFERRED_MOVES:
@@ -231,8 +236,10 @@ Search(const Position*  src_position,
         int* moves_this_phase = move_phases[phase];
         while (*moves_this_phase)
         {
-            if (phase == PHASE_REGULAR_MOVES)
+            switch (phase)
             {
+            case PHASE_CAPTURES:
+            case PHASE_NON_CAPTURES:
                 SelectNextMove(moves_this_phase, ply);
                 move = *moves_this_phase++;
                 if (EvaluateStaticExchange(src_position, move) < 0)
@@ -242,11 +249,12 @@ Search(const Position*  src_position,
                     INCREMENT("deferred moves");
                     continue;
                 }
-            }
-            else
-            {
+                break;
+
+            default:
                 move = *moves_this_phase++;
-            }               
+                break;
+            }              
             score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, search_flags, move, &pv);
             if (*cancel)
             {

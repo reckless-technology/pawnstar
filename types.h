@@ -86,7 +86,8 @@ Phases of move search
 enum MovePhase
 {
     PHASE_PRE_MOVES,        // moves from the PV or TT (before move gen)
-    PHASE_REGULAR_MOVES,    // regular moves with a non negative SEE
+    PHASE_CAPTURES,         // capture and promotion moves with a non negative SEE
+    PHASE_NON_CAPTURES,     // non captures moves with a non negative SEE
     PHASE_DEFERRED_MOVES,   // moves with a negative SEE
 };
 /******************************************************************************

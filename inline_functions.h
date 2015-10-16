@@ -208,3 +208,18 @@ CopyVariation(Variation*       dst,
         }
     }
 }
+
+INLINE int
+PieceAt(const Position* position, 
+        int             location)
+{
+    const bitboard square = BITBOARD(location);
+    return 
+        (square & position->pawns)   ? PAWN   :
+        (square & position->knights) ? KNIGHT :
+        (square & position->bishops) ? BISHOP :
+        (square & position->rooks)   ? ROOK   :
+        (square & position->queens)  ? QUEEN  :
+        (square & position->kings)   ? KING   : NO_PIECE;
+
+}

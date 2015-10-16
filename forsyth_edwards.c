@@ -297,7 +297,7 @@ void PositionToString(const Position* position, char fen_string[])
             else
             {
                 const char piece = (position->white_pieces & BITBOARD_XY(x, y)) ?
-                                   " PNBRQK"[PIECE_AT(position, x + 8 * y)] : " pnbrqk"[PIECE_AT(position, x + 8 * y)];
+                                   " PNBRQK"[PieceAt(position, x + 8 * y)] : " pnbrqk"[PieceAt(position, x + 8 * y)];
                 *fen_string++ = piece;
             }
         }
