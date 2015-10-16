@@ -33,7 +33,6 @@ INLINE void GenerateUnderpromotions(int** pmoves)
 /******************************************************************************
 Generate pseudo-legal moves for all pieces
 If do_non_captures is false, just do captures and promotions (when not in check)
-Returns the end of the buffer (one past the last move generated)
 *******************************************************************************/
 void
 GeneratePseudoLegalMoves(const Position* position, 
@@ -41,6 +40,9 @@ GeneratePseudoLegalMoves(const Position* position,
                          int             non_captures[], 
                          bool            do_non_captures)
 { 
+    /**************************************************************************
+    Pawn move variables
+    ***************************************************************************/
     bitboard   pawns;
     bitboard   promotions_west;
     bitboard   promotions_east;
