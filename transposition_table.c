@@ -100,16 +100,16 @@ RecordTransposition(uint64 hash,
     }
     for (int i = TRANSPOSITIONS_PER_BUCKET; i != 0; --i, ++t)
     {
-        const int score = 
+        const int s = 
             8 * (t->hash == hash)         +
             4 * (t->hash == 0)            +
             2 * (t->node_type != NODE_PV) +
                 (t->depth < candidate->depth);
-        if (score > best_score)
+        if (s > best_score)
         {
-            best_score = score;
+            best_score = s;
             candidate  = t;
-            if (score >= 8)
+            if (s >= 8)
             {
                 break;
             }
