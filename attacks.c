@@ -23,10 +23,11 @@ bitboard RookAttacks(bitboard occupied_squares, int location)
 The naive loop based attack generator performs almost as fast as the magic
 bitboard attack generator when profiled in a release build...
 *******************************************************************************/
-bitboard BishopAttacks(uint64 occupied_squares, int location)
+bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
-    uint64 result = NO_SQUARES;
-    for (uint64 square = SHIFT_NORTHEAST(BITBOARD(location)); square; square = SHIFT_NORTHEAST(square))
+    bitboard result = NO_SQUARES;
+	const bitboard source = BITBOARD(location);
+    for (bitboard square = SHIFT_NORTHEAST(source); square; square = SHIFT_NORTHEAST(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -34,7 +35,7 @@ bitboard BishopAttacks(uint64 occupied_squares, int location)
             break;
         }
     }
-    for (uint64 square = SHIFT_SOUTHEAST(BITBOARD(location)); square; square = SHIFT_SOUTHEAST(square))
+    for (bitboard square = SHIFT_SOUTHEAST(source); square; square = SHIFT_SOUTHEAST(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -42,7 +43,7 @@ bitboard BishopAttacks(uint64 occupied_squares, int location)
             break;
         }
     }
-    for (uint64 square = SHIFT_SOUTHWEST(BITBOARD(location)); square; square = SHIFT_SOUTHWEST(square))
+    for (bitboard square = SHIFT_SOUTHWEST(source); square; square = SHIFT_SOUTHWEST(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -50,7 +51,7 @@ bitboard BishopAttacks(uint64 occupied_squares, int location)
             break;
         }
     }
-    for (uint64 square = SHIFT_NORTHWEST(BITBOARD(location)); square; square = SHIFT_NORTHWEST(square))
+    for (bitboard square = SHIFT_NORTHWEST(source); square; square = SHIFT_NORTHWEST(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -61,10 +62,11 @@ bitboard BishopAttacks(uint64 occupied_squares, int location)
     return result;
 }
 
-bitboard RookAttacks(uint64 occupied_squares, int location)
+bitboard RookAttacks(bitboard occupied_squares, int location)
 {
-    uint64 result = NO_SQUARES;
-    for (uint64 square = SHIFT_NORTH(BITBOARD(location)); square; square = SHIFT_NORTH(square))
+	bitboard result = NO_SQUARES;
+	const bitboard source = BITBOARD(location);
+    for (bitboard square = SHIFT_NORTH(source); square; square = SHIFT_NORTH(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -72,7 +74,7 @@ bitboard RookAttacks(uint64 occupied_squares, int location)
             break;
         }
     }
-    for (uint64 square = SHIFT_EAST(BITBOARD(location)); square; square = SHIFT_EAST(square))
+    for (bitboard square = SHIFT_EAST(source); square; square = SHIFT_EAST(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -80,7 +82,7 @@ bitboard RookAttacks(uint64 occupied_squares, int location)
             break;
         }
     }
-    for (uint64 square = SHIFT_SOUTH(BITBOARD(location)); square; square = SHIFT_SOUTH(square))
+    for (bitboard square = SHIFT_SOUTH(source); square; square = SHIFT_SOUTH(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -88,7 +90,7 @@ bitboard RookAttacks(uint64 occupied_squares, int location)
             break;
         }
     }
-    for (uint64 square = SHIFT_WEST(BITBOARD(location)); square; square = SHIFT_WEST(square))
+    for (bitboard square = SHIFT_WEST(source); square; square = SHIFT_WEST(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -152,14 +154,14 @@ bool IsAttacked(const Position* position, int location, int color)
 Determine the set of squares attacked by the piece (if any) standing on 
 location
 *******************************************************************************/
-bitboard AttacksFromSquare(const Position* position, int location, int piece)
+bitboard AttacksFromSquare(const Position* position, int location, int piece, int color)
 {
     switch (piece)
     {
     case NO_PIECE:
         return NO_SQUARES;
     case PAWN:
-        return ColorAt(position, location) == WHITE ? PAWN_ATTACKS_WHITE[location] : PAWN_ATTACKS_BLACK[location];
+		return PAWN_ATTACKS[color][location];
     case KNIGHT:
         return KNIGHT_ATTACKS[location];
     case BISHOP:

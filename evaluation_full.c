@@ -273,7 +273,7 @@ EvaluatePieceSquare(const Position* position,
                     int             material_percent)
 { 
     /* King placement */
-    const int king_index = position->king_location[color] ^ FLIP_BOARD[color];     
+    const int king_index = KingLocation(position, color) ^ FLIP_BOARD[color];     
     int score = 
         ((KING_SQUARE_MIDGAME[king_index] *        material_percent) + 
          (KING_SQUARE_ENDGAME[king_index] * (100 - material_percent))) / 100;  
@@ -342,7 +342,7 @@ EvaluateKingSafety(const Position* position,
     purpose of the king pawn shield, to allow for fianchetto bishop to protect
     the king.
     ***************************************************************************/
-    const int king_locn                   = position->king_location[color];
+    const int king_locn                   = KingLocation(position, color);
     const bitboard friendly_pawns_bishops = friendly_pieces & (position->pawns | position->bishops);
     const bitboard enemy_pieces           = position->occupied_squares ^ friendly_pieces;
     score += SCORE_PAWN_KING_ADJ1 * PopCount(KPS1[color][king_locn] & friendly_pawns_bishops);

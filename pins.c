@@ -10,7 +10,7 @@ void DeterminePins(const Position* position, Pins* pins)
     pins->pinned_pieces = NO_SQUARES;
     for (color = WHITE; color <= BLACK; ++color)
     {
-        const int king_location = position->king_location[color];
+        const int king_location = KingLocation(position, color);
         const bitboard* const intervening_squares_arr = &INTERVENING_SQUARES[king_location][0];
         const bitboard friendly_pieces = position->pieces_of_color[color];
         bitboard enemy_sliding_pieces = 

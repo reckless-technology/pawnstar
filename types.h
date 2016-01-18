@@ -150,7 +150,6 @@ struct Position
     uint64          hash;                   // Zobrist hash of this position
     const Position* previous;               // position immediately prior to this
     int             move;                   // the move which led to this position
-    uint8           king_location[2];       // kings square indices
     uint8           castle_flags;           // castling rights
     uint8           state_flags;            // game state-machine flags
     uint8           en_passant_index;       // en passant capture availability square (0 if none)

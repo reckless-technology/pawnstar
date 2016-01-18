@@ -233,3 +233,10 @@ ColorAt(const Position* position,
         (square & position->white_pieces) ? WHITE :
         (square & position->black_pieces) ? BLACK : NEITHER_COLOR;
 }
+
+INLINE int
+KingLocation(const Position* position,
+             int             color)
+{
+    return Lsb(position->kings & position->pieces_of_color[color]);
+}

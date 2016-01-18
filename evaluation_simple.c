@@ -154,13 +154,13 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
     if (!position->queens || 
         PopCount(position->occupied_squares ^ position->pawns) < 8)
     {
-        score += king_endgame_values[WHITE][position->king_location[WHITE]];
-        score -= king_endgame_values[BLACK][position->king_location[BLACK]];
+        score += king_endgame_values[WHITE][KingLocation(position, WHITE)];
+        score -= king_endgame_values[BLACK][KingLocation(position, BLACK)];
     }
     else
     {
-        score += piece_square_values[WHITE][KING][position->king_location[WHITE]];
-        score -= piece_square_values[BLACK][KING][position->king_location[BLACK]];
+        score += piece_square_values[WHITE][KING][KingLocation(position, WHITE)];
+        score -= piece_square_values[BLACK][KING][KingLocation(position, BLACK)];
     }
     return position->state_flags & IS_BLACK_TO_MOVE ? -score : score;
     (void)alpha;
