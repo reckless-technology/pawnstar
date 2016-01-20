@@ -1,6 +1,6 @@
 #include "pawnstar.h"
 
-#define IS_IN_CHECK(position, color) (IsAttacked(position, KingLocation(position, color), ENEMY(color)))
+#define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
 /******************************************************************************
 Castling rights masks are ANDed with the castle_flags for the move source and
 destination squares to determine new castling rights following a move
@@ -25,7 +25,7 @@ Make a null move (used for null move pruning during search)
 *******************************************************************************/
 void MakeNullMove(Position* dst_position, const Position* src_position)
 {
-    memcpy(dst_position, src_position, sizeof(Position));
+    *dst_position = *src_position;
     dst_position->previous = src_position;
     dst_position->move = 0;
     if (dst_position->en_passant_index)
@@ -45,12 +45,13 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     const int from              = MOVE_FROM(move);
     const int to                = MOVE_TO(move);
     const int piece             = MOVE_PIECE(move);
-    const int captured          = MOVE_CAPTURED(move);   
+    const int captured          = MOVE_CAPTURED(move);
+    
     const bitboard from_bb      = BITBOARD(from);
     const bitboard to_bb        = BITBOARD(to);
     const bitboard from_to_bb   = from_bb | to_bb;
     
-    memcpy(dst_position, src_position, sizeof(Position));
+    *dst_position = *src_position;
     dst_position->previous = src_position;
     dst_position->move = move;
     dst_position->castle_flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
@@ -136,6 +137,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
         break;
 
     case KING:
+        dst_position->king_location[color] = (uint8)to;
         if (!MOVE_IS_SPECIAL(move))
         {
             goto RegularMove;

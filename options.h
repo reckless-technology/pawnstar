@@ -32,7 +32,7 @@ Whether to enable magic bitboard attacks for bishops and rooks (marginally
 faster on machines with a large L1 cache)
 *******************************************************************************/
 #ifndef DO_MAGIC_BITBOARDS
-#define DO_MAGIC_BITBOARDS 0
+#define DO_MAGIC_BITBOARDS 1
 #endif
 /******************************************************************************
 Whether to enable null move pruning

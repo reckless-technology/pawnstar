@@ -151,7 +151,7 @@ GeneratePseudoLegalMoves(const Position* position,
     {
         const int from  = FindAndClearLsb(&sources);
         const int piece = PieceAt(position, from);
-        const bitboard targets   = AttacksFromSquare(position, from, piece, color);
+        const bitboard targets   = AttacksFromSquare(position, from, piece);
         bitboard capture_targets = targets & position->pieces_of_color[ENEMY(color)];
         while (capture_targets)
         {

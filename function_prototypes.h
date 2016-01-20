@@ -36,7 +36,7 @@ Attacks
 bitboard    BishopAttacks(bitboard occupied_squares, int location);
 bitboard    RookAttacks  (bitboard occupied_squares, int location);
 bitboard    QueenAttacks (bitboard occupied_squares, int location);
-bitboard    AttacksFromSquare(const Position* position, int location, int piece, int color);
+bitboard    AttacksFromSquare(const Position* position, int location, int piece);
 bitboard    AttacksToSquare(const Position* position, int location);
 bitboard    AttacksToSquareByColor(const Position* position, int location, int color);
 bitboard    AttacksToSquareByType(const Position* position, int location, int color, int piece);

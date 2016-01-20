@@ -1,7 +1,7 @@
 #include "pawnstar.h"
 #include <ctype.h>
 
-#define IS_IN_CHECK(position, color) (IsAttacked(position, KingLocation(position, color), ENEMY(color)))
+#define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
 /******************************************************************************
 Compute the Zobrist hash of a position
 *******************************************************************************/
@@ -125,6 +125,8 @@ bool PositionFromString(const char fen_string[], Position* position)
         return false;
     }
     position->occupied_squares = position->white_pieces | position->black_pieces;
+    position->king_location[WHITE] = (uint8)Lsb(position->kings & position->white_pieces);
+    position->king_location[BLACK] = (uint8)Lsb(position->kings & position->black_pieces);
     /**************************************************************************
     Side to move
     ***************************************************************************/
