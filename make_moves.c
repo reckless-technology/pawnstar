@@ -25,7 +25,7 @@ Make a null move (used for null move pruning during search)
 *******************************************************************************/
 void MakeNullMove(Position* dst_position, const Position* src_position)
 {
-    *dst_position = *src_position;
+    memcpy(dst_position, src_position, sizeof(Position));
     dst_position->previous = src_position;
     dst_position->move = 0;
     if (dst_position->en_passant_index)
@@ -51,7 +51,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     const bitboard to_bb        = BITBOARD(to);
     const bitboard from_to_bb   = from_bb | to_bb;
     
-    *dst_position = *src_position;
+    memcpy(dst_position, src_position, sizeof(Position));
     dst_position->previous = src_position;
     dst_position->move = move;
     dst_position->castle_flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];

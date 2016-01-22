@@ -126,13 +126,13 @@ struct Position
 {    
     union
     {
-        bitboard pieces[7];        
+        bitboard pieces[7];                 // used to index pieces by piece type      
         struct
         {
-            bitboard occupied_squares;
-            bitboard pawns;
-            bitboard knights;
-            bitboard bishops;
+            bitboard occupied_squares;      // all squares with a piece on them
+            bitboard pawns;     
+            bitboard knights;   
+            bitboard bishops;   
             bitboard rooks;
             bitboard queens;
             bitboard kings;
@@ -140,17 +140,17 @@ struct Position
     };
     union
     {
-        bitboard pieces_of_color[2]; 
+        bitboard pieces_of_color[2];        // used to index pieces by color
         struct
         {
             bitboard white_pieces;
             bitboard black_pieces;
         };
     };    
-    uint64          hash;                   // Zobrist hash of this position
+    uint64          hash;                   // Zobrist hash of this position, maintained incrementally
     const Position* previous;               // position immediately prior to this
     int             move;                   // the move which led to this position
-    uint8           king_location[2];       // kings square indices
+    uint8           king_location[2];       // king square indices for each color
     uint8           castle_flags;           // castling rights
     uint8           state_flags;            // game state-machine flags
     uint8           en_passant_index;       // en passant capture availability square (0 if none)
