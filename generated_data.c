@@ -1,4 +1,4 @@
-/* This file was generated on Oct 15 2015 at 12:49:26 */
+/* This file was generated on Jan 21 2016 at 22:59:27 */
 #include "types.h"
 const bitboard NORTH_OF[64] = 
 {
