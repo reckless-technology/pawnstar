@@ -4,17 +4,17 @@ Context globals[1];
 
 static void InitializeGlobals(void)
 {
-    globals->time_control.clock_type              = CLOCK_STANDARD;
-    globals->time_control.base_milliseconds       = 300000;
-    globals->time_control.fixed_depth             = 7;
-    globals->time_control.fixed_milliseconds      = 5000;
-    globals->time_control.increment_milliseconds  = 5000;
-    globals->time_control.milliseconds_per_period  = 300000;
-    globals->time_control.milliseconds_remaining  = 300000;
-    globals->time_control.moves_per_period         = 40;
-    globals->node_count                          = 0;
-    globals->engine_color                        = NEITHER_COLOR;
-    globals->do_show_thinking                     = true;
+    globals->time_control.clock_type                = CLOCK_STANDARD;
+    globals->time_control.base_milliseconds         = 300000;
+    globals->time_control.fixed_depth               = 7;
+    globals->time_control.fixed_milliseconds        = 5000;
+    globals->time_control.increment_milliseconds    = 5000;
+    globals->time_control.milliseconds_per_period   = 300000;
+    globals->time_control.milliseconds_remaining    = 300000;
+    globals->time_control.moves_per_period          = 40;
+    globals->node_count                             = 0;
+    globals->engine_color                           = NEITHER_COLOR;
+    globals->do_show_thinking                       = true;
 }
 
 extern const CommandHandler handlers[];
@@ -22,7 +22,7 @@ extern const CommandHandler handlers[];
 int main()
 {       
     printf(
-#if 0
+#if 1
         "                       .::.                            \n"
         "                       _::_                            \n"
         "                     _/____\\_                         \n"
@@ -37,7 +37,7 @@ int main()
         "                    /________\\                      \n\n"
 #endif
         "Pawnstar: A Winboard and Xboard compatible chess engine\n"
-        "(C) Jonny Reckless 2009 - 2014                         \n"
+        "(C) Jonny Reckless 2009 - 2016                         \n"
         "Compiled: " __DATE__ " " __TIME__                     "\n"
         );
     InitializeGlobals();
