@@ -65,6 +65,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
         dst_position->en_passant_index = 0;
     }
     ++dst_position->reversible_move_count;
+    const uint64* const psh = &PIECE_SQUARE_HASHES[color][piece][0];
     switch (piece)
     {
     case PAWN:
@@ -76,14 +77,14 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
                 /* regular pawn move */
                 dst_position->pawns ^= from_to_bb;
                 dst_position->pieces_of_color[color] ^= from_to_bb;
-                dst_position->hash += PIECE_SQUARE_HASHES[color][PAWN][to] - PIECE_SQUARE_HASHES[color][PAWN][from];
+                dst_position->hash += psh[to] - psh[from];
                 if (captured)
                 {
                     dst_position->pieces[captured] ^= to_bb;
                     dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
                     dst_position->hash -= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
-                }
-                else if (abs(to - from) == 16)
+                }                
+                else if (((to - from) & 0xF) == 0) // equiv to (abs(to - from) == 16)
                 {
                     /* double pawn push */
                     dst_position->en_passant_index = (uint8)((from + to) >> 1);
@@ -98,7 +99,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
                 dst_position->pieces_of_color[color] ^= from_to_bb;
                 dst_position->pieces_of_color[ENEMY(color)] ^= en_passant_capture_BB;
                 dst_position->pawns ^= from_to_bb | en_passant_capture_BB;
-                dst_position->hash += PIECE_SQUARE_HASHES[color][PAWN][to] - PIECE_SQUARE_HASHES[color][PAWN][from] - PIECE_SQUARE_HASHES[ENEMY(color)][PAWN][en_passant_capture_location];
+                dst_position->hash += psh[to] - psh[from] - PIECE_SQUARE_HASHES[ENEMY(color)][PAWN][en_passant_capture_location];
             }
         }
         else
@@ -108,7 +109,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
             dst_position->pawns ^= from_bb;
             dst_position->pieces[promoted] ^= to_bb;
             dst_position->pieces_of_color[color] ^= from_to_bb;
-            dst_position->hash += PIECE_SQUARE_HASHES[color][promoted][to] - PIECE_SQUARE_HASHES[color][PAWN][from];
+            dst_position->hash += PIECE_SQUARE_HASHES[color][promoted][to] - psh[from];
             if (captured)
             {
                 dst_position->pieces[captured] ^= to_bb;
@@ -126,7 +127,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     case QUEEN:
         dst_position->pieces[piece] ^= from_to_bb;
         dst_position->pieces_of_color[color] ^= from_to_bb;
-        dst_position->hash += PIECE_SQUARE_HASHES[color][piece][to] - PIECE_SQUARE_HASHES[color][piece][from];
+        dst_position->hash += psh[to] - psh[from];
         if (captured)
         {
             dst_position->reversible_move_count = 0;
