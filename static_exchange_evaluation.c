@@ -6,7 +6,7 @@ extern const bitboard* const ENEMY_PAWN_ATTACKS[2];
 /******************************************************************************
 Use nominal 1-3-3-5-9 material values for SEE
 *******************************************************************************/
-static const int PIECE_VALUES[8] = { 0, 100, 300, 300, 500, 900, 10000, 0 };
+static const int piece_values[7] = { 0, 100, 300, 300, 500, 900, 10000 };
 /******************************************************************************
 Determine the SEE (static exchange evaluation) for a move.
 Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
@@ -17,10 +17,10 @@ int EvaluateStaticExchange(const Position* src_position, int move)
     MakeMove(&position, src_position, move);
     if (MOVE_PROMOTED(move))
     {
-        return PIECE_VALUES[MOVE_CAPTURED(move)] + PIECE_VALUES[MOVE_PROMOTED(move)] - PIECE_VALUES[PAWN] - 
+        return piece_values[MOVE_CAPTURED(move)] + piece_values[MOVE_PROMOTED(move)] - piece_values[PAWN] - 
             EvaluateSwapOff(&position, MOVE_TO(move), COLOR_TO_MOVE(&position), MOVE_PROMOTED(move));
     }
-    return PIECE_VALUES[MOVE_CAPTURED(move)] - 
+    return piece_values[MOVE_CAPTURED(move)] - 
         EvaluateSwapOff(&position, MOVE_TO(move), COLOR_TO_MOVE(&position), MOVE_PIECE(move));
 }
 /******************************************************************************
@@ -105,7 +105,7 @@ FoundAttacker:
         position->pieces[capturing_piece]       ^= attacker | square;
         position->pieces_of_color[color]        ^= attacker | square;
         position->occupied_squares              ^= attacker;        
-        scores[ply]                             = PIECE_VALUES[piece_on_square];
+        scores[ply]                             = piece_values[piece_on_square];
         piece_on_square                         = capturing_piece;
         color                                   = ENEMY(color);
     }
