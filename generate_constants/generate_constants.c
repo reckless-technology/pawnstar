@@ -287,17 +287,45 @@ RookActualAttacks(uint64 occupied_squares,
     return result;
 }
 /******************************************************************************
+Use an RC4 cipher to generate a repeatable, pseudo random stream of bytes
+*******************************************************************************/
+static uint8
+RandomByte(void)
+{
+    static uint8 rc4[256];
+    static bool is_first_time = true;
+    static uint8 i, j;
+    if (is_first_time)
+    {
+        is_first_time = false;
+        for (int k = 0xFF; k >= 0; --k)
+        {
+            rc4[k] = k ^ (k >> 1);
+        }
+        i = 0;
+        j = 0;
+        for (int k = 1093; k != 0; --k)
+        {
+            RandomByte();
+        }
+    }
+    ++i;
+    j += rc4[i];
+    const uint8 tmp = rc4[i];
+    rc4[i] = rc4[j];
+    rc4[j] = tmp;
+    return rc4[(uint8)(rc4[i] + rc4[j])];
+}
+/******************************************************************************
 Generate a pseudo random 64 bit value
 *******************************************************************************/
 static uint64 
 PseudoRandom64(void)
 {
-    static uint64 lcg = 0;
     uint64 result = 0;
     for (int i = 0; i != 8; ++i)
     {
-        lcg = lcg * 6364136223846793005ull + 1442695040888963407ull;
-        result = (result << 8) | (lcg >> 56);
+        result = (result << 8) | RandomByte();
     }
     return result;
 }
