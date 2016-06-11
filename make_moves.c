@@ -2,22 +2,20 @@
 
 #define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
 /******************************************************************************
-Castling rights masks are ANDed with the castle_flags for the move source and
+Bits set in the castling rights mask are cleared for the move source and 
 destination squares to determine new castling rights following a move
 
 Only moves involving squares a1, e1, h1, a8, e8 or h8 affect castling rights
 *******************************************************************************/
 static const uint8 CASTLING_RIGHTS_MASKS[64] =
 {
-    0xFD, 0xFF, 0xFF, 0xFF, 0xFC, 0xFF, 0xFF, 0xFE, // 1
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 2
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 3
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 4
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 5
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 6
-    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, // 7
-    0xF7, 0xFF, 0xFF, 0xFF, 0xF3, 0xFF, 0xFF, 0xFB, // 8
-};//  a     b     c     d     e     f     g     h
+    [E1] = MAY_WHITE_K | MAY_WHITE_Q,
+    [A1] = MAY_WHITE_Q,
+    [H1] = MAY_WHITE_K,
+    [E8] = MAY_BLACK_K | MAY_BLACK_Q,
+    [A8] = MAY_BLACK_Q,
+    [H8] = MAY_BLACK_K,
+};
 /******************************************************************************
 Make a null move (used for null move pruning during search)
 # Clear the en passant square
@@ -54,7 +52,7 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     memcpy(dst_position, src_position, sizeof(Position));
     dst_position->previous = src_position;
     dst_position->move = move;
-    dst_position->castle_flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
+    dst_position->castle_flags &= ~CASTLING_RIGHTS_MASKS[from] & ~CASTLING_RIGHTS_MASKS[to];
     if (dst_position->castle_flags != src_position->castle_flags)
     {
         dst_position->hash += CASTLING_RIGHTS_HASHES[dst_position->castle_flags] - CASTLING_RIGHTS_HASHES[src_position->castle_flags];

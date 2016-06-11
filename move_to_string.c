@@ -193,12 +193,11 @@ compare as equal.
 *******************************************************************************/
 bool AreMoveStringsEqual(char* str1, char* str2)
 {
-    const char* const * x;
     if (!str1 || !str2 || !strlen(str1) || !strlen(str2))
     {
         return false;
     }
-    for (x = strings_to_remove; *x; ++x)
+    for (const char* const * x = strings_to_remove; *x; ++x)
     {
         char* y;
         if ((y = strstr(str1, *x)) != NULL)

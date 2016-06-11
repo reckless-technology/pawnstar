@@ -293,14 +293,14 @@ static uint8
 RandomByte(void)
 {
     static uint8 rc4[256];
-    static bool is_first_time = true;
+    static bool is_initialized = false;
     static uint8 i, j;
-    if (is_first_time)
+    if (!is_initialized)
     {
-        is_first_time = false;
+        is_initialized = true;
         for (int k = 0xFF; k >= 0; --k)
         {
-            rc4[k] = k ^ (k >> 1);
+            rc4[k] = (uint8)(k ^ (k >> 1));
         }
         i = 0;
         j = 0;
