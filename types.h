@@ -68,16 +68,6 @@ enum StateFlags
     IS_GAME_OVER        = (IS_GAME_DRAWN | IS_CHECKMATE),
 };
 /******************************************************************************
-Search option flags (bitset)
-*******************************************************************************/
-enum SearchFlags
-{
-    IS_PVS_OK           = 0x01, // is PVS null window search permitted in this subtree
-    IS_FOLLOWING_PV     = 0x02, // are we following the PV from the root node
-    IS_PV_EXTN_OK       = 0x04, // is full window depth extension permitted in this subtree
-    SEARCH_FLAG_ROOT    = IS_FOLLOWING_PV | IS_PV_EXTN_OK,
-};
-/******************************************************************************
 Phases of move search
 *******************************************************************************/
 enum MovePhase

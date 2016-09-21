@@ -12,10 +12,10 @@ typedef struct HashBucket
 
 static HashBucket*  transposition_table;
 static int          table_bucket_count;
-/******************************************************************************
+/*
 Delete the transposition table
 NB: NOT thread safe
-*******************************************************************************/
+*/
 void FreeTranspositionTable(void)
 {
     if (transposition_table)
@@ -25,10 +25,10 @@ void FreeTranspositionTable(void)
         table_bucket_count   = 0;
     } 
 }
-/******************************************************************************
+/*
 Create the transposition table of a specified maximum size
 NB: NOT thread safe
-*******************************************************************************/
+*/
 bool InitializeTranspositionTable(int megabytes)
 {
     FreeTranspositionTable();
@@ -51,9 +51,9 @@ bool InitializeTranspositionTable(int megabytes)
     }
     return true;
 }
-/******************************************************************************
+/*
 Find a transposition entry for this position if one exists
-*******************************************************************************/
+*/
 bool FindTransposition(uint64 hash, Transposition* transposition)
 {
     int i;
@@ -75,14 +75,14 @@ bool FindTransposition(uint64 hash, Transposition* transposition)
     _InterlockedExchange(bucket->mutex, 0);
     return false;
 }
-/******************************************************************************
+/*
 Insert a new entry into the transposition table.
 Hash bucket replacement policy (in priority order):
 # replace an entry with the same hash
 # replace an empty slot
 # replace a non PV node
 # replace the entry with the smallest depth
-*******************************************************************************/
+*/
 void 
 RecordTransposition(uint64 hash, 
                     int    depth, 

@@ -11,7 +11,6 @@ SearchSingleMove(const Position*    src_position,
                  int                alpha, 
                  int                beta, 
                  volatile bool*     cancel, 
-                 int                search_flags, 
                  int                move,
                  Variation*         pv)
 {      
@@ -28,17 +27,10 @@ SearchSingleMove(const Position*    src_position,
     int child_depth = depth - 1;
     /******************************************************************
     Extend the search depth if any of the following are true:    
-    # We have been following the principal variation from the root node
     # This is a pawn promotion
     # This is a pawn push to the 7th rank 
     # Recapture of same value piece
     *******************************************************************/
-    if ((search_flags & IS_FOLLOWING_PV) && depth == 1)
-    {
-        INCREMENT("extensions following PV");
-        ++child_depth;
-    }
-
     if (MOVE_PROMOTED(move))
     {
         INCREMENT("extensions promotion");
@@ -67,21 +59,20 @@ SearchSingleMove(const Position*    src_position,
 #endif
  
     int score;
-    if (beta > alpha + 1           &&
-        (search_flags & IS_PVS_OK) && 
-        !(src_position->state_flags & IS_CHECK))
+    if (beta > alpha + 1 &&
+       !(src_position->state_flags & IS_CHECK))
     {
         INCREMENT("pvs attempts");
-        score = -Search(&position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, search_flags, pv);
+        score = -Search(&position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, pv);
         if (score > alpha)
         {
             INCREMENT("pvs fails");
-            score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags, pv);
+            score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, pv);
         }
     }
     else
     {
-        score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, search_flags, pv);
+        score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, pv);
     }
     return score;
 }
