@@ -1,8 +1,8 @@
 #include "pawnstar.h"
-/******************************************************************************
+/*
 Fairly standard alpha-beta quiescence search
 Refer to: http://chessprogramming.wikispaces.com/Quiescence+Search
-*******************************************************************************/
+*/
 int SearchQuiescent(const Position* src_position, 
                     int depth,
                     int ply, 
@@ -47,9 +47,9 @@ int SearchQuiescent(const Position* src_position,
 
     int captures[MAX_MOVES_PER_POSITION];
     GeneratePseudoLegalMoves(src_position, captures, NULL, false);    
-    /**************************************************************************
+    /*
     Main loop
-    ***************************************************************************/
+    */
     int* pmove = captures;
     while (*pmove)
     {

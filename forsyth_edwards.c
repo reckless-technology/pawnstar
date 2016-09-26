@@ -2,9 +2,9 @@
 #include <ctype.h>
 
 #define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
-/******************************************************************************
+/*
 Compute the Zobrist hash of a position
-*******************************************************************************/
+*/
 uint64 ComputeHash(const Position* position)
 {
     int piece;
@@ -30,12 +30,12 @@ uint64 ComputeHash(const Position* position)
     }
     return hash;
 }
-/******************************************************************************
+/*
 Set the state of the board to that specified in a FEN string
 refer to http://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
 returns true on success
 returns false if an illegal FEN string was provided
-*******************************************************************************/
+*/
 bool PositionFromString(const char fen_string[], Position* position)
 {
     char buffer[STRING_BUF_LEN];
@@ -66,9 +66,9 @@ bool PositionFromString(const char fen_string[], Position* position)
     }
     memset(position, 0, sizeof(Position));
     position->previous = position;
-    /**************************************************************************
+    /*
     Pieces on the board
-    ***************************************************************************/
+    */
     for ( ; *token; ++token)
     {
         if (*token == '/')
@@ -127,9 +127,9 @@ bool PositionFromString(const char fen_string[], Position* position)
     position->occupied_squares = position->white_pieces | position->black_pieces;
     position->king_location[WHITE] = (uint8)Lsb(position->kings & position->white_pieces);
     position->king_location[BLACK] = (uint8)Lsb(position->kings & position->black_pieces);
-    /**************************************************************************
+    /*
     Side to move
-    ***************************************************************************/
+    */
     token = strtok(NULL, " ");
     if (!token)
     {
@@ -145,9 +145,9 @@ bool PositionFromString(const char fen_string[], Position* position)
         printf("ERROR: FEN string contains illegal side to move '%s'\n", token);
         return false;
     }
-    /**************************************************************************
+    /*
     Castling rights
-    ***************************************************************************/
+    */
     token = strtok(NULL, " ");
     if (!token)
     {
@@ -182,9 +182,9 @@ bool PositionFromString(const char fen_string[], Position* position)
             }
         }
     }
-    /**************************************************************************
+    /*
     En passant capture square
-    ***************************************************************************/
+    */
     token = strtok(NULL, " ");
     if (!token)
     {
@@ -204,9 +204,9 @@ bool PositionFromString(const char fen_string[], Position* position)
         }
         position->en_passant_index = token[0] - 'a' + 8 * (token[1] - '1');
     }
-    /**************************************************************************
+    /*
     Half move clock - optional
-    ***************************************************************************/
+    */
     token = strtok(NULL, " ");
     if (token)
     {
@@ -218,9 +218,9 @@ bool PositionFromString(const char fen_string[], Position* position)
         }
         position->reversible_move_count = (uint8)hmc;
     }
-    /**************************************************************************
+    /*
     Full move number - optional
-    ***************************************************************************/
+    */
     token = strtok(NULL, " ");
     if (token)
     {
@@ -233,25 +233,25 @@ bool PositionFromString(const char fen_string[], Position* position)
         position->full_move_count = (uint8)fmc - 1;
     }
     position->hash = ComputeHash(position);
-    /**************************************************************************
+    /*
     Legality of position
-    ***************************************************************************/
+    */
     if (!IsPositionLegal(position))
     {
         printf("ERROR: FEN string specifies an illegal chess position\n");
         return false;
     }
-    /**************************************************************************
+    /*
     Is the position in check?
-    ***************************************************************************/
+    */
     if (IS_IN_CHECK(position, COLOR_TO_MOVE(position)))
     {
         position->state_flags |= IS_CHECK;
     }
-    /**************************************************************************
+    /*
     Check to see if this position represents checkmate, stalemate or draw
     by insufficient material and set flags accordingly
-    ***************************************************************************/
+    */
     if (IsCheckmate(position))
     {
         printf("NOTE: FEN string specifies a checkmate position\n");
@@ -269,16 +269,16 @@ bool PositionFromString(const char fen_string[], Position* position)
     }
     return true;
 }
-/******************************************************************************
+/*
 Generate the FEN string for the current position
-*******************************************************************************/
+*/
 void PositionToString(const Position* position, char fen_string[])
 {
     const char* const initial_ptr = fen_string;
     int x, y;
-    /**************************************************************************
+    /*
     Pieces on the board
-    ***************************************************************************/
+    */
     for (y = 7; y >= 0; --y)
     {
         for (x = 0; x < 8; ++x)
@@ -306,13 +306,13 @@ void PositionToString(const Position* position, char fen_string[])
             *fen_string++ = '/';
         }
     }
-    /**************************************************************************
+    /*
     Side to move
-    ***************************************************************************/
+    */
     fen_string += sprintf(fen_string, (position->state_flags & IS_BLACK_TO_MOVE) ? " b " : " w ");
-    /**************************************************************************
+    /*
     Castling rights
-    ***************************************************************************/
+    */
     if (!position->castle_flags)
     {
         *fen_string++ = '-';
@@ -337,9 +337,9 @@ void PositionToString(const Position* position, char fen_string[])
         }
     }
     *fen_string++ = ' ';
-    /**************************************************************************
+    /*
     En passant capture availability
-    ***************************************************************************/
+    */
     if (!position->en_passant_index)
     {
         fen_string += sprintf(fen_string, "- ");
@@ -351,25 +351,25 @@ void PositionToString(const Position* position, char fen_string[])
                              FILE_CHAR(position->en_passant_index),
                              RANK_CHAR(position->en_passant_index));
     }
-    /**************************************************************************
+    /*
     Half move clock
-    ***************************************************************************/
+    */
     fen_string += sprintf(fen_string, "%u ", position->reversible_move_count);
-    /**************************************************************************
+    /*
     Full move number
-    ***************************************************************************/
+    */
     fen_string += sprintf(fen_string, "%u", position->full_move_count + 1);
 }
-/******************************************************************************
+/*
 Set up the position for the start of a game
-*******************************************************************************/
+*/
 void NewGame(Position* position)
 {
     PositionFromString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", position);
 }
-/******************************************************************************
+/*
 Set up the game for the start of a new game
-*******************************************************************************/
+*/
 void InitializeGame(Game* game)
 {
     game->position = game->stack;

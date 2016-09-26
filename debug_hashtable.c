@@ -1,4 +1,4 @@
-/******************************************************************************
+/*
 Debugging counts dictionary implemented as a hash table (so that the increment 
 function, which might be called tens of millions of times per move, does not 
 slow down the program too much). This is useful for counting nodes, cutoffs, 
@@ -9,7 +9,7 @@ is the main goal. It seems to work OK in practice, provided you have a
 hashtable array which is prime sized and has lots of free space.
 
 Only included in Debug and ReleaseX configurations.
-*******************************************************************************/
+*/
 #include "pawnstar.h"
 #if DEBUGX
 
@@ -22,16 +22,16 @@ typedef struct
 } DebugEntry;
 
 static DebugEntry debug_dict[DEBUG_DICT_SIZE];
-/******************************************************************************
+/*
 Initialize or reset the dictionary
-*******************************************************************************/
+*/
 void DebugXClear()
 {
     memset(debug_dict, 0, sizeof(debug_dict));
 }
-/******************************************************************************
+/*
 Increment the count associated with the string literal in key
-*******************************************************************************/
+*/
 void DebugXIncrement(const char key[])
 {
     /*
@@ -50,9 +50,9 @@ void DebugXIncrementIf(bool condition, const char key[])
         DebugXIncrement(key);
     }
 }
-/******************************************************************************
+/*
 Write out the various debugging counts to file in alphabetical order
-*******************************************************************************/
+*/
 void DebugXWrite(FILE* file)
 {
     char* const strings = (char*)calloc(DEBUG_DICT_SIZE, STRING_LEN);

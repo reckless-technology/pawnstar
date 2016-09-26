@@ -1,7 +1,7 @@
 #include "pawnstar.h"
-/******************************************************************************
+/*
 Built in opening book used in the event that pawnstar.book cannot be found.
-*******************************************************************************/
+*/
 const char* const OPENING_BOOK_MOVES = 
 "# Pawnstar opening book.                                                                                                                                                     \n"
 "# Moves are recorded in standard albegraic notation.                                                                                                                         \n"

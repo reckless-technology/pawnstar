@@ -1,12 +1,12 @@
 #include "pawnstar.h"
 
 #define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
-/******************************************************************************
+/*
 Bits set in the castling rights mask are cleared for the move source and 
-destination squares to determine new castling rights following a move
+destination squares to determine new castling rights following a move.
 
-Only moves involving squares a1, e1, h1, a8, e8 or h8 affect castling rights
-*******************************************************************************/
+Only moves involving squares a1, e1, h1, a8, e8 or h8 affect castling rights.
+*/
 static const uint8 CASTLING_RIGHTS_MASKS[64] =
 {
     [E1] = MAY_WHITE_K | MAY_WHITE_Q,
@@ -16,11 +16,11 @@ static const uint8 CASTLING_RIGHTS_MASKS[64] =
     [A8] = MAY_BLACK_Q,
     [H8] = MAY_BLACK_K,
 };
-/******************************************************************************
+/*
 Make a null move (used for null move pruning during search)
 # Clear the en passant square
 # Flip the side to move
-*******************************************************************************/
+*/
 void MakeNullMove(Position* dst_position, const Position* src_position)
 {
     memcpy(dst_position, src_position, sizeof(Position));
@@ -34,9 +34,9 @@ void MakeNullMove(Position* dst_position, const Position* src_position)
     dst_position->state_flags ^= IS_BLACK_TO_MOVE;
     dst_position->hash += (dst_position->state_flags & IS_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : -BLACK_MOVE_HASH;
 }
-/******************************************************************************
+/*
 Construct a new position from an old position and a move
-*******************************************************************************/
+*/
 void MakeMove(Position* dst_position, const Position* src_position, int move)
 {                          
     const int color             = COLOR_TO_MOVE(src_position);
@@ -209,9 +209,9 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
         }
     }
 }
-/******************************************************************************
+/*
 Make a move and update the game end status flags
-*******************************************************************************/
+*/
 void PlayMove(Game* game, int move)
 {
     if (game->position->state_flags & IS_GAME_OVER)
@@ -242,13 +242,13 @@ void PlayMove(Game* game, int move)
         game->position->state_flags |= IS_DRAW_50_MOVES;
     }
 }
-/******************************************************************************
+/*
 Play a move from the given move string in either standard algebraic or XBoard 
 format, and update game state_flags accordingly
 
 returns the move if a legal move was played
 returns zero if the move was illegal or the game is over
-*******************************************************************************/
+*/
 int PlayMoveString(Game* game, char* move_str, bool is_san)
 {
     int moves[MAX_MOVES_PER_POSITION];

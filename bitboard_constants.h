@@ -1,5 +1,5 @@
 #pragma once
-/******************************************************************************
+/*
 A bitboard is just a set-wise interpretation of a 64-bit unsigned integer, with 
 each bit mapping to a square on the chessboard. If the bit is 1, then the
 corresponding square is a member of that set, for example:
@@ -21,7 +21,7 @@ If you treat the board as a 2D array, with square (0,0) being a1 and square
 (1ull << (x + 8 * y))
 
 Individual square bitboards
-*******************************************************************************/
+*/
 #define A1BB            0x0000000000000001ull
 #define B1BB            0x0000000000000002ull
 #define C1BB            0x0000000000000004ull
@@ -86,9 +86,9 @@ Individual square bitboards
 #define F8BB            0x2000000000000000ull
 #define G8BB            0x4000000000000000ull
 #define H8BB            0x8000000000000000ull
-/******************************************************************************
+/*
 Rank bitboards
-*******************************************************************************/
+*/
 #define RANK_1          0x00000000000000FFull
 #define RANK_2          0x000000000000FF00ull
 #define RANK_3          0x0000000000FF0000ull
@@ -97,9 +97,9 @@ Rank bitboards
 #define RANK_6          0x0000FF0000000000ull
 #define RANK_7          0x00FF000000000000ull
 #define RANK_8          0xFF00000000000000ull
-/******************************************************************************
+/*
 File bitboards
-*******************************************************************************/
+*/
 #define FILE_A          0x0101010101010101ull
 #define FILE_B          0x0202020202020202ull
 #define FILE_C          0x0404040404040404ull
@@ -108,19 +108,19 @@ File bitboards
 #define FILE_F          0x2020202020202020ull
 #define FILE_G          0x4040404040404040ull
 #define FILE_H          0x8080808080808080ull
-/******************************************************************************
+/*
 Bitboards to mask off edge files to prevent wraparound when shifting 
 horizontally or diagonally
-*******************************************************************************/
+*/
 #define MASK_EAST_1     0x7F7F7F7F7F7F7F7Full   
 #define MASK_EAST_2     0x3F3F3F3F3F3F3F3Full   
 #define MASK_EAST_4     0x0F0F0F0F0F0F0F0Full   
 #define MASK_WEST_1     0xFEFEFEFEFEFEFEFEull   
 #define MASK_WEST_2     0xFCFCFCFCFCFCFCFCull   
 #define MASK_WEST_4     0xF0F0F0F0F0F0F0F0ull   
-/******************************************************************************
+/*
 Bitboards of useful square sets
-*******************************************************************************/
+*/
 #define ALL_SQUARES     0xFFFFFFFFFFFFFFFFull
 #define NO_SQUARES      0x0000000000000000ull
 #define WHITE_SQUARES   0x55AA55AA55AA55AAull
@@ -129,7 +129,7 @@ Bitboards of useful square sets
 #define BORDER_SQUARES  0xFF818181818181FFull
 #define CTR_16_SQUARES  0x00003C3C3C3C0000ull
 #define CTR_4_SQUARES   0x0000001818000000ull
-/******************************************************************************
+/*
 Hash value for black to move - nothing special just a big random number
-*******************************************************************************/
+*/
 #define BLACK_MOVE_HASH 0xB92B78FCCF92F8CDull

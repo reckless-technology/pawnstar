@@ -1,6 +1,6 @@
 #include "pawnstar.h"
 extern const bitboard* const ENEMY_PAWN_ATTACKS[2];
-/******************************************************************************
+/*
 Functions to generate pseudo-legal and strictly-legal moves. Pseudo-legal moves
 may leave our king in check; this is tested during search for improved 
 efficiency.
@@ -20,7 +20,7 @@ A value of 0 terminates a move list
 
 Given a first pawn promotion move to queen, generate the under promotions to
 knight, bishop and rook
-*******************************************************************************/
+*/
 INLINE void GenerateUnderpromotions(int** pmoves)
 {
     int* const moves = *pmoves;
@@ -30,19 +30,19 @@ INLINE void GenerateUnderpromotions(int** pmoves)
     moves[3] = move ^ ((KNIGHT ^ QUEEN) << 18);
     *pmoves += 4;
 }
-/******************************************************************************
+/*
 Generate pseudo-legal moves for all pieces
 If do_non_captures is false, just do captures and promotions (when not in check)
-*******************************************************************************/
+*/
 void
 GeneratePseudoLegalMoves(const Position* position, 
                          int             captures[], 
                          int             non_captures[], 
                          bool            do_non_captures)
 { 
-    /**************************************************************************
+    /*
     Pawn move variables
-    ***************************************************************************/
+    */
     bitboard   pawns;
     bitboard   promotions_west;
     bitboard   promotions_east;
@@ -57,9 +57,9 @@ GeneratePseudoLegalMoves(const Position* position,
     int        east_delta;
     const int color               = COLOR_TO_MOVE(position);
     const bitboard vacant_squares = ~position->occupied_squares;
-    /**************************************************************************
+    /*
     Generate pawn moves
-    ***************************************************************************/
+    */
     if (color == WHITE)
     {
         pawns              = position->pawns            & position->white_pieces;
@@ -143,9 +143,9 @@ GeneratePseudoLegalMoves(const Position* position,
             *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(to - push_delta, to, PAWN);
         }
     }
-    /**************************************************************************
+    /*
     Generate non pawn piece moves
-    ***************************************************************************/
+    */
     bitboard sources = (position->occupied_squares ^ position->pawns) & position->pieces_of_color[color];
     while (sources)
     {
@@ -169,9 +169,9 @@ GeneratePseudoLegalMoves(const Position* position,
     }
     if (do_non_captures && !(position->state_flags & IS_CHECK))
     {
-        /**********************************************************************
+        /*
         Generate castling moves
-        ***********************************************************************/
+        */
         if (color == WHITE)
         {
             if ((position->castle_flags & MAY_WHITE_K)        &&  /* if white retains the right to castle kingside and */
@@ -213,12 +213,12 @@ GeneratePseudoLegalMoves(const Position* position,
         *non_captures = 0;
     }
 }
-/******************************************************************************
+/*
 Generate all strictly legal moves for this position
 This is relatively slow and is not used at each node of the search, since each 
 move has to be tested to see if it leaves the king in check
 Returns the number of moves generated
-*******************************************************************************/
+*/
 #pragma warning(disable:4221)
 int GenerateLegalMoves(const Position* position, int moves[])
 {

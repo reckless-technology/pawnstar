@@ -1,7 +1,7 @@
-/******************************************************************************
+/*
 Generates the file "generated_data.c" which is used by the main program and
 contains various precomputed constants
-*******************************************************************************/
+*/
 #include <stdio.h>
 #include <stdbool.h>
 #include <memory.h>
@@ -105,9 +105,9 @@ static struct
     int    num_discrete_attacks;
 } magics[64];
 
-/******************************************************************************
+/*
 Determine the population count (Hamming weight) of x
-*******************************************************************************/
+*/
 static int 
 PopCount(uint64 x)
 {
@@ -119,10 +119,10 @@ PopCount(uint64 x)
     }
     return count;
 }
-/******************************************************************************
+/*
 Find the index of the least significant bit set in x (x is non zero)
 This is the slow brute force way since we don't care about performance here.
-*******************************************************************************/
+*/
 static int 
 Lsb(uint64 x) 
 {
@@ -134,9 +134,9 @@ Lsb(uint64 x)
     }
     return result;
 }
-/******************************************************************************
+/*
 Find the index of and then clear the least significant bit set in *x
-*******************************************************************************/
+*/
 static int 
 FindAndClearLsb(uint64* x)
 {    
@@ -144,10 +144,10 @@ FindAndClearLsb(uint64* x)
     *x = y & (y - 1);
     return Lsb(y);
 }
-/******************************************************************************
+/*
 Determine the occupancy mask for bishop attacks for a bishop standing on 
 location (excluding outer squares as they do no affect attack set)
-*******************************************************************************/
+*/
 static uint64 
 BishopOccupancyMask(int location)
 {
@@ -171,10 +171,10 @@ BishopOccupancyMask(int location)
     }
     return result;
 }
-/******************************************************************************
+/*
 Determine the occupancy mask for rook attacks for a rook standing on 
 location (excluding outer squares as they do no affect attack set)
-*******************************************************************************/
+*/
 static uint64 
 RookOccupancyMask(int location)
 {
@@ -200,10 +200,10 @@ RookOccupancyMask(int location)
     }
     return result;
 }
-/******************************************************************************
+/*
 Compute attacks for a bishop standing on location in the presence of possible 
 blockers
-*******************************************************************************/
+*/
 static uint64 
 BishopActualAttacks(uint64 occupied_squares, 
                     int    location)
@@ -243,10 +243,10 @@ BishopActualAttacks(uint64 occupied_squares,
     }
     return result;
 }
-/******************************************************************************
+/*
 Compute attacks for a rook standing on location in the presence of possible 
 blockers
-*******************************************************************************/
+*/
 static uint64 
 RookActualAttacks(uint64 occupied_squares, 
                   int    location)
@@ -286,9 +286,9 @@ RookActualAttacks(uint64 occupied_squares,
     }
     return result;
 }
-/******************************************************************************
+/*
 Use an RC4 cipher to generate a repeatable, pseudo random stream of bytes
-*******************************************************************************/
+*/
 static uint8
 RandomByte(void)
 {
@@ -316,9 +316,9 @@ RandomByte(void)
     rc4[j] = tmp;
     return rc4[(uint8)(rc4[i] + rc4[j])];
 }
-/******************************************************************************
+/*
 Generate a pseudo random 64 bit value
-*******************************************************************************/
+*/
 static uint64 
 PseudoRandom64(void)
 {
@@ -329,10 +329,10 @@ PseudoRandom64(void)
     }
     return result;
 }
-/******************************************************************************
+/*
 Given a bit set in mask, determine all the subsets of this set, i.e. determine
 all combinations of occupancy from an occupancy mask value.
-*******************************************************************************/
+*/
 static uint64 
 EnumerateMaskCombinations(uint64 mask, 
                           uint64 values[])
@@ -357,12 +357,12 @@ EnumerateMaskCombinations(uint64 mask,
     }
     return num_values;
 }
-/******************************************************************************
+/*
 Find magic bitboard multiplier, occupancy mask, shift value and attack set for 
 a bishop or a rook standing on location
 Refer to:
 http://chessprogramming.wikispaces.com/Magic+Bitboards
-*******************************************************************************/
+*/
 static void 
 FindMagic(int       location, 
           bool      is_rook, 
@@ -407,12 +407,12 @@ FindMagic(int       location,
         }
     }
 }
-/******************************************************************************
+/*
 Compress the magic attacks by forming a set of unique attacked squares and 
 replacing the attacks themselves with a set of one byte indices into the
 unique attack vector. At the cost of one extra indirection we save approx 8x
 the size of the magic tables which reduces cache pressure considerably.
-*******************************************************************************/
+*/
 static void 
 CompressAttacks(uint64  attacks[4096], 
                 int     num_attacks_in,  
@@ -446,7 +446,7 @@ CompressAttacks(uint64  attacks[4096],
     }
     *num_attacks_out = out_count;
 }
-/******************************************************************************
+/*
 Generate the source file containing the magic bitboard data for bishop and rook
 attack sets. The magic bitboard attack generator uses this structure:
 
@@ -465,7 +465,7 @@ MagicMoveEntry rook_magics[64];         // one per square for bishop and rook
 
 To get sliding attacks, given a set of occupied_squares, we compute:
 x->attacks[x->attack_indices[((occupied_squares & x->occupancy_mask) * x->magic) >> x->shift]];
-*******************************************************************************/
+*/
 static void 
 GenerateMagics(void)
 {
@@ -529,9 +529,9 @@ GenerateMagics(void)
         printf("};\n");
     }
 }
-/******************************************************************************
+/*
 Generate a vector (line) bitboard from location in the specified direction.
-*******************************************************************************/
+*/
 static uint64 VectorFrom(int location, int direction)
 {
     uint64 result = NO_SQUARES;

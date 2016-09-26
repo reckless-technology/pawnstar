@@ -1,7 +1,7 @@
 #pragma once
-/******************************************************************************
+/*
 Global header file - included by each source file
-*******************************************************************************/
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

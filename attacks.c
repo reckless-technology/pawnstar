@@ -19,10 +19,10 @@ bitboard RookAttacks(bitboard occupied_squares, int location)
 
 #else
 
-/******************************************************************************
+/*
 The naive loop based attack generator performs almost as fast as the magic
 bitboard attack generator when profiled in a release build...
-*******************************************************************************/
+*/
 bitboard BishopAttacks(uint64 occupied_squares, int location)
 {
     bitboard result = NO_SQUARES;
@@ -105,18 +105,18 @@ bitboard QueenAttacks(bitboard occupied_squares, int location)
 {
     return BishopAttacks(occupied_squares, location) | RookAttacks(occupied_squares, location);
 }
-/******************************************************************************
+/*
 Determine if location is attacked by color
-*******************************************************************************/
+*/
 bool IsAttacked(const Position* position, int location, int color)
 {
     const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
     const bitboard attacking_pieces = position->pieces_of_color[color];
     bitboard sliding_attackers;
-    /**************************************************************************
+    /*
     Pawn, knight and king attacks can be done by direct lookup since blockers 
     do not affect their attack set.
-    ***************************************************************************/
+    */
     if (attacking_pieces & 
         ((ENEMY_PAWN_ATTACKS[color][location] & position->pawns  )  | 
         (            KNIGHT_ATTACKS[location] & position->knights)  | 
@@ -124,9 +124,9 @@ bool IsAttacked(const Position* position, int location, int color)
     {
         return true;
     }
-    /**************************************************************************
+    /*
     Rook and queen horizontal and vertical sliding attacks
-    ***************************************************************************/
+    */
     sliding_attackers = (position->rooks | position->queens) & ROOK_ATTACKS[location] & attacking_pieces;
     while (sliding_attackers)
     {
@@ -135,9 +135,9 @@ bool IsAttacked(const Position* position, int location, int color)
             return true;
         }
     }
-    /**************************************************************************
+    /*
     Bishop and queen diagonal and antidiagonal sliding attacks
-    ***************************************************************************/
+    */
     sliding_attackers = (position->bishops | position->queens) & BISHOP_ATTACKS[location] & attacking_pieces;
     while (sliding_attackers)
     {
@@ -148,10 +148,10 @@ bool IsAttacked(const Position* position, int location, int color)
     }
     return false;
 }
-/******************************************************************************
+/*
 Determine the set of squares attacked by the piece (if any) standing on 
 location
-*******************************************************************************/
+*/
 bitboard AttacksFromSquare(const Position* position, int location, int piece)
 {
     switch (piece)
@@ -173,26 +173,26 @@ bitboard AttacksFromSquare(const Position* position, int location, int piece)
     }
     return NO_SQUARES;
 }
-/******************************************************************************
+/*
 Generate a bitboard of all pieces of the specified color which directly attack 
 location.
-*******************************************************************************/
+*/
 bitboard AttacksToSquareByColor(const Position* position, int location, int color)
 {
     const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];  
     const bitboard attacking_pieces           = position->pieces_of_color[color];
     bitboard sliding_attackers;
-    /**************************************************************************
+    /*
     Pawn, knight and king attacks can be done by lookup since blockers do not 
     affect their attacks
-    ***************************************************************************/
+    */
     bitboard attackers = attacking_pieces & (
         (ENEMY_PAWN_ATTACKS[color][location] & position->pawns  ) |
         (           KNIGHT_ATTACKS[location] & position->knights) |
         (             KING_ATTACKS[location] & position->kings  ));
-    /**************************************************************************
+    /*
     Rook and queen horizontal and vertical sliding attacks
-    ***************************************************************************/
+    */
     sliding_attackers = ROOK_ATTACKS[location] & (position->rooks | position->queens) & attacking_pieces;
     while (sliding_attackers)
     {
@@ -202,9 +202,9 @@ bitboard AttacksToSquareByColor(const Position* position, int location, int colo
             attackers |= BITBOARD(locn);
         }
     }
-    /**************************************************************************
+    /*
     Bishop and queen diagonal and antidiagonal sliding attacks
-    ***************************************************************************/
+    */
     sliding_attackers = BISHOP_ATTACKS[location] & (position->bishops | position->queens) & attacking_pieces;
     while (sliding_attackers)
     {
@@ -216,10 +216,10 @@ bitboard AttacksToSquareByColor(const Position* position, int location, int colo
     }
     return attackers;
 }
-/******************************************************************************
+/*
 Generate a bitboard of all pieces of the specifed type and color which attack
 the target location.
-*******************************************************************************/
+*/
 bitboard AttacksToSquareByType(const Position* position, int location, int color, int piece)
 {
     const bitboard attacking_pieces = position->pieces_of_color[color];
@@ -283,26 +283,26 @@ bitboard AttacksToSquareByType(const Position* position, int location, int color
         return KING_ATTACKS[location] & position->kings & attacking_pieces;
     }
 }
-/******************************************************************************
+/*
 Generate a bitboard of all pieces of both colors which directly attack 
 location.
-*******************************************************************************/
+*/
 bitboard AttacksToSquare(const Position* position, int location)
 {
     const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
     bitboard sliding_attackers;
-    /**************************************************************************
+    /*
     Pawn, knight and king attacks can be done by lookup since blockers do not 
     affect their attacks
-    ***************************************************************************/
+    */
     bitboard attackers =
         (PAWN_ATTACKS_WHITE[location] & position->pawns & position->black_pieces) |
         (PAWN_ATTACKS_BLACK[location] & position->pawns & position->white_pieces) |
         (    KNIGHT_ATTACKS[location] & position->knights)                        |
         (      KING_ATTACKS[location] & position->kings);
-    /**************************************************************************
+    /*
     Rook and queen horizontal and vertical sliding attacks
-    ***************************************************************************/
+    */
     sliding_attackers = ROOK_ATTACKS[location] & (position->rooks | position->queens);
     while (sliding_attackers)
     {
@@ -312,9 +312,9 @@ bitboard AttacksToSquare(const Position* position, int location)
             attackers |= BITBOARD(locn);
         }
     }
-    /**************************************************************************
+    /*
     Bishop and queen diagonal and antidiagonal sliding attacks
-    ***************************************************************************/
+    */
     sliding_attackers = BISHOP_ATTACKS[location] & (position->bishops | position->queens);
     while (sliding_attackers)
     {

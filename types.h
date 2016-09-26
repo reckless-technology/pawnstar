@@ -1,17 +1,17 @@
 #pragma once
 #include "options.h"
 #include <stdbool.h>
-/******************************************************************************
+/*
 Integral type definitions
-*******************************************************************************/
+*/
 typedef unsigned long long  bitboard;
 typedef unsigned long long  uint64;
 typedef unsigned char       uint8;
 typedef signed char         int8;
 typedef int (*CompareFn)    (const void*, const void*); /* sort predicate */
-/******************************************************************************
+/*
 Piece types
-*******************************************************************************/
+*/
 enum Piece
 {
     NO_PIECE,
@@ -22,18 +22,18 @@ enum Piece
     QUEEN,
     KING,
 };
-/******************************************************************************
+/*
 Colors
-*******************************************************************************/
+*/
 enum Color
 {
     WHITE,
     BLACK,
     NEITHER_COLOR,
 };
-/******************************************************************************
+/*
 Time control clock types
-*******************************************************************************/
+*/
 enum ClockType
 {
     CLOCK_STANDARD,     // N moves to be made in M minutes  
@@ -41,9 +41,9 @@ enum ClockType
     CLOCK_FIXED_DEPTH,  // search to depth D on every move
     CLOCK_FIXED_TIME,   // search for N seconds on every move
 };
-/******************************************************************************
+/*
 Position castling flags (bitset)
-*******************************************************************************/
+*/
 enum CastleFlags
 {
     MAY_WHITE_K         = 0x01, // white has the right to castle king side
@@ -51,9 +51,9 @@ enum CastleFlags
     MAY_BLACK_K         = 0x04, // black has the right to castle king side
     MAY_BLACK_Q         = 0x08, // black has the right to castle queen side
 };
-/******************************************************************************
+/*
 Position state flags (bitset)
-*******************************************************************************/
+*/
 enum StateFlags
 {
     IS_BLACK_TO_MOVE    = 0x01, // it is black's turn to move
@@ -67,9 +67,9 @@ enum StateFlags
     IS_GAME_DRAWN       = (IS_STALEMATE | IS_DRAW_REPETITION | IS_DRAW_MATERIAL | IS_DRAW_50_MOVES),
     IS_GAME_OVER        = (IS_GAME_DRAWN | IS_CHECKMATE),
 };
-/******************************************************************************
+/*
 Phases of move search
-*******************************************************************************/
+*/
 enum MovePhase
 {
     PHASE_PRE_MOVES,        // moves from the PV or TT (before move gen)
@@ -77,9 +77,9 @@ enum MovePhase
     PHASE_NON_CAPTURES,     // non captures moves with a non negative SEE
     PHASE_DEFERRED_MOVES,   // moves with a negative SEE
 };
-/******************************************************************************
+/*
 Individual square indices (little endian rank file mapping)
-*******************************************************************************/
+*/
 enum Squares
 {
     A1, B1, C1, D1, E1, F1, G1, H1,
@@ -91,26 +91,26 @@ enum Squares
     A7, B7, C7, D7, E7, F7, G7, H7,
     A8, B8, C8, D8, E8, F8, G8, H8,
 };
-/******************************************************************************
+/*
 Search node types (used in transposition table entries)
-*******************************************************************************/
+*/
 enum NodeType
 {
     NODE_CUT,       // beta cutoff occurred
     NODE_ALL,       // no move exceeded alpha
     NODE_PV,        // principal variation node
 };
-/******************************************************************************
+/*
 A move / score pair - used when sorting moves
-*******************************************************************************/
+*/
 typedef struct
 {
     int move;       // the move
     int score;      // its associated value
 } ScoredMove;
-/******************************************************************************
+/*
 A chess position
-*******************************************************************************/
+*/
 typedef struct Position Position;
 struct Position
 {    
@@ -147,9 +147,9 @@ struct Position
     uint8           reversible_move_count;  // number of consecutive reversible half-moves (plies)
     uint8           full_move_count;        // number of full moves (zero indexed)
 };
-/******************************************************************************
+/*
 Values for magic bitboard attack generator for one square
-*******************************************************************************/
+*/
 typedef struct
 {
     uint64          magic;          // the multiplier
@@ -159,9 +159,9 @@ typedef struct
     int             shift;          // right shift amount after multiplication
     int             padding;        // make the entry a multiple of 8 bytes in size
 } MagicMoveEntry;
-/******************************************************************************
+/*
 Clock and time control information
-*******************************************************************************/
+*/
 typedef struct
 {
     int     clock_type;              // standard, incremental, fixed time or fixed depth
@@ -173,17 +173,17 @@ typedef struct
     int     fixed_depth;             // search depth to search to when using fixed depth
     int     fixed_milliseconds;      // how many milliseconds to spend on each move when using fixed time
 } TimeControl;
-/******************************************************************************
+/*
 A game of chess represented as a sequence of positions
-*******************************************************************************/
+*/
 typedef struct
 {
     Position*   position;           // stack pointer - current position
     Position    stack[MAX_GAME_LENGTH];
 } Game;
-/******************************************************************************
+/*
 A transposition (encompasses brief results of a previous search)
-*******************************************************************************/
+*/
 typedef struct
 {
     uint64      hash;
@@ -192,17 +192,17 @@ typedef struct
     int8        depth;
     uint8       node_type;    
 } Transposition;
-/******************************************************************************
+/*
 Information about pinned pieces and their possible move targets
-*******************************************************************************/
+*/
 typedef struct
 {
     bitboard pinned_pieces;          // location of all pinned pieces
     bitboard allowed_squares[64];    // allowed_squares[x] indicates squares to which the pinned piece on x may safely move
 } Pins;
-/******************************************************************************
+/*
 Pawn-structure features (one for each color)
-*******************************************************************************/
+*/
 typedef struct
 {
     bitboard    pawn_attacks;    // squares directly attack by pawns
@@ -211,26 +211,26 @@ typedef struct
     bitboard    doubled_pawns;   // pawns with a friendly pawn ahead on the same file
     bitboard    passed_pawns;    // pawns who cannot be stopped by an enemy pawn
 } PawnStructure;
-/******************************************************************************
+/*
 A sequence of moves for a (possibly principal) variation, i.e. line of play
-*******************************************************************************/
+*/
 typedef struct
 {
     int         num_moves;      // number of moves in this line
     int         moves[MAX_PLY]; // the moves
 } Variation;
-/******************************************************************************
+/*
 XBoard input command handling support
-*******************************************************************************/
+*/
 typedef struct
 {
     void            (*function)(char* buffer);
     const char*     name;
     const char*     description;
 } CommandHandler;
-/******************************************************************************
+/*
 Global variables are contained in a single instance of this struct 
-*******************************************************************************/
+*/
 typedef struct
 {
     Game        game[1];

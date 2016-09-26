@@ -1,7 +1,7 @@
 #include "pawnstar.h"
-/******************************************************************************
+/*
 Standard Bratko-Kopec test positions
-*******************************************************************************/
+*/
 static const char* const POSITION_TESTS[] = {
     "1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -",
     "3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - -",
@@ -30,9 +30,9 @@ static const char* const POSITION_TESTS[] = {
     NULL,
 };
 
-/******************************************************************************
+/*
 Run the standard Bratko-Kopec test suite at fixed search depth
-*******************************************************************************/
+*/
 void RunPositionTests(int depth)
 {
     Position position;

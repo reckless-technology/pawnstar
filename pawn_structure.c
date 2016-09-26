@@ -1,7 +1,7 @@
 #include "pawnstar.h"
-/******************************************************************************
+/*
 Identifies the pawn-related features of the current position
-*******************************************************************************/
+*/
 void DeterminePawnStructure(const Position* position, PawnStructure ps[2])
 {
     const bitboard white_pawns = position->pawns & position->white_pieces;

@@ -1,5 +1,5 @@
 #include "pawnstar.h"
-/******************************************************************************
+/*
 Moves are contained within the least significant 22 bits of an integer
 
   Bits      Interpretation
@@ -25,16 +25,16 @@ cutoffs. It's sort of my generalization of the history table and killer move
 concepts. Whilst this assumption is questionable in theory, it has been 
 empirically confirmed that it does indeed measurably speed up the search on a 
 wide variety of positions.
-*******************************************************************************/
+*/
 
 #define MOVE_MASK   0x7FFF                  // piece, from, to fields only
 #define MERIT(move) ((move) & 0x1F8000)     // promoted and captured material only
 
 static int good_move_counts[MAX_PLY][8 * 64 * 64];
-/******************************************************************************
+/*
 This function gets called by the search when we find an interesting move, i.e.
 one which raises alpha or causes a beta cutoff. 
-*******************************************************************************/
+*/
 void 
 RecordGoodMove(int ply, 
                int move)
@@ -49,19 +49,19 @@ HasMoveBeenGood(int ply,
 {
     return !!good_move_counts[ply][move & MOVE_MASK];
 }
-/******************************************************************************
+/*
 The valuable move counts table is reset before the start of each search.
-*******************************************************************************/
+*/
 void InitializeGoodMoveCounts(void)
 {
     memset(good_move_counts, 0, sizeof(good_move_counts));
 }
-/******************************************************************************
+/*
 Sort moves into "best first" order. The heuristic for ranking moves is:
 # Promoted material value, then
 # Captured material value, then
 # Total number of times this move has cutoff or raised alpha at this ply
-*******************************************************************************/
+*/
 void 
 SortMoves(int moves[], 
           int ply)
@@ -85,9 +85,9 @@ SortMoves(int moves[],
         moves[i] = scored_moves[i].move;
     }
 }
-/******************************************************************************
+/*
 Find the best move and bring it to the front (partial selection sort).
-*******************************************************************************/
+*/
 void 
 SelectNextMove(int moves[], 
                int ply)
@@ -112,12 +112,12 @@ SelectNextMove(int moves[],
         moves[best_move_index] = tmp;
     }
 }
-/******************************************************************************
+/*
 Sort an array of scored moves into best first (descending score) order.
 This uses a stable merge sort algorithm. A stable sort is required so that the
 ordering of moves at the root node, where many moves share the same alpha 
 value, is preserved through multiple iterations / sort operations.
-*******************************************************************************/
+*/
 void 
 MergeSort(int        num_elements, 
           ScoredMove values[])
@@ -159,9 +159,9 @@ MergeSort(int        num_elements,
         merge_src = merge_dst;
         merge_dst = tmp;
     }
-    /**************************************************************************
+    /*
     If that last merge was to the work array, copy it back to the values array
-    ***************************************************************************/
+    */
     if (merge_dst == values)
     {
         memcpy(values, work, num_elements * sizeof(ScoredMove));

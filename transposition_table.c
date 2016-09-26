@@ -122,10 +122,10 @@ RecordTransposition(uint64 hash,
     candidate->node_type = (uint8)node_type;
     _InterlockedExchange(bucket->mutex, 0);
 }
-/******************************************************************************
+/*
 We get marginally better dispersion when the hashtable size is a prime number
 Determine if a candidate size is prime (excluding 1 and 2)
-*******************************************************************************/
+*/
 static bool IsPrime(int x)
 {
     int i;

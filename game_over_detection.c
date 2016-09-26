@@ -1,11 +1,11 @@
 #include "pawnstar.h"
-/******************************************************************************
+/*
 Determine if the current position represents a draw by repetition.
 
 We use position Zobrist hash values to determine position equality - there is a
 tiny chance of hash collision causing an error - I have not seen it happen 
 in practice.
-*******************************************************************************/
+*/
 bool IsDrawByRepetition(const Position* position, bool is_search)
 {
     const uint64 hash = position->hash;
@@ -21,10 +21,10 @@ bool IsDrawByRepetition(const Position* position, bool is_search)
     }
     return false;
 }
-/******************************************************************************
+/*
 Determine if the current position represents a draw by the 50 move rule
 (50 consecutive reversible moves by each player is a drawn game)
-*******************************************************************************/
+*/
 bool IsDrawByFiftyMoves(const Position* position)
 {
     if (position->reversible_move_count >= 100)
@@ -34,7 +34,7 @@ bool IsDrawByFiftyMoves(const Position* position)
     }
     return false;
 }
-/******************************************************************************
+/*
 Determine if the current position represents a draw by insufficient material
 
 according to FIDE rules the drawn combinations are:
@@ -43,7 +43,7 @@ a) king vs king
 b) king and knight vs king
 c) king and bishop vs king
 d) king and bishop vs king and bishop, with bishops on the same color square
-*******************************************************************************/
+*/
 bool IsDrawByMaterial(const Position* position)
 {
     switch (PopCount(position->occupied_squares))
@@ -52,16 +52,16 @@ bool IsDrawByMaterial(const Position* position)
     case 1:
         printf("ERROR: too few pieces for play\n");
     case 2:
-        /**********************************************************************
+        /*
         king vs king
-        ***********************************************************************/
+        */
         INCREMENT("draws by material (2)");
         return true;
     case 3:
-        /**********************************************************************
+        /*
         king and bishop vs king
         king and knight vs king
-        ***********************************************************************/
+        */
         if (position->bishops | position->knights)
         {
             INCREMENT("draws by material (3)");
@@ -69,9 +69,9 @@ bool IsDrawByMaterial(const Position* position)
         }
         return false;       
     case 4:
-        /**********************************************************************
+        /*
         king and bishop vs king and bishop with bishops on same color square
-        ***********************************************************************/
+        */
         {
             const bitboard white_bishops = position->bishops & position->white_pieces;
             const bitboard black_bishops = position->bishops ^ white_bishops;
@@ -86,9 +86,9 @@ bool IsDrawByMaterial(const Position* position)
         return false;
     }
 }
-/******************************************************************************
+/*
 Determine if the current position represents stalemate
-*******************************************************************************/
+*/
 bool IsStalemate(const Position* position)
 {
     int moves[MAX_MOVES_PER_POSITION];
@@ -96,9 +96,9 @@ bool IsStalemate(const Position* position)
         !(position->state_flags & IS_CHECK) && 
         GenerateLegalMoves(position, moves) == 0;
 }
-/******************************************************************************
+/*
 Determine if the current position represents checkmate
-*******************************************************************************/
+*/
 bool IsCheckmate(const Position* position)
 {
     int moves[MAX_MOVES_PER_POSITION];
@@ -106,12 +106,12 @@ bool IsCheckmate(const Position* position)
         (position->state_flags & IS_CHECK) && 
         GenerateLegalMoves(position, moves) == 0;
 }
-/******************************************************************************
+/*
 Determine if the current position state is a legal chess position:
 a) each side shall have strictly 1 king
 b) kings shall not be adjacent
 c) the side not on move shall not be in check
-*******************************************************************************/
+*/
 bool IsPositionLegal(const Position* position)
 {
     const int color           = COLOR_TO_MOVE(position);
@@ -124,9 +124,9 @@ bool IsPositionLegal(const Position* position)
         !(KING_ATTACKS[Lsb(white_king)] & black_king) &&
         !IsAttacked(position, position->king_location[ENEMY(color)], color);
 }
-/******************************************************************************
+/*
 If the game is over, display the xboard style result string
-*******************************************************************************/
+*/
 void DisplayResultIfGameOver(const Position* position)
 {
     switch (position->state_flags & IS_GAME_OVER)

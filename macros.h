@@ -1,6 +1,6 @@
 #pragma once
 #include "bitboard_constants.h"
-/******************************************************************************
+/*
 Function like macros
 
 Moves are contained within the least significant 22 bits of an integer
@@ -15,7 +15,7 @@ Moves are contained within the least significant 22 bits of an integer
 21 - 21     special flag (castling or en passant capture move)
 
 A value of 0 terminates a move list
-*******************************************************************************/
+*/
 #define CONSTRUCT_PROMOTION_MOVE(from, to, captured, promoted) \
                                         ((to) | ((from) << 6) | (PAWN << 12) | \
                                         ((captured) << 15) | ((promoted) << 18))

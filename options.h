@@ -1,79 +1,79 @@
 #pragma once
-/******************************************************************************
+/*
 Determine whether to enable the debugging counts dictionaries
-*******************************************************************************/
+*/
 #ifndef DEBUGX
 #define DEBUGX 1
 #endif 
 #if DEBUGX && !defined(EVAL_DEBUGX)
 #define EVAL_DEBUGX 0
 #endif
-/******************************************************************************
+/*
 Determine whether to use the intrinsic population count instruction on native 
 64-bit platforms (not available on many older CPUs)
-*******************************************************************************/
+*/
 #ifndef USE_INTRINSIC_POPCNT
 #define USE_INTRINSIC_POPCNT 1
 #endif
-/******************************************************************************
+/*
 Use experimental "more sophisticated" eval (probably not a great idea)
-*******************************************************************************/
+*/
 #ifndef DO_EVALUATION_FULL
 #define DO_EVALUATION_FULL 1
 #endif
-/******************************************************************************
+/*
 Whether to test the Zobrist hash value at every node of a perft move gen test
-*******************************************************************************/
+*/
 #ifndef DO_TEST_HASH_DURING_PERFT
 #define DO_TEST_HASH_DURING_PERFT 0
 #endif
-/******************************************************************************
+/*
 Whether to enable magic bitboard attacks for bishops and rooks (marginally 
 faster on machines with a large L1 cache)
-*******************************************************************************/
+*/
 #ifndef DO_MAGIC_BITBOARDS
 #define DO_MAGIC_BITBOARDS 1
 #endif
-/******************************************************************************
+/*
 Whether to enable null move pruning
-*******************************************************************************/
+*/
 #ifndef DO_NULL_MOVE_PRUNING
 #define DO_NULL_MOVE_PRUNING 1
 #endif
-/******************************************************************************
+/*
 Whether to enable extension on recapture of same value piece
-*******************************************************************************/
+*/
 #ifndef DO_RECAPTURE_EXTENSION
 #define DO_RECAPTURE_EXTENSION 0
 #endif
-/******************************************************************************
+/*
 Whether to enable extension on pawn push to 7th rank
-*******************************************************************************/
+*/
 #ifndef DO_PUSH_TO_SEVENTH_RANK_EXTENSION
 #define DO_PUSH_TO_SEVENTH_RANK_EXTENSION 0
 #endif
-/******************************************************************************
+/*
 Whether to enable futility pruning at frontier nodes
-*******************************************************************************/
+*/
 #ifndef DO_FUTILITY_PRUNING
 #define DO_FUTILITY_PRUNING 0
 #endif
-/******************************************************************************
+/*
 Whether to enable late move reductions
-*******************************************************************************/
+*/
 #ifndef DO_LATE_MOVE_REDUCTION
 #define DO_LATE_MOVE_REDUCTION 0
 #endif
-/******************************************************************************
+/*
 Whether to skip moves in quiescence search which have a negative static
 exchange evaluation (SEE)
-*******************************************************************************/
+*/
 #ifndef DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
 #define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 1
 #endif
-/******************************************************************************
+/*
 Global constants
-*******************************************************************************/
+*/
 #define HASHTABLE_MEGABYTES                 256 // default transposition table size in MB
 #define STRING_BUF_LEN                     1024 // default line buffer size
 #define MAX_MOVES_PER_POSITION              128 // maximum possible number of pseudo-legal moves for any chess position

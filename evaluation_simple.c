@@ -1,6 +1,6 @@
 #include "pawnstar.h"
 #if !DO_EVALUATION_FULL
-/******************************************************************************
+/*
 This is a very simple evaluation function as described by Tomasz Michniewski
 Refer to http://chessprogramming.wikispaces.com/Simplified+evaluation+function
 
@@ -10,7 +10,7 @@ The idea is that what it lacks in sophistication (a lot) it makes up for in
 speed, thus hopefully allowing greater search depth. It's useful for regression
 testing of the "full" evaluation function, and performs surprisingly well in
 actual game tests.
-*******************************************************************************/
+*/
 static const int PAWN_SQUARE[64] = {
      0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50,
@@ -105,9 +105,9 @@ static const int MATERIAL_VALUES[8] = {
 static int piece_square_values[2][8][64];
 static int king_endgame_values[2][64];
 
-/******************************************************************************
+/*
 Set up the piece square tables
-*******************************************************************************/
+*/
 void InitializeEval()
 {
     for (int location = A1; location <= H8; ++location)
@@ -122,10 +122,10 @@ void InitializeEval()
     }
 }
 
-/******************************************************************************
+/*
 Evaluate the current position, assuming neither king is in check and the 
 position is quiet.
-*******************************************************************************/
+*/
 int EvaluatePosition(const Position* position, int alpha, int beta)
 {    
     int score = 0;
@@ -146,11 +146,11 @@ int EvaluatePosition(const Position* position, int alpha, int beta)
             score -= piece_square_values[BLACK][piece][FindAndClearLsb(&b)];
         }
     }    
-    /**************************************************************************
+    /*
     Endgame is simply classified as:
     # no queens on the board, OR
     # fewer than 8 non-pawn pieces on the board
-    ***************************************************************************/
+    */
     if (!position->queens || 
         PopCount(position->occupied_squares ^ position->pawns) < 8)
     {

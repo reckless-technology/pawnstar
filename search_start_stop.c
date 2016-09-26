@@ -1,8 +1,8 @@
 #include "pawnstar.h"
 #include <Windows.h>
-/******************************************************************************
+/*
 Thread entry function for computer thinking
-*******************************************************************************/
+*/
 static DWORD WINAPI SearchThreadEntry(Game* game)
 {
 
@@ -17,9 +17,9 @@ static DWORD WINAPI SearchThreadEntry(Game* game)
     }  
     return 0;
 }
-/******************************************************************************
+/*
 Start thinking on a background worker thread
-*******************************************************************************/
+*/
 void StartThinking(Game* game)
 {
     QueueUserWorkItem(SearchThreadEntry, game, WT_EXECUTEDEFAULT);

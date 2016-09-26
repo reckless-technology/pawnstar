@@ -1,19 +1,19 @@
 #pragma once
 #include "types.h"
 #include "bitboard_constants.h"
-/******************************************************************************
+/*
 Inline functions - called many times per move; need to be FAST.
-*******************************************************************************/
+*/
 #if _MSC_VER
 #define INLINE static __forceinline
 #else
 #define INLINE static inline
 #endif
-/******************************************************************************
+/*
 Find the index of the least significant bit set in a bitboard, also known as
 bit scan forward, or trailing zero count - bitboard must be non zero.
 On Intel architectures we use the compiler intrinsic BSF instruction.
-*******************************************************************************/
+*/
 #if _MSC_VER /* Microsoft C compiler? */
 #if _M_X64   /* 64 bit platform? */
 INLINE int Lsb(bitboard x)
@@ -43,12 +43,12 @@ INLINE int Lsb(bitboard x)
 #else
 #error Your compiler does not appear to support bit scan. This is required for pawnstar.
 #endif /* _MSC_VER */
-/******************************************************************************
+/*
 Population count (Hamming weight)
 NB: needs to be FAST
 Only recent CPUs support intrinsic popcnt, so this is optional, and otherwise
 we just loop counting the bits set.
-*******************************************************************************/
+*/
 #if USE_INTRINSIC_POPCNT
 #if _MSC_VER
 #if _M_X64
@@ -80,19 +80,19 @@ INLINE int PopCount(bitboard x)
     return count;
 }
 #endif /* USE_INTRINSIC_POPCNT */
-/******************************************************************************
+/*
 Find the index of and clear the least significant bit set in a bitboard
-*******************************************************************************/
+*/
 INLINE int FindAndClearLsb(bitboard* x)
 {
     const bitboard y = *x;
     *x = y & (y - 1);
     return Lsb(y);
 }
-/******************************************************************************
+/*
 Find the first location of a move in a zero terminated list of moves.
 This is analagous to 'strchr' but using 32-bit words instead of bytes.
-*******************************************************************************/
+*/
 INLINE const int* FindMove(const int moves[], int move)
 {
     while (*moves)
@@ -105,22 +105,22 @@ INLINE const int* FindMove(const int moves[], int move)
     }
     return NULL;
 }
-/******************************************************************************
+/*
 King attack fill
-*******************************************************************************/
+*/
 INLINE bitboard KingFill(bitboard b)
 {
     bitboard x = SHIFT_WEST(b) | SHIFT_EAST(b);
     x |= SHIFT_NORTH(x) | SHIFT_SOUTH(x);
     return x | SHIFT_NORTH(b) | SHIFT_SOUTH(b);
 }
-/******************************************************************************
+/*
 Bitboard vector fill functions:
 These functions shift in the specified direction by 1, 2 and 4 squares 
 successively, masking off the appropriate edge files to avoid wraparound in the
 larger shifts, and ORing in the results, which "fills" the bitboard to the edge
 of the board in the specified direction in 3 successive shift-or operations.
-*******************************************************************************/
+*/
 INLINE bitboard FillNorth(bitboard b)
 {
     b |= b <<  8;
@@ -185,10 +185,10 @@ INLINE bitboard FillNorthAndSouth(bitboard b)
     return b;
 }
 
-/******************************************************************************
+/*
 Propagate a principal variation up to the parent node, prepending a 
 "best move" before copying the child PV.
-*******************************************************************************/
+*/
 INLINE void 
 CopyVariation(Variation*       dst, 
               const Variation* src, 

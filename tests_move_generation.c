@@ -1,7 +1,7 @@
 #include "pawnstar.h"
-/******************************************************************************
+/*
 Structure to hold the counts of different move types
-*******************************************************************************/
+*/
 typedef struct
 {
     int legal_moves;
@@ -11,21 +11,21 @@ typedef struct
     int promotions;
     int checks;
 } PerftCounts;
-/******************************************************************************
+/*
 Structure to hold a single perft test
-*******************************************************************************/
+*/
 typedef struct
 {
     const char* position;
     int         depth;
     PerftCounts counts;
 } PerftTest;
-/******************************************************************************
+/*
 Standard test positions for Perft move generation tests
 Refer to:
 http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
-*******************************************************************************/
+*/
 static const PerftTest perft_tests[] =
 {//    position                                                          depth        nodes   captures      ep   castles promotions   checks
     { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",                6, { 119060324,   2812008,   5248,        0,        0,   809099 } },
@@ -36,10 +36,10 @@ static const PerftTest perft_tests[] =
     { "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - -", 5, { 164075551,  19528068,    122,        0,        0,  2998608 } },
     { NULL, },
 };
-/******************************************************************************
+/*
 Categorize a null-terminated set of pseudo-legal moves into strictly-legal
 moves of various types, storing the result in counts
-*******************************************************************************/
+*/
 static void 
 CategorizeMoves(const Position* src_position, 
                 const int       moves[], 
@@ -80,12 +80,12 @@ CategorizeMoves(const Position* src_position,
         }
     }
 }
-/******************************************************************************
+/*
 Recursive standard perft test
 Refer to:
 http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
-*******************************************************************************/
+*/
 #pragma warning(disable:4221)
 static void 
 Perft(const Position* src_position, 
@@ -128,9 +128,9 @@ Perft(const Position* src_position,
     CategorizeMoves(src_position, captures, counts);
     CategorizeMoves(src_position, non_captures, counts);
 }
-/******************************************************************************
+/*
 Run perft test on the standard test positions
-*******************************************************************************/
+*/
 void 
 RunPerftTests(void)
 {

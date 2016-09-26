@@ -3,14 +3,14 @@
 static int EvaluateSwapOff(Position* position, int location, int color, int piece_on_square);
 
 extern const bitboard* const ENEMY_PAWN_ATTACKS[2];
-/******************************************************************************
+/*
 Use nominal 1-3-3-5-9 material values for SEE
-*******************************************************************************/
+*/
 static const int piece_values[7] = { 0, 100, 300, 300, 500, 900, 10000 };
-/******************************************************************************
+/*
 Determine the SEE (static exchange evaluation) for a move.
 Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
-*******************************************************************************/
+*/
 int EvaluateStaticExchange(const Position* src_position, int move)
 {
     Position position;
@@ -23,12 +23,12 @@ int EvaluateStaticExchange(const Position* src_position, int move)
     return piece_values[MOVE_CAPTURED(move)] - 
         EvaluateSwapOff(&position, MOVE_TO(move), COLOR_TO_MOVE(&position), MOVE_PIECE(move));
 }
-/******************************************************************************
+/*
 Determine the swap off value of a capture move onto a fixed square. This 
 function destroys its position during execution, and does not update flags etc
 for speed, since it is called for every move at every node in the tree it must
 be super fast.
-*******************************************************************************/
+*/
 static int EvaluateSwapOff(Position* position, int location, int color, int piece_on_square)
 {
     const bitboard square = BITBOARD(location);

@@ -1,9 +1,9 @@
 #include "pawnstar.h"
 
-/******************************************************************************
+/*
 Search a single move and return its score, or MOVED_INTO_CHECK_SCORE if the 
 move was not legal.
-*******************************************************************************/
+*/
 int 
 SearchSingleMove(const Position*    src_position, 
                  int                depth, 
@@ -25,12 +25,12 @@ SearchSingleMove(const Position*    src_position,
         return MOVED_INTO_CHECK_SCORE;
     }
     int child_depth = depth - 1;
-    /******************************************************************
+    /*
     Extend the search depth if any of the following are true:    
     # This is a pawn promotion
     # This is a pawn push to the 7th rank 
     # Recapture of same value piece
-    *******************************************************************/
+    */
     if (MOVE_PROMOTED(move))
     {
         INCREMENT("extensions promotion");

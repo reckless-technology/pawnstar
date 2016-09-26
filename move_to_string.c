@@ -1,7 +1,7 @@
 #include "pawnstar.h"
-/******************************************************************************
+/*
 Convert a move into Xboard alphanumeric string format
-*******************************************************************************/
+*/
 void MoveToString(int move, char move_string[])
 {
     sprintf(move_string, "%c%c%c%c",
@@ -14,11 +14,11 @@ void MoveToString(int move, char move_string[])
         sprintf(move_string + 4, "%c", "  nbrq"[MOVE_PROMOTED(move)]);
     }
 }
-/******************************************************************************
+/*
 Convert a move into standard algebraic notation
 Refer to:
 http://en.wikipedia.org/wiki/Portable_Game_Notation#Movetext
-*******************************************************************************/
+*/
 char* MoveToSanString(const Position* position, int the_move, char move_string[])
 {
     int legal_moves[MAX_MOVES_PER_POSITION];
@@ -32,10 +32,10 @@ char* MoveToSanString(const Position* position, int the_move, char move_string[]
     bool is_rank_unique      = true;
     sprintf(from_square, "%c%c", FILE_CHAR(MOVE_FROM(the_move)), RANK_CHAR(MOVE_FROM(the_move)));
     sprintf(to_square,   "%c%c", FILE_CHAR(MOVE_TO  (the_move)), RANK_CHAR(MOVE_TO  (the_move)));    
-    /**************************************************************************
+    /*
     Determine if there is more than one piece of the same type which is capable 
     of moving to the target square, and will require further disambiguation
-    ***************************************************************************/
+    */
     GenerateLegalMoves(position, legal_moves);
     for (move = legal_moves; *move; ++move)
     {
@@ -54,10 +54,10 @@ char* MoveToSanString(const Position* position, int the_move, char move_string[]
             }   
         }
     }
-    /**************************************************************************
+    /*
     Determine how to disambiguate source square based on the uniqueness of the 
     source rank and file
-    ***************************************************************************/
+    */
     if (is_source_ambiguous)
     {
         if (is_file_unique)
@@ -140,9 +140,9 @@ char* MoveToSanString(const Position* position, int the_move, char move_string[]
         break;
 
     }    
-    /**************************************************************************
+    /*
     Determine if this move results in check or checkmate
-    ***************************************************************************/
+    */
     MakeMove(dst_position, position, the_move);
     if (IsCheckmate(dst_position))
     {
@@ -154,10 +154,10 @@ char* MoveToSanString(const Position* position, int the_move, char move_string[]
     }
     return move_string;
 }
-/******************************************************************************
+/*
 Convert a sequence of moves into SAN representation with each move separated by
 a space
-*******************************************************************************/
+*/
 void MoveSequenceToSanString(const Position* position, const int moves[], char move_string[])
 {
     bool is_first_move = true;
@@ -186,11 +186,11 @@ static const char* const strings_to_remove[] = {
     "?",
     NULL,
 };
-/******************************************************************************
+/*
 Compare two move strings for equality. Sometimes UIs don't bother to put the 
 "e.p.", "+" or "#" at the end of the move string; we still want these to 
 compare as equal.
-*******************************************************************************/
+*/
 bool AreMoveStringsEqual(char* str1, char* str2)
 {
     if (!str1 || !str2 || !strlen(str1) || !strlen(str2))

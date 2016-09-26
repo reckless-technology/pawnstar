@@ -1,9 +1,9 @@
 #include "pawnstar.h"
-/******************************************************************************
+/*
 Determine any pinned pieces and their corresponding allowed target squares
 NB: the contents of pins->allowed_squares[x] for non-pinned pieces is garbage
 (whatever happened to be there before we were called)
-*******************************************************************************/
+*/
 void DeterminePins(const Position* position, Pins* pins)
 {
     int color;

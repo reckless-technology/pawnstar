@@ -1,18 +1,18 @@
 #include "pawnstar.h"
 
 static volatile bool cancel;
-/******************************************************************************
+/*
 If the worker thread is running, set the cancel flag then wait for it to
 finish
-*******************************************************************************/
+*/
 void StopThinkingMoveImmediately()
 {
     cancel = true;
 }
-/******************************************************************************
+/*
 Entry point for the search to find the computer move.
 Returns the best move found, or 0 if there is no move (i.e. game over)
-*******************************************************************************/
+*/
 int SearchRootNode(const Position* src_position)
 {
     int         i;
@@ -70,12 +70,12 @@ int SearchRootNode(const Position* src_position)
         break;
     }
     InitializeGoodMoveCounts();
-    /**************************************************************************
+    /*
     For first pass move ordering before we do any search, just use a shallow
     search with wide open alpha beta window. Subsequent passes will use the 
     results of the previous iteration to sort the moves (the merge sort is 
     stable).
-    ***************************************************************************/
+    */
     DEBUG_STATEMENT(DebugXClear());
     start_ms = GetMilliseconds();
     cancel = false;

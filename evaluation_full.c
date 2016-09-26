@@ -1,12 +1,12 @@
 #include "pawnstar.h"
 #if DO_EVALUATION_FULL
-/******************************************************************************
+/*
 The more experimental "advanced" evaluation function: in practice this does not
 seem to be much better than the simplified evaluation function, so it clearly 
 needs some refinement.
 
 The evaluation unit is centipawns (1/100 of a pawn)
-*******************************************************************************/
+*/
 
 typedef struct
 {
@@ -82,57 +82,57 @@ static const int KING_SQUARE_ENDGAME[64] =
 #define SCORE_PROTECTED_PASSED_PAWN         10  // additional bonus for a passed pawn protected by a friendly pawn
 #define SCORE_ROOK_BEHIND_PASSED_PAWN       10  // bonus for a rook behind a passed pawn
 #define SCORE_PAWN_ADVANCEMENT               5  // bonus for pawn advancing a rank
-/******************************************************************************
+/*
 Bonus / penalty for bishops and rooks based on number of available pseudo legal 
 target squares. The rest should be handled by search.
-*******************************************************************************/
+*/
 static const int BISHOP_ROOK_MOBILITY[15] = 
 { -30, -15, 0, 10, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20 };
-/******************************************************************************
+/*
 Bonus / penalty for knights based on number of available pseudo legal 
 target squares. The rest should be handled by search.
-*******************************************************************************/
+*/
 static const int KNIGHT_MOBILITY[9] =
 { -40, -30, -20, -10, 0, 10, 20, 30, 40 };
-/******************************************************************************
+/*
 Penalty for enemy queen proximity (Manhattan distance) to friendly king
-*******************************************************************************/
+*/
 static const int QUEEN_KING_PROXIMITY[15] = 
 { -25, -25, -25, -20, -15, -10, -5, 0, 5, 10, 15, 20, 20, 20, 20 };
-/******************************************************************************
+/*
 Bonus / penalty for number of enemy pieces within 3 squares of the friendly 
 king
-*******************************************************************************/
+*/
 static const int ENEMY_PIECES_NEAR_KING[17] = 
 { 20, 15, 10, 5, 0, -5, -10, -15, -20, -25, -30, -30, -30, -30, -30, -30, -30 };
-/******************************************************************************
+/*
 Bonus / penalty for number of friendly non pawn pieces within 2 squares of the 
 friendly king
-*******************************************************************************/
+*/
 static const int FRIENDLY_PIECES_NEAR_KING[17] = 
 { -15, -10, -5, 0, 5, 10, 15, 20, 25, 30, 30, 30, 30, 30, 30, 30, 30 };
-/******************************************************************************
+/*
 Bonus / penalty based on the number of open attacks to the friendly king,
 determined by how many moves a queen could make to empty squares if she were
 standing in the king's location.
-*******************************************************************************/
+*/
 static const int ATTACK_RAYS_TO_KING[28] = 
 { 
     -10,   0,   0,   0,  -5,  -5, -10, -10, -15, -15, -20, -20, -25, -25,  
     -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25,
 };
-/******************************************************************************
+/*
 Bonus awarded to the side ahead on material based on the total number of
 knights, bishops, rooks and queens on the board. Encourages the side ahead to 
 trade down pieces but not pawns.
-*******************************************************************************/
+*/
 static const int TRADE_DOWN_BONUS[33] = 
 { 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 0, /* ... */ };
-/******************************************************************************
+/*
 Bonus awarded to the side ahead on material based on number of friendly
 pawns on the board. Encourages the side ahead to trade down pieces but not 
 pawns.
-*******************************************************************************/
+*/
 static const int FRIENDLY_PAWN_BONUS[9] = 
 { 0, 10, 20, 30, 40, 40, 40, 40, 30 };
 
@@ -141,10 +141,10 @@ void InitializeEval()
     /* nothing to do in this version */
 }
 
-/******************************************************************************
+/*
 Evaluate the current position, assuming neither king is in check and the 
 position is quiet. 
-*******************************************************************************/
+*/
 int EvaluatePosition(const Position* position, int alpha, int beta)
 {    
     INCREMENT("eval calls");
@@ -299,25 +299,25 @@ EvaluateMobility(const Position* position,
                  bitboard        friendly_pieces)
 {
     int score = 0;
-    /**************************************************************************
+    /*
     Bishop mobility
-    ***************************************************************************/
+    */
     bitboard b = position->bishops & friendly_pieces;
     while (b)
     {
         score += BISHOP_ROOK_MOBILITY[PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~friendly_pieces)];
     }
-    /**************************************************************************
+    /*
     Rook mobility
-    ***************************************************************************/
+    */
     b = position->rooks & friendly_pieces;
     while (b)
     {
         score += BISHOP_ROOK_MOBILITY[PopCount(RookAttacks(position->occupied_squares, FindAndClearLsb(&b)) & ~friendly_pieces)];
     }
-    /**************************************************************************
+    /*
     Knight mobility
-    ***************************************************************************/
+    */
     b = position->knights & friendly_pieces;
     while (b)
     {
@@ -337,39 +337,39 @@ EvaluateKingSafety(const Position* position,
         return 0;
     }
     int score = 0;    
-    /**************************************************************************
+    /*
     King safety - pawn shield - treat the bishop as a pseudo pawn for the 
     purpose of the king pawn shield, to allow for fianchetto bishop to protect
     the king.
-    ***************************************************************************/
+    */
     const int king_locn                   = position->king_location[color];
     const bitboard friendly_pawns_bishops = friendly_pieces & (position->pawns | position->bishops);
     const bitboard enemy_pieces           = position->occupied_squares ^ friendly_pieces;
     score += SCORE_PAWN_KING_ADJ1 * PopCount(KPS1[color][king_locn] & friendly_pawns_bishops);
     score += SCORE_PAWN_KING_ADJ2 * PopCount(KPS2[color][king_locn] & friendly_pawns_bishops);     
-    /**************************************************************************
+    /*
     King safety - penalize the enemy queen being too close to our king
-    ***************************************************************************/
+    */
     bitboard q = position->queens & ~friendly_pieces;
     while (q)
     {
         score += QUEEN_KING_PROXIMITY[MANHATTAN_DISTANCE[king_locn][FindAndClearLsb(&q)]];
     }
-    /**************************************************************************
+    /*
     King safety - how many lines of attack are open to the king
-    ***************************************************************************/
+    */
     score += ATTACK_RAYS_TO_KING[PopCount(QueenAttacks(position->occupied_squares, king_locn) & ~position->occupied_squares)];
-    /**************************************************************************
+    /*
     King safety - number of enemy pieces close to our king
-    ***************************************************************************/
+    */
     score += ENEMY_PIECES_NEAR_KING[PopCount(KING_ATTACKS_3[king_locn] & enemy_pieces)];
-    /**************************************************************************
+    /*
     King safety - number of friendly pieces close to our king
-    ***************************************************************************/
+    */
     score += FRIENDLY_PIECES_NEAR_KING[PopCount(KING_ATTACKS_2[king_locn] & friendly_pieces & ~(position->kings | position->pawns))];  
-    /**************************************************************************
+    /*
     Bonus for retaining the right to castle (don't move the king prematurely)
-    ***************************************************************************/
+    */
     if (position->castle_flags & CASTLE_RIGHTS_MASK[color])
     {
         score += SCORE_CASTLING_RIGHTS;
