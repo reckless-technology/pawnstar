@@ -102,8 +102,8 @@ static const int MATERIAL_VALUES[8] = {
       0,
 };
 
-static int piece_square_values[2][8][64];
-static int king_endgame_values[2][64];
+int piece_square_values[2][8][64];
+int king_endgame_values[2][64];
 
 /*
 Set up the piece square tables

@@ -5,19 +5,18 @@
 /*
 Compute the Zobrist hash of a position
 */
-uint64 ComputeHash(const Position* position)
+uint64 
+ComputeHash(const Position* position)
 {
-    int piece;
-    bitboard b;
     uint64 hash = position->state_flags & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
     hash += CASTLING_RIGHTS_HASHES[position->castle_flags];
     if (position->en_passant_index)
     {
         hash += EN_PASSANT_HASHES[FILE_OF(position->en_passant_index)];
     }
-    for (piece = PAWN; piece <= KING; ++piece)
+    for (int piece = PAWN; piece <= KING; ++piece)
     {
-        b = position->pieces[piece] & position->white_pieces;
+        bitboard b = position->pieces[piece] & position->white_pieces;
         while (b)
         {
             hash += PIECE_SQUARE_HASHES[WHITE][piece][FindAndClearLsb(&b)];
@@ -36,7 +35,9 @@ refer to http://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
 returns true on success
 returns false if an illegal FEN string was provided
 */
-bool PositionFromString(const char fen_string[], Position* position)
+bool 
+PositionFromString(const char* fen_string, 
+                   Position* position)
 {
     char buffer[STRING_BUF_LEN];
     size_t i;
@@ -100,8 +101,7 @@ bool PositionFromString(const char fen_string[], Position* position)
         if (index)
         {
             const int piece = (int)(index - white_pieces) + 1;
-            position->pieces[piece] |= BITBOARD_XY(x, y);
-            position->white_pieces  |= BITBOARD_XY(x, y);
+            AddPiece(position, WHITE, piece, x + 8 * y);
             ++x;
             continue;
         }
@@ -109,8 +109,7 @@ bool PositionFromString(const char fen_string[], Position* position)
         if (index)
         {
             const int piece = (int)(index - black_pieces) + 1;
-            position->pieces[piece] |= BITBOARD_XY(x, y);
-            position->black_pieces  |= BITBOARD_XY(x, y);
+            AddPiece(position, BLACK, piece, x + 8 * y);
             ++x;
         }
         else

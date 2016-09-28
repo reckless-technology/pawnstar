@@ -21,7 +21,9 @@ Make a null move (used for null move pruning during search)
 # Clear the en passant square
 # Flip the side to move
 */
-void MakeNullMove(Position* dst_position, const Position* src_position)
+void 
+MakeNullMove(Position* dst_position, 
+             const Position* src_position)
 {
     memcpy(dst_position, src_position, sizeof(Position));
     dst_position->previous = src_position;
@@ -34,21 +36,58 @@ void MakeNullMove(Position* dst_position, const Position* src_position)
     dst_position->state_flags ^= IS_BLACK_TO_MOVE;
     dst_position->hash += (dst_position->state_flags & IS_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : -BLACK_MOVE_HASH;
 }
+
+#if !DO_EVALUATION_FULL
+extern int piece_square_values[2][8][64];
+#endif
+
+void
+AddPiece(Position* position, 
+         int color, 
+         int piece, 
+         int to)
+{
+    position->pieces[piece] ^= BITBOARD(to);
+    position->pieces_of_color[color] ^= BITBOARD(to);
+    position->hash += PIECE_SQUARE_HASHES[color][piece][to];
+}
+
+void
+RemovePiece(Position* position, 
+            int color, 
+            int piece, 
+            int from)
+{
+    position->pieces[piece] ^= BITBOARD(from);
+    position->pieces_of_color[color] ^= BITBOARD(from);
+    position->hash -= PIECE_SQUARE_HASHES[color][piece][from];
+}
+
+void
+MovePiece(Position* position, 
+          int color, 
+          int piece, 
+          int from, 
+          int to)
+{
+    position->pieces[piece] ^= BITBOARD(from) | BITBOARD(to);
+    position->pieces_of_color[color] ^= BITBOARD(from) | BITBOARD(to);
+    position->hash += PIECE_SQUARE_HASHES[color][piece][to] - PIECE_SQUARE_HASHES[color][piece][from];
+}
 /*
 Construct a new position from an old position and a move
 */
-void MakeMove(Position* dst_position, const Position* src_position, int move)
+void 
+MakeMove(Position* dst_position, 
+         const Position* src_position, 
+         int move)
 {                          
     const int color             = COLOR_TO_MOVE(src_position);
     const int from              = MOVE_FROM(move);
     const int to                = MOVE_TO(move);
     const int piece             = MOVE_PIECE(move);
     const int captured          = MOVE_CAPTURED(move);
-    
-    const bitboard from_bb      = BITBOARD(from);
-    const bitboard to_bb        = BITBOARD(to);
-    const bitboard from_to_bb   = from_bb | to_bb;
-    
+     
     memcpy(dst_position, src_position, sizeof(Position));
     dst_position->previous = src_position;
     dst_position->move = move;
@@ -63,7 +102,6 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
         dst_position->en_passant_index = 0;
     }
     ++dst_position->reversible_move_count;
-    const uint64* const psh = &PIECE_SQUARE_HASHES[color][piece][0];
     switch (piece)
     {
     case PAWN:
@@ -72,48 +110,36 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
         {
             if (!MOVE_IS_SPECIAL(move))
             {
-                /* regular pawn move */
-                dst_position->pawns ^= from_to_bb;
-                dst_position->pieces_of_color[color] ^= from_to_bb;
-                dst_position->hash += psh[to] - psh[from];
+                // Regular pawn move
                 if (captured)
                 {
-                    dst_position->pieces[captured] ^= to_bb;
-                    dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
-                    dst_position->hash -= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
+                    RemovePiece(dst_position, ENEMY(color), captured, to);
                 }                
                 else if (((to - from) & 0xF) == 0) // equiv to (abs(to - from) == 16)
                 {
-                    /* double pawn push */
+                    // Pawn double push: affects en passant.
                     dst_position->en_passant_index = (uint8)((from + to) >> 1);
                     dst_position->hash += EN_PASSANT_HASHES[FILE_OF(from)];
                 }
+                MovePiece(dst_position, color, PAWN, from, to);
             }
             else
             {
-                /* en passant capture: capture location is source rank, destination file */
+                // En passant capture: capture location is source rank, destination file
                 const int en_passant_capture_location = (from & 0x38) | (to & 0x07);
-                const bitboard en_passant_capture_BB = BITBOARD(en_passant_capture_location);       
-                dst_position->pieces_of_color[color] ^= from_to_bb;
-                dst_position->pieces_of_color[ENEMY(color)] ^= en_passant_capture_BB;
-                dst_position->pawns ^= from_to_bb | en_passant_capture_BB;
-                dst_position->hash += psh[to] - psh[from] - PIECE_SQUARE_HASHES[ENEMY(color)][PAWN][en_passant_capture_location];
+                RemovePiece(dst_position, ENEMY(color), PAWN, en_passant_capture_location);
+                MovePiece(dst_position, color, PAWN, from, to);
             }
         }
         else
         {
-            /* pawn promotion */
-            const int promoted = MOVE_PROMOTED(move); 
-            dst_position->pawns ^= from_bb;
-            dst_position->pieces[promoted] ^= to_bb;
-            dst_position->pieces_of_color[color] ^= from_to_bb;
-            dst_position->hash += PIECE_SQUARE_HASHES[color][promoted][to] - psh[from];
+            // Pawn promotion
             if (captured)
             {
-                dst_position->pieces[captured] ^= to_bb;
-                dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
-                dst_position->hash -= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
+                RemovePiece(dst_position, ENEMY(color), captured, to);
             }
+            RemovePiece(dst_position, color, PAWN, from);
+            AddPiece(dst_position, color, MOVE_PROMOTED(move), to);
         }
         break;
 
@@ -123,16 +149,12 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
     case BISHOP:
     case ROOK:
     case QUEEN:
-        dst_position->pieces[piece] ^= from_to_bb;
-        dst_position->pieces_of_color[color] ^= from_to_bb;
-        dst_position->hash += psh[to] - psh[from];
         if (captured)
         {
+            RemovePiece(dst_position, ENEMY(color), captured, to);
             dst_position->reversible_move_count = 0;
-            dst_position->pieces[captured] ^= to_bb;
-            dst_position->pieces_of_color[ENEMY(color)] ^= to_bb;
-            dst_position->hash -= PIECE_SQUARE_HASHES[ENEMY(color)][captured][to];
         }
+        MovePiece(dst_position, color, piece, from, to);
         break;
 
     case KING:
@@ -145,44 +167,20 @@ void MakeMove(Position* dst_position, const Position* src_position, int move)
         switch (to)
         {
         case G1:
-            dst_position->kings ^= E1BB | G1BB;
-            dst_position->rooks ^= H1BB | F1BB;
-            dst_position->white_pieces ^= E1BB | F1BB | G1BB | H1BB;
-            dst_position->hash +=
-                PIECE_SQUARE_HASHES[WHITE][KING][G1] -
-                PIECE_SQUARE_HASHES[WHITE][KING][E1] +
-                PIECE_SQUARE_HASHES[WHITE][ROOK][F1] -
-                PIECE_SQUARE_HASHES[WHITE][ROOK][H1];
+            MovePiece(dst_position, WHITE, KING, E1, G1);
+            MovePiece(dst_position, WHITE, ROOK, H1, F1);
             break;
         case C1:
-            dst_position->kings ^= E1BB | C1BB;
-            dst_position->rooks ^= A1BB | D1BB;
-            dst_position->white_pieces ^= A1BB | C1BB | D1BB | E1BB;
-            dst_position->hash +=
-                PIECE_SQUARE_HASHES[WHITE][KING][C1] -
-                PIECE_SQUARE_HASHES[WHITE][KING][E1] +
-                PIECE_SQUARE_HASHES[WHITE][ROOK][D1] -
-                PIECE_SQUARE_HASHES[WHITE][ROOK][A1];
+            MovePiece(dst_position, WHITE, KING, E1, C1);
+            MovePiece(dst_position, WHITE, ROOK, A1, D1);
             break;
         case G8:
-            dst_position->kings ^= E8BB | G8BB;
-            dst_position->rooks ^= H8BB | F8BB;
-            dst_position->black_pieces ^= E8BB | F8BB | G8BB | H8BB;
-            dst_position->hash +=
-                PIECE_SQUARE_HASHES[BLACK][KING][G8] -
-                PIECE_SQUARE_HASHES[BLACK][KING][E8] +
-                PIECE_SQUARE_HASHES[BLACK][ROOK][F8] -
-                PIECE_SQUARE_HASHES[BLACK][ROOK][H8];
+            MovePiece(dst_position, BLACK, KING, E8, G8);
+            MovePiece(dst_position, BLACK, ROOK, H8, F8);
             break;
         case C8:
-            dst_position->kings ^= E8BB | C8BB;
-            dst_position->rooks ^= A8BB | D8BB;
-            dst_position->black_pieces ^= A8BB | C8BB | D8BB | E8BB;
-            dst_position->hash +=
-                PIECE_SQUARE_HASHES[BLACK][KING][C8] -
-                PIECE_SQUARE_HASHES[BLACK][KING][E8] +
-                PIECE_SQUARE_HASHES[BLACK][ROOK][D8] -
-                PIECE_SQUARE_HASHES[BLACK][ROOK][A8];
+            MovePiece(dst_position, BLACK, KING, E8, C8);
+            MovePiece(dst_position, BLACK, ROOK, A8, D8);
             break;
         default:
             break;

@@ -19,7 +19,7 @@ Determine whether to use the intrinsic population count instruction on native
 Use experimental "more sophisticated" eval (probably not a great idea)
 */
 #ifndef DO_EVALUATION_FULL
-#define DO_EVALUATION_FULL 1
+#define DO_EVALUATION_FULL 0
 #endif
 /*
 Whether to test the Zobrist hash value at every node of a perft move gen test
