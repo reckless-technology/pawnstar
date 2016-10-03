@@ -12,7 +12,8 @@ SearchSingleMove(const Position*    src_position,
                  int                beta, 
                  volatile bool*     cancel, 
                  int                move,
-                 Variation*         pv)
+                 Variation*         pv,
+                 int                move_index)
 {      
     if (*cancel)
     {
@@ -25,17 +26,21 @@ SearchSingleMove(const Position*    src_position,
         return MOVED_INTO_CHECK_SCORE;
     }
     int child_depth = depth - 1;
+
     /*
-    Extend the search depth if any of the following are true:    
-    # This is a pawn promotion
-    # This is a pawn push to the 7th rank 
-    # Recapture of same value piece
+    Extend the search depth in the following cases: 
+        # This is a pawn promotion
+        # This is a pawn push to the 7th rank 
+        # Recapture of same value piece
     */
+
+#if DO_PROMOTION_EXTENSION
     if (MOVE_PROMOTED(move))
     {
         INCREMENT("extensions promotion");
         ++child_depth;
     }
+#endif
 
 #if DO_PUSH_TO_SEVENTH_RANK_EXTENSION
     static const int SEVENTH_RANK[2] = { 6, 1 };
@@ -56,10 +61,11 @@ SearchSingleMove(const Position*    src_position,
         INCREMENT("extensions recapture");
         ++child_depth;
     }
-#endif
- 
+#endif 
+
     int score;
     if (beta > alpha + 1 &&
+        move_index       &&
        !(src_position->state_flags & IS_CHECK))
     {
         INCREMENT("pvs attempts");

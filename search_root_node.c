@@ -82,7 +82,7 @@ int SearchRootNode(const Position* src_position)
     for (i = 0; i != move_count; ++i)
     {
         scored_moves[i].move  = moves[i];
-        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, scored_moves[i].move, NULL);    
+        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, scored_moves[i].move, NULL, i);    
     }   
     MergeSort(move_count, scored_moves);
     best_move = scored_moves[0].move;
@@ -105,16 +105,16 @@ int SearchRootNode(const Position* src_position)
         {          
             if (i < NUM_ROOT_MOVES_BEFORE_PVS)
             {
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &pv);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &pv, i);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, scored_moves[i].move, &pv);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, scored_moves[i].move, &pv, i);
                 if (scored_moves[i].score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &pv);
+                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &pv, i);
                 }
             }            
             if (cancel)

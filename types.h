@@ -140,6 +140,7 @@ struct Position
     uint64          hash;                   // Zobrist hash of this position, maintained incrementally
     const Position* previous;               // position immediately prior to this
     int             move;                   // the move which led to this position
+    int             score;                  // piece square score from white's perspective
     uint8           king_location[2];       // king square indices for each color
     uint8           castle_flags;           // castling rights
     uint8           state_flags;            // game state-machine flags

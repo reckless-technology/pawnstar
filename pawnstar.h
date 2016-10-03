@@ -44,6 +44,7 @@ extern const uint64         CASTLING_RIGHTS_HASHES[16];             // indexed b
 extern const uint64         EN_PASSANT_HASHES[8];                   // indexed by en passant file (if any)
 extern Context              globals[1];
 extern const char* const    OPENING_BOOK_MOVES;
+extern int                  piece_square_values[2][8][64];
 
 #if DEBUGX
 #define DEBUG_STATEMENT(x)      x

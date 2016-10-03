@@ -117,7 +117,7 @@ static void handle_setboard(char buffer[])
     globals->game->position = globals->game->stack;
     if (!PositionFromString(buffer, globals->game->position))
     {
-        NewGame(globals->game->position);
+        InitializeGame(globals->game);
     }
 }
 

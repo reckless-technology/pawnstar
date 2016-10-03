@@ -1,12 +1,11 @@
 #include "pawnstar.h"
 
-#define TRANSPOSITIONS_PER_BUCKET   8
+#define TRANSPOSITIONS_PER_BUCKET 7
 
 static bool IsPrime(int x);
 
 typedef struct HashBucket
 {
-    long            mutex[1];
     Transposition   transpositions[TRANSPOSITIONS_PER_BUCKET];
 } HashBucket;
 
@@ -14,9 +13,9 @@ static HashBucket*  transposition_table;
 static int          table_bucket_count;
 /*
 Delete the transposition table
-NB: NOT thread safe
 */
-void FreeTranspositionTable(void)
+void 
+FreeTranspositionTable(void)
 {
     if (transposition_table)
     {
@@ -27,9 +26,9 @@ void FreeTranspositionTable(void)
 }
 /*
 Create the transposition table of a specified maximum size
-NB: NOT thread safe
 */
-bool InitializeTranspositionTable(int megabytes)
+bool 
+InitializeTranspositionTable(int megabytes)
 {
     FreeTranspositionTable();
     table_bucket_count = (megabytes * MEGABYTE) / sizeof(HashBucket);
@@ -54,34 +53,29 @@ bool InitializeTranspositionTable(int megabytes)
 /*
 Find a transposition entry for this position if one exists
 */
-bool FindTransposition(uint64 hash, Transposition* transposition)
+bool 
+FindTransposition(uint64 hash, 
+                  Transposition* transposition)
 {
     int i;
     HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
-    while (_InterlockedCompareExchange(bucket->mutex, 1, 0) != 0)
-    {
-        INCREMENT("transposition lock contention retrieve");
-    }
     const Transposition* t = bucket->transpositions;
     for (i = TRANSPOSITIONS_PER_BUCKET; i != 0; --i, ++t)
     {
         if (t->hash == hash)
         {
             *transposition = *t;
-            _InterlockedExchange(bucket->mutex, 0);
             return true;
         }
     }
-    _InterlockedExchange(bucket->mutex, 0);
     return false;
 }
 /*
 Insert a new entry into the transposition table.
 Hash bucket replacement policy (in priority order):
-# replace an entry with the same hash
-# replace an empty slot
-# replace a non PV node
-# replace the entry with the smallest depth
+    # replace an entry with the same hash
+    # replace an empty slot
+    # replace the entry with the smallest depth
 */
 void 
 RecordTransposition(uint64 hash, 
@@ -94,22 +88,17 @@ RecordTransposition(uint64 hash,
     int best_score           = 0;
     Transposition* candidate = bucket->transpositions;
     Transposition* t         = bucket->transpositions;
-    while (_InterlockedCompareExchange(bucket->mutex, 1, 0) != 0)
-    {
-        INCREMENT("transposition lock contention record");
-    }
     for (int i = TRANSPOSITIONS_PER_BUCKET; i != 0; --i, ++t)
     {
         const int s = 
-            8 * (t->hash == hash)         +
-            4 * (t->hash == 0)            +
-            2 * (t->node_type != NODE_PV) +
+            4 * (t->hash == hash) +
+            2 * (t->hash == 0)    +
                 (t->depth < candidate->depth);
         if (s > best_score)
         {
             best_score = s;
             candidate  = t;
-            if (s >= 8)
+            if (s >= 4)
             {
                 break;
             }
@@ -120,7 +109,6 @@ RecordTransposition(uint64 hash,
     candidate->score     = (short)score;
     candidate->depth     = (int8)depth;
     candidate->node_type = (uint8)node_type;
-    _InterlockedExchange(bucket->mutex, 0);
 }
 /*
 We get marginally better dispersion when the hashtable size is a prime number

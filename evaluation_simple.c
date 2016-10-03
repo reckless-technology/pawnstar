@@ -1,5 +1,4 @@
 #include "pawnstar.h"
-#if !DO_EVALUATION_FULL
 /*
 This is a very simple evaluation function as described by Tomasz Michniewski
 Refer to http://chessprogramming.wikispaces.com/Simplified+evaluation+function
@@ -103,22 +102,23 @@ static const int MATERIAL_VALUES[8] = {
 };
 
 int piece_square_values[2][8][64];
-int king_endgame_values[2][64];
+int king_endgame_delta[2][64];
 
 /*
 Set up the piece square tables
 */
-void InitializeEval()
+void 
+InitializeEval()
 {
     for (int location = A1; location <= H8; ++location)
     {
         for (int piece = PAWN; piece <= KING; ++piece)
         {
-            piece_square_values[WHITE][piece][location] = MATERIAL_VALUES[piece] + PIECE_SQUARES[piece][location ^ RANK_FLIP];
-            piece_square_values[BLACK][piece][location] = MATERIAL_VALUES[piece] + PIECE_SQUARES[piece][location];
+            piece_square_values[WHITE][piece][location] =  MATERIAL_VALUES[piece] + PIECE_SQUARES[piece][location ^ RANK_FLIP];
+            piece_square_values[BLACK][piece][location] = -MATERIAL_VALUES[piece] - PIECE_SQUARES[piece][location];
         }
-        king_endgame_values[WHITE][location] = KING_SQUARE_ENDGAME[location ^ RANK_FLIP];
-        king_endgame_values[BLACK][location] = KING_SQUARE_ENDGAME[location];
+        king_endgame_delta[WHITE][location] =  KING_SQUARE_ENDGAME[location ^ RANK_FLIP] - KING_SQUARE_MIDGAME[location ^ RANK_FLIP];
+        king_endgame_delta[BLACK][location] = -KING_SQUARE_ENDGAME[location] + KING_SQUARE_MIDGAME[location];
     }
 }
 
@@ -126,44 +126,30 @@ void InitializeEval()
 Evaluate the current position, assuming neither king is in check and the 
 position is quiet.
 */
-int EvaluatePosition(const Position* position, int alpha, int beta)
+int 
+EvaluatePosition(const Position* position, 
+                 int alpha, 
+                 int beta)
 {    
-    int score = 0;
+    INCREMENT("eval calls");
     if (IsDrawByMaterial(position))
     {
         return DRAW_SCORE;
     }
-    for (int piece = PAWN; piece <= QUEEN; ++piece)
-    {
-        bitboard b = position->pieces[piece] & position->white_pieces;
-        while (b)
-        {
-            score += piece_square_values[WHITE][piece][FindAndClearLsb(&b)];
-        }
-        b = position->pieces[piece] & position->black_pieces;
-        while (b)
-        {
-            score -= piece_square_values[BLACK][piece][FindAndClearLsb(&b)];
-        }
-    }    
+    int score = position->score;
     /*
-    Endgame is simply classified as:
-    # no queens on the board, OR
-    # fewer than 8 non-pawn pieces on the board
+    Endgame is classified as:
+        # no queens on the board, OR
+        # fewer than 8 non-pawn pieces on the board
     */
     if (!position->queens || 
         PopCount(position->occupied_squares ^ position->pawns) < 8)
     {
-        score += king_endgame_values[WHITE][position->king_location[WHITE]];
-        score -= king_endgame_values[BLACK][position->king_location[BLACK]];
-    }
-    else
-    {
-        score += piece_square_values[WHITE][KING][position->king_location[WHITE]];
-        score -= piece_square_values[BLACK][KING][position->king_location[BLACK]];
+        score += king_endgame_delta[WHITE][position->king_location[WHITE]] + 
+                 king_endgame_delta[BLACK][position->king_location[BLACK]];
+        INCREMENT("eval endgames");
     }
     return position->state_flags & IS_BLACK_TO_MOVE ? -score : score;
     (void)alpha;
     (void)beta;
 }
-#endif

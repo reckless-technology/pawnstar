@@ -10,22 +10,16 @@ Determine whether to enable the debugging counts dictionaries
 #endif
 /*
 Determine whether to use the intrinsic population count instruction on native 
-64-bit platforms (not available on many older CPUs)
+64-bit platforms (not available on older CPUs)
 */
 #ifndef USE_INTRINSIC_POPCNT
 #define USE_INTRINSIC_POPCNT 1
 #endif
 /*
-Use experimental "more sophisticated" eval (probably not a great idea)
-*/
-#ifndef DO_EVALUATION_FULL
-#define DO_EVALUATION_FULL 0
-#endif
-/*
 Whether to test the Zobrist hash value at every node of a perft move gen test
 */
 #ifndef DO_TEST_HASH_DURING_PERFT
-#define DO_TEST_HASH_DURING_PERFT 0
+#define DO_TEST_HASH_DURING_PERFT 1
 #endif
 /*
 Whether to enable magic bitboard attacks for bishops and rooks (marginally 
@@ -39,6 +33,12 @@ Whether to enable null move pruning
 */
 #ifndef DO_NULL_MOVE_PRUNING
 #define DO_NULL_MOVE_PRUNING 1
+#endif
+/*
+Whether to enable extension on pawn promotion
+*/
+#ifndef DO_PROMOTION_EXTENSION
+#define DO_PROMOTION_EXTENSION 0
 #endif
 /*
 Whether to enable extension on recapture of same value piece
@@ -93,7 +93,7 @@ Global constants
 #define DEBUG_DICT_SIZE                    4999 // number of entries in the debug counts hashtable (should be prime)
 #define EVAL_HASHTABLE_SIZE                4999 // number of entries in the evaluation hashtable (should be prime)
 #define SMALL_HASTABLE_SIZE                4999 // number of transpositions in the small auxiliary (cached = fast) TT
-#define FUTILITY_CUTOFF_THRESHOLD          1200 // Prune frontier nodes where eval is this much below alpha
+#define FUTILITY_CUTOFF_THRESHOLD           900 // Prune frontier nodes where eval is this much below alpha
 #define STARTING_SEARCH_DEPTH                 3 // depth to do full width alpha beta pre-search for move ordering at the root node
 #define NUM_ROOT_MOVES_BEFORE_PVS             1 // number of moves to search with full width alpha beta window at the root node
 #define MEGABYTE                       0x100000

@@ -46,7 +46,7 @@ int SearchQuiescent(const Position* src_position,
 #endif
 
     int captures[MAX_MOVES_PER_POSITION];
-    GeneratePseudoLegalMoves(src_position, captures, NULL, false);    
+    GeneratePseudoLegalMoves(src_position, captures, NULL);  
     /*
     Main loop
     */

@@ -122,9 +122,6 @@
     <ClCompile Include="search_start_stop.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="evaluation_full.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="search_single_move.c">
       <Filter>Source Files</Filter>
     </ClCompile>

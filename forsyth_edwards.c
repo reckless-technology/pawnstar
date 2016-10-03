@@ -360,17 +360,10 @@ void PositionToString(const Position* position, char fen_string[])
     fen_string += sprintf(fen_string, "%u", position->full_move_count + 1);
 }
 /*
-Set up the position for the start of a game
-*/
-void NewGame(Position* position)
-{
-    PositionFromString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", position);
-}
-/*
 Set up the game for the start of a new game
 */
 void InitializeGame(Game* game)
 {
     game->position = game->stack;
-    NewGame(game->position);
+    PositionFromString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", game->position);
 }

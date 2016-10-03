@@ -37,10 +37,6 @@ MakeNullMove(Position* dst_position,
     dst_position->hash += (dst_position->state_flags & IS_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : -BLACK_MOVE_HASH;
 }
 
-#if !DO_EVALUATION_FULL
-extern int piece_square_values[2][8][64];
-#endif
-
 void
 AddPiece(Position* position, 
          int color, 
@@ -50,6 +46,7 @@ AddPiece(Position* position,
     position->pieces[piece] ^= BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(to);
     position->hash += PIECE_SQUARE_HASHES[color][piece][to];
+    position->score += piece_square_values[color][piece][to];
 }
 
 void
@@ -61,6 +58,7 @@ RemovePiece(Position* position,
     position->pieces[piece] ^= BITBOARD(from);
     position->pieces_of_color[color] ^= BITBOARD(from);
     position->hash -= PIECE_SQUARE_HASHES[color][piece][from];
+    position->score -= piece_square_values[color][piece][from];
 }
 
 void
@@ -73,6 +71,7 @@ MovePiece(Position* position,
     position->pieces[piece] ^= BITBOARD(from) | BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(from) | BITBOARD(to);
     position->hash += PIECE_SQUARE_HASHES[color][piece][to] - PIECE_SQUARE_HASHES[color][piece][from];
+    position->score += piece_square_values[color][piece][to] - piece_square_values[color][piece][from];
 }
 /*
 Construct a new position from an old position and a move
@@ -82,11 +81,11 @@ MakeMove(Position* dst_position,
          const Position* src_position, 
          int move)
 {                          
-    const int color             = COLOR_TO_MOVE(src_position);
-    const int from              = MOVE_FROM(move);
-    const int to                = MOVE_TO(move);
-    const int piece             = MOVE_PIECE(move);
-    const int captured          = MOVE_CAPTURED(move);
+    const int color    = COLOR_TO_MOVE(src_position);
+    const int from     = MOVE_FROM(move);
+    const int to       = MOVE_TO(move);
+    const int piece    = MOVE_PIECE(move);
+    const int captured = MOVE_CAPTURED(move);
      
     memcpy(dst_position, src_position, sizeof(Position));
     dst_position->previous = src_position;
@@ -163,7 +162,7 @@ MakeMove(Position* dst_position,
         {
             goto RegularMove;
         }
-        /* castling move */
+        // Castling move.
         switch (to)
         {
         case G1:

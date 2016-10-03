@@ -128,6 +128,7 @@ Search(const Position*  src_position,
     if ((src_position->move)                                               &&
         !(src_position->state_flags & IS_CHECK)                            &&
         beta == alpha + 1                                                  &&
+        depth > 3                                                          &&
         PopCount(friendly_pieces) > 4                                      &&
         !!(friendly_pieces & ~(src_position->pawns | src_position->kings)) &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
@@ -201,14 +202,14 @@ Search(const Position*  src_position,
             break;
 
         case PHASE_CAPTURES:
-            GeneratePseudoLegalMoves(src_position, captures, non_captures, true);        
+            GeneratePseudoLegalMoves(src_position, captures, non_captures); 
             break;
 
         case PHASE_NON_CAPTURES:
             break;
 
         case PHASE_DEFERRED_MOVES:
-            *deferred_move = 0; /* Terminate the deferred moves list. */
+            *deferred_move = 0; // Terminate the deferred moves list.
 
 #if DO_LATE_MOVE_REDUCTION
             if (!(src_position->state_flags & IS_CHECK))
@@ -232,7 +233,7 @@ Search(const Position*  src_position,
             case PHASE_NON_CAPTURES:
                 SelectNextMove(moves_this_phase, ply);
                 move = *moves_this_phase++;
-                if (!HasMoveBeenGood(ply, move) && EvaluateStaticExchange(src_position, move) < 0)
+                if (depth > 2 && !HasMoveBeenGood(ply, move) && EvaluateStaticExchange(src_position, move) < 0)
                 {
                     /* 
                     Defer moves which have never raised alpha and have 
@@ -248,7 +249,7 @@ Search(const Position*  src_position,
                 move = *moves_this_phase++;
                 break;
             }              
-            score = SearchSingleMove(src_position, search_depth, ply, alpha, beta, cancel, move, &pv);
+            score = SearchSingleMove(src_position, search_depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
             if (*cancel)
             {
                 return ILLEGAL_SCORE;

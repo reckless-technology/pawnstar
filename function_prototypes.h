@@ -6,7 +6,7 @@ Search
 */
 int         SearchQuiescent (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
 int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, Variation* parent_pv);
-int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, int move, Variation* pv);
+int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, int move, Variation* pv, int move_index);
 int         SearchRootNode  (const Position* position);
 /*
 Thinking and time control
@@ -29,7 +29,6 @@ int         PlayMoveString(Game* game, char* move_str, bool is_san);
 bool        AreMoveStringsEqual(char* str1, char* str2);
 uint64      ComputeHash(const Position* position);
 void        InitializeGame(Game* game);
-void        NewGame(Position* position);
 /*
 Attacks
 */
@@ -63,7 +62,7 @@ void        InitializeGoodMoveCounts(void);
 void        RecordGoodMove(int ply, int move);
 bool        HasMoveBeenGood(int ply, int move);
 int         GenerateLegalMoves(const Position* position, int moves[]);
-void        GeneratePseudoLegalMoves(const Position* position, int captures[], int non_captures[], bool do_non_captures);
+void        GeneratePseudoLegalMoves(const Position* position, int captures[], int non_captures[]);
 int         EvaluateStaticExchange(const Position* src_position, int move);
 void        SortMoves(int moves[], int ply);
 void        SelectNextMove(int moves[], int ply);

@@ -37,8 +37,7 @@ If do_non_captures is false, just do captures and promotions (when not in check)
 void
 GeneratePseudoLegalMoves(const Position* position, 
                          int             captures[], 
-                         int             non_captures[], 
-                         bool            do_non_captures)
+                         int             non_captures[])
 { 
     /*
     Pawn move variables
@@ -128,7 +127,7 @@ GeneratePseudoLegalMoves(const Position* position,
     {
         *captures++ = CONSTRUCT_SPECIAL_MOVE(FindAndClearLsb(&en_passant_sources), position->en_passant_index, PAWN, PAWN);
     }
-    if (do_non_captures)
+    if (non_captures)
     {
         push_delta <<= 1;
         while (double_pushes)
@@ -158,7 +157,7 @@ GeneratePseudoLegalMoves(const Position* position,
             const int to = FindAndClearLsb(&capture_targets);
             *captures++ = CONSTRUCT_MOVE(from, to, piece, PieceAt(position, to));
         }
-        if (do_non_captures)
+        if (non_captures)
         {
             bitboard non_capture_targets = targets & vacant_squares;
             while (non_capture_targets)
@@ -167,7 +166,7 @@ GeneratePseudoLegalMoves(const Position* position,
             }
         }
     }
-    if (do_non_captures && !(position->state_flags & IS_CHECK))
+    if (non_captures && !(position->state_flags & IS_CHECK))
     {
         /*
         Generate castling moves
@@ -208,7 +207,7 @@ GeneratePseudoLegalMoves(const Position* position,
         }
     }
     *captures = 0;
-    if (do_non_captures)
+    if (non_captures)
     {
         *non_captures = 0;
     }
@@ -228,7 +227,7 @@ int GenerateLegalMoves(const Position* position, int moves[])
     int non_captures[MAX_MOVES_PER_POSITION];
     int* phases[] = { captures, non_captures, NULL };
     Position dst_position[1];
-    GeneratePseudoLegalMoves(position, captures, non_captures, true);
+    GeneratePseudoLegalMoves(position, captures, non_captures);
     for (int** phase = phases; *phase; ++phase)
     {
         for (move = *phase; *move; ++move)

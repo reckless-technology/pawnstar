@@ -97,7 +97,7 @@ Perft(const Position* src_position,
     int captures[MAX_MOVES_PER_POSITION];
     int non_captures[MAX_MOVES_PER_POSITION];
     const int* move_phases[] = { captures, non_captures, NULL };
-    GeneratePseudoLegalMoves(src_position, captures, non_captures, true);
+    GeneratePseudoLegalMoves(src_position, captures, non_captures);
     if (!(++call_count & 0x3FFFF))
     {
         printf("\rpositions processed %10u", counts->legal_moves);
