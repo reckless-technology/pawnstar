@@ -47,9 +47,6 @@
     <ClCompile Include="debug_hashtable.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="evaluation_simple.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="forsyth_edwards.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -123,6 +120,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="search_single_move.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="evaluation.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

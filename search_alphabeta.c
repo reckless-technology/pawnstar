@@ -69,7 +69,7 @@ Search(const Position*  src_position,
     position.
     */
     Transposition transposition;
-    bool is_transposition = FindTransposition(src_position->hash, &transposition);
+    const bool is_transposition = FindTransposition(src_position->hash, &transposition);
     if (is_transposition && transposition.depth >= depth)
     {
         switch (transposition.node_type)
@@ -201,9 +201,11 @@ Search(const Position*  src_position,
 
         case PHASE_CAPTURES:
             GeneratePseudoLegalMoves(src_position, captures, non_captures); 
+            SortMoves(captures, ply);
             break;
 
         case PHASE_NON_CAPTURES:
+            SortMoves(non_captures, ply);
             break;
 
         case PHASE_DEFERRED_MOVES:
@@ -229,7 +231,6 @@ Search(const Position*  src_position,
             {
             case PHASE_CAPTURES:
             case PHASE_NON_CAPTURES:
-                SelectNextMove(moves_this_phase, ply);
                 move = *moves_this_phase++;
                 if (EvaluateStaticExchange(src_position, move) < 0)
                 {

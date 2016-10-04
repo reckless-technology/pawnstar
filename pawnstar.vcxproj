@@ -253,7 +253,7 @@
     <ClCompile Include="attacks.c" />
     <ClCompile Include="command_processor.c" />
     <ClCompile Include="debug_hashtable.c" />
-    <ClCompile Include="evaluation_simple.c" />
+    <ClCompile Include="evaluation.c" />
     <ClCompile Include="forsyth_edwards.c" />
     <ClCompile Include="game_over_detection.c" />
     <ClCompile Include="generated_data.c" />

@@ -22,6 +22,13 @@ Whether to test the Zobrist hash value at every node of a perft move gen test
 #define DO_TEST_HASH_DURING_PERFT 0
 #endif
 /*
+/*
+Whether to enable additional evaluation features
+*/
+#ifndef DO_EXTRA_EVAL
+#define DO_EXTRA_EVAL 1
+#endif
+/*
 Whether to enable magic bitboard attacks for bishops and rooks (marginally 
 faster on machines with a large L1 cache)
 */

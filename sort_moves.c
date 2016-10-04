@@ -58,9 +58,9 @@ void InitializeGoodMoveCounts(void)
 }
 /*
 Sort moves into "best first" order. The heuristic for ranking moves is:
-# Promoted material value, then
-# Captured material value, then
-# Total number of times this move has cutoff or raised alpha at this ply
+    # Promoted material value, then
+    # Captured material value, then
+    # Total number of times this move has cutoff or raised alpha at this ply
 */
 void 
 SortMoves(int moves[], 

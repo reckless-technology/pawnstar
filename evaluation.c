@@ -12,6 +12,18 @@ actual game tests.
 
 The piece square score is incrementally maintained in the Position object.
 */
+#if DO_EXTRA_EVAL
+static const int PAWN_SQUARE[64] = {
+    0,  0,  0,  0,  0,  0,  0,  0,
+   50, 50, 50, 50, 50, 50, 50, 50,
+   10, 10, 20, 30, 30, 20, 10, 10,
+    5,  5, 10, 25, 25, 10,  5,  5,
+    0,  0,  0, 20, 20,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0,
+    0,  0,  0,-20,-20,  0,  0,  0,
+    0,  0,  0,  0,  0,  0,  0,  0
+};
+#else
 static const int PAWN_SQUARE[64] = {
      0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50,
@@ -22,6 +34,7 @@ static const int PAWN_SQUARE[64] = {
      5, 10, 10,-20,-20, 10, 10,  5,
      0,  0,  0,  0,  0,  0,  0,  0
 };
+#endif
 static const int KNIGHT_SQUARE[64] = {
     -50,-40,-30,-30,-30,-30,-40,-50,
     -40,-20,  0,  0,  0,  0,-20,-40,
@@ -139,18 +152,30 @@ EvaluatePosition(const Position* position,
         return DRAW_SCORE;
     }
     int score = position->score;
-    /*
-    Endgame is classified as:
-        # no queens on the board, OR
-        # fewer than 8 non-pawn pieces on the board
-    */
-    if (!position->queens || 
-        PopCount(position->occupied_squares ^ position->pawns) < 8)
+    const bool is_endgame = !position->queens || PopCount(position->occupied_squares ^ position->pawns) < 8;
+    if (is_endgame)
     {
         score += king_endgame_delta[WHITE][position->king_location[WHITE]] + 
                  king_endgame_delta[BLACK][position->king_location[BLACK]];
         INCREMENT("eval endgames");
     }
+
+#if DO_EXTRA_EVAL
+    const bitboard white_pawns = position->pawns & position->white_pieces;
+    const bitboard black_pawns = position->pawns & position->black_pieces;
+    const bitboard white_pawn_attacks = SHIFT_NORTHWEST(white_pawns) | SHIFT_NORTHEAST(white_pawns);
+    const bitboard black_pawn_attacks = SHIFT_SOUTHWEST(black_pawns) | SHIFT_SOUTHEAST(black_pawns);
+    score +=  5 * (PopCount(white_pawns & white_pawn_attacks) - 
+                   PopCount(black_pawns & black_pawn_attacks)); // Defended pawn bonus
+    if (!is_endgame)
+    {
+        score += 15 * (PopCount(KING_PAWN_SHIELD_WHITE  [position->king_location[WHITE]] & white_pawns) - 
+                       PopCount(KING_PAWN_SHIELD_BLACK  [position->king_location[BLACK]] & black_pawns));
+        score +=  5 * (PopCount(KING_PAWN_SHIELD_WHITE_2[position->king_location[WHITE]] & white_pawns) - 
+                       PopCount(KING_PAWN_SHIELD_BLACK_2[position->king_location[BLACK]] & black_pawns));
+    }
+#endif
+
     return position->state_flags & IS_BLACK_TO_MOVE ? -score : score;
     (void)alpha;
     (void)beta;

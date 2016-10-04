@@ -46,8 +46,7 @@ CategorizeMoves(const Position* src_position,
                 PerftCounts*    counts)
 {
     Position position;
-    const int* move;
-    for (move = moves; *move; ++move)
+    for (const int* move = moves; *move; ++move)
     {
         MakeMove(&position, src_position, *move);
         if (position.state_flags & MOVED_INTO_CHECK)
