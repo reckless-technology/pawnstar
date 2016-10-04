@@ -69,7 +69,7 @@ Search(const Position*  src_position,
     position.
     */
     Transposition transposition;
-    const bool is_transposition = FindTransposition(src_position->hash, &transposition);
+    bool is_transposition = FindTransposition(src_position->hash, &transposition);
     if (is_transposition && transposition.depth >= depth)
     {
         switch (transposition.node_type)
@@ -128,10 +128,8 @@ Search(const Position*  src_position,
     if ((src_position->move)                                               &&
         !(src_position->state_flags & IS_CHECK)                            &&
         beta == alpha + 1                                                  &&
-        depth > 3                                                          &&
         PopCount(friendly_pieces) > 4                                      &&
-        !!(friendly_pieces & ~(src_position->pawns | src_position->kings)) &&
-        EvaluatePosition(src_position, alpha, beta) >= beta)
+        !!(friendly_pieces & ~(src_position->pawns | src_position->kings)))
     {
         INCREMENT("null move attempts");
         Position position;       
@@ -233,12 +231,9 @@ Search(const Position*  src_position,
             case PHASE_NON_CAPTURES:
                 SelectNextMove(moves_this_phase, ply);
                 move = *moves_this_phase++;
-                if (depth > 2 && !HasMoveBeenGood(ply, move) && EvaluateStaticExchange(src_position, move) < 0)
+                if (EvaluateStaticExchange(src_position, move) < 0)
                 {
-                    /* 
-                    Defer moves which have never raised alpha and have 
-                    a negative static exchange evaluation. 
-                    */
+                    // Defer searching moves with a negative SEE.
                     *deferred_move++ = move;
                     INCREMENT("deferred moves");
                     continue;
@@ -263,9 +258,9 @@ Search(const Position*  src_position,
             {
                 INCREMENT("beta cutoffs");
                 INCREMENT_IF(phase == PHASE_PRE_MOVES, "beta cutoffs from TT move");
-                RecordTransposition(src_position->hash, depth, beta, move, NODE_CUT);
+                RecordTransposition(src_position->hash, depth, score, move, NODE_CUT);
                 RecordGoodMove(ply, move);
-                return beta;
+                return score;
             }
             if (score > best_score)
             {
@@ -318,7 +313,7 @@ Search(const Position*  src_position,
         We tried every move but did not raise alpha; this was an all node
         */
         INCREMENT("all nodes");
-        RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_ALL);       
+        RecordTransposition(src_position->hash, depth, best_score, best_move, NODE_ALL);       
     }
     return alpha;
 }

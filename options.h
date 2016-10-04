@@ -19,7 +19,7 @@ Determine whether to use the intrinsic population count instruction on native
 Whether to test the Zobrist hash value at every node of a perft move gen test
 */
 #ifndef DO_TEST_HASH_DURING_PERFT
-#define DO_TEST_HASH_DURING_PERFT 1
+#define DO_TEST_HASH_DURING_PERFT 0
 #endif
 /*
 Whether to enable magic bitboard attacks for bishops and rooks (marginally 
@@ -38,7 +38,7 @@ Whether to enable null move pruning
 Whether to enable extension on pawn promotion
 */
 #ifndef DO_PROMOTION_EXTENSION
-#define DO_PROMOTION_EXTENSION 0
+#define DO_PROMOTION_EXTENSION 1
 #endif
 /*
 Whether to enable extension on recapture of same value piece
@@ -74,7 +74,7 @@ exchange evaluation (SEE)
 /*
 Global constants
 */
-#define HASHTABLE_MEGABYTES                 256 // default transposition table size in MB
+#define HASHTABLE_MEGABYTES                 512 // default transposition table size in MB
 #define STRING_BUF_LEN                     1024 // default line buffer size
 #define MAX_MOVES_PER_POSITION              128 // maximum possible number of pseudo-legal moves for any chess position
 #define BETA                              11000 // greater than any possible evaluation score including checkmate

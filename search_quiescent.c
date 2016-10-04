@@ -29,7 +29,7 @@ int SearchQuiescent(const Position* src_position,
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
-        return beta;
+        return score;
     }
     if (score > alpha)
     {
@@ -44,6 +44,8 @@ int SearchQuiescent(const Position* src_position,
         return alpha;
     }
 #endif
+
+    int best_score = score;
 
     int captures[MAX_MOVES_PER_POSITION];
     GeneratePseudoLegalMoves(src_position, captures, NULL);  
@@ -78,13 +80,18 @@ int SearchQuiescent(const Position* src_position,
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            return beta;
+            return score;
         }
-        if (score > alpha)
+        if (score > best_score)
         {
-            alpha = score;            
-            INCREMENT("quiescent pv changed");
-        }
+            best_score = score;
+            if (score > alpha)
+            {
+                alpha = score;            
+                INCREMENT("quiescent pv changed");
+            }
+        }      
     }
-    return alpha;
+    INCREMENT("quiescent all nodes");
+    return best_score;
 }

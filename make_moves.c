@@ -18,8 +18,8 @@ static const uint8 CASTLING_RIGHTS_MASKS[64] =
 };
 /*
 Make a null move (used for null move pruning during search)
-# Clear the en passant square
-# Flip the side to move
+    # Clear the en passant square
+    # Flip the side to move
 */
 void 
 MakeNullMove(Position* dst_position, 
@@ -43,9 +43,9 @@ AddPiece(Position* position,
          int piece, 
          int to)
 {
-    position->pieces[piece] ^= BITBOARD(to);
+    position->pieces[piece]          ^= BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(to);
-    position->hash += PIECE_SQUARE_HASHES[color][piece][to];
+    position->hash  += PIECE_SQUARE_HASHES[color][piece][to];
     position->score += piece_square_values[color][piece][to];
 }
 
@@ -55,9 +55,9 @@ RemovePiece(Position* position,
             int piece, 
             int from)
 {
-    position->pieces[piece] ^= BITBOARD(from);
+    position->pieces[piece]          ^= BITBOARD(from);
     position->pieces_of_color[color] ^= BITBOARD(from);
-    position->hash -= PIECE_SQUARE_HASHES[color][piece][from];
+    position->hash  -= PIECE_SQUARE_HASHES[color][piece][from];
     position->score -= piece_square_values[color][piece][from];
 }
 
@@ -68,9 +68,9 @@ MovePiece(Position* position,
           int from, 
           int to)
 {
-    position->pieces[piece] ^= BITBOARD(from) | BITBOARD(to);
+    position->pieces[piece]          ^= BITBOARD(from) | BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(from) | BITBOARD(to);
-    position->hash += PIECE_SQUARE_HASHES[color][piece][to] - PIECE_SQUARE_HASHES[color][piece][from];
+    position->hash  += PIECE_SQUARE_HASHES[color][piece][to] - PIECE_SQUARE_HASHES[color][piece][from];
     position->score += piece_square_values[color][piece][to] - piece_square_values[color][piece][from];
 }
 /*
@@ -105,40 +105,34 @@ MakeMove(Position* dst_position,
     {
     case PAWN:
         dst_position->reversible_move_count = 0;
-        if (!MOVE_PROMOTED(move))
+        if (captured)
         {
-            if (!MOVE_IS_SPECIAL(move))
-            {
-                // Regular pawn move
-                if (captured)
-                {
-                    RemovePiece(dst_position, ENEMY(color), captured, to);
-                }                
-                else if (((to - from) & 0xF) == 0) // equiv to (abs(to - from) == 16)
-                {
-                    // Pawn double push: affects en passant.
-                    dst_position->en_passant_index = (uint8)((from + to) >> 1);
-                    dst_position->hash += EN_PASSANT_HASHES[FILE_OF(from)];
-                }
-                MovePiece(dst_position, color, PAWN, from, to);
-            }
-            else
+            if (MOVE_IS_SPECIAL(move))
             {
                 // En passant capture: capture location is source rank, destination file
                 const int en_passant_capture_location = (from & 0x38) | (to & 0x07);
                 RemovePiece(dst_position, ENEMY(color), PAWN, en_passant_capture_location);
-                MovePiece(dst_position, color, PAWN, from, to);
             }
-        }
-        else
-        {
-            // Pawn promotion
-            if (captured)
+            else
             {
                 RemovePiece(dst_position, ENEMY(color), captured, to);
             }
+        }                
+        if (((to - from) & 0xF) == 0) // equiv to (abs(to - from) == 16)
+        {
+            // Pawn double push: affects en passant.
+            dst_position->en_passant_index = (uint8)((from + to) >> 1);
+            dst_position->hash += EN_PASSANT_HASHES[FILE_OF(from)];
+        }       
+        if (MOVE_PROMOTED(move))
+        {
+            // Pawn promotion.
             RemovePiece(dst_position, color, PAWN, from);
             AddPiece(dst_position, color, MOVE_PROMOTED(move), to);
+        }
+        else
+        {
+            MovePiece(dst_position, color, PAWN, from, to);
         }
         break;
 

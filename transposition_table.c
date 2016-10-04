@@ -1,6 +1,6 @@
 #include "pawnstar.h"
 
-#define TRANSPOSITIONS_PER_BUCKET 7
+#define TRANSPOSITIONS_PER_BUCKET 4
 
 static bool IsPrime(int x);
 

@@ -9,6 +9,8 @@ The idea is that what it lacks in sophistication (a lot) it makes up for in
 speed, thus hopefully allowing greater search depth. It's useful for regression
 testing of the "full" evaluation function, and performs surprisingly well in
 actual game tests.
+
+The piece square score is incrementally maintained in the Position object.
 */
 static const int PAWN_SQUARE[64] = {
      0,  0,  0,  0,  0,  0,  0,  0,
@@ -71,14 +73,14 @@ static const int KING_SQUARE_MIDGAME[64] = {
      20, 30, 10,  0,  0, 10, 30, 20
 };
 static const int KING_SQUARE_ENDGAME[64] = {
-    -50,-40,-30,-20,-20,-30,-40,-50,
-    -30,-20,-10,  0,  0,-10,-20,-30,
-    -30,-10, 20, 30, 30, 20,-10,-30,
-    -30,-10, 30, 40, 40, 30,-10,-30,
-    -30,-10, 30, 40, 40, 30,-10,-30,
-    -30,-10, 20, 30, 30, 20,-10,-30,
-    -30,-30,  0,  0,  0,  0,-30,-30,
-    -50,-30,-30,-30,-30,-30,-30,-50
+      0, 10, 20, 30, 30, 20, 10,  0,
+     10, 20, 30, 40, 40, 30, 20, 10,
+     20, 30, 40, 50, 50, 40, 30, 20,
+     30, 40, 50, 60, 60, 50, 40, 30,
+     30, 40, 50, 60, 60, 50, 40, 30,
+     20, 30, 40, 50, 50, 40, 30, 20,
+     10, 20, 30, 40, 40, 30, 20, 10,
+      0, 10, 20, 30, 30, 20, 10,  0,
 };
 static const int* const PIECE_SQUARES[8] = {
     NULL,
@@ -101,8 +103,8 @@ static const int MATERIAL_VALUES[8] = {
       0,
 };
 
-int piece_square_values[2][8][64];
-int king_endgame_delta[2][64];
+int         piece_square_values[2][8][64];
+static int  king_endgame_delta[2][64];
 
 /*
 Set up the piece square tables

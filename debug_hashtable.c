@@ -39,8 +39,8 @@ void DebugXIncrement(const char key[])
     the bottom 2 bits of the address before finding the index into the table
     */
     DebugEntry* const entry = &debug_dict[((uint64)key >> 2) % DEBUG_DICT_SIZE];
-    entry->key = key;                       /* don't care about hash collisions */
-    _InterlockedIncrement(&entry->count);   /* alleviates miscounts due to races from worker threads */
+    entry->key = key;
+    ++entry->count;
 }
 
 void DebugXIncrementIf(bool condition, const char key[])
