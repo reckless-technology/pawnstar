@@ -83,7 +83,7 @@ Search(const Position*  src_position,
             if (transposition.score >= beta)
             {
                 INCREMENT("table hit beta cutoffs");
-                return beta;
+                return transposition.score;
             }
             break;
 
@@ -96,7 +96,7 @@ Search(const Position*  src_position,
             if (transposition.score <= alpha)
             {
                 INCREMENT("table hit alpha cutoffs");
-                return alpha;
+                return transposition.score;
             }
             break;
 
@@ -224,7 +224,7 @@ Search(const Position*  src_position,
             printf("ERROR: illegal move phase\n");
             break;
         }
-        int* moves_this_phase = move_phases[phase];
+        const int* moves_this_phase = move_phases[phase];
         while (*moves_this_phase)
         {
             switch (phase)
@@ -316,6 +316,6 @@ Search(const Position*  src_position,
         INCREMENT("all nodes");
         RecordTransposition(src_position->hash, depth, best_score, best_move, NODE_ALL);       
     }
-    return alpha;
+    return best_score;
 }
 
