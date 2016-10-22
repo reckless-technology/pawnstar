@@ -1,18 +1,6 @@
 #include "pawnstar.h"
-/*
-This is a very simple evaluation function as described by Tomasz Michniewski
-Refer to http://chessprogramming.wikispaces.com/Simplified+evaluation+function
-
-The evaluation funtion is based on material and piece-square tables. 
-
-The idea is that what it lacks in sophistication (a lot) it makes up for in 
-speed, thus hopefully allowing greater search depth. It's useful for regression
-testing of the "full" evaluation function, and performs surprisingly well in
-actual game tests.
-
-The piece square score is incrementally maintained in the Position object.
-*/
 #if DO_EXTRA_EVAL
+
 static const int PAWN_SQUARE[64] = {
     0,  0,  0,  0,  0,  0,  0,  0,
    50, 50, 50, 50, 50, 50, 50, 50,
@@ -23,7 +11,9 @@ static const int PAWN_SQUARE[64] = {
     0,  0,  0,-20,-20,  0,  0,  0,
     0,  0,  0,  0,  0,  0,  0,  0
 };
+
 #else
+
 static const int PAWN_SQUARE[64] = {
      0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50,
@@ -34,7 +24,9 @@ static const int PAWN_SQUARE[64] = {
      5, 10, 10,-20,-20, 10, 10,  5,
      0,  0,  0,  0,  0,  0,  0,  0
 };
+
 #endif
+
 static const int KNIGHT_SQUARE[64] = {
     -50,-40,-30,-30,-30,-30,-40,-50,
     -40,-20,  0,  0,  0,  0,-20,-40,
@@ -104,15 +96,32 @@ static const int* const PIECE_SQUARES[7] = {
     QUEEN_SQUARE,
     KING_SQUARE_MIDGAME,
 };
+
+#if DO_EXTRA_EVAL
+
 static const int MATERIAL_VALUES[7] = {
       0,
+    100, // pawn
+    325, // knight
+    325, // bishop
+    500, // rook
+   1000, // queen
+      0, // king
+};
+
+#else
+
+static const int MATERIAL_VALUES[7] = {
+    0,
     100, // pawn
     320, // knight
     330, // bishop
     500, // rook
     900, // queen
-      0, // king
+    0, // king
 };
+
+#endif
 
 int         piece_square_values[2][8][64];
 static int  king_endgame_delta[2][64];
@@ -159,22 +168,54 @@ EvaluatePosition(const Position* position,
     }
 
 #if DO_EXTRA_EVAL
+    // Defended pawns
     const bitboard white_pawns = position->pawns & position->white_pieces;
     const bitboard black_pawns = position->pawns & position->black_pieces;
     const bitboard white_pawn_attacks = SHIFT_NORTHWEST(white_pawns) | SHIFT_NORTHEAST(white_pawns);
     const bitboard black_pawn_attacks = SHIFT_SOUTHWEST(black_pawns) | SHIFT_SOUTHEAST(black_pawns);
     score +=  5 * (PopCount(white_pawns & white_pawn_attacks) - 
-                   PopCount(black_pawns & black_pawn_attacks)); // Defended pawn bonus
+                   PopCount(black_pawns & black_pawn_attacks)); 
+    // Bishop pair
+    const bitboard white_bishops = position->bishops & position->white_pieces;
+    const bitboard black_bishops = position->bishops & position->black_pieces;
+    if ((white_bishops & WHITE_SQUARES) && (white_bishops & BLACK_SQUARES))
+    {
+        score += 40;
+    }
+    if ((black_bishops & WHITE_SQUARES) && (black_bishops & BLACK_SQUARES))
+    {
+        score -= 40;
+    }
+    // Mid game features only
     if (!is_endgame)
     {
+        // King pawn shelter
         score += 15 * (PopCount(KING_PAWN_SHIELD_WHITE  [position->king_location[WHITE]] & white_pawns) - 
                        PopCount(KING_PAWN_SHIELD_BLACK  [position->king_location[BLACK]] & black_pawns));
         score +=  5 * (PopCount(KING_PAWN_SHIELD_WHITE_2[position->king_location[WHITE]] & white_pawns) - 
                        PopCount(KING_PAWN_SHIELD_BLACK_2[position->king_location[BLACK]] & black_pawns));
+        // King on open file
+        if (!(NORTH_OF[position->king_location[WHITE]] & white_pawns))
+        {
+            score -= 20;
+        }
+        if (!(SOUTH_OF[position->king_location[BLACK]] & black_pawns))
+        {
+            score += 20;
+        }
+        // Forfeit of castling rights
+        if (!(position->castle_flags & (MAY_WHITE_K | MAY_WHITE_Q)))
+        {
+            score -= 20;
+        }
+        if (!(position->castle_flags & (MAY_BLACK_K | MAY_BLACK_Q)))
+        {
+            score += 20;
+        }
     }
 #endif
 
-    return position->state_flags & IS_BLACK_TO_MOVE ? -score : score;
+    return position->state_flags & IS_BLACK_TO_MOVE ? -score + 10 : score + 10; // tempo bonus
     (void)alpha;
     (void)beta;
 }

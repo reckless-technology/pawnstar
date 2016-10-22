@@ -10,7 +10,8 @@ int NextRandom(void)
 {
 	if (x == 0)
 	{
-		x = (uint64)time(NULL) * GetMilliseconds();
+		x = (uint64)time(NULL);
+        x *= NextRandom();
 	}
 	x ^= x >> 12;
 	x ^= x << 25;

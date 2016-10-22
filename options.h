@@ -5,9 +5,6 @@ Determine whether to enable the debugging counts dictionaries
 #ifndef DEBUGX
 #define DEBUGX 1
 #endif 
-#if DEBUGX && !defined(EVAL_DEBUGX)
-#define EVAL_DEBUGX 0
-#endif
 /*
 Determine whether to use the intrinsic population count instruction on native 
 64-bit platforms (not available on older CPUs)
@@ -76,7 +73,7 @@ Whether to skip moves in quiescence search which have a negative static
 exchange evaluation (SEE)
 */
 #ifndef DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 1
+#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 0
 #endif
 /*
 Global constants
@@ -100,7 +97,7 @@ Global constants
 #define DEBUG_DICT_SIZE                    4999 // number of entries in the debug counts hashtable (should be prime)
 #define EVAL_HASHTABLE_SIZE                4999 // number of entries in the evaluation hashtable (should be prime)
 #define SMALL_HASTABLE_SIZE                4999 // number of transpositions in the small auxiliary (cached = fast) TT
-#define FUTILITY_CUTOFF_THRESHOLD           900 // Prune frontier nodes where eval is this much below alpha
+#define FUTILITY_CUTOFF_THRESHOLD          1000 // Prune frontier nodes where eval is this much below alpha
 #define STARTING_SEARCH_DEPTH                 3 // depth to do full width alpha beta pre-search for move ordering at the root node
 #define NUM_ROOT_MOVES_BEFORE_PVS             1 // number of moves to search with full width alpha beta window at the root node
 #define MEGABYTE                       0x100000

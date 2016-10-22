@@ -1,6 +1,6 @@
 #include "pawnstar.h"
 
-#define TRANSPOSITIONS_PER_BUCKET 4
+#define TRANSPOSITIONS_PER_BUCKET 7
 
 static bool IsPrime(int x);
 
@@ -58,7 +58,7 @@ FindTransposition(uint64 hash,
                   Transposition* transposition)
 {
     int i;
-    HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
+    const HashBucket* const bucket = &transposition_table[hash % table_bucket_count]; 
     const Transposition* t = bucket->transpositions;
     for (i = TRANSPOSITIONS_PER_BUCKET; i != 0; --i, ++t)
     {

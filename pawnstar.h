@@ -15,14 +15,14 @@ Global header file - included by each source file
 
 extern const MagicMoveEntry ROOK_MAGICS[64];
 extern const MagicMoveEntry BISHOP_MAGICS[64];
-//extern const bitboard       NORTH_OF[64];
-//extern const bitboard       NORTHEAST_OF[64];
-//extern const bitboard       EAST_OF[64];
-//extern const bitboard       SOUTHEAST_OF[64];
-//extern const bitboard       SOUTH_OF[64];
-//extern const bitboard       SOUTHWEST_OF[64];
-//extern const bitboard       WEST_OF[64];
-//extern const bitboard       NORTHWEST_OF[64];
+extern const bitboard       NORTH_OF[64];
+extern const bitboard       NORTHEAST_OF[64];
+extern const bitboard       EAST_OF[64];
+extern const bitboard       SOUTHEAST_OF[64];
+extern const bitboard       SOUTH_OF[64];
+extern const bitboard       SOUTHWEST_OF[64];
+extern const bitboard       WEST_OF[64];
+extern const bitboard       NORTHWEST_OF[64];
 extern const bitboard       PAWN_ATTACKS_WHITE[64];
 extern const bitboard       PAWN_ATTACKS_BLACK[64];
 extern const bitboard       KNIGHT_ATTACKS[64];

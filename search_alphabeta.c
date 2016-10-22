@@ -232,7 +232,7 @@ Search(const Position*  src_position,
             case PHASE_CAPTURES:
             case PHASE_NON_CAPTURES:
                 move = *moves_this_phase++;
-                if (EvaluateStaticExchange(src_position, move) < 0)
+                if (depth > 1 && EvaluateStaticExchange(src_position, move) < 0)
                 {
                     // Defer searching moves with a negative SEE.
                     *deferred_move++ = move;
