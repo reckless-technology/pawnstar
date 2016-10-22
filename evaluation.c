@@ -96,6 +96,9 @@ static const int* const PIECE_SQUARES[7] = {
     QUEEN_SQUARE,
     KING_SQUARE_MIDGAME,
 };
+static const int RANDOM_FLUCTUATION[8] = {
+    -5, 0, 0, 0, 0, 0, 0, 5
+};
 
 #if DO_EXTRA_EVAL
 
@@ -214,7 +217,7 @@ EvaluatePosition(const Position* position,
         }
     }
 #endif
-
+    score += RANDOM_FLUCTUATION[NextRandom() & 7];
     return position->state_flags & IS_BLACK_TO_MOVE ? -score + 10 : score + 10; // tempo bonus
     (void)alpha;
     (void)beta;
