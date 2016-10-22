@@ -95,7 +95,7 @@ static const int KING_SQUARE_ENDGAME[64] = {
      10, 20, 30, 40, 40, 30, 20, 10,
       0, 10, 20, 30, 30, 20, 10,  0,
 };
-static const int* const PIECE_SQUARES[8] = {
+static const int* const PIECE_SQUARES[7] = {
     NULL,
     PAWN_SQUARE,
     KNIGHT_SQUARE,
@@ -103,9 +103,8 @@ static const int* const PIECE_SQUARES[8] = {
     ROOK_SQUARE,
     QUEEN_SQUARE,
     KING_SQUARE_MIDGAME,
-    NULL,
 };
-static const int MATERIAL_VALUES[8] = {
+static const int MATERIAL_VALUES[7] = {
       0,
     100, // pawn
     320, // knight
@@ -113,7 +112,6 @@ static const int MATERIAL_VALUES[8] = {
     500, // rook
     900, // queen
       0, // king
-      0,
 };
 
 int         piece_square_values[2][8][64];

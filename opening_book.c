@@ -23,15 +23,15 @@ Head pointer
 */
 static BookPosition* opening_book = NULL;
 /*
-Create a new book bp on the heap and return a pointer to it
+Create a new BookPosition and return a pointer to it
 */
 static BookPosition* NewBookPosition(uint64 hash)
 {
-    BookPosition* bp    = (BookPosition*)malloc(sizeof(BookPosition));
+    BookPosition* bp    = malloc(sizeof(BookPosition));
     bp->hash            = hash;
     bp->capacity        = 1;
     bp->count           = 0;
-    bp->moves           = (int*)malloc(sizeof(int));
+    bp->moves           = malloc(sizeof(int));
     bp->next            = NULL;
     return bp;
 }
@@ -65,7 +65,7 @@ static void AddMove(uint64 hash, int move)
     if (bp->count == bp->capacity)
     {
         bp->capacity <<= 1;
-        bp->moves = (int*)realloc(bp->moves, bp->capacity * sizeof(int));
+        bp->moves = realloc(bp->moves, bp->capacity * sizeof(int));
     }
     bp->moves[bp->count++] = move;
 }
@@ -84,28 +84,20 @@ Free the heap memory used by the opening book
 void FreeOpeningBook()
 {
     BookPosition* bp = opening_book;
-    BookPosition* next;
     while (bp)
     {
-        next = bp->next;
+		BookPosition* next = bp->next;
         free(bp->moves);
         free(bp);
         bp = next;
     }
     opening_book = NULL;
 }
-typedef struct
-{
-    int move;
-    int count;
-} BookMoveCount;
-
 /*
 Show all possible book moves for this position
 */
 void DisplayAvailableBookMoves(const Position* position)
 {
-    int i;
     int book_moves [MAX_MOVES_PER_POSITION] = { 0 };
     int move_counts[MAX_MOVES_PER_POSITION] = { 0 };
     int next_move = 0;
@@ -114,7 +106,7 @@ void DisplayAvailableBookMoves(const Position* position)
     {
         return;
     }
-    for (i = 0; i != bp->count; ++i)
+    for (int i = 0; i != bp->count; ++i)
     {
         const int* move = FindMove(book_moves, bp->moves[i]);
         if (!move)
@@ -130,7 +122,7 @@ void DisplayAvailableBookMoves(const Position* position)
         }
     }
     printf("move   count\n");
-    for (i = 0; i != next_move; ++i)
+    for (int i = 0; i != next_move; ++i)
     {
         char buffer[16];
         MoveToSanString(position, book_moves[i], buffer);
@@ -139,70 +131,49 @@ void DisplayAvailableBookMoves(const Position* position)
 }
 /*
 Initialize an opening book from a string, with each line containing a book 
-line of play. Returns true on success.
+line of play. 
+Returns true on success.
 */
 bool InitializeOpeningBookFromString(const char* book_string)
 {
     bool result = true;
     char* const book = strdup(book_string);
-    char* line;
-    char* next_line = NULL;  
     int line_number = 0;
+	char* line_ctx = NULL;
+	char* move_ctx = NULL;
     FreeOpeningBook();
-    /* Split the string into lines */
-    for (line = book; line; line = next_line)
+    // Split the string into lines
+    for (char* line = strtok_s(book, "\n", &line_ctx);
+	     line;
+		 line = strtok_s(NULL, "\n", &line_ctx))
     {
         Game game[1];
-        char* token;
-        char* next_token = NULL;
-        next_line = strchr(line, '\n');
-        if (next_line)
-        {
-            *next_line++ = '\0';
-            while (*next_line == '\n')
-            {
-                ++next_line;
-            }
-        }
         ++line_number;
         InitializeGame(game);
-        /* Split the line into tokens separated by space(s) */
-        for (token = line; token; token = next_token)
+        // Split the line into tokens separated by spaces
+        for (char* move_str = strtok_s(line, " ", &move_ctx);
+		     move_str;
+			 move_str = strtok_s(NULL, " ", &move_ctx))
         {
-            const uint64 hash = game->position->hash;
-            bool is_bad_move;
-            int move;
-            char* c;
-            next_token = strchr(token, ' ');
-            if (next_token)
+            const uint64 hash = game->position->hash;           
+            if (move_str[0] == '#')
             {
-                *next_token++ = '\0';
-                while (*next_token == ' ')
-                {
-                    ++next_token;
-                }
-            }     
-            if (token[0] == '#')
-            {
-                break; /* comment - ignore rest of line */
+                break; // comment - ignore rest of line
             }
-            if (isdigit(token[0]))
+            if (isdigit(move_str[0]))
             {
-                continue; /* move number only - ignore this token */
+                continue; // move number only
             }
-            if ((c = strchr(token, '?')) != NULL) /* don't make this move! */
+			char* const c = strchr(move_str, '?');
+			const bool is_bad_move = !!c;
+            if (c)
             {
-                is_bad_move = true;
                 *c = '\0';
             }
-            else
-            {
-                is_bad_move = false;
-            }
-            move = PlayMoveString(game, token, true);
+            const int move = PlayMoveString(game, move_str, true);
             if (!move)
             {
-                printf("ERROR: illegal move '%s' found in line %u of opening book\n", token, line_number);
+                printf("ERROR: illegal move '%s' found in line %u of opening book\n", move_str, line_number);
                 result = false;
                 break;
             }

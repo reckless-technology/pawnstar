@@ -44,11 +44,10 @@ int main()
     InitializeEval();
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
     InitializeGoodMoveCounts();
-    InitializeRandom();
     if (!InitializeOpeningBookFromFile("pawnstar.book"))
     {
         printf("NOTE: using built in opening book\n");
-        //InitializeOpeningBookFromString(OPENING_BOOK_MOVES);
+        InitializeOpeningBookFromString(OPENING_BOOK_MOVES);
     }
     InitializeGame(globals->game);
     DEBUG_STATEMENT(DebugXClear());
