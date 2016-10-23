@@ -134,7 +134,7 @@ Search(const Position*  src_position,
         INCREMENT("null move attempts");
         Position position;       
         MakeNullMove(&position, src_position);
-        score = -Search(&position, depth - 3, ply + 1, -beta, -alpha, cancel, NULL);
+        score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, NULL);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -201,11 +201,11 @@ Search(const Position*  src_position,
 
         case PHASE_CAPTURES:
             GeneratePseudoLegalMoves(src_position, captures, non_captures); 
-            SortMoves(captures, ply);
+            SortMoves(src_position, captures, ply, false);
             break;
 
         case PHASE_NON_CAPTURES:
-            SortMoves(non_captures, ply);
+            SortMoves(src_position, non_captures, ply, false);
             break;
 
         case PHASE_DEFERRED_MOVES:

@@ -63,17 +63,30 @@ Sort moves into "best first" order. The heuristic for ranking moves is:
     # Total number of times this move has cutoff or raised alpha at this ply
 */
 void 
-SortMoves(int moves[], 
-          int ply)
+SortMoves(const Position* position,
+          int moves[], 
+          int ply,
+          bool use_see)
 {   
     int i;
     ScoredMove scored_moves[MAX_MOVES_PER_POSITION];    
     const int* const counts = &good_move_counts[ply][0];
     int move;
-    for (i = 0; (move = moves[i]) != 0; ++i)
+    if (use_see)
     {
-        scored_moves[i].move  = move;
-        scored_moves[i].score = MERIT(move) + counts[move & MOVE_MASK];
+        for (i = 0; (move = moves[i]) != 0; ++i)
+        {
+            scored_moves[i].move  = move;
+            scored_moves[i].score = EvaluateStaticExchange(position, move);
+        }
+    }
+    else
+    {
+        for (i = 0; (move = moves[i]) != 0; ++i)
+        {
+            scored_moves[i].move  = move;
+            scored_moves[i].score = MERIT(move) + counts[move & MOVE_MASK];
+        }
     }
     if (i < 2)
     {

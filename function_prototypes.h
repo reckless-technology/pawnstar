@@ -64,7 +64,7 @@ bool        HasMoveBeenGood(int ply, int move);
 int         GenerateLegalMoves(const Position* position, int moves[]);
 void        GeneratePseudoLegalMoves(const Position* position, int captures[], int non_captures[]);
 int         EvaluateStaticExchange(const Position* src_position, int move);
-void        SortMoves(int moves[], int ply);
+void        SortMoves(const Position* position, int moves[], int ply, bool use_see);
 void        SelectNextMove(int moves[], int ply);
 void        MergeSort(int num_elements, ScoredMove values[]);
 /*
