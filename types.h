@@ -151,14 +151,14 @@ struct Position
 /*
 Values for magic bitboard attack generator for one square
 */
+#pragma warning(disable:4200)
 typedef struct
 {
     uint64          magic;          // the multiplier
     bitboard        occupancy_mask; // mask for the pertinent occupied squares excluding outer squares
-    const uint8*    attack_indices; // indices into the attacks set
-    const bitboard* attacks;        // the set of distinct attacks 
     int             shift;          // right shift amount after multiplication
-    int             padding;        // make the entry a multiple of 8 bytes in size
+    int             padding;
+    uint64          attacks[];      // the attack vectors
 } MagicMoveEntry;
 /*
 Clock and time control information

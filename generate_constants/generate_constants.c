@@ -95,19 +95,8 @@ static const DirectionVector direction_vectors[] =
     { DIR_NONE,       0,  0 },
 };
 
-static struct
-{
-    uint64 magic;
-    uint64 mask;
-    uint64 attacks[4096];
-    uint8  attack_indices[4096];
-    int    shift;
-    int    num_discrete_attacks;
-} magics[64];
 
-/*
-Determine the population count (Hamming weight) of x
-*/
+
 static int 
 PopCount(uint64 x)
 {
@@ -119,10 +108,7 @@ PopCount(uint64 x)
     }
     return count;
 }
-/*
-Find the index of the least significant bit set in x (x is non zero)
-This is the slow brute force way since we don't care about performance here.
-*/
+
 static int 
 Lsb(uint64 x) 
 {
@@ -134,9 +120,7 @@ Lsb(uint64 x)
     }
     return result;
 }
-/*
-Find the index of and then clear the least significant bit set in *x
-*/
+
 static int 
 FindAndClearLsb(uint64* x)
 {    
@@ -144,24 +128,12 @@ FindAndClearLsb(uint64* x)
     *x = y & (y - 1);
     return Lsb(y);
 }
-/*
-Determine the occupancy mask for bishop attacks for a bishop standing on 
-location (excluding outer squares as they do no affect attack set)
-*/
 static uint64 
-BishopOccupancyMask(int location)
+DiagonalOccupancyMask(int location)
 {
     uint64 result = NO_SQUARES;
     int x, y;
     for (x = FILE_OF(location) + 1, y = RANK_OF(location) + 1; x < 7 && y < 7; ++x, ++y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    for (x = FILE_OF(location) + 1, y = RANK_OF(location) - 1; x < 7 && y > 0; ++x, --y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    for (x = FILE_OF(location) - 1, y = RANK_OF(location) + 1; x > 0 && y < 7; --x, ++y)
     {
         result |= BITBOARD_XY(x, y);
     }
@@ -171,12 +143,42 @@ BishopOccupancyMask(int location)
     }
     return result;
 }
-/*
-Determine the occupancy mask for rook attacks for a rook standing on 
-location (excluding outer squares as they do no affect attack set)
-*/
+
 static uint64 
-RookOccupancyMask(int location)
+AntiDiagonalOccupancyMask(int location)
+{
+    uint64 result = NO_SQUARES;
+    int x, y;
+    for (x = FILE_OF(location) + 1, y = RANK_OF(location) - 1; x < 7 && y > 0; ++x, --y)
+    {
+        result |= BITBOARD_XY(x, y);
+    }
+    for (x = FILE_OF(location) - 1, y = RANK_OF(location) + 1; x > 0 && y < 7; --x, ++y)
+    {
+        result |= BITBOARD_XY(x, y);
+    }
+    return result;
+}
+
+static uint64 
+FileOccupancyMask(int location)
+{
+    uint64 result = NO_SQUARES;
+    int x, y;
+    x = FILE_OF(location);
+    for (y = RANK_OF(location) + 1; y < 7; ++y)
+    {
+        result |= BITBOARD_XY(x, y);
+    }
+    for (y = RANK_OF(location) - 1; y > 0; --y)
+    {
+        result |= BITBOARD_XY(x, y);
+    }
+    return result;
+}
+
+static uint64 
+RankOccupancyMask(int location)
 {
     uint64 result = NO_SQUARES;
     int x, y;
@@ -189,24 +191,12 @@ RookOccupancyMask(int location)
     {
         result |= BITBOARD_XY(x, y);
     }
-    x = FILE_OF(location);
-    for (y = RANK_OF(location) + 1; y < 7; ++y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    for (y = RANK_OF(location) - 1; y > 0; --y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
     return result;
 }
-/*
-Compute attacks for a bishop standing on location in the presence of possible 
-blockers
-*/
+
 static uint64 
-BishopActualAttacks(uint64 occupied_squares, 
-                    int    location)
+DiagonalActualAttacks(uint64 occupied_squares, 
+                      int    location)
 {
     uint64 result = NO_SQUARES;
     for (uint64 square = SHIFT_NORTHEAST(BITBOARD(location)); square; square = SHIFT_NORTHEAST(square))
@@ -217,7 +207,7 @@ BishopActualAttacks(uint64 occupied_squares,
             break;
         }
     }
-    for (uint64 square = SHIFT_SOUTHEAST(BITBOARD(location)); square; square = SHIFT_SOUTHEAST(square))
+    for (uint64 square = SHIFT_SOUTHWEST(BITBOARD(location)); square; square = SHIFT_SOUTHWEST(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -225,7 +215,15 @@ BishopActualAttacks(uint64 occupied_squares,
             break;
         }
     }
-    for (uint64 square = SHIFT_SOUTHWEST(BITBOARD(location)); square; square = SHIFT_SOUTHWEST(square))
+    return result;
+}
+
+static uint64 
+AntiDiagonalActualAttacks(uint64 occupied_squares, 
+                          int    location)
+{
+    uint64 result = NO_SQUARES;
+    for (uint64 square = SHIFT_SOUTHEAST(BITBOARD(location)); square; square = SHIFT_SOUTHEAST(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -243,12 +241,33 @@ BishopActualAttacks(uint64 occupied_squares,
     }
     return result;
 }
-/*
-Compute attacks for a rook standing on location in the presence of possible 
-blockers
-*/
+
 static uint64 
-RookActualAttacks(uint64 occupied_squares, 
+RankActualAttacks(uint64 occupied_squares, 
+                  int    location)
+{
+    uint64 result = NO_SQUARES;
+    for (uint64 square = SHIFT_EAST(BITBOARD(location)); square; square = SHIFT_EAST(square))
+    {
+        result |= square;
+        if (square & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (uint64 square = SHIFT_WEST(BITBOARD(location)); square; square = SHIFT_WEST(square))
+    {
+        result |= square;
+        if (square & occupied_squares)
+        {
+            break;
+        }
+    }
+    return result;
+}
+
+static uint64 
+FileActualAttacks(uint64 occupied_squares, 
                   int    location)
 {
     uint64 result = NO_SQUARES;
@@ -260,23 +279,7 @@ RookActualAttacks(uint64 occupied_squares,
             break;
         }
     }
-    for (uint64 square = SHIFT_EAST(BITBOARD(location)); square; square = SHIFT_EAST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
     for (uint64 square = SHIFT_SOUTH(BITBOARD(location)); square; square = SHIFT_SOUTH(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (uint64 square = SHIFT_WEST(BITBOARD(location)); square; square = SHIFT_WEST(square))
     {
         result |= square;
         if (square & occupied_squares)
@@ -357,28 +360,30 @@ EnumerateMaskCombinations(uint64 mask,
     }
     return num_values;
 }
+
+typedef uint64(*OccupancyFn)   (int location);
+typedef uint64(*ActualAttackFn)(uint64 occupied_squares, int location);
 /*
-Find magic bitboard multiplier, occupancy mask, shift value and attack set for 
-a bishop or a rook standing on location
-Refer to:
+Find magic bitboard multiplier, occupancy mask, shift value and attack set.
 http://chessprogramming.wikispaces.com/Magic+Bitboards
 */
 static void 
-FindMagic(int       location, 
-          bool      is_rook, 
-          uint64*   magic, 
-          uint64*   mask, 
-          uint64    attacks[4096], 
-          int*      shift)
+FindMagic(int               location, 
+          ActualAttackFn    actual_attacks_fn,
+          OccupancyFn       occupancy_mask_fn,
+          uint64*           magic, 
+          uint64*           mask, 
+          uint64            attacks[4096], 
+          int*              shift)
 {   
     uint64 occupancies[4096];
     uint64 actual_attacks[4096];
-    *mask = is_rook ? RookOccupancyMask(location) : BishopOccupancyMask(location);
+    *mask = occupancy_mask_fn(location);
     *shift = 64 - PopCount(*mask);
     const uint64 num_values = EnumerateMaskCombinations(*mask, occupancies);
     for (int i = 0; i != num_values; ++i)
     {
-        actual_attacks[i] = is_rook ? RookActualAttacks(occupancies[i], location) : BishopActualAttacks(occupancies[i], location);
+        actual_attacks[i] = actual_attacks_fn(occupancies[i], location);
     }
     for ( ; ; )
     {
@@ -407,124 +412,63 @@ FindMagic(int       location,
         }
     }
 }
-/*
-Compress the magic attacks by forming a set of unique attacked squares and 
-replacing the attacks themselves with a set of one byte indices into the
-unique attack vector. At the cost of one extra indirection we save approx 8x
-the size of the magic tables which reduces cache pressure considerably.
-*/
-static void 
-CompressAttacks(uint64  attacks[4096], 
-                int     num_attacks_in,  
-                uint8   indices[4096],
-                int*    num_attacks_out)
-{
-    uint8 out_count = 0;
-    for (int i = 0; i != num_attacks_in; ++i)
-    {
-        const uint64 attack = attacks[i];
-        uint8 j;
-        for (j = 0; j != out_count; ++j)
-        {
-            if (attacks[j] == attack)
-            {
-                indices[i] = j;
-                break;
-            }
-        }
-        if (j == out_count)
-        {
-            /* we didn't find the attack so add it to the set */
-            indices[i] = out_count;
-            attacks[out_count] = attack;
-            if (++out_count == 0)
-            {
-                printf("OVERFLOW!\n");
-                return;
-            }
-        }
-    }
-    *num_attacks_out = out_count;
-}
-/*
-Generate the source file containing the magic bitboard data for bishop and rook
-attack sets. The magic bitboard attack generator uses this structure:
 
 typedef struct
 {
-    uint64          magic;              // multiplier
-    bitboard        occupancy_mask;     // pre mask (excl outside squares)  
-    const uint8*    attack_indices;     // lookup index
-    const bitboard* attacks;            // unique attack set
-    int             shift;              // right shift amount
-} MagicMoveEntry;
+    const char*     name;
+    ActualAttackFn  actual_attacks_fn;
+    OccupancyFn     occupancy_mask_fn;
+} MagicVector;
 
-Then for example we have:
+static const MagicVector magic_vectors[] = {
+    { "DIAGONAL",     DiagonalActualAttacks,     DiagonalOccupancyMask     },
+    { "ANTIDIAGONAL", AntiDiagonalActualAttacks, AntiDiagonalOccupancyMask },
+    { "FILE",         FileActualAttacks,         FileOccupancyMask         },
+    { "RANK",         RankActualAttacks,         RankOccupancyMask         },
+};
 
-MagicMoveEntry rook_magics[64];         // one per square for bishop and rook
+static struct
+{
+    uint64 magic;
+    uint64 mask;
+    uint64 attacks[4096];
+    int    shift;
+} magics[64];
 
-To get sliding attacks, given a set of occupied_squares, we compute:
-x->attacks[x->attack_indices[((occupied_squares & x->occupancy_mask) * x->magic) >> x->shift]];
-*/
 static void 
 GenerateMagics(void)
 {
-    for (int piece = BISHOP; piece <= ROOK; ++piece)
-    {
-        const char* const piece_name = (piece == BISHOP) ? "BISHOP" : "ROOK";
-       
+    for (int v = 0; v != 4; ++v)
+    {      
         for (int j = 0; j != 64; ++j)
         {
-            FindMagic(j, piece == ROOK, &magics[j].magic, &magics[j].mask, magics[j].attacks, &magics[j].shift);
-            CompressAttacks(magics[j].attacks, 1 << (64 - magics[j].shift), magics[j].attack_indices, &magics[j].num_discrete_attacks);
+            FindMagic(j, 
+                      magic_vectors[v].actual_attacks_fn, 
+                      magic_vectors[v].occupancy_mask_fn, 
+                      &magics[j].magic, 
+                      &magics[j].mask, 
+                       magics[j].attacks, 
+                      &magics[j].shift);
         }
+        for (int j = 0; j != 64; ++j) 
+        {
+            printf("static const MagicMoveEntry %s_MAGIC_%c%c = {\n", magic_vectors[v].name, 'A' + FILE_OF(j), RANK_CHAR(j));
+            printf("    .magic          = 0x%016llXull,\n",    magics[j].magic);
+            printf("    .occupancy_mask = 0x%016llXull,\n",    magics[j].mask);
+            printf("    .shift          = %d,\n",              magics[j].shift);
+            printf("    .attacks        = {\n");
+            const int num_attacks = 1 << (64 - magics[j].shift);
+            for (int k = 0; k != num_attacks; ++k)
+            {
+                printf("        [%2d] = 0x%016llXull,\n", k, magics[j].attacks[k]);
+            }
+            printf("    },\n");
+            printf("};\n");
+        }  
+        printf("const MagicMoveEntry* %s_MAGICS[64] = {\n", magic_vectors[v].name);
         for (int j = 0; j != 64; ++j)
         {
-            const int num_entries = magics[j].num_discrete_attacks;
-            printf("static const bitboard %s_MAGIC_ATTACKS_%c%c[%d] = \n{",
-                    piece_name,
-                    'A' + FILE_OF(j),
-                    '1' + RANK_OF(j),
-                    num_entries);
-            for (int k = 0; k != num_entries; ++k)
-            {
-                if ((k & 7) == 0)
-                {
-                    printf("\n    ");
-                }
-                printf("0x%016llXull,",  magics[j].attacks[k]);                
-            }
-            printf("\n};\n");
-            const int num_indices = 1 << (64 - magics[j].shift);
-            printf("static const uint8 %s_MAGIC_INDICES_%c%c[%d] = \n{",
-                    piece_name,
-                    'A' + FILE_OF(j),
-                    '1' + RANK_OF(j),
-                    num_indices);
-            for (int k = 0; k != num_indices; ++k)
-            {
-                if ((k & 0x1F) == 0)
-                {
-                    printf("\n    ");
-                }
-                printf("0x%02hhX,",  magics[j].attack_indices[k]);                
-            }
-            printf("\n};\n");
-
-        }
-        printf("const MagicMoveEntry %s_MAGICS[64] = \n{\n", piece_name);
-        for (int j = 0; j != 64; ++j)
-        {
-            printf("    { 0x%016llXull,0x%016llXull,%s_MAGIC_INDICES_%c%c,%s_MAGIC_ATTACKS_%c%c,%d },\n",
-                    magics[j].magic,
-                    magics[j].mask,
-                    piece_name,
-                    'A' + FILE_OF(j),
-                    '1' + RANK_OF(j),
-                    piece_name,
-                    'A' + FILE_OF(j),
-                    '1' + RANK_OF(j),
-                    magics[j].shift);
+            printf("    &%s_MAGIC_%c%c,\n", magic_vectors[v].name, 'A' + FILE_OF(j), RANK_CHAR(j));
         }
         printf("};\n");
     }
@@ -747,8 +691,8 @@ static const BitboardGen bitboard_generators[] = {
     { "ROOK_ATTACKS",		      RookAttacks		   },
     { "QUEEN_ATTACKS",		      QueenAttacks		   },
     { "KING_ATTACKS",		      KingAttacks		   },
-    { "KING_ATTACKS_2",           KingAttacks2         },
-    { "KING_ATTACKS_3",           KingAttacks3         },
+    //{ "KING_ATTACKS_2",           KingAttacks2         },
+    //{ "KING_ATTACKS_3",           KingAttacks3         },
     { "KING_PAWN_SHIELD_WHITE",   KingPawnShieldWhite  },
     { "KING_PAWN_SHIELD_BLACK",   KingPawnShieldBlack  },
     { "KING_PAWN_SHIELD_WHITE_2", KingPawnShield2White },
@@ -777,6 +721,7 @@ int main()
         }
         printf("};\n");
     }
+#if 0
     printf("const uint8 MANHATTAN_DISTANCE[64][64] = \n{");
     for (i = 0; i != 64; ++i)
     {
@@ -792,13 +737,14 @@ int main()
         printf("\n},");
     }
     printf("};\n");
+#endif
     printf("const uint64 INTERVENING_SQUARES[64][64] = \n{");
     for (i = 0; i != 64; ++i)
     {
         printf("\n{");
         for (j = 0; j != 64; ++j)
         {
-            if ((j & 7) == 0)
+            if ((j & 3) == 0)
             {
                 printf("\n    ");
             }
@@ -816,7 +762,7 @@ int main()
             printf("{");
             for (i = 0; i != 64; ++i)
             {
-                if ((i & 7) == 0)
+                if ((i & 3) == 0)
                 {
                     printf("\n    ");
                 }
@@ -830,16 +776,20 @@ int main()
     printf("const uint64 CASTLING_RIGHTS_HASHES[16] = \n{");
     for (i = 0; i != 16; ++i)
     {
-        if ((i & 7) == 0)
+        if ((i & 3) == 0)
         {
             printf("\n    ");
         }
         printf("0x%016llXull,", PseudoRandom64());
     }
     printf("\n};\n");
-    printf("const uint64 EN_PASSANT_HASHES[8] = \n{\n    ");
+    printf("const uint64 EN_PASSANT_HASHES[8] = {");
     for (i = 0; i != 8; ++i)
     {
+        if ((i & 3) == 0)
+        {
+            printf("\n    ");
+        }
         printf("0x%016llXull,", PseudoRandom64());
     }
     printf("\n};\n");
