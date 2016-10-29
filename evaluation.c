@@ -105,10 +105,10 @@ static const int RANDOM_FLUCTUATION[8] = {
 static const int MATERIAL_VALUES[7] = {
       0,
     100, // pawn
-    325, // knight
-    325, // bishop
-    500, // rook
-   1000, // queen
+    350, // knight
+    350, // bishop
+    600, // rook
+   1200, // queen
       0, // king
 };
 
@@ -183,11 +183,11 @@ EvaluatePosition(const Position* position,
     const bitboard black_bishops = position->bishops & position->black_pieces;
     if ((white_bishops & WHITE_SQUARES) && (white_bishops & BLACK_SQUARES))
     {
-        score += 40;
+        score += 30;
     }
     if ((black_bishops & WHITE_SQUARES) && (black_bishops & BLACK_SQUARES))
     {
-        score -= 40;
+        score -= 30;
     }
     // Mid game features only
     if (!is_endgame)

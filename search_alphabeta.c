@@ -118,23 +118,21 @@ Search(const Position*  src_position,
     # the previous move was not a null move
     # we are not in check   
     # this is not a PV node
-    # we have at least 5 pieces on the board
-    # we are not down to king and pawns
+    # this is not the endgame
     # static eval is at least beta
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    const bitboard friendly_pieces = src_position->pieces_of_color[COLOR_TO_MOVE(src_position)];
-    if ((src_position->move)                                               &&
-        !(src_position->state_flags & IS_CHECK)                            &&
-        beta == alpha + 1                                                  &&
-        PopCount(friendly_pieces) > 4                                      &&
-        !!(friendly_pieces & ~(src_position->pawns | src_position->kings)))
+    if ((src_position->move)                    &&
+        !(src_position->state_flags & IS_CHECK) &&
+        beta == alpha + 1                       &&
+        !(!src_position->queens || PopCount(src_position->occupied_squares ^ src_position->pawns) < 8) &&
+        EvaluatePosition(src_position, alpha, beta) > beta)
     {
         INCREMENT("null move attempts");
         Position position;       
         MakeNullMove(&position, src_position);
-        score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, NULL);
+        score = -Search(&position, depth - 3, ply + 1, -beta, -alpha, cancel, NULL);
         if (*cancel)
         {
             return ILLEGAL_SCORE;
@@ -232,6 +230,7 @@ Search(const Position*  src_position,
             case PHASE_CAPTURES:
             case PHASE_NON_CAPTURES:
                 move = *moves_this_phase++;
+#if 0
                 if (depth > 1 && EvaluateStaticExchange(src_position, move) < 0)
                 {
                     // Defer searching moves with a negative SEE.
@@ -239,6 +238,7 @@ Search(const Position*  src_position,
                     INCREMENT("deferred moves");
                     continue;
                 }
+#endif
                 break;
 
             default:
