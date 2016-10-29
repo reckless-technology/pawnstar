@@ -13,10 +13,10 @@ Global header file - included by each source file
 #include "types.h"
 #include "function_prototypes.h"
 
-extern const MagicMoveEntry* RANK_MAGICS[64];
-extern const MagicMoveEntry* FILE_MAGICS[64];
-extern const MagicMoveEntry* DIAGONAL_MAGICS[64];
-extern const MagicMoveEntry* ANTIDIAGONAL_MAGICS[64];
+extern const MagicMoveEntry* const  RANK_MAGICS[64];
+extern const MagicMoveEntry* const  FILE_MAGICS[64];
+extern const MagicMoveEntry* const  DIAGONAL_MAGICS[64];
+extern const MagicMoveEntry* const  ANTIDIAGONAL_MAGICS[64];
 extern const bitboard       NORTH_OF[64];
 extern const bitboard       NORTHEAST_OF[64];
 extern const bitboard       EAST_OF[64];
@@ -32,15 +32,11 @@ extern const bitboard       BISHOP_ATTACKS[64];
 extern const bitboard       ROOK_ATTACKS[64];
 extern const bitboard       QUEEN_ATTACKS[64];
 extern const bitboard       KING_ATTACKS[64];
-//extern const bitboard       KING_ATTACKS_2[64];
-//extern const bitboard       KING_ATTACKS_3[64];
-//extern const bitboard       BISHOP_ADJACENT[64];
 extern const bitboard       KING_PAWN_SHIELD_WHITE[64];
 extern const bitboard       KING_PAWN_SHIELD_BLACK[64];
 extern const bitboard       KING_PAWN_SHIELD_WHITE_2[64];
 extern const bitboard       KING_PAWN_SHIELD_BLACK_2[64];
 extern const bitboard       INTERVENING_SQUARES[64][64];            // indexed by [to][from] square locations
-//extern const uint8          MANHATTAN_DISTANCE[64][64];
 extern const uint64         PIECE_SQUARE_HASHES[2][8][64];          // indexed by [color][piece][location]
 extern const uint64         CASTLING_RIGHTS_HASHES[16];             // indexed by 4 bit castling rights
 extern const uint64         EN_PASSANT_HASHES[8];                   // indexed by en passant file (if any)

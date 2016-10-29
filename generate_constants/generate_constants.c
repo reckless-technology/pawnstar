@@ -95,8 +95,6 @@ static const DirectionVector direction_vectors[] =
     { DIR_NONE,       0,  0 },
 };
 
-
-
 static int 
 PopCount(uint64 x)
 {
@@ -290,47 +288,17 @@ FileActualAttacks(uint64 occupied_squares,
     return result;
 }
 /*
-Use an RC4 cipher to generate a repeatable, pseudo random stream of bytes
-*/
-static uint8
-RandomByte(void)
-{
-    static uint8 rc4[256];
-    static bool is_initialized = false;
-    static uint8 i, j;
-    if (!is_initialized)
-    {
-        is_initialized = true;
-        for (int k = 0xFF; k >= 0; --k)
-        {
-            rc4[k] = (uint8)(k ^ (k >> 1));
-        }
-        i = 0;
-        j = 0;
-        for (int k = 1093; k != 0; --k)
-        {
-            RandomByte();
-        }
-    }
-    ++i;
-    j += rc4[i];
-    const uint8 tmp = rc4[i];
-    rc4[i] = rc4[j];
-    rc4[j] = tmp;
-    return rc4[(uint8)(rc4[i] + rc4[j])];
-}
-/*
-Generate a pseudo random 64 bit value
+Generate a pseudo random 64 bit value.
+Xorshift* 
 */
 static uint64 
 PseudoRandom64(void)
 {
-    uint64 result = 0;
-    for (int i = 0; i != 8; ++i)
-    {
-        result = (result << 8) | RandomByte();
-    }
-    return result;
+    static uint64 x = 0xD31C302BB74E79B3ull;
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    return x * 2685821657736338717ull;
 }
 /*
 Given a bit set in mask, determine all the subsets of this set, i.e. determine
@@ -381,7 +349,7 @@ FindMagic(int               location,
     *mask = occupancy_mask_fn(location);
     *shift = 64 - PopCount(*mask);
     const uint64 num_values = EnumerateMaskCombinations(*mask, occupancies);
-    for (int i = 0; i != num_values; ++i)
+    for (uint64 i = 0; i != num_values; ++i)
     {
         actual_attacks[i] = actual_attacks_fn(occupancies[i], location);
     }
@@ -465,7 +433,7 @@ GenerateMagics(void)
             printf("    },\n");
             printf("};\n");
         }  
-        printf("const MagicMoveEntry* %s_MAGICS[64] = {\n", magic_vectors[v].name);
+        printf("const MagicMoveEntry* const %s_MAGICS[64] = {\n", magic_vectors[v].name);
         for (int j = 0; j != 64; ++j)
         {
             printf("    &%s_MAGIC_%c%c,\n", magic_vectors[v].name, 'A' + FILE_OF(j), RANK_CHAR(j));
@@ -703,10 +671,9 @@ static const BitboardGen bitboard_generators[] = {
 int main()
 {
     int i, j, piece, color;
-    const BitboardGen* generator;
     printf("/* This file was generated on " __DATE__ " at " __TIME__ " */\n"); 
     printf("#include \"types.h\"\n");
-    for (generator = bitboard_generators; generator->name; ++generator)
+    for (const BitboardGen* generator = bitboard_generators; generator->name; ++generator)
     {
         int location;
         printf("const bitboard %s[64] = \n{\n", generator->name);
@@ -738,7 +705,7 @@ int main()
     }
     printf("};\n");
 #endif
-    printf("const uint64 INTERVENING_SQUARES[64][64] = \n{");
+    printf("const bitboard INTERVENING_SQUARES[64][64] = \n{");
     for (i = 0; i != 64; ++i)
     {
         printf("\n{");
