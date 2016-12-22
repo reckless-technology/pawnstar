@@ -238,5 +238,6 @@ typedef struct
     TimeControl time_control;
     int         node_count;
     int         engine_color;
+	int			stop_search_ms;
     bool        do_show_thinking;
 } Context;

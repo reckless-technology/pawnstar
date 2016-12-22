@@ -49,24 +49,28 @@ int SearchRootNode(const Position* src_position)
     {
     case CLOCK_STANDARD:
     default:
-        moves_to_go  = globals->time_control.moves_per_period - (src_position->full_move_count % globals->time_control.moves_per_period);
-        ms_allocated = globals->time_control.milliseconds_remaining / moves_to_go;
-        timeout_ms   = max(100, min(ms_allocated * 4, globals->time_control.milliseconds_remaining - 3000));
+        moves_to_go    = globals->time_control.moves_per_period - (src_position->full_move_count % globals->time_control.moves_per_period);
+        ms_allocated   = globals->time_control.milliseconds_remaining / moves_to_go;
+        timeout_ms     = max(100, min(ms_allocated * 4, globals->time_control.milliseconds_remaining - 3000));
+		globals->stop_search_ms = GetMilliseconds() + timeout_ms;
         break;
     
     case CLOCK_FIXED_DEPTH:
-        timeout_ms   = 0;
-        ms_allocated = 0;
+        timeout_ms     = 0;
+        ms_allocated   = 0;
+		globals->stop_search_ms = 0;
         break;
     
     case CLOCK_FIXED_TIME:
-        timeout_ms   = globals->time_control.fixed_milliseconds;
-        ms_allocated = 0;
+        timeout_ms     = globals->time_control.fixed_milliseconds;
+		globals->stop_search_ms = GetMilliseconds() + timeout_ms;
+        ms_allocated   = 0;
         break;
     
     case CLOCK_INCREMENTAL:
-        ms_allocated = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 30);
-        timeout_ms   = max(100, min(ms_allocated * 4, globals->time_control.milliseconds_remaining - 3000));
+        ms_allocated   = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 30);
+        timeout_ms     = max(100, min(ms_allocated * 4, globals->time_control.milliseconds_remaining - 3000));
+		globals->stop_search_ms = GetMilliseconds() + timeout_ms;
         break;
     }
     InitializeGoodMoveCounts();
@@ -86,11 +90,6 @@ int SearchRootNode(const Position* src_position)
     }   
     MergeSort(move_count, scored_moves);
     best_move = scored_moves[0].move;
-    if (timeout_ms)
-    {
-        CancelThinkingTimer();
-        SetThinkingTimer(timeout_ms, &cancel);
-    }
     for (depth = STARTING_SEARCH_DEPTH; depth != MAX_PLY; ++depth)
     {       
         if (globals->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > globals->time_control.fixed_depth)
@@ -176,6 +175,5 @@ int SearchRootNode(const Position* src_position)
             }
         }             
     }  
-    CancelThinkingTimer();
     return best_move;
 }

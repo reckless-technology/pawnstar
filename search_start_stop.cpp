@@ -1,9 +1,12 @@
+#include <thread>
+
 #include "pawnstar.h"
-#include <Windows.h>
+
+static std::thread worker_thread;
 /*
 Thread entry function for computer thinking
 */
-static DWORD WINAPI SearchThreadEntry(Game* game)
+static void SearchThreadEntry(Game* game)
 {
 
     int move = SearchRootNode(game->position);
@@ -15,12 +18,21 @@ static DWORD WINAPI SearchThreadEntry(Game* game)
         printf("move %s\n", move_string);
         DisplayResultIfGameOver(game->position);
     }  
-    return 0;
+}
+
+extern "C" void StopWorker(void)
+{
+	if (worker_thread.joinable())
+	{
+		worker_thread.join();
+	}
 }
 /*
 Start thinking on a background worker thread
 */
-void StartThinking(Game* game)
+extern "C" void StartThinking(Game* game)
 {
-    QueueUserWorkItem(SearchThreadEntry, game, WT_EXECUTEDEFAULT);
+	StopWorker();
+    worker_thread = std::thread(SearchThreadEntry, game);
 }
+

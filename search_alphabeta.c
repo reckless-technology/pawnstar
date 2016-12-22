@@ -1,5 +1,6 @@
 #include "pawnstar.h"
 #pragma warning(disable:4221)
+
 /*
 Main search routine: fail-hard alpha beta with PVS
 Refer to:
@@ -39,7 +40,13 @@ Search(const Position*  src_position,
         return ILLEGAL_SCORE;
     }
     pv.num_moves = 0;
-    ++globals->node_count;
+    if (!(++globals->node_count & 0xFFFF) &&
+		globals->stop_search_ms           &&
+		GetMilliseconds() >= globals->stop_search_ms)
+	{
+		*cancel = true;
+		return ILLEGAL_SCORE;
+	}
     INCREMENT("alpha beta calls");
     if (IsDrawByRepetition(src_position, true) || 
         IsDrawByMaterial  (src_position)       || 

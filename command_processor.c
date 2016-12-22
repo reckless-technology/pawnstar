@@ -5,6 +5,8 @@
 
 static void handle_quit(char buffer[])
 {
+	StopThinkingMoveImmediately();
+	StopWorker();
     exit(0);
 }
 

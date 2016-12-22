@@ -116,13 +116,13 @@
     <ClCompile Include="timer.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="search_start_stop.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="search_single_move.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="evaluation.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="search_start_stop.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

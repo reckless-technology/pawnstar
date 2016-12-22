@@ -1,6 +1,10 @@
 #pragma once
 #include <stdio.h>
 #include "types.h"
+
+#ifdef __cplusplus 
+extern "C" {
+#endif
 /*
 Search
 */
@@ -12,9 +16,8 @@ int         SearchRootNode  (const Position* position);
 Thinking and time control
 */
 void        StartThinking(Game* game);
-void        SetThinkingTimer(int milliseconds, volatile bool* cancel);
-void        CancelThinkingTimer(void);
 void        StopThinkingMoveImmediately(void);
+void        StopWorker(void);
 int         GetMilliseconds(void);
 /*
 Support for FEN and SAN strings
@@ -112,4 +115,8 @@ void        DebugXClear(void);
 void        DebugXIncrement(const char* key);
 void        DebugXIncrementIf(bool condition, const char* key);
 void        DebugXWrite(FILE* file);
+#endif
+
+#ifdef __cplusplus 
+}
 #endif

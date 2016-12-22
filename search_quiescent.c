@@ -73,10 +73,6 @@ int SearchQuiescent(const Position* src_position,
             continue;
         }
         score = -SearchQuiescent(&position, depth - 1, ply + 1, -beta, -alpha, cancel);
-        if (*cancel)
-        {
-            return ILLEGAL_SCORE;
-        }
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
