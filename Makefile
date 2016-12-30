@@ -1,10 +1,10 @@
 PROGRAM  = pawnstar
-CC       = gcc
-CXX      = g++
-CFLAGS   = -I. -Wall -Wextra -O3 -Wno-unused-parameter -Wno-unknown-pragmas -flto -std=gnu99
-CXXFLAGS = -I. -Wall -Wextra -O3 -Wno-unused-parameter -Wno-unknown-pragmas -flto -std=c++11
+CC       = clang
+CXX      = clang++
+CFLAGS   = -I. -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -std=gnu99 -O3
+CXXFLAGS = -I. -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -std=c++11 -O3
 LDFLAGS  = -lpthread
-HDRS     = *.h
+HDRS     = $(wildcard *.h)
 CSRCS    = $(wildcard *.c)
 CPPSRCS  = $(wildcard *.cpp)
 OBJ      = $(CSRCS:.c=.o) $(CPPSRCS:.cpp=.o)
@@ -20,5 +20,6 @@ all: $(PROGRAM)
 $(PROGRAM): $(OBJ)
 	$(CXX) -o $@ $^ $(LDFLAGS)
 
+.PHONY: clean
 clean:
 	rm -f $(OBJ) $(PROGRAM)
