@@ -1,5 +1,11 @@
 #include "pawnstar.h"
 #include <ctype.h>
+#include <string.h>
+
+#if _MSC_VER
+#define strtok_r strtok_s
+#endif
+
 /*
 Functions to use an opening book.
 Opening book text files are 1 line per line of play, with moves in SAN format.
@@ -143,17 +149,17 @@ bool InitializeOpeningBookFromString(const char* book_string)
 	char* move_ctx = NULL;
     FreeOpeningBook();
     // Split the string into lines
-    for (char* line = strtok_s(book, "\n", &line_ctx);
+    for (char* line = strtok_r(book, "\n", &line_ctx);
 	     line;
-		 line = strtok_s(NULL, "\n", &line_ctx))
+		 line = strtok_r(NULL, "\n", &line_ctx))
     {
         Game game[1];
         ++line_number;
         InitializeGame(game);
         // Split the line into tokens separated by spaces
-        for (char* move_str = strtok_s(line, " ", &move_ctx);
+        for (char* move_str = strtok_r(line, " ", &move_ctx);
 		     move_str;
-			 move_str = strtok_s(NULL, " ", &move_ctx))
+			 move_str = strtok_r(NULL, " ", &move_ctx))
         {
             const uint64 hash = game->position->hash;           
             if (move_str[0] == '#')
@@ -205,7 +211,10 @@ bool InitializeOpeningBookFromFile(const char filename[])
     len = ftell(file);
     fseek(file, 0, SEEK_SET);
     buffer = malloc(len + 1);
-    fread(buffer, 1, len, file);
+    if (fread(buffer, 1, len, file) == 0)
+    {
+        printf("NOTE: unable to read from book file '%s'\n", filename);
+    }
     fclose(file);
     buffer[len] = '\0';
     result = InitializeOpeningBookFromString(buffer);

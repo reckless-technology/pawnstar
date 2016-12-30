@@ -71,7 +71,7 @@ void DebugXWrite(FILE* file)
     fprintf(file, "************************** DEBUGX **************************\n");
     while (*s)
     {
-        fprintf(file, s);
+        fputs(s, file);
         s += STRING_LEN;
     }
     free(strings);

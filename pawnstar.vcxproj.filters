@@ -136,5 +136,6 @@
     <None Include="pawnstar.book">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="Makefile" />
   </ItemGroup>
 </Project>

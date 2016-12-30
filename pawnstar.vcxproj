@@ -283,6 +283,7 @@
   <ItemGroup>
     <None Include="clean.bat" />
     <None Include="engine_protocol.html" />
+    <None Include="Makefile" />
     <None Include="pawnstar.book" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

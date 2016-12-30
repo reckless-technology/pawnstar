@@ -59,7 +59,10 @@ int main()
         char* argument;
         char* nl;
         const CommandHandler* command_handler;
-        fgets(line_buffer, sizeof(line_buffer), stdin);
+        if (fgets(line_buffer, sizeof(line_buffer), stdin) == NULL)
+        {
+            continue;
+        }
         nl = strchr(line_buffer, '\n');
         if (nl)
         {

@@ -40,7 +40,7 @@ RecordGoodMove(int ply,
                int move)
 {
     INCREMENT("good moves");
-    _InterlockedIncrement(&good_move_counts[ply][move & MOVE_MASK]);
+    ++good_move_counts[ply][move & MOVE_MASK];
 }
 
 bool 

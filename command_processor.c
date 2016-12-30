@@ -281,7 +281,7 @@ const CommandHandler handlers[] = {
     { COMMAND(bookmoves),   "display available book moves for current position"         },
 #if DEBUGX
     { COMMAND(dbg),         "display diagnostic counts"                                 },
-    { COMMAND(dbgclear)     "reset diagnostic counts"                                   },
+    { COMMAND(dbgclear),    "reset diagnostic counts"                                   },
 #endif
     { COMMAND(eval),        "display the current static evaluation"                     },
     { COMMAND(force),       "assign pawnstar to play neither color"                     },
