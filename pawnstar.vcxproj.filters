@@ -113,9 +113,6 @@
     <ClCompile Include="opening_book_moves.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="timer.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="search_single_move.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -123,6 +120,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="search_start_stop.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="timer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

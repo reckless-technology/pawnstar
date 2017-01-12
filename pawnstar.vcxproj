@@ -276,7 +276,7 @@
     <ClCompile Include="tests_move_generation.c" />
     <ClCompile Include="tests_pawn_structure.c" />
     <ClCompile Include="tests_static_exchange.c" />
-    <ClCompile Include="timer.c" />
+    <ClCompile Include="timer.cpp" />
     <ClCompile Include="transposition_table.c" />
     <ClCompile Include="random.c" />
   </ItemGroup>
