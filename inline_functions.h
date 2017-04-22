@@ -15,6 +15,7 @@ bit scan forward, or trailing zero count - bitboard must be non zero.
 On Intel architectures we use the compiler intrinsic BSF instruction.
 */
 #if _MSC_VER /* Microsoft C compiler? */
+#include <intrin.h>
 #if _M_X64   /* 64 bit platform? */
 INLINE int Lsb(bitboard x)
 {
