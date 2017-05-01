@@ -1,8 +1,8 @@
 PROGRAM  = pawnstar
 CC       = clang
 CXX      = clang++
-CFLAGS   = -I. -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -std=gnu99 -O3
-CXXFLAGS = -I. -Wall -Wextra -Wno-unused-parameter -Wno-unknown-pragmas -std=c++11 -O3
+CFLAGS   = -I. -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unknown-pragmas -Wno-missing-field-initializers -std=gnu99 -O3
+CXXFLAGS = -I. -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unknown-pragmas -Wno-missing-field-initializers -std=c++11 -O3
 LDFLAGS  = -lpthread
 HDRS     = $(wildcard *.h)
 CSRCS    = $(wildcard *.c)
