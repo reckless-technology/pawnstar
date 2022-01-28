@@ -51,6 +51,7 @@ bool IsDrawByMaterial(const Position* position)
     case 0:
     case 1:
         printf("ERROR: too few pieces for play\n");
+        return true;
     case 2:
         /*
         king vs king
