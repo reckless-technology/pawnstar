@@ -22,7 +22,7 @@ extern const CommandHandler handlers[];
 int main()
 {       
     printf(
-#if 0
+#if 1
         "                       .::.                            \n"
         "                       _::_                            \n"
         "                     _/____\\_                         \n"

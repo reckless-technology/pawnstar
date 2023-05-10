@@ -191,7 +191,7 @@ typedef struct
     int         move;
     short       score;
     int8        depth;
-    uint8       node_type;    
+    uint8       node_type;
 } Transposition;
 /*
 Information about pinned pieces and their possible move targets

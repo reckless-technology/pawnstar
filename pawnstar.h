@@ -13,10 +13,8 @@ Global header file - included by each source file
 #include "types.h"
 #include "function_prototypes.h"
 
-extern const MagicMoveEntry* const  RANK_MAGICS[64];
-extern const MagicMoveEntry* const  FILE_MAGICS[64];
-extern const MagicMoveEntry* const  DIAGONAL_MAGICS[64];
-extern const MagicMoveEntry* const  ANTIDIAGONAL_MAGICS[64];
+extern const MagicMoveEntry* const  BISHOP_MAGICS[64];
+extern const MagicMoveEntry* const  ROOK_MAGICS[64];
 extern const bitboard       NORTH_OF[64];
 extern const bitboard       NORTHEAST_OF[64];
 extern const bitboard       EAST_OF[64];

@@ -7,18 +7,14 @@ const bitboard* const PAWN_ATTACKS[2]       = { PAWN_ATTACKS_WHITE, PAWN_ATTACKS
 
 bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
-    const MagicMoveEntry* const d =     DIAGONAL_MAGICS[location];
-    const MagicMoveEntry* const a = ANTIDIAGONAL_MAGICS[location];
-    return d->attacks[((occupied_squares & d->occupancy_mask) * d->magic) >> d->shift] |
-           a->attacks[((occupied_squares & a->occupancy_mask) * a->magic) >> a->shift];
+    const MagicMoveEntry* const m = BISHOP_MAGICS[location];
+    return m->attacks[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift];
 }
 
 bitboard RookAttacks(bitboard occupied_squares, int location)
 {
-    const MagicMoveEntry* const r = RANK_MAGICS[location];
-    const MagicMoveEntry* const f = FILE_MAGICS[location];
-    return r->attacks[((occupied_squares & r->occupancy_mask) * r->magic) >> r->shift] |
-           f->attacks[((occupied_squares & f->occupancy_mask) * f->magic) >> f->shift];
+    const MagicMoveEntry* const m = ROOK_MAGICS[location];
+    return m->attacks[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift];
 }
 
 #else
