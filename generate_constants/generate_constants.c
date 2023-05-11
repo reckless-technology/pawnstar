@@ -415,14 +415,15 @@ FindMagic(int               location,
 
 typedef struct
 {
-    const char* name;
+    const char*     name;
     ActualAttackFn  actual_attacks_fn;
     OccupancyFn     occupancy_mask_fn;
 } MagicVector;
 
-static const MagicVector magic_vectors[] = {
+static const MagicVector magic_vectors[] = 
+{
     { "BISHOP",     BishopActualAttacks,     BishopOccupancyMask     },
-    { "ROOK", RookActualAttacks, RookOccupancyMask },
+    { "ROOK",       RookActualAttacks,       RookOccupancyMask       },
 };
 
 static struct

@@ -20,82 +20,45 @@ bitboard RookAttacks(bitboard occupied_squares, int location)
 #else
 
 /*
-The naive loop based attack generator performs almost as fast as the magic
-bitboard attack generator when profiled in a release build...
+The flood fill attack generator performs almost as fast as the magic
+bitboard attack generator when profiled in a release build.
 */
+
 bitboard BishopAttacks(uint64 occupied_squares, int location)
 {
     bitboard result = NO_SQUARES;
-    for (bitboard square = SHIFT_NORTHEAST(BITBOARD(location)); square; square = SHIFT_NORTHEAST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard square = SHIFT_SOUTHEAST(BITBOARD(location)); square; square = SHIFT_SOUTHEAST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard square = SHIFT_SOUTHWEST(BITBOARD(location)); square; square = SHIFT_SOUTHWEST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard square = SHIFT_NORTHWEST(BITBOARD(location)); square; square = SHIFT_NORTHWEST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
+    const bitboard square = BITBOARD(location);
+    bitboard vector = FillNorthEast(SHIFT_NORTHEAST(square));
+    vector ^= FillNorthEast(SHIFT_NORTHEAST(vector & occupied_squares));
+    result |= vector;
+    vector = FillNorthWest(SHIFT_NORTHWEST(square));
+    vector ^= FillNorthWest(SHIFT_NORTHWEST(vector & occupied_squares));
+    result |= vector;
+    vector = FillSouthEast(SHIFT_SOUTHEAST(square));
+    vector ^= FillSouthEast(SHIFT_SOUTHEAST(vector & occupied_squares));
+    result |= vector;
+    vector = FillSouthWest(SHIFT_SOUTHWEST(square));
+    vector ^= FillSouthWest(SHIFT_SOUTHWEST(vector & occupied_squares));
+    result |= vector;
     return result;
 }
 
 bitboard RookAttacks(uint64 occupied_squares, int location)
 {
     bitboard result = NO_SQUARES;
-    for (bitboard square = SHIFT_NORTH(BITBOARD(location)); square; square = SHIFT_NORTH(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard square = SHIFT_EAST(BITBOARD(location)); square; square = SHIFT_EAST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard square = SHIFT_SOUTH(BITBOARD(location)); square; square = SHIFT_SOUTH(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard square = SHIFT_WEST(BITBOARD(location)); square; square = SHIFT_WEST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
+    const bitboard square = BITBOARD(location);
+    bitboard vector = FillNorth(SHIFT_NORTH(square));
+    vector ^= FillNorth(SHIFT_NORTH(vector & occupied_squares));
+    result |= vector;
+    vector = FillWest(SHIFT_WEST(square));
+    vector ^= FillWest(SHIFT_WEST(vector & occupied_squares));
+    result |= vector;
+    vector = FillEast(SHIFT_EAST(square));
+    vector ^= FillEast(SHIFT_EAST(vector & occupied_squares));
+    result |= vector;
+    vector = FillSouth(SHIFT_SOUTH(square));
+    vector ^= FillSouth(SHIFT_SOUTH(vector & occupied_squares));
+    result |= vector;
     return result;
 }
 
