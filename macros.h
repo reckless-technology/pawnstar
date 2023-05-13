@@ -39,8 +39,6 @@ A value of 0 terminates a move list
 #define RANK_CHAR(locn)                 ('1' + ((locn) >> 3))
 #define BITBOARD(locn)                  (1ull << (locn))
 #define BITBOARD_XY(x,y)                (1ull << ((x) + 8 * (y)))
-#define FILE_BITBOARD(locn)             (FILE_A << ((locn) & 0x07))
-#define RANK_BITBOARD(locn)             (RANK_1 << ((locn) & 0x38))
 #define SHIFT_NORTH(b)                  ((b) << 8)
 #define SHIFT_NORTHEAST(b)              (((b) & MASK_EAST_1) << 9)
 #define SHIFT_EAST(b)                   (((b) & MASK_EAST_1) << 1)

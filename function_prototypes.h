@@ -39,9 +39,6 @@ bitboard    BishopAttacks(bitboard occupied_squares, int location);
 bitboard    RookAttacks  (bitboard occupied_squares, int location);
 bitboard    QueenAttacks (bitboard occupied_squares, int location);
 bitboard    AttacksFromSquare(const Position* position, int location, int piece);
-bitboard    AttacksToSquare(const Position* position, int location);
-bitboard    AttacksToSquareByColor(const Position* position, int location, int color);
-bitboard    AttacksToSquareByType(const Position* position, int location, int color, int piece);
 bool        IsAttacked(const Position* position, int location, int color);
 /*
 Opening book
@@ -63,20 +60,15 @@ Generation and ordering of moves
 */
 void        InitializeGoodMoveCounts(void);
 void        RecordGoodMove(int ply, int move);
-bool        HasMoveBeenGood(int ply, int move);
 int         GenerateLegalMoves(const Position* position, int moves[]);
 void        GeneratePseudoLegalMoves(const Position* position, int captures[], int non_captures[]);
 int         EvaluateStaticExchange(const Position* src_position, int move);
 void        SortMoves(const Position* position, int moves[], int ply, bool use_see);
-void        SelectNextMove(int moves[], int ply);
 void        MergeSort(int num_elements, ScoredMove values[]);
 /*
 Positional evaluation
 */
 void        InitializeEval(void);
-void        DeterminePins(const Position* position, Pins* pins);
-void        DeterminePawnStructure(const Position* position, PawnStructure pawn_struct[2]);
-void        DisplayPawnStructure(const Position* position);
 int         EvaluatePosition(const Position* position, int alpha, int beta);
 /*
 Game over (terminal node) detection
@@ -99,7 +91,6 @@ void        PlayMove(Game* game, int move);
 /*
 Tests
 */
-void        RunPawnStructureTests(void);
 void        RunPerftTests(void);
 void        RunPositionTests(int depth);
 void        RunStaticExchangeTests(void);

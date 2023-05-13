@@ -1,81 +1,70 @@
 #include "pawnstar.h"
 
-const bitboard* const ENEMY_PAWN_ATTACKS[2] = { PAWN_ATTACKS_BLACK, PAWN_ATTACKS_WHITE };
-const bitboard* const PAWN_ATTACKS[2]       = { PAWN_ATTACKS_WHITE, PAWN_ATTACKS_BLACK };
+const bitboard* const FRIENDLY_PAWN_ATTACKS[2]  = { PAWN_ATTACKS_WHITE, PAWN_ATTACKS_BLACK };
+const bitboard* const ENEMY_PAWN_ATTACKS[2]     = { PAWN_ATTACKS_BLACK, PAWN_ATTACKS_WHITE };
 
-#if DO_MAGIC_BITBOARDS
-
-bitboard BishopAttacks(bitboard occupied_squares, int location)
-{
-    const MagicMoveEntry* const m = BISHOP_MAGICS[location];
-    return m->attacks[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift];
-}
-
-bitboard RookAttacks(bitboard occupied_squares, int location)
-{
-    const MagicMoveEntry* const m = ROOK_MAGICS[location];
-    return m->attacks[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift];
-}
-
-#else
-
-/*
-The flood fill attack generator performs almost as fast as the magic
-bitboard attack generator when profiled in a release build.
+/**
+ * @brief Determine bishop attacks based on occupied squares.
+ * @param occupied_squares set of occupied squares
+ * @param location location where bishop is
+ * @return bitset of attacked squares
 */
-
 bitboard BishopAttacks(uint64 occupied_squares, int location)
 {
-    bitboard result = NO_SQUARES;
-    const bitboard square = BITBOARD(location);
-    bitboard vector = FillNorthEast(SHIFT_NORTHEAST(square));
-    vector ^= FillNorthEast(SHIFT_NORTHEAST(vector & occupied_squares));
-    result |= vector;
-    vector = FillNorthWest(SHIFT_NORTHWEST(square));
-    vector ^= FillNorthWest(SHIFT_NORTHWEST(vector & occupied_squares));
-    result |= vector;
-    vector = FillSouthEast(SHIFT_SOUTHEAST(square));
-    vector ^= FillSouthEast(SHIFT_SOUTHEAST(vector & occupied_squares));
-    result |= vector;
-    vector = FillSouthWest(SHIFT_SOUTHWEST(square));
-    vector ^= FillSouthWest(SHIFT_SOUTHWEST(vector & occupied_squares));
-    result |= vector;
+    bitboard result = BISHOP_ATTACKS[location];
+    bitboard ray = NORTHEAST_OF[location] & occupied_squares;
+    result ^= NORTHEAST_OF[Lsb(ray | H8BB)];
+    ray = NORTHWEST_OF[location] & occupied_squares;
+    result ^= NORTHWEST_OF[Lsb(ray | H8BB)];
+    ray = SOUTHWEST_OF[location] & occupied_squares;
+    result ^= SOUTHWEST_OF[Msb(ray | A1BB)];
+    ray = SOUTHEAST_OF[location] & occupied_squares;
+    result ^= SOUTHEAST_OF[Msb(ray | A1BB)];
     return result;
 }
 
+/**
+ * @brief Determine rook attacks based on occupied squares.
+ * @param occupied_squares set of occupied squares
+ * @param location location where rook is
+ * @return bitset of attacked squares
+*/
 bitboard RookAttacks(uint64 occupied_squares, int location)
 {
-    bitboard result = NO_SQUARES;
-    const bitboard square = BITBOARD(location);
-    bitboard vector = FillNorth(SHIFT_NORTH(square));
-    vector ^= FillNorth(SHIFT_NORTH(vector & occupied_squares));
-    result |= vector;
-    vector = FillWest(SHIFT_WEST(square));
-    vector ^= FillWest(SHIFT_WEST(vector & occupied_squares));
-    result |= vector;
-    vector = FillEast(SHIFT_EAST(square));
-    vector ^= FillEast(SHIFT_EAST(vector & occupied_squares));
-    result |= vector;
-    vector = FillSouth(SHIFT_SOUTH(square));
-    vector ^= FillSouth(SHIFT_SOUTH(vector & occupied_squares));
-    result |= vector;
+    bitboard result = ROOK_ATTACKS[location];
+    bitboard ray = NORTH_OF[location] & occupied_squares;
+    result ^= NORTH_OF[Lsb(ray | H8BB)];
+    ray = EAST_OF[location] & occupied_squares;
+    result ^= EAST_OF[Lsb(ray | H8BB)];
+    ray = SOUTH_OF[location] & occupied_squares;
+    result ^= SOUTH_OF[Msb(ray | A1BB)];
+    ray = WEST_OF[location] & occupied_squares;
+    result ^= WEST_OF[Msb(ray | A1BB)];
     return result;
 }
 
-#endif // DO_MAGIC_BITBOARDS
-
+/**
+ * @brief Determine queen attacks based on occupied squares.
+ * @param occupied_squares set of occupied squares
+ * @param location location where queen is
+ * @return bitset of attacked squares
+*/
 bitboard QueenAttacks(bitboard occupied_squares, int location)
 {
     return BishopAttacks(occupied_squares, location) | RookAttacks(occupied_squares, location);
 }
-/*
-Determine if location is attacked by color
+
+/**
+ * @brief Determine if a square is attacked by a color
+ * @param position the position
+ * @param location  location of attacked square
+ * @param color attacking color
+ * @return true if color attacks position, otherwise false
 */
 bool IsAttacked(const Position* position, int location, int color)
 {
     const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
     const bitboard attacking_pieces = position->pieces_of_color[color];
-    bitboard sliding_attackers;
     /*
     Pawn, knight and king attacks can be done by direct lookup since blockers 
     do not affect their attack set.
@@ -90,7 +79,7 @@ bool IsAttacked(const Position* position, int location, int color)
     /*
     Rook and queen horizontal and vertical sliding attacks
     */
-    sliding_attackers = (position->rooks | position->queens) & ROOK_ATTACKS[location] & attacking_pieces;
+    bitboard sliding_attackers = (position->rooks | position->queens) & ROOK_ATTACKS[location] & attacking_pieces;
     while (sliding_attackers)
     {
         if (!(intervening_squares[FindAndClearLsb(&sliding_attackers)] & position->occupied_squares))
@@ -135,157 +124,4 @@ bitboard AttacksFromSquare(const Position* position, int location, int piece)
         return KING_ATTACKS[location];
     }
     return NO_SQUARES;
-}
-/*
-Generate a bitboard of all pieces of the specified color which directly attack 
-location.
-*/
-bitboard AttacksToSquareByColor(const Position* position, int location, int color)
-{
-    const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];  
-    const bitboard attacking_pieces           = position->pieces_of_color[color];
-    bitboard sliding_attackers;
-    /*
-    Pawn, knight and king attacks can be done by lookup since blockers do not 
-    affect their attacks
-    */
-    bitboard attackers = attacking_pieces & (
-        (ENEMY_PAWN_ATTACKS[color][location] & position->pawns  ) |
-        (           KNIGHT_ATTACKS[location] & position->knights) |
-        (             KING_ATTACKS[location] & position->kings  ));
-    /*
-    Rook and queen horizontal and vertical sliding attacks
-    */
-    sliding_attackers = ROOK_ATTACKS[location] & (position->rooks | position->queens) & attacking_pieces;
-    while (sliding_attackers)
-    {
-        const int locn = FindAndClearLsb(&sliding_attackers);
-        if (!(intervening_squares[locn] & position->occupied_squares))
-        {
-            attackers |= BITBOARD(locn);
-        }
-    }
-    /*
-    Bishop and queen diagonal and antidiagonal sliding attacks
-    */
-    sliding_attackers = BISHOP_ATTACKS[location] & (position->bishops | position->queens) & attacking_pieces;
-    while (sliding_attackers)
-    {
-        const int locn = FindAndClearLsb(&sliding_attackers);
-        if (!(intervening_squares[locn] & position->occupied_squares))
-        {
-            attackers |= BITBOARD(locn);
-        }
-    }
-    return attackers;
-}
-/*
-Generate a bitboard of all pieces of the specifed type and color which attack
-the target location.
-*/
-bitboard AttacksToSquareByType(const Position* position, int location, int color, int piece)
-{
-    const bitboard attacking_pieces = position->pieces_of_color[color];
-    bitboard attackers, sliding_attackers;
-    const bitboard* intervening_squares;   
-    switch (piece)
-    {
-    default:
-    case NO_PIECE:
-        return NO_SQUARES;
-
-    case PAWN:
-        return ENEMY_PAWN_ATTACKS[color][location] & position->pawns & attacking_pieces;
-
-    case KNIGHT:
-        return KNIGHT_ATTACKS[location] & position->knights & attacking_pieces;
-    
-    case BISHOP:
-        intervening_squares = &INTERVENING_SQUARES[location][0]; 
-        sliding_attackers   = BISHOP_ATTACKS[location] & position->bishops & attacking_pieces;
-        attackers           = NO_SQUARES;
-        while (sliding_attackers)
-        {
-            const int locn = FindAndClearLsb(&sliding_attackers);
-            if (!(intervening_squares[locn] & position->occupied_squares))
-            {
-                attackers |= BITBOARD(locn);
-            }
-        }
-        return attackers;
-    
-    case ROOK:
-        intervening_squares = &INTERVENING_SQUARES[location][0]; 
-        sliding_attackers   = ROOK_ATTACKS[location] & position->rooks & attacking_pieces;
-        attackers           = NO_SQUARES;
-        while (sliding_attackers)
-        {
-            const int locn = FindAndClearLsb(&sliding_attackers);
-            if (!(intervening_squares[locn] & position->occupied_squares))
-            {
-                attackers |= BITBOARD(locn);
-            }
-        }
-        return attackers;
-
-    case QUEEN:
-        intervening_squares = &INTERVENING_SQUARES[location][0]; 
-        sliding_attackers   = QUEEN_ATTACKS[location] & position->queens & attacking_pieces;
-        attackers           = NO_SQUARES;
-        while (sliding_attackers)
-        {
-            const int locn = FindAndClearLsb(&sliding_attackers);
-            if (!(intervening_squares[locn] & position->occupied_squares))
-            {
-                attackers |= BITBOARD(locn);
-            }
-        }
-        return attackers;
-
-    case KING:
-        return KING_ATTACKS[location] & position->kings & attacking_pieces;
-    }
-}
-/*
-Generate a bitboard of all pieces of both colors which directly attack 
-location.
-*/
-bitboard AttacksToSquare(const Position* position, int location)
-{
-    const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
-    bitboard sliding_attackers;
-    /*
-    Pawn, knight and king attacks can be done by lookup since blockers do not 
-    affect their attacks
-    */
-    bitboard attackers =
-        (PAWN_ATTACKS_WHITE[location] & position->pawns & position->black_pieces) |
-        (PAWN_ATTACKS_BLACK[location] & position->pawns & position->white_pieces) |
-        (    KNIGHT_ATTACKS[location] & position->knights)                        |
-        (      KING_ATTACKS[location] & position->kings);
-    /*
-    Rook and queen horizontal and vertical sliding attacks
-    */
-    sliding_attackers = ROOK_ATTACKS[location] & (position->rooks | position->queens);
-    while (sliding_attackers)
-    {
-        const int locn = FindAndClearLsb(&sliding_attackers);
-        if (!(intervening_squares[locn] & position->occupied_squares))
-        {
-            attackers |= BITBOARD(locn);
-        }
-    }
-    /*
-    Bishop and queen diagonal and antidiagonal sliding attacks
-    */
-    sliding_attackers = BISHOP_ATTACKS[location] & (position->bishops | position->queens);
-    while (sliding_attackers)
-    {
-        const int locn = FindAndClearLsb(&sliding_attackers);
-        if (!(intervening_squares[locn] & position->occupied_squares))
-        {
-            attackers |= BITBOARD(locn);
-        }
-    }
-    return attackers;
 }

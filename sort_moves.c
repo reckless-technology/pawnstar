@@ -30,6 +30,16 @@ wide variety of positions.
 #define MOVE_MASK   0x7FFF                  // piece, from, to fields only
 #define MERIT(move) ((move) & 0x1F8000)     // promoted and captured material only
 
+static const int MATERIAL_VALUE[7] = {
+    [PAWN]      = 100,
+    [KNIGHT]    = 300,
+    [BISHOP]    = 300,
+    [ROOK]      = 500,
+    [QUEEN]     = 900,
+    [KING]      = 0,
+};
+
+
 static int good_move_counts[MAX_PLY][8 * 64 * 64];
 /*
 This function gets called by the search when we find an interesting move, i.e.
@@ -43,12 +53,6 @@ RecordGoodMove(int ply,
     ++good_move_counts[ply][move & MOVE_MASK];
 }
 
-bool 
-HasMoveBeenGood(int ply, 
-                int move)
-{
-    return !!good_move_counts[ply][move & MOVE_MASK];
-}
 /*
 The valuable move counts table is reset before the start of each search.
 */
@@ -56,11 +60,16 @@ void InitializeGoodMoveCounts(void)
 {
     memset(good_move_counts, 0, sizeof(good_move_counts));
 }
-/*
-Sort moves into "best first" order. The heuristic for ranking moves is:
-    # Promoted material value, then
-    # Captured material value, then
-    # Total number of times this move has cutoff or raised alpha at this ply
+
+/**
+ * @brief Sort moves "best first" using a stable merge sort.
+ * A stable sort is required so that root node moves with equal alpha score
+ * have their relative sequence preserved.
+ * @param position position for which the moves were generated
+ * @param moves null terminated list of moves to be sorted
+ * @param ply distance from root node
+ * @param use_see true to use static exchange evaluation for scoring
+ *                false to use the number of cutoffs / alpha raises in the tree
 */
 void 
 SortMoves(const Position* position,
@@ -97,39 +106,14 @@ SortMoves(const Position* position,
     {
         moves[i] = scored_moves[i].move;
     }
+    (void)ply;
+    (void)counts;
 }
-/*
-Find the best move and bring it to the front (partial selection sort).
-*/
-void 
-SelectNextMove(int moves[], 
-               int ply)
-{
-    const int* const counts = &good_move_counts[ply][0];   
-    int best_score = -1;
-    int best_move_index = 0;
-    int move;
-    for (int i = 0; (move = moves[i]) != 0; ++i)
-    {
-        const int score = MERIT(move) + counts[move & MOVE_MASK];
-        if (score > best_score)
-        {
-            best_score = score;
-            best_move_index = i;
-        }
-    }
-    if (best_move_index != 0)
-    {
-        int tmp = moves[0];
-        moves[0] = moves[best_move_index];
-        moves[best_move_index] = tmp;
-    }
-}
-/*
-Sort an array of scored moves into best first (descending score) order.
-This uses a stable merge sort algorithm. A stable sort is required so that the
-ordering of moves at the root node, where many moves share the same alpha 
-value, is preserved through multiple iterations / sort operations.
+
+/**
+ * @brief Stable merge sort of scored moves.
+ * @param num_elements number of elements to sort
+ * @param values pointer to the elements
 */
 void 
 MergeSort(int        num_elements, 

@@ -1,13 +1,12 @@
 #include "pawnstar.h"
 
-static uint64 x;
-
-/*
-XORSHIFT* Very simple, platform-independent, pseudo-random number generator.
-https://en.wikipedia.org/wiki/Xorshift#xorshift.2A
+/**
+ * @brief Xorshift simple PRNG
+ * @return next pseudo random integer
 */
 int NextRandom(void)
 {
+	static uint64 x;
 	if (x == 0)
 	{
 		x = (uint64)time(NULL);

@@ -6,8 +6,10 @@ Inline functions - called many times per move; need to be FAST.
 */
 #if _MSC_VER
 #define INLINE static __forceinline
+#elif defined (__GNUC__)
+#define INLINE static __attribute__((always_inline))
 #else
-#define INLINE static inline
+#error you must define force inline for your compiler
 #endif
 /*
 Find the index of the least significant bit set in a bitboard, also known as
@@ -16,80 +18,49 @@ On Intel architectures we use the compiler intrinsic BSF instruction.
 */
 #if _MSC_VER /* Microsoft C compiler? */
 #include <intrin.h>
-#if _M_X64   /* 64 bit platform? */
 INLINE int Lsb(bitboard x)
 {
     unsigned long index;
     _BitScanForward64(&index, x);
     return (int)index;
 }
-#else /* 32 bit platform */
-INLINE int Lsb(bitboard x)
+INLINE int Msb(bitboard x)
 {
     unsigned long index;
-    if ((unsigned long)x)
-    {
-        _BitScanForward(&index, (unsigned long)x);
-        return (int)index;
-    }
-    _BitScanForward(&index, (unsigned long)(x >> 32));
-    return (int)(index + 32);
+    _BitScanReverse64(&index, x);
+    return (int)index;
 }
-#endif /* _M_X64 */
+INLINE int PopCount(bitboard x)
+{
+    return (int)__popcnt64(x);
+}
 #elif defined (__GNUC__)
 INLINE int Lsb(bitboard x)
 {
     return (int)__builtin_ctzll(x);
 }
-#else
-#error Your compiler does not appear to support bit scan. This is required for pawnstar.
-#endif /* _MSC_VER */
-/*
-Population count (Hamming weight)
-NB: needs to be FAST
-Only recent CPUs support intrinsic popcnt, so this is optional, and otherwise
-we just loop counting the bits set.
-*/
-#if USE_INTRINSIC_POPCNT
-#if _MSC_VER
-#if _M_X64
-INLINE int PopCount(bitboard x)
+INLINE int Msb(bitboard x)
 {
-    return (int)__popcnt64(x);
+    return 63 - (int)__builtin_clzll(x);
 }
-#else
-INLINE int PopCount(bitboard x)
-{
-    return __popcnt((unsigned int)x) + __popcnt((unsigned int)(x >> 32));
-}
-#endif /* _M_X64 */
-#elif defined (__GNUC__)
 INLINE int PopCount(bitboard x)
 {
     return (int)__builtin_popcountll(x);
 }
-#endif /* _MSC_VER */
 #else
-INLINE int PopCount(bitboard x)
-{
-    int count = 0;
-    while (x)
-    {
-        ++count;
-        x &= x - 1; /* clear the LSB of x */
-    }
-    return count;
-}
-#endif /* USE_INTRINSIC_POPCNT */
+#error you must define bitscan forward, reverse and popcount for your compiler
+#endif
+
 /*
 Find the index of and clear the least significant bit set in a bitboard
 */
 INLINE int FindAndClearLsb(bitboard* x)
 {
-    const bitboard y = *x;
-    *x = y & (y - 1);
-    return Lsb(y);
+    const int y = Lsb(*x);
+    *x &= (*x - 1);
+    return y;
 }
+
 /*
 Find the first location of a move in a zero terminated list of moves.
 This is analagous to 'strchr' but using 32-bit words instead of bytes.

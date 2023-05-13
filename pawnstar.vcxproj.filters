@@ -65,12 +65,6 @@
     <ClCompile Include="opening_book.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="pawn_structure.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="pins.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="search_alphabeta.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -90,9 +84,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="tests_move_generation.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="tests_pawn_structure.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="tests_static_exchange.c">

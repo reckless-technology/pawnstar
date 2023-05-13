@@ -19,28 +19,26 @@ int SearchRootNode(const Position* src_position)
     ScoredMove  scored_moves[MAX_MOVES_PER_POSITION];
     ScoredMove  best_moves[MAX_PLY];
     int         moves[MAX_MOVES_PER_POSITION];
-    Variation   pv;
-    int         move_count;
+    Variation   pv = { .num_moves = 0 };
     int         depth;
     int         start_ms;
     int         stop_ms;
-    int         book_move;
-    int         best_move = 0;
-    int         timeout_ms;
-    int         ms_allocated;
-    int         moves_to_go;
+    int         best_move       = 0;
+    int         timeout_ms      = 0;
+    int         ms_allocated    = 0;
+    int         moves_to_go     = 0;
     int         alpha;
 
-    pv.num_moves = 0;
     if (src_position->state_flags & IS_GAME_OVER)
     {
         return 0;
     }
-    if ((book_move = GetBookMove(src_position->hash)) != 0)
+    int book_move = GetBookMove(src_position->hash);
+    if (book_move)
     {
         return book_move;
     } 
-    move_count = GenerateLegalMoves(src_position, moves);
+    int move_count = GenerateLegalMoves(src_position, moves);
     if (move_count <= 1)
     {
         return moves[0]; /* If there is only 1 legal move available just play it */
@@ -49,28 +47,28 @@ int SearchRootNode(const Position* src_position)
     {
     case CLOCK_STANDARD:
     default:
-        moves_to_go    = globals->time_control.moves_per_period - (src_position->full_move_count % globals->time_control.moves_per_period);
-        ms_allocated   = globals->time_control.milliseconds_remaining / moves_to_go;
-        timeout_ms     = max(100, min(ms_allocated * 4, globals->time_control.milliseconds_remaining - 3000));
-		globals->stop_search_ms = GetMilliseconds() + timeout_ms;
-        break;
+        moves_to_go = globals->time_control.standard.moves_per_period - (src_position->full_move_count % globals->time_control.standard.moves_per_period);
+        ms_allocated = globals->time_control.standard.milliseconds_remaining / moves_to_go;
+        timeout_ms = max(100, min(ms_allocated * 4, globals->time_control.standard.milliseconds_remaining - 3000));
+        globals->hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        break; 
     
     case CLOCK_FIXED_DEPTH:
         timeout_ms     = 0;
         ms_allocated   = 0;
-		globals->stop_search_ms = 0;
+		globals->hard_stop_search_ms = 0;
         break;
     
     case CLOCK_FIXED_TIME:
-        timeout_ms     = globals->time_control.fixed_milliseconds;
-		globals->stop_search_ms = GetMilliseconds() + timeout_ms;
-        ms_allocated   = 0;
+        timeout_ms = globals->time_control.fixed_time.milliseconds;
+		globals->hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        ms_allocated = 0;
         break;
     
     case CLOCK_INCREMENTAL:
-        ms_allocated   = globals->time_control.increment_milliseconds + (globals->time_control.milliseconds_remaining / 30);
-        timeout_ms     = max(100, min(ms_allocated * 4, globals->time_control.milliseconds_remaining - 3000));
-		globals->stop_search_ms = GetMilliseconds() + timeout_ms;
+        ms_allocated   = globals->time_control.incremental.increment_milliseconds + (globals->time_control.incremental.milliseconds_remaining / 30);
+        timeout_ms     = max(100, min(ms_allocated * 4, globals->time_control.incremental.milliseconds_remaining - 3000));
+		globals->hard_stop_search_ms = GetMilliseconds() + timeout_ms;
         break;
     }
     InitializeGoodMoveCounts();
@@ -92,7 +90,7 @@ int SearchRootNode(const Position* src_position)
     best_move = scored_moves[0].move;
     for (depth = STARTING_SEARCH_DEPTH; depth != MAX_PLY; ++depth)
     {       
-        if (globals->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > globals->time_control.fixed_depth)
+        if (globals->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > globals->time_control.fixed_depth.depth)
         {
             break;
         }

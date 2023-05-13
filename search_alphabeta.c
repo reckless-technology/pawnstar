@@ -1,11 +1,16 @@
 #include "pawnstar.h"
 #pragma warning(disable:4221)
 
-/*
-Main search routine: fail-hard alpha beta with PVS
-Refer to:
-http://chessprogramming.wikispaces.com/Alpha-Beta
-http://chessprogramming.wikispaces.com/Principal+Variation+Search
+/**
+ * @brief Fail soft alpha beta main search algorithm.
+ * @param src_position position to search
+ * @param depth search depth
+ * @param ply distance from root node
+ * @param alpha score floor at parent node
+ * @param beta score ceiling at parent node
+ * @param cancel cancel thinking flag
+ * @param parent_pv principal variation
+ * @return score for this node
 */
 int 
 Search(const Position*  src_position, 
@@ -17,13 +22,11 @@ Search(const Position*  src_position,
        Variation*       parent_pv)
 {    
     Variation   pv;
-    int         move;   
+    int         move;
     int         pre_move[2];
     int         captures[MAX_MOVES_PER_POSITION];
     int         non_captures[MAX_MOVES_PER_POSITION];
-    int         deferred_moves[MAX_MOVES_PER_POSITION];    
     int         score;   
-    int*        deferred_move    = deferred_moves;
     int         num_legal_moves  = 0;
     int         best_move        = 0;
     int         best_score       = ALPHA;
@@ -33,7 +36,6 @@ Search(const Position*  src_position,
         [PHASE_PRE_MOVES]        = pre_move,
         [PHASE_CAPTURES]         = captures,
         [PHASE_NON_CAPTURES]     = non_captures,
-        [PHASE_DEFERRED_MOVES]   = deferred_moves,
     };
     if (*cancel)
     {
@@ -41,12 +43,12 @@ Search(const Position*  src_position,
     }
     pv.num_moves = 0;
     if (!(++globals->node_count & 0xFFFF) &&
-		globals->stop_search_ms           &&
-		GetMilliseconds() >= globals->stop_search_ms)
-	{
-		*cancel = true;
-		return ILLEGAL_SCORE;
-	}
+        globals->hard_stop_search_ms      &&
+        GetMilliseconds() >= globals->hard_stop_search_ms)
+    {
+        *cancel = true;
+        return ILLEGAL_SCORE;
+    }
     INCREMENT("alpha beta calls");
     if (IsDrawByRepetition(src_position, true) || 
         IsDrawByMaterial  (src_position)       || 
@@ -130,10 +132,10 @@ Search(const Position*  src_position,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    if ((src_position->move)                    &&
-        !(src_position->state_flags & IS_CHECK) &&
-        beta == alpha + 1                       &&
-        !(!src_position->queens || PopCount(src_position->occupied_squares ^ src_position->pawns) < 8) &&
+    if ((src_position->move)                                                                            &&
+        !(src_position->state_flags & IS_CHECK)                                                         &&
+        beta == alpha + 1                                                                               &&
+        !(!src_position->queens || PopCount(src_position->occupied_squares ^ src_position->pawns) < 8)  &&
         EvaluatePosition(src_position, alpha, beta) > beta)
     {
         INCREMENT("null move attempts");
@@ -152,21 +154,6 @@ Search(const Position*  src_position,
     }
 #endif
     
-#if DO_FUTILITY_PRUNING
-    /*
-    Futility pruning doesn't really achieve much; the idea is to prune frontier
-    nodes (depth 1) where the eval is so bad there is no way we can match alpha 
-    even with a great winning tactical sequence.
-    */
-    if (depth == 1                              &&
-        !(src_position->state_flags & IS_CHECK) &&
-        EvaluatePosition(src_position, alpha, beta) + FUTILITY_CUTOFF_THRESHOLD < alpha)
-    {
-        INCREMENT("futility cutoffs");
-        return alpha;
-    }
-#endif
-
     /*
     Before we generate any moves, try any transposition table move first. 
     This might save us the cost of move generation, or provide better alpha 
@@ -197,7 +184,7 @@ Search(const Position*  src_position,
     Move generation is deferred until after the pre move has been searched.
     */
     int search_depth = depth;
-    for (int phase = PHASE_PRE_MOVES; phase <= PHASE_DEFERRED_MOVES; ++phase)
+    for (int phase = PHASE_PRE_MOVES; phase <= PHASE_NON_CAPTURES; ++phase)
     {            
         switch (phase)
         {
@@ -213,18 +200,6 @@ Search(const Position*  src_position,
             SortMoves(src_position, non_captures, ply, false);
             break;
 
-        case PHASE_DEFERRED_MOVES:
-            *deferred_move = 0; // Terminate the deferred moves list.
-
-#if DO_LATE_MOVE_REDUCTION
-            if (!(src_position->state_flags & IS_CHECK))
-            {
-                INCREMENT("lmr");
-                --search_depth;
-            }
-#endif
-            break;
-
         default:
             printf("ERROR: illegal move phase\n");
             break;
@@ -232,26 +207,7 @@ Search(const Position*  src_position,
         const int* moves_this_phase = move_phases[phase];
         while (*moves_this_phase)
         {
-            switch (phase)
-            {
-            case PHASE_CAPTURES:
-            case PHASE_NON_CAPTURES:
-                move = *moves_this_phase++;
-#if 0
-                if (depth > 1 && EvaluateStaticExchange(src_position, move) < 0)
-                {
-                    // Defer searching moves with a negative SEE.
-                    *deferred_move++ = move;
-                    INCREMENT("deferred moves");
-                    continue;
-                }
-#endif
-                break;
-
-            default:
-                move = *moves_this_phase++;
-                break;
-            }              
+            move = *moves_this_phase++;
             score = SearchSingleMove(src_position, search_depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
             if (*cancel)
             {

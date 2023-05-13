@@ -1,11 +1,9 @@
 #include "pawnstar.h"
 
 #define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
-/*
-Bits set in the castling rights mask are cleared for the move source and 
-destination squares to determine new castling rights following a move.
 
-Only moves involving squares a1, e1, h1, a8, e8 or h8 affect castling rights.
+/**
+ * @brief Castling rights flags to be cleared based on move from and to squares.
 */
 static const uint8 CASTLING_RIGHTS_MASKS[64] =
 {
@@ -16,10 +14,13 @@ static const uint8 CASTLING_RIGHTS_MASKS[64] =
     [A8] = MAY_BLACK_Q,
     [H8] = MAY_BLACK_K,
 };
-/*
-Make a null move (used for null move pruning during search)
-    # Clear the en passant square
-    # Flip the side to move
+
+/**
+ * @brief Make a non (null) move
+ * - Flip side to move
+ * - Clear en passant capture availablity
+ * @param dst_position destination position
+ * @param src_position source position
 */
 void 
 MakeNullMove(Position* dst_position, 
@@ -73,13 +74,17 @@ MovePiece(Position* position,
     position->hash  += PIECE_SQUARE_HASHES[color][piece][to] - PIECE_SQUARE_HASHES[color][piece][from];
     position->score += piece_square_values[color][piece][to] - piece_square_values[color][piece][from];
 }
-/*
-Construct a new position from an old position and a move
+
+/**
+ * @brief Construct a new position from a source position and a move.
+ * @param dst_position destination (new) position
+ * @param src_position source (old) position
+ * @param move move being made
 */
 void 
-MakeMove(Position* dst_position, 
+MakeMove(Position*       dst_position, 
          const Position* src_position, 
-         int move)
+         int             move)
 {                          
     const int color    = COLOR_TO_MOVE(src_position);
     const int from     = MOVE_FROM(move);
@@ -87,7 +92,7 @@ MakeMove(Position* dst_position,
     const int piece    = MOVE_PIECE(move);
     const int captured = MOVE_CAPTURED(move);
      
-    memcpy(dst_position, src_position, sizeof(Position));
+    *dst_position = *src_position;
     dst_position->previous = src_position;
     dst_position->move = move;
     dst_position->castle_flags &= ~CASTLING_RIGHTS_MASKS[from] & ~CASTLING_RIGHTS_MASKS[to];
@@ -118,7 +123,7 @@ MakeMove(Position* dst_position,
                 RemovePiece(dst_position, ENEMY(color), captured, to);
             }
         }                
-        if (((to - from) & 0xF) == 0) // equiv to (abs(to - from) == 16)
+        else if (((to - from) & 0xF) == 0)
         {
             // Pawn double push: affects en passant.
             dst_position->en_passant_index = (uint8)((from + to) >> 1);

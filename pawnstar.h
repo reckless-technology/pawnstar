@@ -13,8 +13,6 @@ Global header file - included by each source file
 #include "types.h"
 #include "function_prototypes.h"
 
-extern const MagicMoveEntry* const  BISHOP_MAGICS[64];
-extern const MagicMoveEntry* const  ROOK_MAGICS[64];
 extern const bitboard       NORTH_OF[64];
 extern const bitboard       NORTHEAST_OF[64];
 extern const bitboard       EAST_OF[64];
@@ -30,14 +28,10 @@ extern const bitboard       BISHOP_ATTACKS[64];
 extern const bitboard       ROOK_ATTACKS[64];
 extern const bitboard       QUEEN_ATTACKS[64];
 extern const bitboard       KING_ATTACKS[64];
-extern const bitboard       KING_PAWN_SHIELD_WHITE[64];
-extern const bitboard       KING_PAWN_SHIELD_BLACK[64];
-extern const bitboard       KING_PAWN_SHIELD_WHITE_2[64];
-extern const bitboard       KING_PAWN_SHIELD_BLACK_2[64];
-extern const bitboard       INTERVENING_SQUARES[64][64];            // indexed by [to][from] square locations
-extern const uint64         PIECE_SQUARE_HASHES[2][8][64];          // indexed by [color][piece][location]
-extern const uint64         CASTLING_RIGHTS_HASHES[16];             // indexed by 4 bit castling rights
-extern const uint64         EN_PASSANT_HASHES[8];                   // indexed by en passant file (if any)
+extern const bitboard       INTERVENING_SQUARES[64][64];
+extern const uint64         PIECE_SQUARE_HASHES[2][8][64];
+extern const uint64         CASTLING_RIGHTS_HASHES[16];
+extern const uint64         EN_PASSANT_HASHES[8];
 extern Context              globals[1];
 extern const char* const    OPENING_BOOK_MOVES;
 extern int                  piece_square_values[2][8][64];

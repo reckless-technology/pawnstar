@@ -34,34 +34,12 @@ SearchSingleMove(const Position*    src_position,
         # Recapture of same value piece
     */
 
-#if DO_PROMOTION_EXTENSION
     if (MOVE_PROMOTED(move))
     {
         INCREMENT("extensions promotion");
         ++child_depth;
     }
-#endif
 
-#if DO_PUSH_TO_SEVENTH_RANK_EXTENSION
-    static const int SEVENTH_RANK[2] = { 6, 1 };
-    if (MOVE_PIECE(move) == PAWN && 
-        RANK_OF(MOVE_TO(move)) == SEVENTH_RANK[COLOR_TO_MOVE(src_position)])
-    {
-        INCREMENT("extensions push to 7th");
-        ++child_depth;
-    }
-#endif
-
-#if DO_RECAPTURE_EXTENSION
-    static const int CLASSICAL_MATERIAL[7] = { 0, 1, 3, 3, 5, 9, 0 };
-    if (MOVE_CAPTURED(move)                          && 
-        MOVE_TO(move) == MOVE_TO(src_position->move) &&
-        CLASSICAL_MATERIAL[MOVE_CAPTURED(move)] == CLASSICAL_MATERIAL[MOVE_CAPTURED(src_position->move)])
-    {
-        INCREMENT("extensions recapture");
-        ++child_depth;
-    }
-#endif 
 
     int score;
     if (beta > alpha + 1 &&

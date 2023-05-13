@@ -264,8 +264,6 @@
     <ClCompile Include="move_to_string.c" />
     <ClCompile Include="opening_book.c" />
     <ClCompile Include="opening_book_moves.c" />
-    <ClCompile Include="pawn_structure.c" />
-    <ClCompile Include="pins.c" />
     <ClCompile Include="search_alphabeta.c" />
     <ClCompile Include="search_quiescent.c" />
     <ClCompile Include="search_root_node.c" />
@@ -275,7 +273,6 @@
     <ClCompile Include="static_exchange_evaluation.c" />
     <ClCompile Include="tests_bratko_kopec.c" />
     <ClCompile Include="tests_move_generation.c" />
-    <ClCompile Include="tests_pawn_structure.c" />
     <ClCompile Include="tests_static_exchange.c" />
     <ClCompile Include="timer.cpp" />
     <ClCompile Include="transposition_table.c" />

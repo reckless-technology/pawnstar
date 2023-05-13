@@ -1,8 +1,13 @@
 #pragma once
+/**
+ * @brief Various useful bitboard constants.
+ */
+
 /*
 A bitboard is just a set-wise interpretation of a 64-bit unsigned integer, with 
-each bit mapping to a square on the chessboard. If the bit is 1, then the
-corresponding square is a member of that set, for example:
+each bit mapping to a square on the chessboard. 
+
+If the bit is 1, then the corresponding square is a member of that set, for example:
 
 The set of squares occupied by pawns
 The set of squares occupied by a black piece
@@ -109,8 +114,8 @@ File bitboards
 #define FILE_G          0x4040404040404040ull
 #define FILE_H          0x8080808080808080ull
 /*
-Bitboards to mask off edge files to prevent wraparound when shifting 
-horizontally or diagonally
+Bitboards to mask off edge files to prevent wraparound 
+when shifting horizontally or diagonally
 */
 #define MASK_EAST_1     0x7F7F7F7F7F7F7F7Full   
 #define MASK_EAST_2     0x3F3F3F3F3F3F3F3Full   

@@ -66,6 +66,7 @@ void DebugXWrite(FILE* file)
             s += STRING_LEN;
         }
     }
+    typedef int (*CompareFn)(const void*, const void*);
     qsort(strings, (s - strings) / STRING_LEN, STRING_LEN, (CompareFn)strcmp);
     s = strings;
     fprintf(file, "************************** DEBUGX **************************\n");

@@ -142,7 +142,7 @@ static void handle_post(char buffer[])
 
 static void handle_time(char buffer[])
 {
-    globals->time_control.milliseconds_remaining = atoi(buffer) * 10;
+    globals->time_control.standard.milliseconds_remaining = atoi(buffer) * 10;
 }
 
 static void handle_cancel(char buffer[])
@@ -164,29 +164,29 @@ static void handle_level(char buffer[])
     if (moves)
     {
         globals->time_control.clock_type = CLOCK_STANDARD;
-        globals->time_control.moves_per_period = moves;
-        globals->time_control.milliseconds_per_period = minutes * 60000 + seconds * 1000;
-        globals->time_control.milliseconds_remaining = globals->time_control.milliseconds_per_period;
+        globals->time_control.standard.moves_per_period = moves;
+        globals->time_control.standard.milliseconds_per_period = minutes * 60000 + seconds * 1000;
+        globals->time_control.standard.milliseconds_remaining = globals->time_control.standard.milliseconds_per_period;
     }
     else
     {
         globals->time_control.clock_type = CLOCK_INCREMENTAL;
-        globals->time_control.base_milliseconds = minutes * 60000 + seconds * 1000;
-        globals->time_control.increment_milliseconds = increment * 1000;
-        globals->time_control.milliseconds_remaining = globals->time_control.base_milliseconds;
+        globals->time_control.incremental.base_milliseconds = minutes * 60000 + seconds * 1000;
+        globals->time_control.incremental.increment_milliseconds = increment * 1000;
+        globals->time_control.incremental.milliseconds_remaining = globals->time_control.incremental.base_milliseconds;
     }
 }
 
 static void handle_st(char buffer[])
 {
     globals->time_control.clock_type = CLOCK_FIXED_TIME;
-    globals->time_control.fixed_milliseconds = atoi(buffer) * 1000;
+    globals->time_control.fixed_time.milliseconds = atoi(buffer) * 1000;
 }
 
 static void handle_sd(char buffer[])
 {
     globals->time_control.clock_type = CLOCK_FIXED_DEPTH;
-    globals->time_control.fixed_depth = atoi(buffer);
+    globals->time_control.fixed_depth.depth = atoi(buffer);
 }
 
 #define PRINT_MIN_SEC(milliseconds) printf("%02d:%02d\n", (milliseconds) / 60000, ((milliseconds) / 1000) % 60)
@@ -197,29 +197,29 @@ static void handle_showtime(char buffer[])
     {
     case CLOCK_STANDARD:
         printf("standard clock mode\n");
-        printf("moves per period              %5d\n", globals->time_control.moves_per_period);
+        printf("moves per period              %5d\n", globals->time_control.standard.moves_per_period);
         printf("time period                   ");
-        PRINT_MIN_SEC(globals->time_control.milliseconds_per_period);
+        PRINT_MIN_SEC(globals->time_control.standard.milliseconds_per_period);
         printf("time remaining                ");
-        PRINT_MIN_SEC(globals->time_control.milliseconds_remaining);
+        PRINT_MIN_SEC(globals->time_control.standard.milliseconds_remaining);
         break;
     case CLOCK_INCREMENTAL:
         printf("incremental clock mode\n");
         printf("base time                     ");
-        PRINT_MIN_SEC(globals->time_control.base_milliseconds);
+        PRINT_MIN_SEC(globals->time_control.incremental.base_milliseconds);
         printf("increment time                ");
-        PRINT_MIN_SEC(globals->time_control.increment_milliseconds);
+        PRINT_MIN_SEC(globals->time_control.incremental.increment_milliseconds);
         printf("time remaining                ");
-        PRINT_MIN_SEC(globals->time_control.milliseconds_remaining);
+        PRINT_MIN_SEC(globals->time_control.incremental.milliseconds_remaining);
         break;
     case CLOCK_FIXED_DEPTH:
         printf("fixed depth mode\n");
-        printf("search depth                  %5d\n", globals->time_control.fixed_depth);
+        printf("search depth                  %5d\n", globals->time_control.fixed_depth.depth);
         break;
     case CLOCK_FIXED_TIME:
         printf("fixed time mode\n");
         printf("search time                   ");
-        PRINT_MIN_SEC(globals->time_control.fixed_milliseconds);
+        PRINT_MIN_SEC(globals->time_control.fixed_time.milliseconds);
         break;
     }
 }
@@ -227,16 +227,6 @@ static void handle_showtime(char buffer[])
 static void handle_eval(char buffer[])
 {
     printf("evaluation %5d\n", EvaluatePosition(globals->game->position, ALPHA, BETA));
-}
-
-static void handle_pawntests(char buffer[])
-{
-    RunPawnStructureTests();
-}
-
-static void handle_pawnstruct(char buffer[])
-{
-    DisplayPawnStructure(globals->game->position);
 }
 
 #if DEBUGX
@@ -292,8 +282,6 @@ const CommandHandler handlers[] = {
     { COMMAND(level),       "set a chess clock: 'level moves min:sec increment'"        },
     { COMMAND(new),         "start a new game (pawnstar will play black)"               },
     { COMMAND(nopost),      "turns off analysis output while thinking"                  },
-    { COMMAND(pawnstruct),  "display pawn structure for current position"               },
-    { COMMAND(pawntests),   "perform a series of pawn structure tests"                  },
     { COMMAND(perft),       "run standard move generation tests"                        },
     { COMMAND(ping),        "responds with pong <n> (check worker still alive)"         },
     { COMMAND(playother),   "assign pawnstar to play the color not to move"             },

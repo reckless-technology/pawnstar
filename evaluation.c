@@ -1,18 +1,5 @@
 #include "pawnstar.h"
-#if DO_EXTRA_EVAL
 
-static const int PAWN_SQUARE[64] = {
-    0,  0,  0,  0,  0,  0,  0,  0,
-   50, 50, 50, 50, 50, 50, 50, 50,
-   10, 10, 20, 30, 30, 20, 10, 10,
-    5,  5, 10, 25, 25, 10,  5,  5,
-    0,  0,  0, 20, 20,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0,
-    0,  0,  0,-20,-20,  0,  0,  0,
-    0,  0,  0,  0,  0,  0,  0,  0
-};
-
-#else
 
 static const int PAWN_SQUARE[64] = {
      0,  0,  0,  0,  0,  0,  0,  0,
@@ -24,8 +11,6 @@ static const int PAWN_SQUARE[64] = {
      5, 10, 10,-20,-20, 10, 10,  5,
      0,  0,  0,  0,  0,  0,  0,  0
 };
-
-#endif
 
 static const int KNIGHT_SQUARE[64] = {
     -50,-40,-30,-30,-30,-30,-40,-50,
@@ -96,23 +81,7 @@ static const int* const PIECE_SQUARES[7] = {
     QUEEN_SQUARE,
     KING_SQUARE_MIDGAME,
 };
-static const int RANDOM_FLUCTUATION[8] = {
-    -5, 0, 0, 0, 0, 0, 0, 5
-};
 
-#if DO_EXTRA_EVAL
-
-static const int MATERIAL_VALUES[7] = {
-      0,
-    100, // pawn
-    350, // knight
-    350, // bishop
-    600, // rook
-   1200, // queen
-      0, // king
-};
-
-#else
 
 static const int MATERIAL_VALUES[7] = {
     0,
@@ -124,7 +93,6 @@ static const int MATERIAL_VALUES[7] = {
     0, // king
 };
 
-#endif
 
 int         piece_square_values[2][8][64];
 static int  king_endgame_delta[2][64];
@@ -169,55 +137,6 @@ EvaluatePosition(const Position* position,
                  king_endgame_delta[BLACK][position->king_location[BLACK]];
         INCREMENT("eval endgames");
     }
-
-#if DO_EXTRA_EVAL
-    // Defended pawns
-    const bitboard white_pawns = position->pawns & position->white_pieces;
-    const bitboard black_pawns = position->pawns & position->black_pieces;
-    const bitboard white_pawn_attacks = SHIFT_NORTHWEST(white_pawns) | SHIFT_NORTHEAST(white_pawns);
-    const bitboard black_pawn_attacks = SHIFT_SOUTHWEST(black_pawns) | SHIFT_SOUTHEAST(black_pawns);
-    score +=  5 * (PopCount(white_pawns & white_pawn_attacks) - 
-                   PopCount(black_pawns & black_pawn_attacks)); 
-    // Bishop pair
-    const bitboard white_bishops = position->bishops & position->white_pieces;
-    const bitboard black_bishops = position->bishops & position->black_pieces;
-    if ((white_bishops & WHITE_SQUARES) && (white_bishops & BLACK_SQUARES))
-    {
-        score += 30;
-    }
-    if ((black_bishops & WHITE_SQUARES) && (black_bishops & BLACK_SQUARES))
-    {
-        score -= 30;
-    }
-    // Mid game features only
-    if (!is_endgame)
-    {
-        // King pawn shelter
-        score += 15 * (PopCount(KING_PAWN_SHIELD_WHITE  [position->king_location[WHITE]] & white_pawns) - 
-                       PopCount(KING_PAWN_SHIELD_BLACK  [position->king_location[BLACK]] & black_pawns));
-        score +=  5 * (PopCount(KING_PAWN_SHIELD_WHITE_2[position->king_location[WHITE]] & white_pawns) - 
-                       PopCount(KING_PAWN_SHIELD_BLACK_2[position->king_location[BLACK]] & black_pawns));
-        // King on open file
-        if (!(NORTH_OF[position->king_location[WHITE]] & white_pawns))
-        {
-            score -= 20;
-        }
-        if (!(SOUTH_OF[position->king_location[BLACK]] & black_pawns))
-        {
-            score += 20;
-        }
-        // Forfeit of castling rights
-        if (!(position->castle_flags & (MAY_WHITE_K | MAY_WHITE_Q)))
-        {
-            score -= 20;
-        }
-        if (!(position->castle_flags & (MAY_BLACK_K | MAY_BLACK_Q)))
-        {
-            score += 20;
-        }
-    }
-#endif
-    score += RANDOM_FLUCTUATION[NextRandom() & 7];
     return position->state_flags & IS_BLACK_TO_MOVE ? -score + 10 : score + 10; // tempo bonus
     (void)alpha;
     (void)beta;
