@@ -42,7 +42,6 @@ enum Piece
 
 enum Direction
 {
-    DIR_NONE,
     DIR_NORTH,
     DIR_NORTHEAST,
     DIR_EAST,
@@ -51,18 +50,6 @@ enum Direction
     DIR_SOUTHWEST,
     DIR_WEST,
     DIR_NORTHWEST,
-};
-
-enum Squares
-{
-    A1, B1, C1, D1, E1, F1, G1, H1,
-    A2, B2, C2, D2, E2, F2, G2, H2,
-    A3, B3, C3, D3, E3, F3, G3, H3,
-    A4, B4, C4, D4, E4, F4, G4, H4,
-    A5, B5, C5, D5, E5, F5, G5, H5,
-    A6, B6, C6, D6, E6, F6, G6, H6,
-    A7, B7, C7, D7, E7, F7, G7, H7,
-    A8, B8, C8, D8, E8, F8, G8, H8,
 };
 
 typedef struct
@@ -76,19 +63,19 @@ typedef uint64(*BitboardFn)(int location);
 typedef struct
 {
     const char* name;
-    BitboardFn    function;
+    BitboardFn  function;
 } BitboardGen;
 
 static const DirectionVector direction_vectors[] =
 {
-    [DIR_NORTH]     = {  0,  1 },
-    [DIR_NORTHEAST] = {  1,  1 },
-    [DIR_EAST]      = {  1,  0 },
-    [DIR_SOUTHEAST] = {  1, -1 },
-    [DIR_SOUTH]     = {  0, -1 },
-    [DIR_SOUTHWEST] = { -1, -1 },
-    [DIR_WEST]      = { -1,  0 },
-    [DIR_NORTHWEST] = { -1,  1 },
+    [DIR_NORTH]     = { .dx =  0, .dy =  1 },
+    [DIR_NORTHEAST] = { .dx =  1, .dy =  1 },
+    [DIR_EAST]      = { .dx =  1, .dy =  0 },
+    [DIR_SOUTHEAST] = { .dx =  1, .dy = -1 },
+    [DIR_SOUTH]     = { .dx =  0, .dy = -1 },
+    [DIR_SOUTHWEST] = { .dx = -1, .dy = -1 },
+    [DIR_WEST]      = { .dx = -1, .dy =  0 },
+    [DIR_NORTHWEST] = { .dx = -1, .dy =  1 },
 };
 
 static int
@@ -252,79 +239,97 @@ static uint64 PseudoRandom64(void)
     return x * 0x2545F4914F6CDD1Dull;
 }
 
-static const BitboardGen bitboard_generators[] = 
+static const BitboardGen ray_generators[] = 
 {
-    { "NORTH_OF",           NorthOf             },
-    { "NORTHEAST_OF",       NortheastOf         },
-    { "EAST_OF",            EastOf              },
-    { "SOUTHEAST_OF",       SoutheastOf         },
-    { "SOUTH_OF",           SouthOf             },
-    { "SOUTHWEST_OF",       SouthwestOf         },
-    { "WEST_OF",            WestOf              },
-    { "NORTHWEST_OF",       NorthwestOf         },
-    { "PAWN_ATTACKS_WHITE", PawnAttacksWhite    },
-    { "PAWN_ATTACKS_BLACK", PawnAttacksBlack    },
-    { "KNIGHT_ATTACKS",     KnightAttacks       },
-    { "BISHOP_ATTACKS",     BishopAttacks       },
-    { "ROOK_ATTACKS",       RookAttacks         },
-    { "QUEEN_ATTACKS",      QueenAttacks        },
-    { "KING_ATTACKS",       KingAttacks         },
+    { "north",              NorthOf             },
+    { "northeast",          NortheastOf         },
+    { "east",               EastOf              },
+    { "southeast",          SoutheastOf         },
+    { "south",              SouthOf             },
+    { "southwest",          SouthwestOf         },
+    { "west",               WestOf              },
+    { "northwest",          NorthwestOf         },
+    { "pawn_attacks_white", PawnAttacksWhite    },
+    { "pawn_attacks_black", PawnAttacksBlack    },
+    { "knight_attacks",     KnightAttacks       },
+    { "bishop_attacks",     BishopAttacks       },
+    { "rook_attacks",       RookAttacks         },
+    { "queen_attacks",      QueenAttacks        },
+    { "king_attacks",       KingAttacks         },
     { NULL,                 NULL                },
+};
+
+static const char* const piece_names[7] = 
+{
+    "none",
+    "pawn",
+    "knight",
+    "bishop",
+    "rook",
+    "queen",
+    "king"
+};
+
+static const char* const color_names[2] = 
+{
+    "white",
+    "black"
 };
 
 int main()
 {
     printf("/* This file was generated on " __DATE__ " at " __TIME__ " */\n");
     printf("#include \"types.h\"\n");
-    for (const BitboardGen* generator = bitboard_generators; generator->name; ++generator)
+    printf("const Sets SETS[64] = \n{");
+    for (int location = 0; location != 64; ++location)
     {
-        printf("const bitboard %s[64] = \n{\n", generator->name);
-        for (int location = 0; location != 64; ++location)
+        printf("\n    { /* square %c%c */", FILE_CHAR(location), RANK_CHAR(location));
+        for (const BitboardGen* generator = ray_generators; generator->name; ++generator)
         {
             const uint64 b = generator->function(location);
-            printf("    0x%016llXull, /* %c%c popcnt %d */\n",
+            printf("\n        .%-20s = 0x%016llXull, /* popcnt %2d */",
+                generator->name,
                 b,
-                FILE_CHAR(location),
-                RANK_CHAR(location),
                 PopCount(b));
         }
-        printf("};\n");
+        printf("\n    },");
     }
+    printf("\n};\n");
     printf("const bitboard INTERVENING_SQUARES[64][64] = \n{");
     for (int i = 0; i != 64; ++i)
     {
-        printf("\n{");
+        printf("\n    {");
         for (int j = 0; j != 64; ++j)
         {
             if ((j & 3) == 0)
             {
-                printf("\n    ");
+                printf("\n        ");
             }
             printf("0x%016llXull,", InterveningSquares(i, j));
         }
-        printf("\n},");
+        printf("\n    },");
     }
-    printf("};\n");
-    printf("const uint64 PIECE_SQUARE_HASHES[2][8][64] = \n{\n");
+    printf("\n};\n");
+    printf("const uint64 PIECE_SQUARE_HASHES[2][6][64] = \n{");
     for (int color = 0; color != 2; ++color)
     {
-        printf("{");
-        for (int piece = 0; piece != 8; ++piece)
+        printf("\n    {");
+        for (int piece = PAWN; piece <= KING; ++piece)
         {
-            printf("{");
+            printf("\n        {   /* %s %s */", color_names[color], piece_names[piece]);
             for (int i = 0; i != 64; ++i)
             {
                 if ((i & 3) == 0)
                 {
-                    printf("\n    ");
+                    printf("\n            ");
                 }
                 printf("0x%016llXull,", piece >= PAWN && piece <= KING ? PseudoRandom64() : 0ull);
             }
-            printf("\n},");
+            printf("\n        },");
         }
-        printf("},\n");
+        printf("\n    },");
     }
-    printf("};\n");
+    printf("\n};\n");
     printf("const uint64 CASTLING_RIGHTS_HASHES[16] = \n{");
     for (int i = 0; i != 16; ++i)
     {
@@ -335,7 +340,7 @@ int main()
         printf("0x%016llXull,", PseudoRandom64());
     }
     printf("\n};\n");
-    printf("const uint64 EN_PASSANT_HASHES[8] = {");
+    printf("const uint64 EN_PASSANT_HASHES[8] = \n{");
     for (int i = 0; i != 8; ++i)
     {
         if ((i & 3) == 0)

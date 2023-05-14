@@ -2,7 +2,6 @@
 
 static int EvaluateSwapOff(Position* position, int location, int color, int piece_on_square);
 
-extern const bitboard* const ENEMY_PAWN_ATTACKS[2];
 /*
 Use nominal 1-3-3-5-9 material values for SEE
 */
@@ -31,6 +30,7 @@ be super fast.
 */
 static int EvaluateSwapOff(Position* position, int location, int color, int piece_on_square)
 {
+    const Sets* const sets = &SETS[location];
     const bitboard square = BITBOARD(location);
     const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
     int scores[32];
@@ -41,21 +41,21 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         /* Find the least valuable piece of color which directly attacks location */
         int capturing_piece;       
         const bitboard attacking_pieces = position->pieces_of_color[color];
-        bitboard attacker = ENEMY_PAWN_ATTACKS[color][location] & attacking_pieces & position->pawns;
+        bitboard attacker = sets->pawn_attacks[ENEMY(color)] & attacking_pieces & position->pawns;
         if (attacker)
         {
             attacker &= -attacker; /* isolate LSB in case there is more than 1 pawn attacker */
             capturing_piece = PAWN;
             goto FoundAttacker;
         }
-        attacker = KNIGHT_ATTACKS[location] & attacking_pieces & position->knights;
+        attacker = sets->knight_attacks & attacking_pieces & position->knights;
         if (attacker)
         {
             attacker &= -attacker; /* isolate LSB in case there is more than 1 knight attacker */
             capturing_piece = KNIGHT;
             goto FoundAttacker;
         }
-        bitboard sliders = BISHOP_ATTACKS[location] & attacking_pieces & position->bishops;
+        bitboard sliders = sets->bishop_attacks & attacking_pieces & position->bishops;
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(&sliders);
@@ -66,7 +66,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
                 goto FoundAttacker;
             }
         }
-        sliders = ROOK_ATTACKS[location] & attacking_pieces & position->rooks;
+        sliders = sets->rook_attacks & attacking_pieces & position->rooks;
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(&sliders);
@@ -77,7 +77,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
                 goto FoundAttacker;
             }
         }
-        sliders = QUEEN_ATTACKS[location] & attacking_pieces & position->queens;
+        sliders = sets->queen_attacks & attacking_pieces & position->queens;
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(&sliders);
@@ -88,7 +88,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
                 goto FoundAttacker;
             }
         }
-        attacker = KING_ATTACKS[location] & attacking_pieces & position->kings;
+        attacker = sets->king_attacks & attacking_pieces & position->kings;
         if (attacker)
         {
             capturing_piece = KING;

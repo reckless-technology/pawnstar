@@ -49,7 +49,7 @@ CategorizeMoves(const Position* src_position,
     for (const int* move = moves; *move; ++move)
     {
         MakeMove(&position, src_position, *move);
-        if (position.state_flags & MOVED_INTO_CHECK)
+        if (position.state_flags & IS_MOVED_INTO_CHECK)
         {
             continue;
         }
@@ -115,7 +115,7 @@ Perft(const Position* src_position,
                     printf("ERROR in hash during perft\n");
                 }
 #endif
-                if (position.state_flags & MOVED_INTO_CHECK)
+                if (position.state_flags & IS_MOVED_INTO_CHECK)
                 {
                     continue;
                 }

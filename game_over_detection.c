@@ -8,7 +8,7 @@ in practice.
 */
 bool IsDrawByRepetition(const Position* position, bool is_search)
 {
-    const uint64 hash = position->hash;
+    const uint64_t hash = position->hash;
     int repetitions = is_search ? 1 : 2;
     for (int i = position->reversible_move_count; i != 0; --i)
     {
@@ -122,7 +122,7 @@ bool IsPositionLegal(const Position* position)
         PopCount(white_king) == 1                     &&
         PopCount(black_king) == 1                     &&
         white_king != black_king                      &&
-        !(KING_ATTACKS[Lsb(white_king)] & black_king) &&
+        !(SETS[Lsb(white_king)].king_attacks & black_king) &&
         !IsAttacked(position, position->king_location[ENEMY(color)], color);
 }
 /*

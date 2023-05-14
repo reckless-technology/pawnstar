@@ -12,29 +12,21 @@ Global header file - included by each source file
 #include "macros.h"
 #include "types.h"
 #include "function_prototypes.h"
+#include "inline_functions.h"
 
-extern const bitboard       NORTH_OF[64];
-extern const bitboard       NORTHEAST_OF[64];
-extern const bitboard       EAST_OF[64];
-extern const bitboard       SOUTHEAST_OF[64];
-extern const bitboard       SOUTH_OF[64];
-extern const bitboard       SOUTHWEST_OF[64];
-extern const bitboard       WEST_OF[64];
-extern const bitboard       NORTHWEST_OF[64];
-extern const bitboard       PAWN_ATTACKS_WHITE[64];
-extern const bitboard       PAWN_ATTACKS_BLACK[64];
-extern const bitboard       KNIGHT_ATTACKS[64];
-extern const bitboard       BISHOP_ATTACKS[64];
-extern const bitboard       ROOK_ATTACKS[64];
-extern const bitboard       QUEEN_ATTACKS[64];
-extern const bitboard       KING_ATTACKS[64];
-extern const bitboard       INTERVENING_SQUARES[64][64];
-extern const uint64         PIECE_SQUARE_HASHES[2][8][64];
-extern const uint64         CASTLING_RIGHTS_HASHES[16];
-extern const uint64         EN_PASSANT_HASHES[8];
-extern Context              globals[1];
+#if _MSC_VER
+#define strtok_r strtok_s
+#endif
+
 extern const char* const    OPENING_BOOK_MOVES;
-extern int                  piece_square_values[2][8][64];
+extern const Sets           SETS[64];
+extern const bitboard       INTERVENING_SQUARES[64][64];
+extern const uint64_t         CASTLING_RIGHTS_HASHES[16];
+extern const uint64_t         EN_PASSANT_HASHES[8];
+extern const uint64_t         PIECE_SQUARE_HASHES[2][6][64];
+extern int                  piece_square_scores[2][6][64];
+extern Context              globals[1];
+
 
 #if DEBUGX
 #define DEBUG_STATEMENT(x)      x
@@ -51,5 +43,3 @@ extern int                  piece_square_values[2][8][64];
 #else
 #define EVAL_INCREMENT(x)
 #endif
-
-#include "inline_functions.h"

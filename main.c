@@ -5,18 +5,18 @@ Context globals[1];
 static void InitializeGlobals(void)
 {
     globals->time_control.clock_type                        = CLOCK_STANDARD;
-    globals->time_control.standard.milliseconds_per_period  = 300000;
-    globals->time_control.standard.moves_per_period         = 40;
-    globals->time_control.standard.milliseconds_remaining   = 300000;
+    globals->time_control.standard.milliseconds_per_period  = 5 * 60 * 1000; // 5 minutes
+    globals->time_control.standard.moves_per_period         = 40;            // 40 moves in 5 mins
+    globals->time_control.standard.milliseconds_remaining   = 5 * 60 * 1000;
     globals->node_count                                     = 0;
     globals->engine_color                                   = NEITHER_COLOR;
     globals->do_show_thinking                               = true;
 }
 
-extern const CommandHandler handlers[];
-
 int main()
-{       
+{    
+    setbuf(stdout, NULL);
+    setbuf(stdin, NULL);
     printf(
 #if 1
         "                       .::.                            \n"
@@ -33,7 +33,7 @@ int main()
         "                    /________\\                      \n\n"
 #endif
         "Pawnstar: A Winboard and Xboard compatible chess engine\n"
-        "(C) Jonny Reckless 2009 - 2016                         \n"
+        "(C) Jonny Reckless 2009 - 2023                         \n"
         "Compiled: " __DATE__ " " __TIME__                     "\n"
         );
     InitializeGlobals();
@@ -49,39 +49,11 @@ int main()
     DEBUG_STATEMENT(DebugXClear());
     for ( ; ; )
     {
-        char nullchar[1] = { '\0' };
         char line_buffer[STRING_BUF_LEN];
-        char* command;
-        char* argument;
-        char* nl;
-        const CommandHandler* command_handler;
         if (fgets(line_buffer, sizeof(line_buffer), stdin) == NULL)
         {
             continue;
         }
-        nl = strchr(line_buffer, '\n');
-        if (nl)
-        {
-            *nl = '\0';
-        }
-        command = strtok(line_buffer, " ");
-        if (!command)
-        {
-            continue;
-        }
-        argument = strtok(NULL, "");
-        if (!argument)
-        {
-            nullchar[0] = '\0';
-            argument = nullchar;
-        }
-        for (command_handler = handlers; command_handler->name != NULL; ++command_handler)
-        {
-            if (!strcmp(command_handler->name, command))
-            {
-                command_handler->function(argument);
-                break;
-            }
-        }
+        ProcessInput(line_buffer);
     }
 }

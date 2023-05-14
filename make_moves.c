@@ -5,7 +5,7 @@
 /**
  * @brief Castling rights flags to be cleared based on move from and to squares.
 */
-static const uint8 CASTLING_RIGHTS_MASKS[64] =
+static const uint8_t CASTLING_RIGHTS_MASKS[64] =
 {
     [E1] = MAY_WHITE_K | MAY_WHITE_Q,
     [A1] = MAY_WHITE_Q,
@@ -46,8 +46,8 @@ AddPiece(Position* position,
 {
     position->pieces[piece]          ^= BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(to);
-    position->hash  += PIECE_SQUARE_HASHES[color][piece][to];
-    position->score += piece_square_values[color][piece][to];
+    position->hash  += PIECE_SQUARE_HASHES[color][piece - 1][to];
+    position->score += piece_square_scores[color][piece - 1][to];
 }
 
 void
@@ -58,8 +58,8 @@ RemovePiece(Position* position,
 {
     position->pieces[piece]          ^= BITBOARD(from);
     position->pieces_of_color[color] ^= BITBOARD(from);
-    position->hash  -= PIECE_SQUARE_HASHES[color][piece][from];
-    position->score -= piece_square_values[color][piece][from];
+    position->hash  -= PIECE_SQUARE_HASHES[color][piece - 1][from];
+    position->score -= piece_square_scores[color][piece - 1][from];
 }
 
 void
@@ -71,8 +71,8 @@ MovePiece(Position* position,
 {
     position->pieces[piece]          ^= BITBOARD(from) | BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(from) | BITBOARD(to);
-    position->hash  += PIECE_SQUARE_HASHES[color][piece][to] - PIECE_SQUARE_HASHES[color][piece][from];
-    position->score += piece_square_values[color][piece][to] - piece_square_values[color][piece][from];
+    position->hash  += PIECE_SQUARE_HASHES[color][piece - 1][to] - PIECE_SQUARE_HASHES[color][piece - 1][from];
+    position->score += piece_square_scores[color][piece - 1][to] - piece_square_scores[color][piece - 1][from];
 }
 
 /**
@@ -126,7 +126,7 @@ MakeMove(Position*       dst_position,
         else if (((to - from) & 0xF) == 0)
         {
             // Pawn double push: affects en passant.
-            dst_position->en_passant_index = (uint8)((from + to) >> 1);
+            dst_position->en_passant_index = (uint8_t)((from + to) >> 1);
             dst_position->hash += EN_PASSANT_HASHES[FILE_OF(from)];
         }       
         if (MOVE_PROMOTED(move))
@@ -156,7 +156,7 @@ MakeMove(Position*       dst_position,
         break;
 
     case KING:
-        dst_position->king_location[color] = (uint8)to;
+        dst_position->king_location[color] = (uint8_t)to;
         if (!MOVE_IS_SPECIAL(move))
         {
             goto RegularMove;
@@ -191,7 +191,7 @@ MakeMove(Position*       dst_position,
     dst_position->full_move_count += (color == BLACK);
     if (IS_IN_CHECK(dst_position, color))
     {
-        dst_position->state_flags |= MOVED_INTO_CHECK;
+        dst_position->state_flags |= IS_MOVED_INTO_CHECK;
     }
     else
     {
@@ -245,27 +245,19 @@ format, and update game state_flags accordingly
 returns the move if a legal move was played
 returns zero if the move was illegal or the game is over
 */
-int PlayMoveString(Game* game, char* move_str, bool is_san)
+int PlayMoveString(Game* game, char* move_str)
 {
-    int moves[MAX_MOVES_PER_POSITION];
-    const int* move;
     if (game->position->state_flags & IS_GAME_OVER)
     {
         return 0;
-    }    
+    }  
+    int moves[MAX_MOVES_PER_POSITION];
     GenerateLegalMoves(game->position, moves);
-    for (move = moves; *move; ++move)
+    for (const int* move = moves; *move; ++move)
     {
         char buffer[16];
-        if (is_san)
-        {
-            MoveToSanString(game->position, *move,  buffer);
-        }
-        else
-        {
-            MoveToString(*move, buffer);
-        }
-        if (AreMoveStringsEqual(buffer, move_str))
+        MoveToString(game->position, *move,  buffer);
+        if (AreMoveStringsEquivalent(buffer, move_str))
         {
             PlayMove(game, *move);
             return *move;

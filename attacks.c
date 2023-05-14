@@ -1,25 +1,23 @@
 #include "pawnstar.h"
 
-const bitboard* const FRIENDLY_PAWN_ATTACKS[2]  = { PAWN_ATTACKS_WHITE, PAWN_ATTACKS_BLACK };
-const bitboard* const ENEMY_PAWN_ATTACKS[2]     = { PAWN_ATTACKS_BLACK, PAWN_ATTACKS_WHITE };
-
 /**
  * @brief Determine bishop attacks based on occupied squares.
  * @param occupied_squares set of occupied squares
  * @param location location where bishop is
  * @return bitset of attacked squares
 */
-bitboard BishopAttacks(uint64 occupied_squares, int location)
+bitboard BishopAttacks(uint64_t occupied_squares, int location)
 {
-    bitboard result = BISHOP_ATTACKS[location];
-    bitboard ray = NORTHEAST_OF[location] & occupied_squares;
-    result ^= NORTHEAST_OF[Lsb(ray | H8BB)];
-    ray = NORTHWEST_OF[location] & occupied_squares;
-    result ^= NORTHWEST_OF[Lsb(ray | H8BB)];
-    ray = SOUTHWEST_OF[location] & occupied_squares;
-    result ^= SOUTHWEST_OF[Msb(ray | A1BB)];
-    ray = SOUTHEAST_OF[location] & occupied_squares;
-    result ^= SOUTHEAST_OF[Msb(ray | A1BB)];
+    const Sets* const sets = &SETS[location];
+    bitboard result = sets->bishop_attacks;
+    bitboard ray = sets->northeast & occupied_squares;
+    result ^= SETS[Lsb(ray | H8BB)].northeast;
+    ray = sets->northwest & occupied_squares;
+    result ^= SETS[Lsb(ray | H8BB)].northwest;
+    ray = sets->southwest & occupied_squares;
+    result ^= SETS[Msb(ray | A1BB)].southwest;
+    ray = sets->southeast & occupied_squares;
+    result ^= SETS[Msb(ray | A1BB)].southeast;
     return result;
 }
 
@@ -29,17 +27,18 @@ bitboard BishopAttacks(uint64 occupied_squares, int location)
  * @param location location where rook is
  * @return bitset of attacked squares
 */
-bitboard RookAttacks(uint64 occupied_squares, int location)
+bitboard RookAttacks(uint64_t occupied_squares, int location)
 {
-    bitboard result = ROOK_ATTACKS[location];
-    bitboard ray = NORTH_OF[location] & occupied_squares;
-    result ^= NORTH_OF[Lsb(ray | H8BB)];
-    ray = EAST_OF[location] & occupied_squares;
-    result ^= EAST_OF[Lsb(ray | H8BB)];
-    ray = SOUTH_OF[location] & occupied_squares;
-    result ^= SOUTH_OF[Msb(ray | A1BB)];
-    ray = WEST_OF[location] & occupied_squares;
-    result ^= WEST_OF[Msb(ray | A1BB)];
+    const Sets* const sets = &SETS[location];
+    bitboard result = sets->rook_attacks;
+    bitboard ray = sets->north & occupied_squares;
+    result ^= SETS[Lsb(ray | H8BB)].north;
+    ray = sets->east & occupied_squares;
+    result ^= SETS[Lsb(ray | H8BB)].east;
+    ray = sets->south & occupied_squares;
+    result ^= SETS[Msb(ray | A1BB)].south;
+    ray = sets->west & occupied_squares;
+    result ^= SETS[Msb(ray | A1BB)].west;
     return result;
 }
 
@@ -63,6 +62,7 @@ bitboard QueenAttacks(bitboard occupied_squares, int location)
 */
 bool IsAttacked(const Position* position, int location, int color)
 {
+    const Sets* const sets = &SETS[location];
     const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
     const bitboard attacking_pieces = position->pieces_of_color[color];
     /*
@@ -70,16 +70,16 @@ bool IsAttacked(const Position* position, int location, int color)
     do not affect their attack set.
     */
     if (attacking_pieces & 
-        ((ENEMY_PAWN_ATTACKS[color][location] & position->pawns  )  | 
-        (            KNIGHT_ATTACKS[location] & position->knights)  | 
-        (              KING_ATTACKS[location] & position->kings)))
+        ((sets->pawn_attacks[ENEMY(color)] & position->pawns)   |
+        (             sets->knight_attacks & position->knights) | 
+        (               sets->king_attacks & position->kings)))
     {
         return true;
     }
     /*
     Rook and queen horizontal and vertical sliding attacks
     */
-    bitboard sliding_attackers = (position->rooks | position->queens) & ROOK_ATTACKS[location] & attacking_pieces;
+    bitboard sliding_attackers = (position->rooks | position->queens) & sets->rook_attacks & attacking_pieces;
     while (sliding_attackers)
     {
         if (!(intervening_squares[FindAndClearLsb(&sliding_attackers)] & position->occupied_squares))
@@ -90,7 +90,7 @@ bool IsAttacked(const Position* position, int location, int color)
     /*
     Bishop and queen diagonal and antidiagonal sliding attacks
     */
-    sliding_attackers = (position->bishops | position->queens) & BISHOP_ATTACKS[location] & attacking_pieces;
+    sliding_attackers = (position->bishops | position->queens) & sets->bishop_attacks & attacking_pieces;
     while (sliding_attackers)
     {
         if (!(intervening_squares[FindAndClearLsb(&sliding_attackers)] & position->occupied_squares))
@@ -111,9 +111,9 @@ bitboard AttacksFromSquare(const Position* position, int location, int piece)
     case NO_PIECE:
         return NO_SQUARES;
     case PAWN:
-        return ColorAt(position, location) == WHITE ? PAWN_ATTACKS_WHITE[location] : PAWN_ATTACKS_BLACK[location];
+        return ColorAt(position, location) == WHITE ? SETS[location].pawn_attacks_white : SETS[location].pawn_attacks_black;
     case KNIGHT:
-        return KNIGHT_ATTACKS[location];
+        return SETS[location].knight_attacks;
     case BISHOP:
         return BishopAttacks(position->occupied_squares, location);
     case ROOK:
@@ -121,7 +121,7 @@ bitboard AttacksFromSquare(const Position* position, int location, int piece)
     case QUEEN:
         return QueenAttacks(position->occupied_squares, location);
     case KING:
-        return KING_ATTACKS[location];
+        return SETS[location].king_attacks;
     }
     return NO_SQUARES;
 }

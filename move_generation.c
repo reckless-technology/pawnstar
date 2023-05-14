@@ -1,5 +1,4 @@
 #include "pawnstar.h"
-extern const bitboard* const ENEMY_PAWN_ATTACKS[2];
 /*
 Functions to generate pseudo-legal and strictly-legal moves. Pseudo-legal moves
 may leave our king in check; this is tested during search for improved 
@@ -66,7 +65,7 @@ GeneratePseudoLegalMoves(const Position* position,
         double_pushes      = SHIFT_NORTH(single_pushes) & vacant_squares & RANK_4;
         captures_west      = SHIFT_NORTHWEST(pawns)     & position->black_pieces;
         captures_east      = SHIFT_NORTHEAST(pawns)     & position->black_pieces;
-        en_passant_sources = position->en_passant_index ? PAWN_ATTACKS_BLACK[position->en_passant_index] & pawns : NO_SQUARES;
+        en_passant_sources = position->en_passant_index ? SETS[position->en_passant_index].pawn_attacks_black & pawns : NO_SQUARES;
         promotions         = single_pushes & RANK_8;
         promotions_west    = captures_west & RANK_8;
         promotions_east    = captures_east & RANK_8;   
@@ -84,7 +83,7 @@ GeneratePseudoLegalMoves(const Position* position,
         double_pushes      = SHIFT_SOUTH(single_pushes) & vacant_squares & RANK_5;
         captures_west      = SHIFT_SOUTHWEST(pawns)     & position->white_pieces;
         captures_east      = SHIFT_SOUTHEAST(pawns)     & position->white_pieces;
-        en_passant_sources = position->en_passant_index ? PAWN_ATTACKS_WHITE[position->en_passant_index] & pawns : NO_SQUARES;
+        en_passant_sources = position->en_passant_index ? SETS[position->en_passant_index].pawn_attacks_white & pawns : NO_SQUARES;
         promotions         = single_pushes & RANK_1;
         promotions_west    = captures_west & RANK_1;
         promotions_east    = captures_east & RANK_1;   
@@ -233,7 +232,7 @@ int GenerateLegalMoves(const Position* position, int moves[])
         for (move = *phase; *move; ++move)
         {
             MakeMove(dst_position, position, *move);
-            if (!(dst_position->state_flags & MOVED_INTO_CHECK))
+            if (!(dst_position->state_flags & IS_MOVED_INTO_CHECK))
             {
                 *moves++ = *move;
             }

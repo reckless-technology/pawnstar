@@ -18,7 +18,7 @@ Structure containing a node of the opening book linked list.
 typedef struct BookPosition BookPosition;
 struct BookPosition
 {
-    uint64          hash;       
+    uint64_t          hash;       
     int             capacity;   
     int             count;      
     int*            moves;      
@@ -31,7 +31,7 @@ static BookPosition* opening_book = NULL;
 /*
 Create a new BookPosition and return a pointer to it
 */
-static BookPosition* NewBookPosition(uint64 hash)
+static BookPosition* NewBookPosition(uint64_t hash)
 {
     BookPosition* bp    = malloc(sizeof(BookPosition));
     bp->hash            = hash;
@@ -44,7 +44,7 @@ static BookPosition* NewBookPosition(uint64 hash)
 /*
 Find a BookPosition from a position hash (NULL if not found)
 */
-static BookPosition* FindBookPosition(uint64 hash)
+static BookPosition* FindBookPosition(uint64_t hash)
 {
     BookPosition* bp;
     for (bp = opening_book; bp; bp = bp->next)
@@ -59,7 +59,7 @@ static BookPosition* FindBookPosition(uint64 hash)
 /*
 Add a new move to the opening book
 */
-static void AddMove(uint64 hash, int move)
+static void AddMove(uint64_t hash, int move)
 {
     BookPosition* bp = FindBookPosition(hash);
     if (!bp)
@@ -79,7 +79,7 @@ static void AddMove(uint64 hash, int move)
 Select one from the possible book moves for the current position
 Returns 0 if there is no book move for this position.
 */
-int GetBookMove(uint64 hash)
+int GetBookMove(uint64_t hash)
 {
     const BookPosition* bp = FindBookPosition(hash);
     return bp ? bp->moves[(unsigned)NextRandom() % bp->count] : 0;
@@ -131,7 +131,7 @@ void DisplayAvailableBookMoves(const Position* position)
     for (int i = 0; i != next_move; ++i)
     {
         char buffer[16];
-        MoveToSanString(position, book_moves[i], buffer);
+        MoveToString(position, book_moves[i], buffer);
         printf("%-8s %3u\n", buffer, move_counts[i]);
     }
 }
@@ -161,7 +161,7 @@ bool InitializeOpeningBookFromString(const char* book_string)
 		     move_str;
 			 move_str = strtok_r(NULL, " ", &move_ctx))
         {
-            const uint64 hash = game->position->hash;           
+            const uint64_t hash = game->position->hash;           
             if (move_str[0] == '#')
             {
                 break; // comment - ignore rest of line
@@ -176,7 +176,7 @@ bool InitializeOpeningBookFromString(const char* book_string)
             {
                 *c = '\0';
             }
-            const int move = PlayMoveString(game, move_str, true);
+            const int move = PlayMoveString(game, move_str);
             if (!move)
             {
                 printf("ERROR: illegal move '%s' found in line %u of opening book\n", move_str, line_number);

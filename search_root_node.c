@@ -9,9 +9,11 @@ void StopThinkingMoveImmediately()
 {
     cancel = true;
 }
-/*
-Entry point for the search to find the computer move.
-Returns the best move found, or 0 if there is no move (i.e. game over)
+
+/**
+ * @brief Search the root node and find the best move
+ * @param src_position the position to search
+ * @return the best move found
 */
 int SearchRootNode(const Position* src_position)
 {
@@ -23,34 +25,37 @@ int SearchRootNode(const Position* src_position)
     int         depth;
     int         start_ms;
     int         stop_ms;
-    int         best_move       = 0;
-    int         timeout_ms      = 0;
-    int         ms_allocated    = 0;
-    int         moves_to_go     = 0;
+    int         best_move       = 0;    /* the move we are going to return to the caller    */
+    int         timeout_ms      = 0;    /* cancel search when this time expires             */
+    int         ms_allocated    = 0;    /* soft allocated time for the move                 */
+    int         moves_to_go     = 0;    /* number of remaining moves in this clock period   */
     int         alpha;
 
     if (src_position->state_flags & IS_GAME_OVER)
     {
         return 0;
     }
+    /* If there is a book move for this position, do not bother with search. */
     int book_move = GetBookMove(src_position->hash);
     if (book_move)
     {
         return book_move;
     } 
     int move_count = GenerateLegalMoves(src_position, moves);
-    if (move_count <= 1)
+    /* If there is only 1 legal move available, no point wasting time searching, just play it. */
+    if (move_count == 1)
     {
-        return moves[0]; /* If there is only 1 legal move available just play it */
+        return moves[0];
     }  
+    /* Plan time usage for this search. */
     switch (globals->time_control.clock_type)
     {
     case CLOCK_STANDARD:
     default:
-        moves_to_go = globals->time_control.standard.moves_per_period - (src_position->full_move_count % globals->time_control.standard.moves_per_period);
-        ms_allocated = globals->time_control.standard.milliseconds_remaining / moves_to_go;
-        timeout_ms = max(100, min(ms_allocated * 4, globals->time_control.standard.milliseconds_remaining - 3000));
-        globals->hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        moves_to_go     = globals->time_control.standard.moves_per_period - (src_position->full_move_count % globals->time_control.standard.moves_per_period);
+        ms_allocated    = globals->time_control.standard.milliseconds_remaining / moves_to_go;
+        timeout_ms      = max(100, min(ms_allocated * 2, globals->time_control.standard.milliseconds_remaining - 3000));
+        globals->hard_stop_search_ms = GetMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
         break; 
     
     case CLOCK_FIXED_DEPTH:
@@ -67,7 +72,7 @@ int SearchRootNode(const Position* src_position)
     
     case CLOCK_INCREMENTAL:
         ms_allocated   = globals->time_control.incremental.increment_milliseconds + (globals->time_control.incremental.milliseconds_remaining / 30);
-        timeout_ms     = max(100, min(ms_allocated * 4, globals->time_control.incremental.milliseconds_remaining - 3000));
+        timeout_ms     = max(100, min(ms_allocated * 2, globals->time_control.incremental.milliseconds_remaining - 3000));
 		globals->hard_stop_search_ms = GetMilliseconds() + timeout_ms;
         break;
     }
@@ -88,16 +93,16 @@ int SearchRootNode(const Position* src_position)
     }   
     MergeSort(move_count, scored_moves);
     best_move = scored_moves[0].move;
-    for (depth = STARTING_SEARCH_DEPTH; depth != MAX_PLY; ++depth)
+    for (depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
     {       
         if (globals->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > globals->time_control.fixed_depth.depth)
         {
             break;
         }
         globals->node_count = 0;
-        alpha = ALPHA;
         MergeSort(move_count, scored_moves);
         pv.num_moves = 0;
+        alpha = ALPHA;
         for (i = 0; i != move_count; ++i)
         {          
             if (i < NUM_ROOT_MOVES_BEFORE_PVS)
@@ -145,6 +150,12 @@ int SearchRootNode(const Position* src_position)
         if (globals->time_control.clock_type == CLOCK_STANDARD || 
             globals->time_control.clock_type == CLOCK_INCREMENTAL)
         {
+            /* 
+            Plan our use of the time with some care. If both the score we find and the best move are consistent
+            between successive iterations, we can probably stop searchning before our allocated time is elapsed and
+            save the time for other, more difficult positions. Similarly we can save a smaller amount of time if either
+            of these but not both are true.
+            */
             const int elapsed_ms = stop_ms - start_ms;
             bool is_best_move_consistent = true;
             bool is_score_stable = true;
@@ -159,15 +170,15 @@ int SearchRootNode(const Position* src_position)
                     is_score_stable = false;
                 }
             }
-            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 4) > ms_allocated)
+            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 6) > ms_allocated)
             {
                 break;
             }
-            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 2) > ms_allocated)
+            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 4) > ms_allocated)
             {
                 break;
             }
-            if (elapsed_ms > ms_allocated)
+            if (elapsed_ms * 2 > ms_allocated)
             {
                 break;
             }

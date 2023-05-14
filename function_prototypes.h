@@ -26,11 +26,10 @@ bool        PositionFromString(const char* fen_string, Position* position);
 void        PositionToString(const Position* position, char* fen_string);
 bool        IsPositionLegal(const Position* position);
 void        MoveSequenceToSanString(const Position* position, const int moves[], char* move_string);
-char*       MoveToSanString(const Position* position, int the_move, char* move_string);
-void        MoveToString(int move, char* move_string);
-int         PlayMoveString(Game* game, char* move_str, bool is_san);
-bool        AreMoveStringsEqual(char* str1, char* str2);
-uint64      ComputeHash(const Position* position);
+char*       MoveToString(const Position* position, int the_move, char* move_string);
+int         PlayMoveString(Game* game, char* move_string);
+bool        AreMoveStringsEquivalent(char* str1, char* str2);
+uint64_t      ComputeHash(const Position* position);
 void        InitializeGame(Game* game);
 /*
 Attacks
@@ -46,15 +45,15 @@ Opening book
 bool        InitializeOpeningBookFromString(const char* book_string);
 bool        InitializeOpeningBookFromFile(const char* filename);
 void        FreeOpeningBook(void);
-int         GetBookMove(uint64 hash);
+int         GetBookMove(uint64_t hash);
 void        DisplayAvailableBookMoves(const Position* position);
 /*
 Transposition table
 */
 bool        InitializeTranspositionTable(int megabytes);
 void        FreeTranspositionTable(void);
-void        RecordTransposition(uint64 hash, int depth, int score, int move, int node_type);
-bool        FindTransposition(uint64 hash, Transposition* transposition);
+void        RecordTransposition(uint64_t hash, int depth, int score, int move, int node_type);
+bool        FindTransposition(uint64_t hash, Transposition* transposition);
 /*
 Generation and ordering of moves
 */
@@ -107,6 +106,10 @@ void        DebugXIncrement(const char* key);
 void        DebugXIncrementIf(bool condition, const char* key);
 void        DebugXWrite(FILE* file);
 #endif
+/*
+Process Input Commands
+*/
+void        ProcessInput(char* line);
 
 #ifdef __cplusplus 
 }

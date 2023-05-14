@@ -2,7 +2,7 @@
 #pragma warning(disable:4221)
 
 /**
- * @brief Fail soft alpha beta main search algorithm.
+ * @brief Fail hard alpha beta main search algorithm.
  * @param src_position position to search
  * @param depth search depth
  * @param ply distance from root node
@@ -21,17 +21,14 @@ Search(const Position*  src_position,
        volatile bool*   cancel, 
        Variation*       parent_pv)
 {    
-    Variation   pv;
-    int         move;
-    int         pre_move[2];
-    int         captures[MAX_MOVES_PER_POSITION];
-    int         non_captures[MAX_MOVES_PER_POSITION];
-    int         score;   
-    int         num_legal_moves  = 0;
-    int         best_move        = 0;
-    int         best_score       = ALPHA;
-    bool        has_raised_alpha = false;
-    int* const  move_phases[]    = 
+    Variation           pv;
+    int                 pre_move[2];
+    int                 captures[MAX_MOVES_PER_POSITION];
+    int                 non_captures[MAX_MOVES_PER_POSITION]; 
+    int                 num_legal_moves  = 0;
+    int                 best_move        = 0;
+    bool                has_raised_alpha = false;
+    const int* const    move_phases[]    = 
     { 
         [PHASE_PRE_MOVES]        = pre_move,
         [PHASE_CAPTURES]         = captures,
@@ -39,7 +36,7 @@ Search(const Position*  src_position,
     };
     if (*cancel)
     {
-        return ILLEGAL_SCORE;
+        return SEARCH_CANCELLED_SCORE;
     }
     pv.num_moves = 0;
     if (!(++globals->node_count & 0xFFFF) &&
@@ -47,7 +44,7 @@ Search(const Position*  src_position,
         GetMilliseconds() >= globals->hard_stop_search_ms)
     {
         *cancel = true;
-        return ILLEGAL_SCORE;
+        return SEARCH_CANCELLED_SCORE;
     }
     INCREMENT("alpha beta calls");
     if (IsDrawByRepetition(src_position, true) || 
@@ -56,23 +53,16 @@ Search(const Position*  src_position,
     {
         return DRAW_SCORE;
     }
+    INCREMENT_IF(src_position->state_flags & IS_CHECK, "checks");
     if (ply == MAX_PLY)
     {
         INCREMENT("max ply reached");
         return EvaluatePosition(src_position, alpha, beta);
     }
-    if (!(src_position->state_flags & IS_CHECK))
+    if (!(src_position->state_flags & IS_CHECK) && depth <= 0)
     {
-        if (depth <= 0)
-        {
-            return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
-        }
-    }
-    else
-    {
-        INCREMENT("checks");
-        ++depth;
-    }    
+        return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
+    } 
     /*
     Determine if there is an entry in the transposition table for this 
     position.
@@ -92,7 +82,7 @@ Search(const Position*  src_position,
             if (transposition.score >= beta)
             {
                 INCREMENT("table hit beta cutoffs");
-                return transposition.score;
+                return beta;
             }
             break;
 
@@ -105,7 +95,7 @@ Search(const Position*  src_position,
             if (transposition.score <= alpha)
             {
                 INCREMENT("table hit alpha cutoffs");
-                return transposition.score;
+                return alpha;
             }
             break;
 
@@ -132,19 +122,19 @@ Search(const Position*  src_position,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    if ((src_position->move)                                                                            &&
-        !(src_position->state_flags & IS_CHECK)                                                         &&
-        beta == alpha + 1                                                                               &&
-        !(!src_position->queens || PopCount(src_position->occupied_squares ^ src_position->pawns) < 8)  &&
-        EvaluatePosition(src_position, alpha, beta) > beta)
+    if ((src_position->move)                            &&
+        !(src_position->state_flags & IS_CHECK)         &&
+        beta == alpha + 1                               &&
+        PopCount(src_position->occupied_squares) > 7    &&
+        EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
         Position position;       
         MakeNullMove(&position, src_position);
-        score = -Search(&position, depth - 3, ply + 1, -beta, -alpha, cancel, NULL);
+        int score = -Search(&position, depth - 4, ply + 1, -beta, -alpha, cancel, NULL);
         if (*cancel)
         {
-            return ILLEGAL_SCORE;
+            return SEARCH_CANCELLED_SCORE;
         }
         if (score >= beta)
         {
@@ -170,20 +160,18 @@ Search(const Position*  src_position,
     {
         pre_move[0] = 0;
     }
-    if (!is_transposition && depth > 1)
-    {
-        INCREMENT("nodes without transposition");
-    }    
+    INCREMENT_IF(!is_transposition && depth > 1, "nodes without transposition");   
     /*
     Start of main loop - we go through the following move phases:
-
-    1) Pre move from the PV or TT
-    2) Regular moves with a SEE >= 0 (sorted "best first")
-    3) Deferred moves with a SEE < 0
-
-    Move generation is deferred until after the pre move has been searched.
+    
+    1) pre move from the transposition table
+    2) captures
+    3) non captures
+    
+    Move generation is deferred until after the pre move has been searched,
+    in the hope that in the case of a cutoff we don't actually have to bother
+    with move generation at all.
     */
-    int search_depth = depth;
     for (int phase = PHASE_PRE_MOVES; phase <= PHASE_NON_CAPTURES; ++phase)
     {            
         switch (phase)
@@ -207,11 +195,11 @@ Search(const Position*  src_position,
         const int* moves_this_phase = move_phases[phase];
         while (*moves_this_phase)
         {
-            move = *moves_this_phase++;
-            score = SearchSingleMove(src_position, search_depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
+            int move = *moves_this_phase++;
+            int score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
             if (*cancel)
             {
-                return ILLEGAL_SCORE;
+                return SEARCH_CANCELLED_SCORE;
             }
             if (score == MOVED_INTO_CHECK_SCORE)
             {
@@ -224,19 +212,15 @@ Search(const Position*  src_position,
                 INCREMENT_IF(phase == PHASE_PRE_MOVES, "beta cutoffs from TT move");
                 RecordTransposition(src_position->hash, depth, score, move, NODE_CUT);
                 RecordGoodMove(ply, move);
-                return score;
+                return beta;
             }
-            if (score > best_score)
+            if (score > alpha)
             {
-                best_score = score;
+                INCREMENT("pv changed");
+                alpha = score;
+                has_raised_alpha = true;
+                RecordGoodMove(ply, move);
                 best_move  = move;
-                if (score > alpha)
-                {
-                    INCREMENT("pv changed");
-                    has_raised_alpha = true;
-                    RecordGoodMove(ply, move);
-                    alpha = score;
-                }
             }
         }       
     }    
@@ -277,8 +261,8 @@ Search(const Position*  src_position,
         We tried every move but did not raise alpha; this was an all node
         */
         INCREMENT("all nodes");
-        RecordTransposition(src_position->hash, depth, best_score, best_move, NODE_ALL);       
+        RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_ALL);       
     }
-    return best_score;
+    return alpha;
 }
 

@@ -17,46 +17,30 @@ SearchSingleMove(const Position*    src_position,
 {      
     if (*cancel)
     {
-        return ILLEGAL_SCORE;
+        return SEARCH_CANCELLED_SCORE;
     }
     Position position;
     MakeMove(&position, src_position, move);
-    if (position.state_flags & MOVED_INTO_CHECK)
+    if (position.state_flags & IS_MOVED_INTO_CHECK)
     {
         return MOVED_INTO_CHECK_SCORE;
     }
-    int child_depth = depth - 1;
-
-    /*
-    Extend the search depth in the following cases: 
-        # This is a pawn promotion
-        # This is a pawn push to the 7th rank 
-        # Recapture of same value piece
-    */
-
-    if (MOVE_PROMOTED(move))
-    {
-        INCREMENT("extensions promotion");
-        ++child_depth;
-    }
-
-
     int score;
     if (beta > alpha + 1 &&
-        move_index       &&
+        move_index != 0  &&
        !(src_position->state_flags & IS_CHECK))
     {
         INCREMENT("pvs attempts");
-        score = -Search(&position, child_depth, ply + 1, -alpha - 1, -alpha, cancel, pv);
+        score = -Search(&position, depth - 1, ply + 1, -alpha - 1, -alpha, cancel, pv);
         if (score > alpha)
         {
             INCREMENT("pvs fails");
-            score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, pv);
+            score = -Search(&position, depth - 1, ply + 1, -beta, -alpha, cancel, pv);
         }
     }
     else
     {
-        score = -Search(&position, child_depth, ply + 1, -beta, -alpha, cancel, pv);
+        score = -Search(&position, depth - 1, ply + 1, -beta, -alpha, cancel, pv);
     }
     return score;
 }

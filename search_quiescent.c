@@ -1,7 +1,14 @@
 #include "pawnstar.h"
-/*
-Fairly standard alpha-beta quiescence search
-Refer to: http://chessprogramming.wikispaces.com/Quiescence+Search
+
+/**
+ * @brief Alpha beta quiescence (capture only) search.
+ * @param src_position position to search
+ * @param depth search depth (<= 0 for quiescence)
+ * @param ply distance from root node
+ * @param alpha parent floor value
+ * @param beta parent ceiling value
+ * @param cancel stop search flag
+ * @return score
 */
 int SearchQuiescent(const Position* src_position, 
                     int depth,
@@ -13,7 +20,7 @@ int SearchQuiescent(const Position* src_position,
     INCREMENT("quiescent calls");
     if (*cancel)
     {
-        return ILLEGAL_SCORE;
+        return SEARCH_CANCELLED_SCORE;
     }
     if (ply == MAX_PLY)
     {
@@ -23,52 +30,34 @@ int SearchQuiescent(const Position* src_position,
     if (src_position->state_flags & IS_CHECK)
     {
         INCREMENT("quiescent checks");
-        return Search(src_position, depth, ply, alpha, beta, cancel, NULL);
+        return alpha;
     }
     int score = EvaluatePosition(src_position, alpha, beta);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
-        return score;
+        return beta;
     }
     if (score > alpha)
     {
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
-
-#if DO_FUTILITY_PRUNING
-    else if (score + FUTILITY_CUTOFF_THRESHOLD < alpha)
-    {
-        INCREMENT("quiescent futility cutoffs");
-        return alpha;
-    }
-#endif
-
-    int best_score = score;
-
     int captures[MAX_MOVES_PER_POSITION];
     GeneratePseudoLegalMoves(src_position, captures, NULL);  
     SortMoves(src_position, captures, ply, false);
-    /*
-    Main loop
-    */
-    int* pmove = captures;
-    while (*pmove)
+    for (const int* move = captures; *move; ++move)
     {
-        const int move = *pmove++;
-        Position position;
-
 #if DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-        if (EvaluateStaticExchange(src_position, move) < 0)
+        if (EvaluateStaticExchange(src_position, *move) < 0)
         {
             INCREMENT("quiescent SEE skips");
             continue;
         }
 #endif
-
-        MakeMove(&position, src_position, move);
-        if (position.state_flags & MOVED_INTO_CHECK)
+        Position position;
+        MakeMove(&position, src_position, *move);
+        if (position.state_flags & IS_MOVED_INTO_CHECK)
         {
             continue;
         }
@@ -76,18 +65,13 @@ int SearchQuiescent(const Position* src_position,
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            return score;
+            return beta;
         }
-        if (score > best_score)
+        if (score > alpha)
         {
-            best_score = score;
-            if (score > alpha)
-            {
-                alpha = score;            
-                INCREMENT("quiescent pv changed");
-            }
+            alpha = score;
+            INCREMENT("quiescent pv changed");
         }      
     }
-    INCREMENT("quiescent all nodes");
-    return best_score;
+    return alpha;
 }

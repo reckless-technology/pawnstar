@@ -13,7 +13,7 @@ static void SearchThreadEntry(Game* game)
     if (move)
     {
         char move_string[16];
-        MoveToSanString(game->position, move, move_string);
+        MoveToString(game->position, move, move_string);
         PlayMove(game, move);
         printf("move %s\n", move_string);
         DisplayResultIfGameOver(game->position);

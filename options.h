@@ -22,7 +22,7 @@ Whether to skip moves in quiescence search which have a negative static
 exchange evaluation (SEE)
 */
 #ifndef DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 0
+#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 1
 #endif
 /*
 Global constants
@@ -39,7 +39,7 @@ Global constants
 #define MAX_PLY                              64 // terminate the search at this ply no matter what
 #define MAX_GAME_LENGTH                     512 // maximum number of positions we can store in a game
 #define RANK_FLIP                          0x38 // used as XOR mask to mirror or "flip" the board horizontally (x,y) => (x,7-y)
-#define ILLEGAL_SCORE                  12345678 // you should never see this score in any search result - returned only when cancel flag was set
+#define SEARCH_CANCELLED_SCORE         12345678 // you should never see this score in any search result - returned only when cancel flag was set
 #define MOVED_INTO_CHECK_SCORE        -23456789 // returned when a pseudo-legal move placed us into check
 #define SCORE_INSTABILITY_THRESHOLD          50 // deviation of score this amount between iterations triggers deeper search
 #define PV_TABLE_SIZE                      4999 // number of entries in the principal variation hashtable (should be prime)

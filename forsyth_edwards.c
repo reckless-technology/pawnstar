@@ -5,10 +5,10 @@
 /*
 Compute the Zobrist hash of a position
 */
-uint64 
+uint64_t 
 ComputeHash(const Position* position)
 {
-    uint64 hash = position->state_flags & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
+    uint64_t hash = position->state_flags & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
     hash += CASTLING_RIGHTS_HASHES[position->castle_flags];
     if (position->en_passant_index)
     {
@@ -19,12 +19,12 @@ ComputeHash(const Position* position)
         bitboard b = position->pieces[piece] & position->white_pieces;
         while (b)
         {
-            hash += PIECE_SQUARE_HASHES[WHITE][piece][FindAndClearLsb(&b)];
+            hash += PIECE_SQUARE_HASHES[WHITE][piece - 1][FindAndClearLsb(&b)];
         }
         b = position->pieces[piece] & position->black_pieces;
         while (b)
         {
-            hash += PIECE_SQUARE_HASHES[BLACK][piece][FindAndClearLsb(&b)];
+            hash += PIECE_SQUARE_HASHES[BLACK][piece - 1][FindAndClearLsb(&b)];
         }
     }
     return hash;
@@ -37,67 +37,61 @@ returns false if an illegal FEN string was provided
 */
 bool 
 PositionFromString(const char* fen_string, 
-                   Position* position)
+                   Position*   position)
 {
+    static const char* const white_pieces = "PNBRQK";
+    static const char* const black_pieces = "pnbrqk";
+    static const char* const ep_files     = "abcdefgh";
+    static const char* const ep_ranks     = "36";
+    const size_t len = strlen(fen_string);
+    if (len == 0 || len >= STRING_BUF_LEN)
+    {
+        goto Error;
+    }
     char buffer[STRING_BUF_LEN];
-    size_t i;
-    int x = 0, y = 7;
-    const char* const white_pieces = "PNBRQK";
-    const char* const black_pieces = "pnbrqk";
-    const char* const ep_files     = "abcdefgh";
-    const char* const ep_ranks     = "36";
-    char* token;
-    const char* index;
-    if (strlen(fen_string) >= STRING_BUF_LEN)
-    {
-        printf("ERROR: FEN string too long\n");
-        return false;
-    }
     strcpy(buffer, fen_string);
-    i = strlen(buffer);
-    if (i && buffer[i - 1] == '\n')
+    if (buffer[len - 1] == '\n')
     {
-        buffer[i - 1] = '\0';
+        buffer[len - 1] = '\0';
     }
-    token = strtok(buffer, " ");
-    if (!token)
+    char* save_ptr      = NULL;
+    const char* pieces  = strtok_r(buffer, " ", &save_ptr);
+    if (!pieces)
     {
-        printf("ERROR: FEN string does not contain board definition\n");
-        return false;
+        goto Error;
     }
     memset(position, 0, sizeof(Position));
     position->previous = position;
     /*
     Pieces on the board
     */
-    for ( ; *token; ++token)
+    int x = 0, y = 7;
+    for ( ; *pieces; ++pieces)
     {
-        if (*token == '/')
+        const char c = *pieces;
+        if (c == '/')
         {
             if (x != 8)
             {
-                printf("ERROR: FEN string contains too few files\n");
-                return false;
+                goto Error;
             }
             x = 0;
             if (--y == -1)
             {
-                printf("ERROR: FEN string contains too many ranks\n");
-                return false;
+                goto Error;
             }
             continue;
         }
-        if (*token >= '1' && *token <= '8')
+        if (c >= '1' && c <= '8')
         {
-            x += *token - '0';
+            x += c - '0';
             continue;
         }
         if (x >= 8)
         {
-            printf("ERROR: FEN string contains too many files\n");
-            return false;
+            goto Error;
         }
-        index = strchr(white_pieces, *token);
+        const char* index = strchr(white_pieces, c);
         if (index)
         {
             const int piece = (int)(index - white_pieces) + 1;
@@ -105,61 +99,54 @@ PositionFromString(const char* fen_string,
             ++x;
             continue;
         }
-        index = strchr(black_pieces, *token);
+        index = strchr(black_pieces, c);
         if (index)
         {
             const int piece = (int)(index - black_pieces) + 1;
             AddPiece(position, BLACK, piece, x + 8 * y);
             ++x;
+            continue;
         }
-        else
-        {
-            printf("ERROR: unrecognized character '%c' in FEN string\n", *token);
-            return false;
-        }
+        goto Error;
     }
-    if (y)
+    if (x != 8 || y != 0)
     {
-        printf("ERROR: FEN string contains too few ranks\n");
-        return false;
+        goto Error;
     }
-    position->occupied_squares = position->white_pieces | position->black_pieces;
-    position->king_location[WHITE] = (uint8)Lsb(position->kings & position->white_pieces);
-    position->king_location[BLACK] = (uint8)Lsb(position->kings & position->black_pieces);
+    position->occupied_squares     = position->white_pieces | position->black_pieces;
+    position->king_location[WHITE] = (uint8_t)Lsb(position->kings & position->white_pieces);
+    position->king_location[BLACK] = (uint8_t)Lsb(position->kings & position->black_pieces);
     /*
     Side to move
     */
-    token = strtok(NULL, " ");
-    if (!token)
+    const char* color_to_move = strtok_r(NULL, " ", &save_ptr);
+    if (!color_to_move)
     {
-        printf("ERROR: FEN string does not specify side to move\n");
-        return false;
+        goto Error;
     }
-    if (!strcmp(token, "b"))
+    if (!strcmp(color_to_move, "b"))
     {
         position->state_flags |= IS_BLACK_TO_MOVE;
     }
-    else if (!!strcmp(token, "w"))
+    else if (!!strcmp(color_to_move, "w"))
     {
-        printf("ERROR: FEN string contains illegal side to move '%s'\n", token);
-        return false;
+        goto Error;
     }
     /*
     Castling rights
     */
-    token = strtok(NULL, " ");
-    if (!token)
+    const char* castling_rights = strtok_r(NULL, " ", &save_ptr);
+    if (!castling_rights)
     {
-        printf("ERROR: FEN string does not specify castling rights\n");
-        return false;
+        goto Error;
     }
-    if (!strcmp("-", token))
+    if (!strcmp("-", castling_rights))
     {
         position->castle_flags = 0;
     }
     else
     {
-        for (const char* c = token; *c; ++c)
+        for (const char* c = castling_rights; *c; ++c)
         {
             switch (*c)
             {
@@ -176,60 +163,55 @@ PositionFromString(const char* fen_string,
                 position->castle_flags |= MAY_BLACK_Q;
                 break;
             default:
-                printf("ERROR: FEN string specifies illegal castling right '%c'\n", *c);
-                return false;
+                goto Error;
             }
         }
     }
     /*
     En passant capture square
     */
-    token = strtok(NULL, " ");
-    if (!token)
+    const char* ep_square = strtok_r(NULL, " ", &save_ptr);
+    if (!ep_square)
     {
-        printf("ERROR: FEN string does not specify en passant capture availability\n");
-        return false;
+        goto Error;
     }
-    if (!strcmp(token, "-"))
+    if (!strcmp(ep_square, "-"))
     {
         position->en_passant_index = 0;
     }
     else
     {
-        if (strlen(token) != 2 || !strchr(ep_files, token[0]) || !strchr(ep_ranks, token[1]))
+        if (strlen(ep_square) != 2 || !strchr(ep_files, ep_square[0]) || !strchr(ep_ranks, ep_square[1]))
         {
-            printf("ERROR: FEN string specifies illegal en passant square '%s'\n", token);
-            return false;
+            goto Error;
         }
-        position->en_passant_index = token[0] - 'a' + 8 * (token[1] - '1');
+        position->en_passant_index = ep_square[0] - 'a' + 8 * (ep_square[1] - '1');
     }
     /*
     Half move clock - optional
     */
-    token = strtok(NULL, " ");
-    if (token)
+    const char* hmc = strtok_r(NULL, " ", &save_ptr);
+    if (hmc)
     {
-        int hmc = 0;
-        if (sscanf(token, "%d", &hmc) != 1)
+        int half_move_clock = 0;
+        if (sscanf(hmc, "%d", &half_move_clock) != 1)
         {
-            printf("ERROR: FEN string specifies illegal half move clock '%s'\n", token);
-            return false;
+            goto Error;
         }
-        position->reversible_move_count = (uint8)hmc;
+        position->reversible_move_count = (uint8_t)half_move_clock;
     }
     /*
     Full move number - optional
     */
-    token = strtok(NULL, " ");
-    if (token)
+    const char* full_move_num = strtok_r(NULL, " ", &save_ptr);
+    if (full_move_num)
     {
         int fmc = 0;
-        if (sscanf(token, "%d", &fmc) != 1)
+        if (sscanf(full_move_num, "%d", &fmc) != 1)
         {
-            printf("ERROR: FEN string specifies illegal full move number '%s'\n", token);
-            return false;
+            goto Error;
         }
-        position->full_move_count = (uint8)fmc - 1;
+        position->full_move_count = (uint8_t)fmc - 1;
     }
     position->hash = ComputeHash(position);
     /*
@@ -237,8 +219,7 @@ PositionFromString(const char* fen_string,
     */
     if (!IsPositionLegal(position))
     {
-        printf("ERROR: FEN string specifies an illegal chess position\n");
-        return false;
+        goto Error;
     }
     /*
     Is the position in check?
@@ -267,6 +248,10 @@ PositionFromString(const char* fen_string,
         position->state_flags |= IS_DRAW_MATERIAL;
     }
     return true;
+
+Error:
+    printf("ERROR: bad FEN string %s\n", fen_string);
+    return false;
 }
 /*
 Generate the FEN string for the current position

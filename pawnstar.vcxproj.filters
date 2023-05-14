@@ -41,7 +41,7 @@
     <ClCompile Include="attacks.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="command_processor.c">
+    <ClCompile Include="input_handling.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="debug_hashtable.c">

@@ -1,11 +1,9 @@
 #pragma once
 #include "options.h"
 #include <stdbool.h>
+#include <stdint.h>
 
-typedef unsigned long long  bitboard; /**<  64 bit unsigned bitset mapping to squares on the chess board. */
-typedef unsigned long long  uint64;
-typedef unsigned char       uint8;
-typedef signed char         int8;
+typedef uint64_t bitboard; /**<  64 bit unsigned bitset mapping to squares on the chess board. */
 
 /**
  * @brief Chess pieces.
@@ -60,7 +58,7 @@ enum StateFlags
 {                                                                                               
     IS_BLACK_TO_MOVE    = 0x01, /**< it is black's turn to move                                 */
     IS_CHECK            = 0x02, /**< is the side to move in check                               */
-    MOVED_INTO_CHECK    = 0x04, /**< is the side not to move in check                           */
+    IS_MOVED_INTO_CHECK = 0x04, /**< is the side not to move in check (illegal position)        */
     IS_CHECKMATE        = 0x08, /**< position represents checkmate                              */
     IS_STALEMATE        = 0x10, /**< position represents stalemate                              */
     IS_DRAW_REPETITION  = 0x20, /**< position represents draw by repetition 3 times             */
@@ -115,6 +113,35 @@ typedef struct
 } ScoredMove;
 
 /**
+ * @brief Bitboard bit sets for a specific square.
+*/
+typedef struct
+{
+    bitboard north;     /**< all squares due north of this square */
+    bitboard northeast;
+    bitboard east;
+    bitboard southeast;
+    bitboard south;
+    bitboard southwest;
+    bitboard west;
+    bitboard northwest;
+    union
+    {
+        bitboard pawn_attacks[2];   /**< indexed by color */
+        struct
+        {
+            bitboard pawn_attacks_white;    /**< squares attacked by a white pawn on this square    */
+            bitboard pawn_attacks_black;    /**< squares attacked by a black pawn on this square    */
+        };
+    };
+    bitboard knight_attacks;    /**< squares attacked by a knight on this square    */
+    bitboard bishop_attacks;    /**< squares attacked by a bishop on an empty board */
+    bitboard rook_attacks;      /**< squares attacked by a rook on an empty board   */
+    bitboard queen_attacks;     /**< squares attacked by a queen on an empty board  */
+    bitboard king_attacks;      /**< squares attacked by a king on this square      */
+} Sets;
+
+/**
  * @brief A chess position.
  * The position comprises the pieces on the board, whose turn it is to
  * move, castling rights for each side, whether en passant capture is possible,
@@ -146,16 +173,16 @@ struct Position
             bitboard black_pieces;      /**< squares with a black piece on them */
         };
     };    
-    uint64          hash;                   /**< Zobrist hash of this position, maintained incrementally    */
+    uint64_t          hash;                   /**< Zobrist hash of this position, maintained incrementally    */
     const Position* previous;               /**< position immediately prior to this in the line of play     */
     int             move;                   /**< the move which led to this position                        */
     int             score;                  /**< piece square score from white's perspective                */
-    uint8           king_location[2];       /**< king square indices for each color                         */
-    uint8           castle_flags;           /**< castling rights                                            */
-    uint8           state_flags;            /**< game state-machine flags                                   */
-    uint8           en_passant_index;       /**< en passant capture availability square (0 if none)         */
-    uint8           reversible_move_count;  /**< number of consecutive reversible half-moves (plies)        */
-    uint8           full_move_count;        /**< number of full moves (zero indexed)                        */
+    uint8_t           king_location[2];       /**< king square indices for each color                         */
+    uint8_t           castle_flags;           /**< castling rights                                            */
+    uint8_t           state_flags;            /**< game state-machine flags                                   */
+    uint8_t           en_passant_index;       /**< en passant capture availability square (0 if none)         */
+    uint8_t           reversible_move_count;  /**< number of consecutive reversible half-moves (plies)        */
+    uint8_t           full_move_count;        /**< number of full moves (zero indexed)                        */
 };
 
 /**
@@ -225,11 +252,11 @@ typedef struct
 */
 typedef struct
 {
-    uint64      hash;       /**< Zobrist hash of this position                          */
+    uint64_t    hash;       /**< Zobrist hash of this position                          */
     int         move;       /**< Best move from this position, if any                   */
-    short       score;      /**< The score computed from this position                  */
-    int8        depth;      /**< The depth to which this position was searched          */
-    uint8       node_type;  /**< The alpha-beta tree search node type (cut, all, pv)    */
+    int16_t     score;      /**< The score computed from this position                  */
+    int8_t      depth;      /**< The depth to which this position was searched          */
+    uint8_t     node_type;  /**< The alpha-beta tree search node type (cut, all, pv)    */
 } Transposition;
 
 /**
@@ -241,16 +268,6 @@ typedef struct
     int         num_moves;      /**< number of moves in this line   */
     int         moves[MAX_PLY]; /**< the moves comprising the line  */
 } Variation;
-
-/**
- * @brief Handling for input commands (xboard support)
-*/
-typedef struct
-{
-    void            (*function)(char* buffer);  /**< function to be called  */
-    const char*     name;                       /**< command name           */
-    const char*     description;                /**< command description    */
-} CommandHandler;
 
 /**
  * @brief Container for global variables and stuff that doesn't belong anywhere else.

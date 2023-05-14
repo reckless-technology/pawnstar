@@ -6,10 +6,10 @@
 */
 int NextRandom(void)
 {
-	static uint64 x;
+	static uint64_t x;
 	if (x == 0)
 	{
-		x = (uint64)time(NULL);
+		x = (uint64_t)time(NULL);
         x *= NextRandom();
 	}
 	x ^= x >> 12;

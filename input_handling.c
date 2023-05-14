@@ -1,105 +1,137 @@
 #include "pawnstar.h"
 
-#pragma warning(push)
-#pragma warning(disable:4100)
+/**
+ * @brief Handling for input commands (xboard support)
+*/
+typedef struct
+{
+    void      (*function)(int argc, char* argv[]);  /**< function to be called  */
+    const char* name;                               /**< command name           */
+    const char* description;                        /**< command description    */
+} InputHandler;
 
-static void handle_quit(char buffer[])
+static void handle_quit(int argc, char* argv[])
 {
 	StopThinkingMoveImmediately();
 	StopWorker();
     exit(0);
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_perft(char buffer[])
+static void handle_perft(int argc, char* argv[])
 {
     RunPerftTests();
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_postests(char buffer[])
+static void handle_postests(int argc, char* argv[])
 {
     int depth = 9;
-    sscanf(buffer, "%u", &depth);
+    if (argc > 1)
+    {
+        int d = 0;
+        if (sscanf(argv[1], "%d", &d) == 1)
+        {
+            depth = d;
+        }
+    }    
     RunPositionTests(depth);
 }
 
-static void handle_ping(char buffer[])
+static void handle_ping(int argc, char* argv[])
 {
-    printf("pong %s\n", buffer);
+    printf("pong %s\n", argc > 1 ? argv[1] : "");
 }
 
-static void handle_xboard(char buffer[])
+static void handle_xboard(int argc, char* argv[])
 {
-    setbuf(stdout, NULL);
     printf("\n");
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_book(char buffer[])
-{
-    if (!strlen(buffer))
-    {
-        printf("ERROR: book name not specified\n");
-        return;
-    }
-    InitializeOpeningBookFromFile(buffer);
-}
-
-static void handle_bookmoves(char buffer[])
+static void handle_bookmoves(int argc, char* argv[])
 {
     DisplayAvailableBookMoves(globals->game->position);
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_freebook(char buffer[])
+static void handle_freebook(int argc, char* argv[])
 {
     FreeOpeningBook();
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_protover(char buffer[])
+static void handle_protover(int argc, char* argv[])
 {
-    if (!strcmp(buffer, "2"))
+    if (argc != 2)
+    {
+        printf("ERROR protocol not defined\n");
+        return;
+    }
+    if (!strcmp(argv[1], "2"))
     {
         printf(
             "feature ping=1 setboard=1 playother=1 san=1 usermove=1 time=1 draw=0 "
-            "sigint=0 sigterm=0 reuse=1 analyze=0 myname=\"Pawnstar " __DATE__ " " __TIME__ "\" variants=\"normal\" "
+            "sigint=0 sigterm=0 reuse=1 analyze=0 "
+            "myname=\"Pawnstar " __DATE__ " " __TIME__ "\" variants=\"normal\" "
             "colors=0 ics=0 name=0 pause=0 nps=0 debug=0 memory=0 smp=0 done=1 \n");
     }
     else
     {
-        printf("ERROR: unsupported XBoard protocol version %s\n", buffer);
+        printf("ERROR: unsupported XBoard protocol version %s\n", argv[1]);
     }
 }
 
-static void handle_new(char buffer[])
+static void handle_new(int argc, char* argv[])
 {
     StopThinkingMoveImmediately();
     InitializeGame(globals->game);
     globals->engine_color = BLACK;
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_force(char buffer[])
+static void handle_force(int argc, char* argv[])
 {
     globals->engine_color = NEITHER_COLOR;
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_go(char buffer[])
+static void handle_go(int argc, char* argv[])
 {
     globals->engine_color = COLOR_TO_MOVE(globals->game->position);
     if (!(globals->game->position->state_flags & IS_GAME_OVER))
     {
         StartThinking(globals->game);
     }
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_playother(char buffer[])
+static void handle_playother(int argc, char* argv[])
 {
     globals->engine_color = ENEMY(COLOR_TO_MOVE(globals->game->position));
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_usermove(char buffer[])
+static void handle_usermove(int argc, char* argv[])
 {
-    int move = PlayMoveString(globals->game, buffer, true);
+    if (argc != 2)
+    {
+        printf("ERROR: move not specified\n");
+        return;
+    }
+    int move = PlayMoveString(globals->game, argv[1]);
     if (!move)
     {
-        printf("Illegal move: %s\n", buffer);
+        printf("Illegal move: %s\n", argv[1]);
     }
     else
     {
@@ -114,53 +146,84 @@ static void handle_usermove(char buffer[])
     }
 }
 
-static void handle_setboard(char buffer[])
+static void handle_setboard(int argc, char* argv[])
 {
+    char fen_string[256];
+    char* p = fen_string;
+    for (int i = 1; i < argc; ++i)
+    {
+        p += sprintf(p, "%s ", argv[i]);
+    }
+    *p = 0;
     globals->game->position = globals->game->stack;
-    if (!PositionFromString(buffer, globals->game->position))
+    if (!PositionFromString(fen_string, globals->game->position))
     {
         InitializeGame(globals->game);
     }
 }
 
-static void handle_getboard(char buffer[])
+static void handle_getboard(int argc, char* argv[])
 {
     char fen_string[256];
     PositionToString(globals->game->position, fen_string);
     printf("%s\n", fen_string);
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_nopost(char buffer[])
+static void handle_nopost(int argc, char* argv[])
 {
     globals->do_show_thinking = false;
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_post(char buffer[])
+static void handle_post(int argc, char* argv[])
 {
     globals->do_show_thinking = true;
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_time(char buffer[])
+static void handle_time(int argc, char* argv[])
 {
-    globals->time_control.standard.milliseconds_remaining = atoi(buffer) * 10;
+    if (argc != 2)
+    {
+        printf("ERROR: time not specified\n");
+        return;
+    }
+    int time;
+    if (sscanf(argv[1], "%d", &time) == 1)
+    {
+        globals->time_control.standard.milliseconds_remaining = time * 10;
+    }
 }
 
-static void handle_cancel(char buffer[])
+static void handle_cancel(int argc, char* argv[])
 {
     StopThinkingMoveImmediately();
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_level(char buffer[])
+static void handle_level(int argc, char* argv[])
 {
-    int moves = 40, minutes = 5, seconds = 0, increment = 5;
-    if (strchr(buffer, ':'))
+    if (argc != 4)
     {
-        sscanf(buffer, "%d %d:%d %d", &moves, &minutes, &seconds, &increment);
+        printf("ERROR: time control specification invalid\n");
+        return;
+    }
+    int moves = 40, minutes = 5, seconds = 0, increment = 5;
+    sscanf(argv[1], "%d", &moves);
+    if (strchr(argv[2], ':'))
+    {
+        sscanf(argv[2], "%d:%d", &minutes, &seconds);
     }
     else
     {
-        sscanf(buffer, "%d %d %d", &moves, &minutes, &increment);
+        sscanf(argv[2], "%d", &minutes);
     }
+    sscanf(argv[3], "%d", &increment);
     if (moves)
     {
         globals->time_control.clock_type = CLOCK_STANDARD;
@@ -177,21 +240,39 @@ static void handle_level(char buffer[])
     }
 }
 
-static void handle_st(char buffer[])
+static void handle_st(int argc, char* argv[])
 {
-    globals->time_control.clock_type = CLOCK_FIXED_TIME;
-    globals->time_control.fixed_time.milliseconds = atoi(buffer) * 1000;
+    if (argc != 2)
+    {
+        printf("ERROR: time not specified\n");
+        return;
+    }
+    int seconds = 0;
+    if (sscanf(argv[1], "%d", &seconds) == 1) 
+    {
+        globals->time_control.clock_type = CLOCK_FIXED_TIME;
+        globals->time_control.fixed_time.milliseconds = seconds * 1000;
+    }
 }
 
-static void handle_sd(char buffer[])
+static void handle_sd(int argc, char* argv[])
 {
-    globals->time_control.clock_type = CLOCK_FIXED_DEPTH;
-    globals->time_control.fixed_depth.depth = atoi(buffer);
+    if (argc != 2)
+    {
+        printf("ERROR: depth not specified\n");
+        return;
+    }
+    int depth = 0;
+    if (sscanf(argv[1], "%d", &depth) == 1)
+    {
+        globals->time_control.clock_type = CLOCK_FIXED_DEPTH;
+        globals->time_control.fixed_depth.depth = depth;
+    }
 }
 
 #define PRINT_MIN_SEC(milliseconds) printf("%02d:%02d\n", (milliseconds) / 60000, ((milliseconds) / 1000) % 60)
 
-static void handle_showtime(char buffer[])
+static void handle_showtime(int argc, char* argv[])
 {
     switch (globals->time_control.clock_type)
     {
@@ -222,52 +303,65 @@ static void handle_showtime(char buffer[])
         PRINT_MIN_SEC(globals->time_control.fixed_time.milliseconds);
         break;
     }
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_eval(char buffer[])
+static void handle_eval(int argc, char* argv[])
 {
     printf("evaluation %5d\n", EvaluatePosition(globals->game->position, ALPHA, BETA));
+    (void)argc;
+    (void)argv;
 }
 
 #if DEBUGX
-static void handle_dbg(char buffer[])
+static void handle_dbg(int argc, char* argv[])
 {
     DebugXWrite(stdout);
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_dbgclear(char buffer[])
+static void handle_dbgclear(int argc, char* argv[])
 {
     DebugXClear();
+    (void)argc;
+    (void)argv;
 }
 #endif
 
-static void handle_undo(char buffer[])
+static void handle_undo(int argc, char* argv[])
 {
     if (globals->game->position != globals->game->stack)
     {
         --globals->game->position;
     }
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_remove(char buffer[])
+static void handle_remove(int argc, char* argv[])
 {
     if (globals->game->position - globals->game->stack >= 2)
     {
         globals->game->position -= 2;
     }
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_seetests(char buffer[])
+static void handle_seetests(int argc, char* argv[])
 {
     RunStaticExchangeTests();
+    (void)argc;
+    (void)argv;
 }
 
-static void handle_help(char buffer[]);
+static void handle_help(int argc, char* argv[]);
 
 #define COMMAND(name) handle_ ## name, #name
 
-const CommandHandler handlers[] = {
-    { COMMAND(book),        "initialize opening book from text file"                    },
+const InputHandler handlers[] = {
     { COMMAND(bookmoves),   "display available book moves for current position"         },
 #if DEBUGX
     { COMMAND(dbg),         "display diagnostic counts"                                 },
@@ -303,9 +397,9 @@ const CommandHandler handlers[] = {
     { NULL, NULL,           NULL                                                        },
 };
 
-static void handle_help(char buffer[])
+static void handle_help(int argc, char* argv[])
 {
-    const CommandHandler* i;
+    const InputHandler* i;
     printf("refer to 'engine_protocol.html' for details of the communication\n");
     printf("between an xboard protocol chess engine and a user interface\n\n");
     printf("available commands:\n");
@@ -313,5 +407,41 @@ static void handle_help(char buffer[])
     {
         printf("%-12s %s\n", i->name, i->description);
     }
+    (void)argc;
+    (void)argv;
 }
-#pragma warning(pop)
+
+#define MAX_NUM_ARGS 8
+
+void ProcessInput(char* line)
+{
+    int argc                    = 0;
+    char* argv[MAX_NUM_ARGS]    = { 0 };
+    char* save_ptr              = NULL;
+    char* newline               = strchr(line, '\n');
+    if (newline)
+    {
+        *newline = '\0';
+    }
+    for (int i = 0; i != MAX_NUM_ARGS; ++i)
+    {
+        argv[i] = strtok_r(i == 0 ? line : NULL, " ", &save_ptr);
+        if (!argv[i])
+        {
+            break;
+        }
+        ++argc;
+    }
+    if (argc == 0)
+    {
+        return;
+    }
+    for (const InputHandler* handler = handlers; handler->name; ++handler)
+    {
+        if (!strcmp(handler->name, argv[0]))
+        {
+            handler->function(argc, argv);
+            break;
+        }
+    }
+}

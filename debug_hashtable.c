@@ -1,15 +1,16 @@
-/*
-Debugging counts dictionary implemented as a hash table (so that the increment 
-function, which might be called tens of millions of times per move, does not 
-slow down the program too much). This is useful for counting nodes, cutoffs, 
-table hits etc when debugging. The hash function is null, i.e. just use the 
-address of the string literal. There is no thread locking per se, and no 
-checking of hash collisions; this is intentional and for fastest speed, which 
-is the main goal. It seems to work OK in practice, provided you have a 
-hashtable array which is prime sized and has lots of free space.
-
-Only included in Debug and ReleaseX configurations.
+/** @file Debug hash table.
+* Debugging counts dictionary implemented as a hash table (so that the increment 
+* function, which might be called tens of millions of times per move, does not 
+* slow down the program too much). This is useful for counting nodes, cutoffs, 
+* table hits etc when debugging. The hash function is null, i.e. just use the 
+* address of the string literal. There is no thread locking per se, and no 
+* checking of hash collisions; this is intentional and for fastest speed, which 
+* is the main goal. It seems to work OK in practice, provided you have a 
+* hashtable array which is prime sized and has lots of free space.
+*
+* Only included in Debug and ReleaseX configurations.
 */
+
 #include "pawnstar.h"
 #if DEBUGX
 
@@ -32,18 +33,18 @@ void DebugXClear()
 /*
 Increment the count associated with the string literal in key
 */
-void DebugXIncrement(const char key[])
+void DebugXIncrement(const char* key)
 {
     /*
     String literals are typically aligned on 4 byte boundaries, so throw away
     the bottom 2 bits of the address before finding the index into the table
     */
-    DebugEntry* const entry = &debug_dict[((uint64)key >> 2) % DEBUG_DICT_SIZE];
+    DebugEntry* const entry = &debug_dict[((uint64_t)key >> 2) % DEBUG_DICT_SIZE];
     entry->key = key;
     ++entry->count;
 }
 
-void DebugXIncrementIf(bool condition, const char key[])
+void DebugXIncrementIf(bool condition, const char* key)
 {
     if (condition)
     {

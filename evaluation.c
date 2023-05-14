@@ -94,7 +94,7 @@ static const int MATERIAL_VALUES[7] = {
 };
 
 
-int         piece_square_values[2][8][64];
+int         piece_square_scores[2][6][64];
 static int  king_endgame_delta[2][64];
 
 /*
@@ -107,11 +107,11 @@ InitializeEval()
     {
         for (int piece = PAWN; piece <= KING; ++piece)
         {
-            piece_square_values[WHITE][piece][location] =  MATERIAL_VALUES[piece] + PIECE_SQUARES[piece][location ^ RANK_FLIP];
-            piece_square_values[BLACK][piece][location] = -MATERIAL_VALUES[piece] - PIECE_SQUARES[piece][location];
+            piece_square_scores[WHITE][piece - 1][location] =  MATERIAL_VALUES[piece] + PIECE_SQUARES[piece][location ^ RANK_FLIP];
+            piece_square_scores[BLACK][piece - 1][location] = -MATERIAL_VALUES[piece] - PIECE_SQUARES[piece][location];
         }
         king_endgame_delta[WHITE][location] =  KING_SQUARE_ENDGAME[location ^ RANK_FLIP] - KING_SQUARE_MIDGAME[location ^ RANK_FLIP];
-        king_endgame_delta[BLACK][location] = -KING_SQUARE_ENDGAME[location] + KING_SQUARE_MIDGAME[location];
+        king_endgame_delta[BLACK][location] = -KING_SQUARE_ENDGAME[location            ] + KING_SQUARE_MIDGAME[location            ];
     }
 }
 
@@ -137,6 +137,9 @@ EvaluatePosition(const Position* position,
                  king_endgame_delta[BLACK][position->king_location[BLACK]];
         INCREMENT("eval endgames");
     }
+    // Bonus for friendly players near the king
+    score += 5 * PopCount(SETS[position->king_location[WHITE]].king_attacks & position->white_pieces);
+    score -= 5 * PopCount(SETS[position->king_location[BLACK]].king_attacks & position->black_pieces);;
     return position->state_flags & IS_BLACK_TO_MOVE ? -score + 10 : score + 10; // tempo bonus
     (void)alpha;
     (void)beta;
