@@ -2,6 +2,12 @@
 
 Context globals[1];
 
+void InitializeGame(Game* game)
+{
+    game->position = game->stack;
+    PositionFromString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", game->position);
+}
+
 static void InitializeGlobals(void)
 {
     globals->time_control.clock_type                        = CLOCK_STANDARD;

@@ -142,6 +142,65 @@ typedef struct
 } Sets;
 
 /**
+ * @brief Bitsets used to efficiently determine pawn structure.
+*/
+typedef struct
+{
+    union
+    {
+        /**
+         * @brief Set of squares which must be free of enemy pawns 
+         * for a pawn to be passed.
+        */
+        bitboard passed_pawn_mask[2];
+        struct
+        {
+            bitboard passed_pawn_mask_white;
+            bitboard passed_pawn_mask_black;
+        };
+    };
+    union
+    {
+        /**
+         * @brief Set of squares which must contain a pawn for a 
+         * pawn not to be isolated.
+        */
+        bitboard isolated_pawn_mask[2];
+        struct
+        {
+            bitboard isolated_pawn_mask_white;
+            bitboard isolated_pawn_mask_black;
+        };
+    };
+    union
+    {
+        /**
+         * @brief Set of squares which must contain a pawn for a 
+         * pawn to be supported.
+        */
+        bitboard supported_pawn_mask[2];
+        struct
+        {
+            bitboard supported_pawn_mask_white;
+            bitboard supported_pawn_mask_black;
+        };
+    };
+    union
+    {
+        /**
+         * @brief Set of squares which, if containing a pawn,
+         * make a pawn doubled.
+        */
+        bitboard doubled_pawn_mask[2];
+        struct
+        {
+            bitboard doubled_pawn_mask_white;
+            bitboard doubled_pawn_mask_black;
+        };
+    };
+} PawnSets;
+
+/**
  * @brief A chess position.
  * The position comprises the pieces on the board, whose turn it is to
  * move, castling rights for each side, whether en passant capture is possible,

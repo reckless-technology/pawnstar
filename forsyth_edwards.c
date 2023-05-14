@@ -2,38 +2,12 @@
 #include <ctype.h>
 
 #define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
-/*
-Compute the Zobrist hash of a position
-*/
-uint64_t 
-ComputeHash(const Position* position)
-{
-    uint64_t hash = position->state_flags & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
-    hash += CASTLING_RIGHTS_HASHES[position->castle_flags];
-    if (position->en_passant_index)
-    {
-        hash += EN_PASSANT_HASHES[FILE_OF(position->en_passant_index)];
-    }
-    for (int piece = PAWN; piece <= KING; ++piece)
-    {
-        bitboard b = position->pieces[piece] & position->white_pieces;
-        while (b)
-        {
-            hash += PIECE_SQUARE_HASHES[WHITE][piece - 1][FindAndClearLsb(&b)];
-        }
-        b = position->pieces[piece] & position->black_pieces;
-        while (b)
-        {
-            hash += PIECE_SQUARE_HASHES[BLACK][piece - 1][FindAndClearLsb(&b)];
-        }
-    }
-    return hash;
-}
-/*
-Set the state of the board to that specified in a FEN string
-refer to http://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation
-returns true on success
-returns false if an illegal FEN string was provided
+
+/**
+ * @brief Construct a position from a Forsyth-Edwards (FEN) string.
+ * @param fen_string string format of position
+ * @param position position object to initialize
+ * @return true on success, false if an illegal position string was provided
 */
 bool 
 PositionFromString(const char* fen_string, 
@@ -43,12 +17,14 @@ PositionFromString(const char* fen_string,
     static const char* const black_pieces = "pnbrqk";
     static const char* const ep_files     = "abcdefgh";
     static const char* const ep_ranks     = "36";
+    char buffer[STRING_BUF_LEN];
     const size_t len = strlen(fen_string);
-    if (len == 0 || len >= STRING_BUF_LEN)
+    if (len == 0 || len >= sizeof(buffer))
     {
         goto Error;
-    }
-    char buffer[STRING_BUF_LEN];
+    }    
+    memset(position, 0, sizeof(Position));
+    position->previous = position;
     strcpy(buffer, fen_string);
     if (buffer[len - 1] == '\n')
     {
@@ -60,11 +36,7 @@ PositionFromString(const char* fen_string,
     {
         goto Error;
     }
-    memset(position, 0, sizeof(Position));
-    position->previous = position;
-    /*
-    Pieces on the board
-    */
+    /* Pieces on the board */
     int x = 0, y = 7;
     for ( ; *pieces; ++pieces)
     {
@@ -116,9 +88,7 @@ PositionFromString(const char* fen_string,
     position->occupied_squares     = position->white_pieces | position->black_pieces;
     position->king_location[WHITE] = (uint8_t)Lsb(position->kings & position->white_pieces);
     position->king_location[BLACK] = (uint8_t)Lsb(position->kings & position->black_pieces);
-    /*
-    Side to move
-    */
+    /* Side to move */
     const char* color_to_move = strtok_r(NULL, " ", &save_ptr);
     if (!color_to_move)
     {
@@ -132,9 +102,7 @@ PositionFromString(const char* fen_string,
     {
         goto Error;
     }
-    /*
-    Castling rights
-    */
+    /* Castling rights */
     const char* castling_rights = strtok_r(NULL, " ", &save_ptr);
     if (!castling_rights)
     {
@@ -167,9 +135,7 @@ PositionFromString(const char* fen_string,
             }
         }
     }
-    /*
-    En passant capture square
-    */
+    /* En passant capture square */
     const char* ep_square = strtok_r(NULL, " ", &save_ptr);
     if (!ep_square)
     {
@@ -185,11 +151,9 @@ PositionFromString(const char* fen_string,
         {
             goto Error;
         }
-        position->en_passant_index = ep_square[0] - 'a' + 8 * (ep_square[1] - '1');
+        position->en_passant_index = (ep_square[0] - 'a') + 8 * (ep_square[1] - '1');
     }
-    /*
-    Half move clock - optional
-    */
+    /* Half move clock - optional */
     const char* hmc = strtok_r(NULL, " ", &save_ptr);
     if (hmc)
     {
@@ -200,9 +164,7 @@ PositionFromString(const char* fen_string,
         }
         position->reversible_move_count = (uint8_t)half_move_clock;
     }
-    /*
-    Full move number - optional
-    */
+    /* Full move number - optional */
     const char* full_move_num = strtok_r(NULL, " ", &save_ptr);
     if (full_move_num)
     {
@@ -214,23 +176,19 @@ PositionFromString(const char* fen_string,
         position->full_move_count = (uint8_t)fmc - 1;
     }
     position->hash = ComputeHash(position);
-    /*
-    Legality of position
-    */
+    /* Legality of position */
     if (!IsPositionLegal(position))
     {
         goto Error;
     }
-    /*
-    Is the position in check?
-    */
+    /* Is the position in check? */
     if (IS_IN_CHECK(position, COLOR_TO_MOVE(position)))
     {
         position->state_flags |= IS_CHECK;
     }
     /*
-    Check to see if this position represents checkmate, stalemate or draw
-    by insufficient material and set flags accordingly
+    Check to see if this position represents checkmate, stalemate or 
+    draw by insufficient material and set flags accordingly.
     */
     if (IsCheckmate(position))
     {
@@ -253,50 +211,52 @@ Error:
     printf("ERROR: bad FEN string %s\n", fen_string);
     return false;
 }
-/*
-Generate the FEN string for the current position
+
+
+/**
+ * @brief Construct a Forsyth-Edwards (FEN) string from the specified position.
+ * @param position the position
+ * @param fen_string pointer to the string to be created
 */
-void PositionToString(const Position* position, char fen_string[])
+void PositionToString(const Position* position, char* fen_string)
 {
-    const char* const initial_ptr = fen_string;
-    int x, y;
-    /*
-    Pieces on the board
-    */
-    for (y = 7; y >= 0; --y)
+    /* Pieces on the board */
+    for (int y = 7; y >= 0; --y)
     {
-        for (x = 0; x < 8; ++x)
+        int num_empty_squares = 0;
+        for (int x = 0; x < 8; ++x)
         {
             if (!(position->occupied_squares & BITBOARD_XY(x, y)))
             {
-                if (initial_ptr == fen_string || !(fen_string[-1] >= '1' && fen_string[-1] <= '8'))
-                {
-                    *fen_string++ = '1';
-                }
-                else
-                {
-                    ++fen_string[-1];
-                }
+                ++num_empty_squares;
             }
             else
             {
+                if (num_empty_squares)
+                {
+                    *fen_string++ = (char)('0' + num_empty_squares);
+                    num_empty_squares = 0;
+                }
                 const char piece = (position->white_pieces & BITBOARD_XY(x, y)) ?
                                    " PNBRQK"[PieceAt(position, x + 8 * y)] : " pnbrqk"[PieceAt(position, x + 8 * y)];
                 *fen_string++ = piece;
             }
+        }
+        if (num_empty_squares)
+        {
+            *fen_string++ = (char)('0' + num_empty_squares);
+            num_empty_squares = 0;
         }
         if (y)
         {
             *fen_string++ = '/';
         }
     }
-    /*
-    Side to move
-    */
-    fen_string += sprintf(fen_string, (position->state_flags & IS_BLACK_TO_MOVE) ? " b " : " w ");
-    /*
-    Castling rights
-    */
+    /* Side to move */
+    *fen_string++ = ' ';
+    *fen_string++ = position->state_flags & IS_BLACK_TO_MOVE ? 'b' : 'w';
+    *fen_string++ = ' ';;
+    /* Castling rights */
     if (!position->castle_flags)
     {
         *fen_string++ = '-';
@@ -321,34 +281,17 @@ void PositionToString(const Position* position, char fen_string[])
         }
     }
     *fen_string++ = ' ';
-    /*
-    En passant capture availability
-    */
+    /* En passant capture availability */
     if (!position->en_passant_index)
     {
-        fen_string += sprintf(fen_string, "- ");
+        *fen_string++ = '-';
     }
     else
     {
-        fen_string += sprintf(fen_string,
-                             "%c%c ",
-                             FILE_CHAR(position->en_passant_index),
-                             RANK_CHAR(position->en_passant_index));
+        *fen_string++ = FILE_CHAR(position->en_passant_index);
+        *fen_string++ = RANK_CHAR(position->en_passant_index);
     }
-    /*
-    Half move clock
-    */
-    fen_string += sprintf(fen_string, "%u ", position->reversible_move_count);
-    /*
-    Full move number
-    */
-    fen_string += sprintf(fen_string, "%u", position->full_move_count + 1);
-}
-/*
-Set up the game for the start of a new game
-*/
-void InitializeGame(Game* game)
-{
-    game->position = game->stack;
-    PositionFromString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", game->position);
+    *fen_string++ = ' ';
+    /* Half move clock and full move number */
+    fen_string += sprintf(fen_string, "%hu %hu", position->reversible_move_count, position->full_move_count + 1);
 }

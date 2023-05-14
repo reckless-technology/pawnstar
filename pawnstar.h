@@ -20,18 +20,19 @@ Global header file - included by each source file
 
 extern const char* const    OPENING_BOOK_MOVES;
 extern const Sets           SETS[64];
+extern const PawnSets       PAWN_SETS[64];
 extern const bitboard       INTERVENING_SQUARES[64][64];
-extern const uint64_t         CASTLING_RIGHTS_HASHES[16];
-extern const uint64_t         EN_PASSANT_HASHES[8];
-extern const uint64_t         PIECE_SQUARE_HASHES[2][6][64];
+extern const uint64_t       CASTLING_RIGHTS_HASHES[16];
+extern const uint64_t       EN_PASSANT_HASHES[8];
+extern const uint64_t       PIECE_SQUARE_HASHES[2][6][64];
 extern int                  piece_square_scores[2][6][64];
 extern Context              globals[1];
 
 
 #if DEBUGX
-#define DEBUG_STATEMENT(x)      x
-#define INCREMENT(x)            DebugXIncrement(x)
-#define INCREMENT_IF(b,x)       DebugXIncrementIf(b,x)
+#define DEBUG_STATEMENT(x)  x
+#define INCREMENT(x)        DebugXIncrement(x)
+#define INCREMENT_IF(b,x)   DebugXIncrementIf(b,x)
 #else
 #define DEBUG_STATEMENT(x)
 #define INCREMENT(x)
@@ -39,7 +40,7 @@ extern Context              globals[1];
 #endif
 
 #if EVAL_DEBUGX
-#define EVAL_INCREMENT(x)       DebugXIncrement(x)
+#define EVAL_INCREMENT(x)   DebugXIncrement(x)
 #else
 #define EVAL_INCREMENT(x)
 #endif

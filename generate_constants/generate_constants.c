@@ -16,8 +16,8 @@ typedef unsigned char       uint8;
 #define NO_SQUARES          0x0000000000000000ull
 #define FILE_OF(locn)       ((locn) & 7)
 #define RANK_OF(locn)       ((locn) >> 3)
-#define FILE_CHAR(locn)     ('a' + ((locn) & 7))
-#define RANK_CHAR(locn)     ('1' + ((locn) >> 3))
+#define FILE_CHAR(locn)     ('a' + FILE_OF(locn))
+#define RANK_CHAR(locn)     ('1' + RANK_OF(locn))
 #define BITBOARD(locn)      (1ull << (locn))
 #define BITBOARD_XY(x,y)    (1ull << ((x) + 8 * (y)))
 #define SHIFT_NORTH(b)      ((b) << 8)
@@ -217,6 +217,121 @@ static uint64 KingAttacks(int location)
     return KingFill(BITBOARD(location));
 }
 
+static uint64 PassedPawnMaskWhite(int location)
+{
+    uint64 result       = NO_SQUARES;
+    const int locn_x    = FILE_OF(location);
+    const int locn_y    = RANK_OF(location);
+    for (int x = locn_x - 1; x <= locn_x + 1; ++x)
+    {
+        if (x < 0 || x > 7)
+        {
+            continue; /* off board */
+        }
+        for (int y = locn_y + 1; y < 8; ++y)
+        {
+            result |= BITBOARD_XY(x, y);
+        }
+    }
+    return result;
+}
+
+static uint64 PassedPawnMaskBlack(int location)
+{
+    uint64 result       = NO_SQUARES;
+    const int locn_x    = FILE_OF(location);
+    const int locn_y    = RANK_OF(location);
+    for (int x = locn_x - 1; x <= locn_x + 1; ++x)
+    {
+        if (x < 0 || x > 7)
+        {
+            continue; /* off board */
+        }
+        for (int y = locn_y - 1; y >= 0; --y)
+        {
+            result |= BITBOARD_XY(x, y);
+        }
+    }
+    return result;
+}
+
+static uint64 IsolatedPawnMaskWhite(int location)
+{
+    uint64 result       = NO_SQUARES;
+    const int locn_x    = FILE_OF(location);
+    const int isolated_files[2] = { locn_x - 1, locn_x + 1 };
+    for (int i = 0; i != 2; ++i)
+    {
+        const int x = isolated_files[i];
+        if (x < 0 || x > 7)
+        {
+            continue; /* off board */
+        }
+        for (int y = 0; y < 8; ++y)
+        {
+            result |= BITBOARD_XY(x, y);
+        }
+    }
+    return result;
+}
+
+static uint64 IsolatedPawnMaskBlack(int location)
+{
+    return IsolatedPawnMaskWhite(location); /* files are symmetrical */
+}
+
+static uint64 SupportedPawnMaskWhite(int location)
+{
+    uint64 result       = NO_SQUARES;
+    const int locn_x    = FILE_OF(location);
+    const int locn_y    = RANK_OF(location);
+    const int supported_files[2] = { locn_x - 1, locn_x + 1 };
+    for (int i = 0; i != 2; ++i)
+    {
+        const int x = supported_files[i];
+        if (x < 0 || x > 7)
+        {
+            continue; /* off board */
+        }
+        for (int y = locn_y - 1; y >= 0; --y)
+        {
+            result |= BITBOARD_XY(x, y);
+        }
+    }
+    return result;
+}
+
+static uint64 SupportedPawnMaskBlack(int location)
+{
+    uint64 result    = NO_SQUARES;
+    const int locn_x = FILE_OF(location);
+    const int locn_y = RANK_OF(location);
+    const int supported_files[2] = { locn_x - 1, locn_x + 1 };
+    for (int i = 0; i != 2; ++i)
+    {
+        const int x = supported_files[i];
+        if (x < 0 || x > 7)
+        {
+            continue; /* off board */
+        }
+        for (int y = locn_y + 1; y < 8; ++y)
+        {
+            result |= BITBOARD_XY(x, y);
+        }
+    }
+    return result;
+}
+
+static uint64 DoubledPawnMaskWhite(int location)
+{
+    return NorthOf(location);
+}
+
+static uint64 DoubledPawnMaskBlack(int location)
+{
+    return SouthOf(location);
+}
+
 static uint64 InterveningSquares(int from, int to)
 {
     for (int dir = DIR_NORTH; dir <= DIR_NORTHWEST; ++dir)
@@ -241,22 +356,35 @@ static uint64 PseudoRandom64(void)
 
 static const BitboardGen ray_generators[] = 
 {
-    { "north",              NorthOf             },
-    { "northeast",          NortheastOf         },
-    { "east",               EastOf              },
-    { "southeast",          SoutheastOf         },
-    { "south",              SouthOf             },
-    { "southwest",          SouthwestOf         },
-    { "west",               WestOf              },
-    { "northwest",          NorthwestOf         },
-    { "pawn_attacks_white", PawnAttacksWhite    },
-    { "pawn_attacks_black", PawnAttacksBlack    },
-    { "knight_attacks",     KnightAttacks       },
-    { "bishop_attacks",     BishopAttacks       },
-    { "rook_attacks",       RookAttacks         },
-    { "queen_attacks",      QueenAttacks        },
-    { "king_attacks",       KingAttacks         },
-    { NULL,                 NULL                },
+    { "north",                      NorthOf                 },
+    { "northeast",                  NortheastOf             },
+    { "east",                       EastOf                  },
+    { "southeast",                  SoutheastOf             },
+    { "south",                      SouthOf                 },
+    { "southwest",                  SouthwestOf             },
+    { "west",                       WestOf                  },
+    { "northwest",                  NorthwestOf             },
+    { "pawn_attacks_white",         PawnAttacksWhite        },
+    { "pawn_attacks_black",         PawnAttacksBlack        },
+    { "knight_attacks",             KnightAttacks           },
+    { "bishop_attacks",             BishopAttacks           },
+    { "rook_attacks",               RookAttacks             },
+    { "queen_attacks",              QueenAttacks            },
+    { "king_attacks",               KingAttacks             },
+    { NULL,                         NULL                    },
+};
+
+static const BitboardGen pawn_generators[] =
+{
+    { "passed_pawn_mask_white",     PassedPawnMaskWhite,    },
+    { "passed_pawn_mask_black",     PassedPawnMaskBlack,    },
+    { "isolated_pawn_mask_white",   IsolatedPawnMaskWhite,  },
+    { "isolated_pawn_mask_black",   IsolatedPawnMaskBlack,  },
+    { "supported_pawn_mask_white",  SupportedPawnMaskWhite, },
+    { "supported_pawn_mask_black",  SupportedPawnMaskBlack, },
+    { "doubled_pawn_mask_white",    DoubledPawnMaskWhite,   },
+    { "doubled_pawn_mask_black",    DoubledPawnMaskBlack,   },
+    { NULL,                         NULL                    },
 };
 
 static const char* const piece_names[7] = 
@@ -295,6 +423,21 @@ int main()
         printf("\n    },");
     }
     printf("\n};\n");
+    printf("const PawnSets PAWN_SETS[64] = \n{");
+    for (int location = 0; location != 64; ++location)
+    {
+        printf("\n    { /* square %c%c */", FILE_CHAR(location), RANK_CHAR(location));
+        for (const BitboardGen* generator = pawn_generators; generator->name; ++generator)
+        {
+            const uint64 b = generator->function(location);
+            printf("\n        .%-28s = 0x%016llXull, /* popcnt %2d */",
+                generator->name,
+                b,
+                PopCount(b));
+        }
+        printf("\n    },");
+    }
+    printf("\n};\n");
     printf("const bitboard INTERVENING_SQUARES[64][64] = \n{");
     for (int i = 0; i != 64; ++i)
     {
@@ -310,7 +453,7 @@ int main()
         printf("\n    },");
     }
     printf("\n};\n");
-    printf("const uint64 PIECE_SQUARE_HASHES[2][6][64] = \n{");
+    printf("const uint64_t PIECE_SQUARE_HASHES[2][6][64] = \n{");
     for (int color = 0; color != 2; ++color)
     {
         printf("\n    {");
@@ -330,7 +473,7 @@ int main()
         printf("\n    },");
     }
     printf("\n};\n");
-    printf("const uint64 CASTLING_RIGHTS_HASHES[16] = \n{");
+    printf("const uint64_t CASTLING_RIGHTS_HASHES[16] = \n{");
     for (int i = 0; i != 16; ++i)
     {
         if ((i & 3) == 0)
@@ -340,7 +483,7 @@ int main()
         printf("0x%016llXull,", PseudoRandom64());
     }
     printf("\n};\n");
-    printf("const uint64 EN_PASSANT_HASHES[8] = \n{");
+    printf("const uint64_t EN_PASSANT_HASHES[8] = \n{");
     for (int i = 0; i != 8; ++i)
     {
         if ((i & 3) == 0)

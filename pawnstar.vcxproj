@@ -277,6 +277,7 @@
     <ClCompile Include="timer.cpp" />
     <ClCompile Include="transposition_table.c" />
     <ClCompile Include="random.c" />
+    <ClCompile Include="zobrist.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include="clean.bat" />

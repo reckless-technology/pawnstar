@@ -41,20 +41,20 @@ GeneratePseudoLegalMoves(const Position* position,
     /*
     Pawn move variables
     */
-    bitboard   pawns;
-    bitboard   promotions_west;
-    bitboard   promotions_east;
-    bitboard   promotions;
-    bitboard   captures_west;
-    bitboard   captures_east;
-    bitboard   double_pushes;
-    bitboard   single_pushes;
-    bitboard   en_passant_sources;
-    int        push_delta;
-    int        west_delta;
-    int        east_delta;
-    const int color               = COLOR_TO_MOVE(position);
-    const bitboard vacant_squares = ~position->occupied_squares;
+    bitboard        pawns;
+    bitboard        promotions_west;
+    bitboard        promotions_east;
+    bitboard        promotions;
+    bitboard        captures_west;
+    bitboard        captures_east;
+    bitboard        double_pushes;
+    bitboard        single_pushes;
+    bitboard        en_passant_sources;
+    int             push_delta;
+    int             west_delta;
+    int             east_delta;
+    const int       color          = COLOR_TO_MOVE(position);
+    const bitboard  vacant_squares = ~position->occupied_squares;
     /*
     Generate pawn moves
     */

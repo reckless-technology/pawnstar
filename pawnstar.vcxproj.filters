@@ -116,6 +116,9 @@
     <ClCompile Include="generated_data.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="zobrist.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="engine_protocol.html">

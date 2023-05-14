@@ -119,10 +119,10 @@ bool IsPositionLegal(const Position* position)
     const bitboard white_king = position->kings & position->white_pieces;
     const bitboard black_king = position->kings & position->black_pieces;
     return
-        PopCount(white_king) == 1                     &&
-        PopCount(black_king) == 1                     &&
-        white_king != black_king                      &&
-        !(SETS[Lsb(white_king)].king_attacks & black_king) &&
+        PopCount(white_king) == 1                               &&
+        PopCount(black_king) == 1                               &&
+        white_king != black_king                                &&
+        !(SETS[Lsb(white_king)].king_attacks & black_king)      &&
         !IsAttacked(position, position->king_location[ENEMY(color)], color);
 }
 /*

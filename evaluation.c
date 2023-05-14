@@ -1,5 +1,13 @@
 #include "pawnstar.h"
 
+#define ISOLATED_PAWN_SCORE    -20
+#define DOUBLED_PAWN_SCORE     -10
+#define BLOCKED_PAWN_SCORE     -10
+#define SUPPORTED_PAWN_SCORE    10
+#define DEFENDED_PAWN_SCORE     15
+#define PASSED_PAWN_SCORE       20
+
+
 
 static const int PAWN_SQUARE[64] = {
      0,  0,  0,  0,  0,  0,  0,  0,
@@ -115,9 +123,61 @@ InitializeEval()
     }
 }
 
-/*
-Evaluate the current position, assuming neither king is in check and the 
-position is quiet.
+static int EvaluateKingPawnPosition(const Position* position, int alpha, int beta, int score)
+{
+    INCREMENT("eval king pawn");
+    int scores[2] = { 0 };
+    for (int color = WHITE; color <= BLACK; ++color)
+    {
+        const bitboard friendly_pawns  = position->pawns & position->pieces_of_color[      color ];
+        const bitboard enemy_pawns     = position->pawns & position->pieces_of_color[ENEMY(color)];
+        bitboard pawns = friendly_pawns;
+        while (pawns)
+        {
+            const int location          = FindAndClearLsb(&pawns);
+            const Sets* sets            = &SETS[location];
+            const PawnSets* pawn_sets   = &PAWN_SETS[location];
+
+            if (pawn_sets->doubled_pawn_mask[color] & enemy_pawns)
+            {
+                scores[color] += BLOCKED_PAWN_SCORE;
+            }
+
+            if (pawn_sets->doubled_pawn_mask[color] & friendly_pawns)
+            {
+                scores[color] += DOUBLED_PAWN_SCORE;
+            }
+            else if (!(pawn_sets->passed_pawn_mask[color] & enemy_pawns))
+            {
+                scores[color] += PASSED_PAWN_SCORE;
+            }
+
+            if (sets->pawn_attacks[ENEMY(color)] & friendly_pawns)
+            {
+                scores[color] += DEFENDED_PAWN_SCORE;
+            }
+            else if (pawn_sets->supported_pawn_mask[color] & friendly_pawns)
+            {
+                scores[color] += SUPPORTED_PAWN_SCORE;
+            }
+            else if (!(pawn_sets->isolated_pawn_mask[color] & friendly_pawns))
+            {
+                scores[color] += ISOLATED_PAWN_SCORE;
+            }
+        }
+    }
+    score += scores[WHITE] - scores[BLACK];
+    return score;
+    (void)alpha;
+    (void)beta;
+}
+
+/**
+ * @brief Evaluate the current position, assuming neither king is in check and the position is quiet.
+ * @param position position to evaluate
+ * @param alpha current alpha value
+ * @param beta current beta value
+ * @return score from the perspective of the side to move
 */
 int 
 EvaluatePosition(const Position* position, 
@@ -130,17 +190,26 @@ EvaluatePosition(const Position* position,
         return DRAW_SCORE;
     }
     int score = position->score;
-    const bool is_endgame = !position->queens || PopCount(position->occupied_squares ^ position->pawns) < 8;
-    if (is_endgame)
+    if (IS_ENDGAME(position))
     {
         score += king_endgame_delta[WHITE][position->king_location[WHITE]] + 
                  king_endgame_delta[BLACK][position->king_location[BLACK]];
         INCREMENT("eval endgames");
+    }    
+    // Handle king pawn endgames separately
+    if (position->occupied_squares == (position->kings | position->pawns))
+    {
+        score = EvaluateKingPawnPosition(position, alpha, beta, score);
     }
-    // Bonus for friendly players near the king
-    score += 5 * PopCount(SETS[position->king_location[WHITE]].king_attacks & position->white_pieces);
-    score -= 5 * PopCount(SETS[position->king_location[BLACK]].king_attacks & position->black_pieces);;
-    return position->state_flags & IS_BLACK_TO_MOVE ? -score + 10 : score + 10; // tempo bonus
+    else
+    {
+        // Bonus for friendly players near the king
+        score += 5 * PopCount(SETS[position->king_location[WHITE]].king_attacks & position->white_pieces);
+        score -= 5 * PopCount(SETS[position->king_location[BLACK]].king_attacks & position->black_pieces);
+    }    
+    return position->state_flags & IS_BLACK_TO_MOVE ? -score : score;
     (void)alpha;
     (void)beta;
 }
+
+

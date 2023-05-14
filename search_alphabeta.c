@@ -125,7 +125,7 @@ Search(const Position*  src_position,
     if ((src_position->move)                            &&
         !(src_position->state_flags & IS_CHECK)         &&
         beta == alpha + 1                               &&
-        PopCount(src_position->occupied_squares) > 7    &&
+        !IS_ENDGAME(src_position)                       &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");

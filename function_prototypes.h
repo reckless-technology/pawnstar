@@ -29,7 +29,7 @@ void        MoveSequenceToSanString(const Position* position, const int moves[],
 char*       MoveToString(const Position* position, int the_move, char* move_string);
 int         PlayMoveString(Game* game, char* move_string);
 bool        AreMoveStringsEquivalent(char* str1, char* str2);
-uint64_t      ComputeHash(const Position* position);
+uint64_t    ComputeHash(const Position* position);
 void        InitializeGame(Game* game);
 /*
 Attacks
