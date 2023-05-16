@@ -272,6 +272,7 @@
     <ClCompile Include="sort_moves.c" />
     <ClCompile Include="static_exchange_evaluation.c" />
     <ClCompile Include="tests_bratko_kopec.c" />
+    <ClCompile Include="tests_merge_sort.c" />
     <ClCompile Include="tests_move_generation.c" />
     <ClCompile Include="tests_static_exchange.c" />
     <ClCompile Include="timer.cpp" />

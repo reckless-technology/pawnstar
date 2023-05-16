@@ -357,6 +357,14 @@ static void handle_seetests(int argc, char* argv[])
     (void)argv;
 }
 
+static void handle_mergetest(int argc, char* argv[])
+{
+    const bool is_pass = RunMergeSortTests();
+    printf("Merge sort tests: %s\n", is_pass ? "PASS" : "FAIL");
+    (void)argc;
+    (void)argv;
+}
+
 static void handle_help(int argc, char* argv[]);
 
 #define COMMAND(name) handle_ ## name, #name
@@ -374,6 +382,7 @@ const InputHandler handlers[] = {
     { COMMAND(go),          "assign pawnstar to play the color to move"                 },
     { COMMAND(help),        "display a summary of commands"                             },
     { COMMAND(level),       "set a chess clock: 'level moves min:sec increment'"        },
+    { COMMAND(mergetest),   "run merge sort tests"                                      },
     { COMMAND(new),         "start a new game (pawnstar will play black)"               },
     { COMMAND(nopost),      "turns off analysis output while thinking"                  },
     { COMMAND(perft),       "run standard move generation tests"                        },

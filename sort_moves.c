@@ -111,7 +111,9 @@ SortMoves(const Position* position,
 }
 
 /**
- * @brief Stable merge sort of scored moves.
+ * @brief Sort moves best first.
+ * Uses iterative, stable merge sort algorithm.
+ * Sort must be stable to preserve move ordering at the root node.
  * @param num_elements number of elements to sort
  * @param values pointer to the elements
 */
@@ -122,43 +124,32 @@ MergeSort(int        num_elements,
     ScoredMove work[MAX_MOVES_PER_POSITION];
     ScoredMove* merge_src = values;
     ScoredMove* merge_dst = work;
-    ScoredMove* tmp;
     for (int width = 1; width < num_elements; width *= 2)
     {
-        for (int left = 0; left < num_elements; left += width * 2)
+        for (int begin = 0; begin < num_elements; begin += width * 2)
         {
-            ScoredMove* dst         = &merge_dst[left];
-            const ScoredMove* right = &merge_src[min(left + width,     num_elements)];
-            const ScoredMove* end   = &merge_src[min(left + width * 2, num_elements)];           
-            const ScoredMove* j     = &merge_src[left];
-            const ScoredMove* k     = right;                    
-            while (j < right && k < end)
+            const ScoredMove* const mid = &merge_src[min(begin + width,     num_elements)];
+            const ScoredMove* const end = &merge_src[min(begin + width * 2, num_elements)];           
+            const ScoredMove* i         = &merge_src[begin];
+            const ScoredMove* j         = mid;
+            ScoredMove* dst             = &merge_dst[begin];
+            while (i < mid && j < end)
             {
-                if (j->score >= k->score)
-                {
-                    *dst++ = *j++;
-                }
-                else
-                {
-                    *dst++ = *k++;
-                }
+                *dst++ = (i->score >= j->score) ? *i++ : *j++;
             }
-            while (j < right)
+            while (i < mid)
+            {
+                *dst++ = *i++;
+            }
+            while (j < end)
             {
                 *dst++ = *j++;
             }
-            while (k < end)
-            {
-                *dst++ = *k++;
-            }
         }
-        tmp       = merge_src;
-        merge_src = merge_dst;
-        merge_dst = tmp;
+        ScoredMove* tmp = merge_src;
+        merge_src       = merge_dst;
+        merge_dst       = tmp;
     }
-    /*
-    If that last merge was to the work array, copy it back to the values array
-    */
     if (merge_dst == values)
     {
         memcpy(values, work, num_elements * sizeof(ScoredMove));

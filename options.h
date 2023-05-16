@@ -9,7 +9,7 @@ Determine whether to enable the debugging counts dictionaries
 Whether to test the Zobrist hash value at every node of a perft move gen test
 */
 #ifndef DO_TEST_HASH_DURING_PERFT
-#define DO_TEST_HASH_DURING_PERFT 0
+#define DO_TEST_HASH_DURING_PERFT 1
 #endif
 /*
 Whether to enable null move pruning
@@ -29,7 +29,7 @@ Global constants
 */
 #define HASHTABLE_MEGABYTES                 512 // default transposition table size in MB
 #define STRING_BUF_LEN                      256 // default line buffer size
-#define MAX_MOVES_PER_POSITION              128 // maximum possible number of pseudo-legal moves for any chess position
+#define MAX_MOVES_PER_POSITION              256 // maximum possible number of pseudo-legal moves for a chess position
 #define BETA                              11000 // greater than any possible evaluation score including checkmate
 #define ALPHA                            -11000 // smaller than any possible evaluation score including being checkmated
 #define CHECKMATED_SCORE                 -10000 // score for losing at this ply
@@ -42,11 +42,7 @@ Global constants
 #define SEARCH_CANCELLED_SCORE         12345678 // you should never see this score in any search result - returned only when cancel flag was set
 #define MOVED_INTO_CHECK_SCORE        -23456789 // returned when a pseudo-legal move placed us into check
 #define SCORE_INSTABILITY_THRESHOLD          50 // deviation of score this amount between iterations triggers deeper search
-#define PV_TABLE_SIZE                      4999 // number of entries in the principal variation hashtable (should be prime)
 #define DEBUG_DICT_SIZE                    4999 // number of entries in the debug counts hashtable (should be prime)
-#define EVAL_HASHTABLE_SIZE                4999 // number of entries in the evaluation hashtable (should be prime)
-#define SMALL_HASTABLE_SIZE                4999 // number of transpositions in the small auxiliary (cached = fast) TT
-#define FUTILITY_CUTOFF_THRESHOLD          1000 // Prune frontier nodes where eval is this much below alpha
 #define STARTING_SEARCH_DEPTH                 3 // depth to do full width alpha beta pre-search for move ordering at the root node
 #define NUM_ROOT_MOVES_BEFORE_PVS             1 // number of moves to search with full width alpha beta window at the root node
 #define MEGABYTE                       0x100000

@@ -16,17 +16,12 @@ Moves are contained within the least significant 22 bits of an integer
 
 A value of 0 terminates a move list
 */
-#define CONSTRUCT_PROMOTION_MOVE(from, to, captured, promoted) \
-                                        ((to) | ((from) << 6) | (PAWN << 12) | \
-                                        ((captured) << 15) | ((promoted) << 18))
-#define CONSTRUCT_MOVE(from, to, piece, captured) \
-                                        ((to) | ((from) << 6) | ((piece) << 12) | \
-                                        ((captured) << 15))
-#define CONSTRUCT_NON_CAPTURE_MOVE(from, to, piece) \
-                                        ((to) | ((from) << 6) | ((piece) << 12))
-#define CONSTRUCT_SPECIAL_MOVE(from, to, piece, captured) \
-                                        ((to) | ((from) << 6) | ((piece) << 12) | \
-                                        ((captured) << 15) | (1 << 21))
+#define CONSTRUCT_PROMOTION_MOVE(from, to, captured, promoted)  ((to) | ((from) << 6) | (PAWN    << 12) | ((captured) << 15) | ((promoted) << 18))
+#define CONSTRUCT_EP_CAPTURE_MOVE(from, to)                     ((to) | ((from) << 6) | (PAWN    << 12) | (PAWN       << 15) | (1 << 21))
+#define CONSTRUCT_CAPTURE_MOVE(from, to, piece, captured)       ((to) | ((from) << 6) | ((piece) << 12) | ((captured) << 15))
+#define CONSTRUCT_CASTLING_MOVE(from, to)                       ((to) | ((from) << 6) | (KING    << 12) | (1 << 21))
+#define CONSTRUCT_NON_CAPTURE_MOVE(from, to, piece)             ((to) | ((from) << 6) | ((piece) << 12))
+
 #define MOVE_TO(m)                      ( (m)        & 0x3F)
 #define MOVE_FROM(m)                    (((m) >>  6) & 0x3F)
 #define MOVE_PIECE(m)                   (((m) >> 12) & 0x07)
