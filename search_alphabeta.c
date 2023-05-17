@@ -25,10 +25,10 @@ Search(const Position*  src_position,
     int                 pre_move[2];
     int                 captures[MAX_MOVES_PER_POSITION];
     int                 non_captures[MAX_MOVES_PER_POSITION]; 
-    int                 num_legal_moves  = 0;
-    int                 best_move        = 0;
-    bool                has_raised_alpha = false;
-    const int* const    move_phases[]    = 
+    int                 num_legal_moves     = 0;
+    int                 best_move           = 0;
+    bool                has_raised_alpha    = false;
+    const int* const    move_phases[]       = 
     { 
         [PHASE_PRE_MOVES]        = pre_move,
         [PHASE_CAPTURES]         = captures,
@@ -40,20 +40,19 @@ Search(const Position*  src_position,
     }
     pv.num_moves = 0;
     if (!(++globals->node_count & 0xFFFF) &&
-        globals->hard_stop_search_ms      &&
+        globals->hard_stop_search_ms &&
         GetMilliseconds() >= globals->hard_stop_search_ms)
     {
         *cancel = true;
         return SEARCH_CANCELLED_SCORE;
     }
     INCREMENT("alpha beta calls");
-    if (IsDrawByRepetition(src_position, true) || 
-        IsDrawByMaterial  (src_position)       || 
-        IsDrawByFiftyMoves(src_position))
+    if (IsDrawByMaterial  (src_position)    ||
+        IsDrawByFiftyMoves(src_position)    ||
+        IsDrawByRepetition(src_position, true))
     {
         return DRAW_SCORE;
-    }
-    
+    }    
     if (ply == MAX_PLY)
     {
         INCREMENT("max ply reached");
@@ -61,12 +60,12 @@ Search(const Position*  src_position,
     }
     if (src_position->state_flags & IS_CHECK)
     {
+        INCREMENT("extensions checks");
         ++depth;
-        INCREMENT("checks");
     }
     else if (depth <= 0)
     {
-        return SearchQuiescent(src_position, depth, ply, alpha, beta);
+        return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
     } 
     /*
     Determine if there is an entry in the transposition table for this 
@@ -84,7 +83,7 @@ Search(const Position*  src_position,
             position, but we do know it is at least transposition->score
             */
             INCREMENT("table hit cut node");
-            if (transposition.score >= beta)
+            if (transposition.score == beta)
             {
                 INCREMENT("table hit beta cutoffs");
                 return beta;
@@ -130,7 +129,7 @@ Search(const Position*  src_position,
     if ((src_position->move)                            &&
         !(src_position->state_flags & IS_CHECK)         &&
         beta == alpha + 1                               &&
-        !IS_ENDGAME(src_position)                       &&
+        PopCount(src_position->occupied_squares) > 8    &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
@@ -215,7 +214,7 @@ Search(const Position*  src_position,
             {
                 INCREMENT("beta cutoffs");
                 INCREMENT_IF(phase == PHASE_PRE_MOVES, "beta cutoffs from TT move");
-                RecordTransposition(src_position->hash, depth, score, move, NODE_CUT, false);
+                RecordTransposition(src_position->hash, depth, score, move, NODE_CUT, TT_MAIN);
                 RecordGoodMove(ply, move);
                 return beta;
             }
@@ -225,7 +224,7 @@ Search(const Position*  src_position,
                 alpha = score;
                 has_raised_alpha = true;
                 /* Might turn out to be a PV node but record in the TT for now */
-                RecordTransposition(src_position->hash, depth, score, move, NODE_CUT, false);
+                RecordTransposition(src_position->hash, depth, score, move, NODE_CUT, TT_MAIN);
                 RecordGoodMove(ply, move);
                 best_move  = move;
             }
@@ -258,7 +257,7 @@ Search(const Position*  src_position,
         We raised alpha but did not cutoff; this was a PV node
         */
         INCREMENT("pv nodes");
-        RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV, false);
+        RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV, TT_MAIN);
         RecordGoodMove(ply, best_move);
         CopyVariation(parent_pv, &pv, best_move);
     }
@@ -268,7 +267,7 @@ Search(const Position*  src_position,
         We tried every move but did not raise alpha; this was an all node
         */
         INCREMENT("all nodes");
-        RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_ALL, false);
+        RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_ALL, TT_MAIN);
     }
     return alpha;
 }

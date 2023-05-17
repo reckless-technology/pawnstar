@@ -15,7 +15,7 @@ Whether to test the Zobrist hash value at every node of a perft move gen test
 Whether to enable null move pruning
 */
 #ifndef DO_NULL_MOVE_PRUNING
-#define DO_NULL_MOVE_PRUNING 1
+#define DO_NULL_MOVE_PRUNING 0
 #endif
 /*
 Whether to skip moves in quiescence search which have a negative static
@@ -28,7 +28,7 @@ exchange evaluation (SEE)
 Global constants
 */
 #define HASHTABLE_MEGABYTES                 512 // default transposition table size in MB
-#define QUIESCENT_HASHTABLE_MB               16
+#define QUIESCENT_HASHTABLE_MB               64 // default quiescent search transposition table size in MB
 #define STRING_BUF_LEN                      256 // default line buffer size
 #define MAX_MOVES_PER_POSITION              256 // maximum possible number of pseudo-legal moves for a chess position
 #define BETA                              11000 // greater than any possible evaluation score including checkmate
@@ -45,5 +45,5 @@ Global constants
 #define SCORE_INSTABILITY_THRESHOLD          50 // deviation of score this amount between iterations triggers deeper search
 #define DEBUG_DICT_SIZE                    4999 // number of entries in the debug counts hashtable (should be prime)
 #define STARTING_SEARCH_DEPTH                 3 // depth to do full width alpha beta pre-search for move ordering at the root node
-#define NUM_ROOT_MOVES_BEFORE_PVS             1 // number of moves to search with full width alpha beta window at the root node
+#define NUM_ROOT_MOVES_BEFORE_PVS             2 // number of moves to search with full width alpha beta window at the root node
 #define MEGABYTE                       0x100000

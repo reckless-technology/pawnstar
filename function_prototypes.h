@@ -8,7 +8,7 @@ extern "C" {
 /*
 Search
 */
-int         SearchQuiescent (const Position* src_position, int depth, int ply, int alpha, int beta);
+int         SearchQuiescent (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
 int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, Variation* parent_pv);
 int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, int move, Variation* pv, int move_index);
 int         SearchRootNode  (const Position* position);
@@ -50,10 +50,10 @@ void        DisplayAvailableBookMoves(const Position* position);
 /*
 Transposition table
 */
-bool        InitializeTranspositionTable(int megabytes, int quiescent_megabytes);
+void        InitializeTranspositionTable(int megabytes, int quiescent_megabytes);
 void        FreeTranspositionTable(void);
-void        RecordTransposition(uint64_t hash, int depth, int score, int move, int node_type, bool is_quiescent);
-bool        FindTransposition(uint64_t hash, Transposition* transposition, bool is_quiescent);
+void        RecordTransposition(uint64_t hash, int depth, int score, int move, int node_type, int which_table);
+bool        FindTransposition(uint64_t hash, Transposition* transposition, int which_table);
 /*
 Generation and ordering of moves
 */

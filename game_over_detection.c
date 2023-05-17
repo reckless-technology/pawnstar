@@ -10,9 +10,10 @@ bool IsDrawByRepetition(const Position* position, bool is_search)
 {
     const uint64_t hash = position->hash;
     int repetitions = is_search ? 1 : 2;
-    for (int i = position->reversible_move_count; i != 0; --i)
+    for (position = position->previous; 
+         position->reversible_move_count != 0; 
+         position = position->previous)
     {
-        position = position->previous;
         if (position->hash == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");

@@ -1,74 +1,32 @@
 #include "pawnstar.h"
 
+typedef struct
+{
+    Transposition*  entries;
+    int             num_entries;
+} TranspositionTable;
+
 static bool IsPrime(int x);
+static void FreeTT(TranspositionTable* table);
+static void InitTT(TranspositionTable* table, int megabytes);
 
-static Transposition*   transposition_table;
-static int              table_num_entries;
-
-static Transposition*   quiescent_table;
-static int              quiescent_num_entries;
+static TranspositionTable tables[2]; /**< primary and quiescent tables */
 
 void 
-FreeTranspositionTable(void)
-{
-    if (transposition_table)
-    {
-        free(transposition_table);
-        transposition_table = NULL;
-        table_num_entries = 0;
-    } 
-}
-
-
-bool 
 InitializeTranspositionTable(int megabytes, int quiescent_megabytes)
 {
-    FreeTranspositionTable();
-    table_num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
-    /* Find the next smallest prime number and make the table that size */
-    if ((table_num_entries & 1) == 0)
-    {
-        --table_num_entries;
-    }
-    while (!IsPrime(table_num_entries))
-    {
-        table_num_entries -= 2;
-    }
-    transposition_table = calloc(table_num_entries, sizeof(Transposition));
-    if (!transposition_table)
-    {
-        printf("ERROR: unable to create transposition transposition_table of %u megabytes\n", megabytes);
-        table_num_entries = 0;
-        return false;
-    }
-    quiescent_num_entries = (quiescent_megabytes * MEGABYTE) / sizeof(Transposition);
-    if ((quiescent_num_entries & 1) == 0)
-    {
-        --quiescent_num_entries;
-    }
-    while (!IsPrime(quiescent_num_entries))
-    {
-        quiescent_num_entries -= 2;
-    }
-    quiescent_table = calloc(quiescent_num_entries, sizeof(Transposition));
-    if (!quiescent_table)
-    {
-        printf("ERROR: unable to create quiescent transposition transposition_table of %u megabytes\n", quiescent_megabytes);
-        quiescent_num_entries = 0;
-        return false;
-    }
-    return true;
+    InitTT(&tables[TT_MAIN     ], megabytes);
+    InitTT(&tables[TT_QUIESCENT], quiescent_megabytes);
 }
 
 
 bool 
 FindTransposition(uint64_t         hash, 
                   Transposition*   transposition,
-                  bool             is_quiescent)
+                  int              which_table)
 {
-    const Transposition* const t = is_quiescent ? 
-        &quiescent_table[hash & quiescent_num_entries] : 
-        &transposition_table[hash % table_num_entries];
+    const TranspositionTable* table = &tables[which_table];
+    const Transposition* t = &table->entries[hash % table->num_entries];
     if (t->hash == hash)
     {
         *transposition = *t;
@@ -84,11 +42,10 @@ RecordTransposition(uint64_t hash,
                     int      score, 
                     int      move, 
                     int      node_type,
-                    bool     is_quiescent)
+                    int      which_table)
 {   
-    Transposition* const t = is_quiescent ? 
-        &quiescent_table[hash & quiescent_num_entries] : 
-        &transposition_table[hash % table_num_entries];
+    const TranspositionTable* table = &tables[which_table];
+    Transposition* t = &table->entries[hash % table->num_entries];
     INCREMENT_IF(t->hash && t->hash != hash, "hash table collisions");
     t->hash         = hash;
     t->move         = move;
@@ -97,6 +54,38 @@ RecordTransposition(uint64_t hash,
     t->node_type    = (uint8_t)node_type;
 }
 
+static void
+FreeTT(TranspositionTable* table)
+{
+    if (table->entries)
+    {
+        free(table->entries);
+        table->entries = NULL;
+    }
+    table->num_entries = 0;
+}
+
+static void
+InitTT(TranspositionTable* table, int megabytes)
+{
+    FreeTT(table);
+    int num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
+    if ((num_entries & 1) == 0)
+    {
+        --num_entries;
+    }
+    while (!IsPrime(num_entries))
+    {
+        num_entries -= 2;
+    }
+    table->entries = calloc(num_entries, sizeof(Transposition));
+    if (table->entries == NULL)
+    {
+        printf("ERROR: unable to create transposition transposition_table of %u megabytes\n", megabytes);
+        return;
+    }
+    table->num_entries = num_entries;
+}
 
 static bool IsPrime(int x)
 {

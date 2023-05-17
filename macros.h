@@ -45,7 +45,6 @@ A value of 0 terminates a move list
 #define ENEMY(color)                    (!(color))
 #define COLOR_TO_MOVE(position)         (((position)->state_flags & IS_BLACK_TO_MOVE) ? BLACK : WHITE)
 #define COLOR_NOT_TO_MOVE(position)     (((position)->state_flags & IS_BLACK_TO_MOVE) ? WHITE : BLACK)
-#define IS_ENDGAME(position)            (PopCount(position->occupied_squares) < 10)
 
 #ifndef min
 #define min(a,b)                        ((a) < (b) ? (a) : (b))

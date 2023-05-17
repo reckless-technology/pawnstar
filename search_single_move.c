@@ -26,6 +26,11 @@ SearchSingleMove(const Position*    src_position,
         return MOVED_INTO_CHECK_SCORE;
     }
     int score;
+    if (MOVE_PROMOTED(move))
+    {
+        INCREMENT("extensions promoted");
+        ++depth;
+    }
     if (beta > alpha + 1 &&
         move_index != 0  &&
        !(src_position->state_flags & IS_CHECK))
