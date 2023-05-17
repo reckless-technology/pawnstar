@@ -5,6 +5,9 @@ static bool IsPrime(int x);
 static Transposition*   transposition_table;
 static int              table_num_entries;
 
+static Transposition*   quiescent_table;
+static int              quiescent_num_entries;
+
 void 
 FreeTranspositionTable(void)
 {
@@ -18,7 +21,7 @@ FreeTranspositionTable(void)
 
 
 bool 
-InitializeTranspositionTable(int megabytes)
+InitializeTranspositionTable(int megabytes, int quiescent_megabytes)
 {
     FreeTranspositionTable();
     table_num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
@@ -38,15 +41,34 @@ InitializeTranspositionTable(int megabytes)
         table_num_entries = 0;
         return false;
     }
+    quiescent_num_entries = (quiescent_megabytes * MEGABYTE) / sizeof(Transposition);
+    if ((quiescent_num_entries & 1) == 0)
+    {
+        --quiescent_num_entries;
+    }
+    while (!IsPrime(quiescent_num_entries))
+    {
+        quiescent_num_entries -= 2;
+    }
+    quiescent_table = calloc(quiescent_num_entries, sizeof(Transposition));
+    if (!quiescent_table)
+    {
+        printf("ERROR: unable to create quiescent transposition transposition_table of %u megabytes\n", quiescent_megabytes);
+        quiescent_num_entries = 0;
+        return false;
+    }
     return true;
 }
 
 
 bool 
 FindTransposition(uint64_t         hash, 
-                  Transposition*   transposition)
+                  Transposition*   transposition,
+                  bool             is_quiescent)
 {
-    const Transposition* const t = &transposition_table[hash % table_num_entries];
+    const Transposition* const t = is_quiescent ? 
+        &quiescent_table[hash & quiescent_num_entries] : 
+        &transposition_table[hash % table_num_entries];
     if (t->hash == hash)
     {
         *transposition = *t;
@@ -61,9 +83,12 @@ RecordTransposition(uint64_t hash,
                     int      depth, 
                     int      score, 
                     int      move, 
-                    int      node_type)
+                    int      node_type,
+                    bool     is_quiescent)
 {   
-    Transposition* const t = &transposition_table[hash % table_num_entries];
+    Transposition* const t = is_quiescent ? 
+        &quiescent_table[hash & quiescent_num_entries] : 
+        &transposition_table[hash % table_num_entries];
     INCREMENT_IF(t->hash && t->hash != hash, "hash table collisions");
     t->hash         = hash;
     t->move         = move;

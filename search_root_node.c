@@ -128,7 +128,7 @@ int SearchRootNode(const Position* src_position)
                 alpha             = scored_moves[i].score;
                 best_move         = scored_moves[i].move;
                 best_moves[depth] = scored_moves[i];
-                RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);            
+                RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV, false);
             }
         }        
         stop_ms = GetMilliseconds();

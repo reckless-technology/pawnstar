@@ -28,6 +28,7 @@ exchange evaluation (SEE)
 Global constants
 */
 #define HASHTABLE_MEGABYTES                 512 // default transposition table size in MB
+#define QUIESCENT_HASHTABLE_MB               16
 #define STRING_BUF_LEN                      256 // default line buffer size
 #define MAX_MOVES_PER_POSITION              256 // maximum possible number of pseudo-legal moves for a chess position
 #define BETA                              11000 // greater than any possible evaluation score including checkmate

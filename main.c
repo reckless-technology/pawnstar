@@ -44,7 +44,7 @@ int main()
         );
     InitializeGlobals();
     InitializeEval();
-    InitializeTranspositionTable(HASHTABLE_MEGABYTES);
+    InitializeTranspositionTable(HASHTABLE_MEGABYTES, QUIESCENT_HASHTABLE_MB);
     InitializeGoodMoveCounts();
     if (!InitializeOpeningBookFromFile("pawnstar.book"))
     {
