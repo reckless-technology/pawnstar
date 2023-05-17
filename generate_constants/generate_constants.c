@@ -374,17 +374,28 @@ static const BitboardGen ray_generators[] =
     { NULL,                         NULL                    },
 };
 
-static const BitboardGen pawn_generators[] =
+static const BitboardGen pawn_generators_white[] =
 {
-    { "passed_pawn_mask_white",     PassedPawnMaskWhite,    },
-    { "passed_pawn_mask_black",     PassedPawnMaskBlack,    },
-    { "isolated_pawn_mask_white",   IsolatedPawnMaskWhite,  },
-    { "isolated_pawn_mask_black",   IsolatedPawnMaskBlack,  },
-    { "supported_pawn_mask_white",  SupportedPawnMaskWhite, },
-    { "supported_pawn_mask_black",  SupportedPawnMaskBlack, },
-    { "doubled_pawn_mask_white",    DoubledPawnMaskWhite,   },
-    { "doubled_pawn_mask_black",    DoubledPawnMaskBlack,   },
+    { "passed_pawn_mask",           PassedPawnMaskWhite,    },
+    { "isolated_pawn_mask",         IsolatedPawnMaskWhite,  },
+    { "supported_pawn_mask",        SupportedPawnMaskWhite, },
+    { "doubled_pawn_mask",          DoubledPawnMaskWhite,   },
     { NULL,                         NULL                    },
+};
+
+static const BitboardGen pawn_generators_black[] =
+{
+    { "passed_pawn_mask",           PassedPawnMaskBlack,    },
+    { "isolated_pawn_mask",         IsolatedPawnMaskBlack,  },
+    { "supported_pawn_mask",        SupportedPawnMaskBlack, },
+    { "doubled_pawn_mask",          DoubledPawnMaskBlack,   },
+    { NULL,                         NULL                    },
+};
+
+static const BitboardGen* pawn_generators[] =
+{
+    pawn_generators_white,
+    pawn_generators_black,
 };
 
 static const char* const piece_names[7] = 
@@ -423,17 +434,24 @@ int main()
         printf("\n    },");
     }
     printf("\n};\n");
-    printf("const PawnSets PAWN_SETS[64] = \n{");
-    for (int location = 0; location != 64; ++location)
+    printf("const PawnSets PAWN_SETS[2][64] = \n{");
+    for (int color = 0; color != 2; ++color)
     {
-        printf("\n    { /* square %c%c */", FILE_CHAR(location), RANK_CHAR(location));
-        for (const BitboardGen* generator = pawn_generators; generator->name; ++generator)
+        printf("\n    {");
+        for (int location = 0; location != 64; ++location)
         {
-            const uint64 b = generator->function(location);
-            printf("\n        .%-28s = 0x%016llXull, /* popcnt %2d */",
-                generator->name,
-                b,
-                PopCount(b));
+            printf("\n        { /* %s square %c%c */", color_names[color], FILE_CHAR(location), RANK_CHAR(location));
+            for (const BitboardGen* generator = pawn_generators[color];
+                 generator->name; 
+                ++generator)
+            {
+                const uint64 b = generator->function(location);
+                printf("\n            .%-28s = 0x%016llXull, /* popcnt %2d */",
+                    generator->name,
+                    b,
+                    PopCount(b));
+            }
+            printf("\n        },");
         }
         printf("\n    },");
     }
@@ -441,7 +459,7 @@ int main()
     printf("const bitboard INTERVENING_SQUARES[64][64] = \n{");
     for (int i = 0; i != 64; ++i)
     {
-        printf("\n    {");
+        printf("\n    { /* square %c%c */", FILE_CHAR(i), RANK_CHAR(i));
         for (int j = 0; j != 64; ++j)
         {
             if ((j & 3) == 0)

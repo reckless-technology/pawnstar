@@ -20,7 +20,7 @@ Global header file - included by each source file
 
 extern const char* const    OPENING_BOOK_MOVES;
 extern const Sets           SETS[64];
-extern const PawnSets       PAWN_SETS[64];
+extern const PawnSets       PAWN_SETS[2][64];
 extern const bitboard       INTERVENING_SQUARES[64][64];
 extern const uint64_t       CASTLING_RIGHTS_HASHES[16];
 extern const uint64_t       EN_PASSANT_HASHES[8];
