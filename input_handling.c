@@ -54,7 +54,7 @@ static void handle_xboard(int argc, char* argv[])
 
 static void handle_bookmoves(int argc, char* argv[])
 {
-    DisplayAvailableBookMoves(globals->game->position);
+    DisplayAvailableBookMoves(the_game.position);
     (void)argc;
     (void)argv;
 }
@@ -90,25 +90,25 @@ static void handle_protover(int argc, char* argv[])
 static void handle_new(int argc, char* argv[])
 {
     StopThinkingMoveImmediately();
-    InitializeGame(globals->game);
-    globals->engine_color = BLACK;
+    InitializeGame(&the_game);
+    the_game.engine_color = BLACK;
     (void)argc;
     (void)argv;
 }
 
 static void handle_force(int argc, char* argv[])
 {
-    globals->engine_color = NEITHER_COLOR;
+    the_game.engine_color = NEITHER_COLOR;
     (void)argc;
     (void)argv;
 }
 
 static void handle_go(int argc, char* argv[])
 {
-    globals->engine_color = COLOR_TO_MOVE(globals->game->position);
-    if (!(globals->game->position->state_flags & IS_GAME_OVER))
+    the_game.engine_color = COLOR_TO_MOVE(the_game.position);
+    if (!(the_game.position->state_flags & IS_GAME_OVER))
     {
-        StartThinking(globals->game);
+        StartThinking(&the_game);
     }
     (void)argc;
     (void)argv;
@@ -116,7 +116,7 @@ static void handle_go(int argc, char* argv[])
 
 static void handle_playother(int argc, char* argv[])
 {
-    globals->engine_color = ENEMY(COLOR_TO_MOVE(globals->game->position));
+    the_game.engine_color = ENEMY(COLOR_TO_MOVE(the_game.position));
     (void)argc;
     (void)argv;
 }
@@ -128,20 +128,20 @@ static void handle_usermove(int argc, char* argv[])
         printf("ERROR: move not specified\n");
         return;
     }
-    int move = PlayMoveString(globals->game, argv[1]);
+    int move = PlayMoveString(&the_game, argv[1]);
     if (!move)
     {
         printf("Illegal move: %s\n", argv[1]);
     }
     else
     {
-        if (!(globals->game->position->state_flags & IS_GAME_OVER) && globals->engine_color == (int)COLOR_TO_MOVE(globals->game->position))
+        if (!(the_game.position->state_flags & IS_GAME_OVER) && the_game.engine_color == (int)COLOR_TO_MOVE(the_game.position))
         {
-            StartThinking(globals->game);
+            StartThinking(&the_game);
         }
         else
         {
-            DisplayResultIfGameOver(globals->game->position);
+            DisplayResultIfGameOver(the_game.position);
         }
     }
 }
@@ -155,17 +155,17 @@ static void handle_setboard(int argc, char* argv[])
         p += sprintf(p, "%s ", argv[i]);
     }
     *p = 0;
-    globals->game->position = globals->game->stack;
-    if (!PositionFromString(fen_string, globals->game->position))
+    the_game.position = the_game.stack;
+    if (!PositionFromString(fen_string, the_game.position))
     {
-        InitializeGame(globals->game);
+        InitializeGame(&the_game);
     }
 }
 
 static void handle_getboard(int argc, char* argv[])
 {
     char fen_string[256];
-    PositionToString(globals->game->position, fen_string);
+    PositionToString(the_game.position, fen_string);
     printf("%s\n", fen_string);
     (void)argc;
     (void)argv;
@@ -173,14 +173,14 @@ static void handle_getboard(int argc, char* argv[])
 
 static void handle_nopost(int argc, char* argv[])
 {
-    globals->do_show_thinking = false;
+    the_game.do_show_thinking = false;
     (void)argc;
     (void)argv;
 }
 
 static void handle_post(int argc, char* argv[])
 {
-    globals->do_show_thinking = true;
+    the_game.do_show_thinking = true;
     (void)argc;
     (void)argv;
 }
@@ -195,7 +195,7 @@ static void handle_time(int argc, char* argv[])
     int time;
     if (sscanf(argv[1], "%d", &time) == 1)
     {
-        globals->time_control.standard.milliseconds_remaining = time * 10;
+        the_game.time_control.standard.milliseconds_remaining = time * 10;
     }
 }
 
@@ -226,17 +226,17 @@ static void handle_level(int argc, char* argv[])
     sscanf(argv[3], "%d", &increment);
     if (moves)
     {
-        globals->time_control.clock_type = CLOCK_STANDARD;
-        globals->time_control.standard.moves_per_period = moves;
-        globals->time_control.standard.milliseconds_per_period = minutes * 60000 + seconds * 1000;
-        globals->time_control.standard.milliseconds_remaining = globals->time_control.standard.milliseconds_per_period;
+        the_game.time_control.clock_type = CLOCK_STANDARD;
+        the_game.time_control.standard.moves_per_period = moves;
+        the_game.time_control.standard.milliseconds_per_period = minutes * 60000 + seconds * 1000;
+        the_game.time_control.standard.milliseconds_remaining = the_game.time_control.standard.milliseconds_per_period;
     }
     else
     {
-        globals->time_control.clock_type = CLOCK_INCREMENTAL;
-        globals->time_control.incremental.base_milliseconds = minutes * 60000 + seconds * 1000;
-        globals->time_control.incremental.increment_milliseconds = increment * 1000;
-        globals->time_control.incremental.milliseconds_remaining = globals->time_control.incremental.base_milliseconds;
+        the_game.time_control.clock_type = CLOCK_INCREMENTAL;
+        the_game.time_control.incremental.base_milliseconds = minutes * 60000 + seconds * 1000;
+        the_game.time_control.incremental.increment_milliseconds = increment * 1000;
+        the_game.time_control.incremental.milliseconds_remaining = the_game.time_control.incremental.base_milliseconds;
     }
 }
 
@@ -250,8 +250,8 @@ static void handle_st(int argc, char* argv[])
     int seconds = 0;
     if (sscanf(argv[1], "%d", &seconds) == 1) 
     {
-        globals->time_control.clock_type = CLOCK_FIXED_TIME;
-        globals->time_control.fixed_time.milliseconds = seconds * 1000;
+        the_game.time_control.clock_type = CLOCK_FIXED_TIME;
+        the_game.time_control.fixed_time.milliseconds = seconds * 1000;
     }
 }
 
@@ -265,8 +265,8 @@ static void handle_sd(int argc, char* argv[])
     int depth = 0;
     if (sscanf(argv[1], "%d", &depth) == 1)
     {
-        globals->time_control.clock_type = CLOCK_FIXED_DEPTH;
-        globals->time_control.fixed_depth.depth = depth;
+        the_game.time_control.clock_type = CLOCK_FIXED_DEPTH;
+        the_game.time_control.fixed_depth.depth = depth;
     }
 }
 
@@ -274,33 +274,33 @@ static void handle_sd(int argc, char* argv[])
 
 static void handle_showtime(int argc, char* argv[])
 {
-    switch (globals->time_control.clock_type)
+    switch (the_game.time_control.clock_type)
     {
     case CLOCK_STANDARD:
         printf("standard clock mode\n");
-        printf("moves per period              %5d\n", globals->time_control.standard.moves_per_period);
+        printf("moves per period              %5d\n", the_game.time_control.standard.moves_per_period);
         printf("time period                   ");
-        PRINT_MIN_SEC(globals->time_control.standard.milliseconds_per_period);
+        PRINT_MIN_SEC(the_game.time_control.standard.milliseconds_per_period);
         printf("time remaining                ");
-        PRINT_MIN_SEC(globals->time_control.standard.milliseconds_remaining);
+        PRINT_MIN_SEC(the_game.time_control.standard.milliseconds_remaining);
         break;
     case CLOCK_INCREMENTAL:
         printf("incremental clock mode\n");
         printf("base time                     ");
-        PRINT_MIN_SEC(globals->time_control.incremental.base_milliseconds);
+        PRINT_MIN_SEC(the_game.time_control.incremental.base_milliseconds);
         printf("increment time                ");
-        PRINT_MIN_SEC(globals->time_control.incremental.increment_milliseconds);
+        PRINT_MIN_SEC(the_game.time_control.incremental.increment_milliseconds);
         printf("time remaining                ");
-        PRINT_MIN_SEC(globals->time_control.incremental.milliseconds_remaining);
+        PRINT_MIN_SEC(the_game.time_control.incremental.milliseconds_remaining);
         break;
     case CLOCK_FIXED_DEPTH:
         printf("fixed depth mode\n");
-        printf("search depth                  %5d\n", globals->time_control.fixed_depth.depth);
+        printf("search depth                  %5d\n", the_game.time_control.fixed_depth.depth);
         break;
     case CLOCK_FIXED_TIME:
         printf("fixed time mode\n");
         printf("search time                   ");
-        PRINT_MIN_SEC(globals->time_control.fixed_time.milliseconds);
+        PRINT_MIN_SEC(the_game.time_control.fixed_time.milliseconds);
         break;
     }
     (void)argc;
@@ -309,7 +309,7 @@ static void handle_showtime(int argc, char* argv[])
 
 static void handle_eval(int argc, char* argv[])
 {
-    printf("evaluation %5d\n", EvaluatePosition(globals->game->position, ALPHA, BETA));
+    printf("evaluation %5d\n", EvaluatePosition(the_game.position, ALPHA, BETA));
     (void)argc;
     (void)argv;
 }
@@ -332,9 +332,9 @@ static void handle_dbgclear(int argc, char* argv[])
 
 static void handle_undo(int argc, char* argv[])
 {
-    if (globals->game->position != globals->game->stack)
+    if (the_game.position != the_game.stack)
     {
-        --globals->game->position;
+        --the_game.position;
     }
     (void)argc;
     (void)argv;
@@ -342,9 +342,9 @@ static void handle_undo(int argc, char* argv[])
 
 static void handle_remove(int argc, char* argv[])
 {
-    if (globals->game->position - globals->game->stack >= 2)
+    if (the_game.position - the_game.stack >= 2)
     {
-        globals->game->position -= 2;
+        the_game.position -= 2;
     }
     (void)argc;
     (void)argv;

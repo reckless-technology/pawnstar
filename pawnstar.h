@@ -26,7 +26,7 @@ extern const uint64_t       CASTLING_RIGHTS_HASHES[16];
 extern const uint64_t       EN_PASSANT_HASHES[8];
 extern const uint64_t       PIECE_SQUARE_HASHES[2][6][64];
 extern int                  piece_square_scores[2][6][64];
-extern Context              globals[1];
+extern Game                 the_game;
 
 
 #if DEBUGX

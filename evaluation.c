@@ -151,17 +151,11 @@ EvaluatePosition(const Position* position,
         return DRAW_SCORE;
     }
     int score = position->score;
-
     const int endgame_delta = king_endgame_delta[WHITE][position->king_location[WHITE]] 
                             + king_endgame_delta[BLACK][position->king_location[BLACK]];
-    
     const int material_remaining = ClassicalMaterialRemaining(position);
-
-    score += endgame_delta * (INITIAL_CLASSICAL_MATERIAL - material_remaining) / INITIAL_CLASSICAL_MATERIAL;
-    
+    score += (endgame_delta * (INITIAL_CLASSICAL_MATERIAL - material_remaining)) / INITIAL_CLASSICAL_MATERIAL;
     return position->state_flags & IS_BLACK_TO_MOVE ? -score : score;
     (void)alpha;
     (void)beta;
 }
-
-

@@ -39,9 +39,9 @@ Search(const Position*  src_position,
         return SEARCH_CANCELLED_SCORE;
     }
     pv.num_moves = 0;
-    if (!(++globals->node_count & 0xFFFF) &&
-        globals->hard_stop_search_ms &&
-        GetMilliseconds() >= globals->hard_stop_search_ms)
+    if (!(++the_game.node_count & 0xFFFF)         &&
+        the_game.time_control.hard_stop_search_ms &&
+        GetMilliseconds() >= the_game.time_control.hard_stop_search_ms)
     {
         *cancel = true;
         return SEARCH_CANCELLED_SCORE;

@@ -246,7 +246,8 @@ typedef struct
 */
 typedef struct
 {
-    enum ClockType clock_type;      /**< standard chess clock, incremental clock, fixed time or fixed depth         */
+    int             hard_stop_search_ms;    /**< Wall clock time to hard stop searching and move    */
+    enum ClockType  clock_type;             /**< standard chess clock, incremental clock, fixed time or fixed depth         */
     union
     {
         StandardTimeControl     standard;
@@ -256,14 +257,7 @@ typedef struct
     };
 } TimeControl;
 
-/**
- * @brief A sequence of positions comprising a game.
-*/
-typedef struct
-{
-    Position*   position;               /**< stack pointer - current position   */
-    Position    stack[MAX_GAME_LENGTH]; /**< position stack                     */
-} Game;
+
 
 /**
  * @brief A transposition table entry.
@@ -290,14 +284,28 @@ typedef struct
 } Variation;
 
 /**
- * @brief Container for global variables and stuff that doesn't belong anywhere else.
+ * @brief Items required to restore the state of a position after undoing a move.
 */
 typedef struct
 {
-    Game        game[1];            /**< The computer game being played                     */
-    TimeControl time_control;       /**< Clock controls for the current game                */
-    int         node_count;         /**< Number of nodes (positions) during search          */
-    int         engine_color;       /**< The color which pawnstar is playing                */
-	int			hard_stop_search_ms;/**< Wall clock time to hard stop searching and move    */
-    bool        do_show_thinking;   /**< Whether to show scores and PV during search        */
-} Context;
+    uint8_t           castle_flags;           /**< castling rights                                      */
+    uint8_t           state_flags;            /**< game state-machine flags                             */
+    uint8_t           en_passant_index;       /**< en passant capture availability square (0 if none)   */
+    uint8_t           reversible_move_count;  /**< number of consecutive reversible half-moves (plies)  */
+    uint8_t           full_move_count;        /**< number of full moves (zero indexed)                  */
+} MoveContext;
+
+/**
+ * @brief A chess game.
+*/
+typedef struct
+{
+    Position*       position;                           /**< stack pointer - current position               */
+    Position        [MAX_GAME_LENGTH];                  /**< position stack                                 */
+    MoveContext     move_ctx_stack[MAX_GAME_LENGTH];    /**< move undo stack                                */
+    MoveContext*    move_ctx;                           /**< move undo stack pointer                        */
+    TimeControl     time_control;                       /**< Clock controls for the current game            */
+    int             node_count;                         /**< Number of nodes (positions) during search      */
+    int             engine_color;                       /**< The color which pawnstar is playing            */
+    bool            do_show_thinking;                   /**< Whether to show scores and PV during search    */
+} Game;

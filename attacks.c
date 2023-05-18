@@ -100,9 +100,13 @@ bool IsAttacked(const Position* position, int location, int color)
     }
     return false;
 }
-/*
-Determine the set of squares attacked by the piece (if any) standing on 
-location
+
+/**
+ * @brief Determine the set of squares attacked from a piece
+ * @param position the chess position
+ * @param location square index
+ * @param piece piece standing on location
+ * @return set of squares attacked / defended by piece
 */
 bitboard AttacksFromSquare(const Position* position, int location, int piece)
 {

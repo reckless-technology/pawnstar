@@ -48,32 +48,32 @@ int SearchRootNode(const Position* src_position)
         return moves[0];
     }  
     /* Plan time usage for this search. */
-    switch (globals->time_control.clock_type)
+    switch (the_game.time_control.clock_type)
     {
     case CLOCK_STANDARD:
     default:
-        moves_to_go     = globals->time_control.standard.moves_per_period - (src_position->full_move_count % globals->time_control.standard.moves_per_period);
-        ms_allocated    = globals->time_control.standard.milliseconds_remaining / moves_to_go;
-        timeout_ms      = max(100, min(ms_allocated * 2, globals->time_control.standard.milliseconds_remaining - 3000));
-        globals->hard_stop_search_ms = GetMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
+        moves_to_go     = the_game.time_control.standard.moves_per_period - (src_position->full_move_count % the_game.time_control.standard.moves_per_period);
+        ms_allocated    = the_game.time_control.standard.milliseconds_remaining / moves_to_go;
+        timeout_ms      = max(100, min(ms_allocated * 2, the_game.time_control.standard.milliseconds_remaining - 3000));
+        the_game.time_control.hard_stop_search_ms = GetMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
         break; 
     
     case CLOCK_FIXED_DEPTH:
         timeout_ms     = 0;
         ms_allocated   = 0;
-		globals->hard_stop_search_ms = 0;
+		the_game.time_control.hard_stop_search_ms = 0;
         break;
     
     case CLOCK_FIXED_TIME:
-        timeout_ms = globals->time_control.fixed_time.milliseconds;
-		globals->hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        timeout_ms = the_game.time_control.fixed_time.milliseconds;
+		the_game.time_control.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
         ms_allocated = 0;
         break;
     
     case CLOCK_INCREMENTAL:
-        ms_allocated   = globals->time_control.incremental.increment_milliseconds + (globals->time_control.incremental.milliseconds_remaining / 30);
-        timeout_ms     = max(100, min(ms_allocated * 2, globals->time_control.incremental.milliseconds_remaining - 3000));
-		globals->hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        ms_allocated   = the_game.time_control.incremental.increment_milliseconds + (the_game.time_control.incremental.milliseconds_remaining / 30);
+        timeout_ms     = max(100, min(ms_allocated * 2, the_game.time_control.incremental.milliseconds_remaining - 3000));
+		the_game.time_control.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
         break;
     }
     InitializeGoodMoveCounts();
@@ -95,11 +95,11 @@ int SearchRootNode(const Position* src_position)
     best_move = scored_moves[0].move;
     for (depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
     {       
-        if (globals->time_control.clock_type == CLOCK_FIXED_DEPTH && depth > globals->time_control.fixed_depth.depth)
+        if (the_game.time_control.clock_type == CLOCK_FIXED_DEPTH && depth > the_game.time_control.fixed_depth.depth)
         {
             break;
         }
-        globals->node_count = 0;
+        the_game.node_count = 0;
         MergeSort(move_count, scored_moves);
         pv.num_moves = 0;
         alpha = ALPHA;
@@ -132,7 +132,7 @@ int SearchRootNode(const Position* src_position)
             }
         }        
         stop_ms = GetMilliseconds();
-        if (globals->do_show_thinking)
+        if (the_game.do_show_thinking)
         {
             char move_string[256];
             int move_sequence[MAX_PLY];
@@ -140,15 +140,15 @@ int SearchRootNode(const Position* src_position)
             memcpy(&move_sequence[1], pv.moves, pv.num_moves * sizeof(int));
             move_sequence[pv.num_moves + 1] = 0;
             MoveSequenceToSanString(src_position, move_sequence, move_string);
-            printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score, (stop_ms - start_ms) / 10, globals->node_count, move_string);
+            printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score, (stop_ms - start_ms) / 10, the_game.node_count, move_string);
         }
         if (alpha > WIN_THRESHOLD || 
             alpha < LOSE_THRESHOLD)
         {
             break;
         }
-        if (globals->time_control.clock_type == CLOCK_STANDARD || 
-            globals->time_control.clock_type == CLOCK_INCREMENTAL)
+        if (the_game.time_control.clock_type == CLOCK_STANDARD || 
+            the_game.time_control.clock_type == CLOCK_INCREMENTAL)
         {
             /* 
             Plan our use of the time with some care. If both the score we find and the best move are consistent
