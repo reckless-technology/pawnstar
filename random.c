@@ -15,5 +15,5 @@ int NextRandom(void)
 	x ^= x >> 12;
 	x ^= x << 25;
 	x ^= x >> 27;
-	return (int)(x * 2685821657736338717ull);
+	return (int)((x * 2685821657736338717ull) >> 32);
 }

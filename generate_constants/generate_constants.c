@@ -351,7 +351,12 @@ static uint64 PseudoRandom64(void)
     x ^= x >> 12;
     x ^= x << 25;
     x ^= x >> 27;
-    return x * 0x2545F4914F6CDD1Dull;
+    uint64 result = (x * 0x2545F4914F6CDD1Dull) >> 32;
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    result |= (x * 0x2545F4914F6CDD1Dull) & 0xFFFFFFFF00000000ull;
+    return result;
 }
 
 static const BitboardGen ray_generators[] = 

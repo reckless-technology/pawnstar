@@ -180,7 +180,7 @@ GeneratePseudoLegalMoves(const Position* position,
                 *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
             }
             if ((position->castle_flags & MAY_WHITE_Q)               &&
-                !(position->occupied_squares & (B1BB | C1BB | D1BB)) &&                              
+                !(position->occupied_squares & (B1BB | C1BB | D1BB)) &&
                 !IsAttacked(position, D1, BLACK)                     &&
                 !IsAttacked(position, C1, BLACK))
             {
@@ -190,14 +190,14 @@ GeneratePseudoLegalMoves(const Position* position,
         else
         {
             if ((position->castle_flags & MAY_BLACK_K)        &&
-                !(position->occupied_squares & (F8BB | G8BB)) &&                                     
+                !(position->occupied_squares & (F8BB | G8BB)) && 
                 !IsAttacked(position, F8, WHITE)              &&
                 !IsAttacked(position, G8, WHITE))
             {
                 *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
             }
             if ((position->castle_flags & MAY_BLACK_Q)               &&
-                !(position->occupied_squares & (B8BB | C8BB | D8BB)) &&                              
+                !(position->occupied_squares & (B8BB | C8BB | D8BB)) &&
                 !IsAttacked(position, D8, WHITE)                     &&
                 !IsAttacked(position, C8, WHITE))
             {

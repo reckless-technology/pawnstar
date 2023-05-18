@@ -75,6 +75,7 @@ Search(const Position*  src_position,
     const bool is_transposition = FindTransposition(src_position->hash, &transposition, false);
     if (is_transposition && transposition.depth >= depth)
     {
+        INCREMENT("table hit");
         switch (transposition.node_type)
         {
         case NODE_CUT:
@@ -83,7 +84,7 @@ Search(const Position*  src_position,
             position, but we do know it is at least transposition->score
             */
             INCREMENT("table hit cut node");
-            if (transposition.score == beta)
+            if (transposition.score >= beta)
             {
                 INCREMENT("table hit beta cutoffs");
                 return beta;
@@ -99,7 +100,7 @@ Search(const Position*  src_position,
             if (transposition.score <= alpha)
             {
                 INCREMENT("table hit alpha cutoffs");
-                return alpha;
+                //return alpha;
             }
             break;
 
@@ -110,6 +111,7 @@ Search(const Position*  src_position,
             searching these few principal variation nodes is trivial.
             */
             INCREMENT("table hit pv node");
+            ++depth;
             break;
         }
     }
@@ -129,7 +131,8 @@ Search(const Position*  src_position,
     if ((src_position->move)                            &&
         !(src_position->state_flags & IS_CHECK)         &&
         beta == alpha + 1                               &&
-        PopCount(src_position->occupied_squares) > 8    &&
+        PopCount(src_position->occupied_squares) > 7    &&
+        depth > 3                                       &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
@@ -140,7 +143,7 @@ Search(const Position*  src_position,
         {
             return SEARCH_CANCELLED_SCORE;
         }
-        if (score == beta)
+        if (score >= beta)
         {
             return beta;
         }
@@ -156,7 +159,7 @@ Search(const Position*  src_position,
     */
     if (is_transposition && transposition.move)
     {
-        INCREMENT("table moves");
+        INCREMENT("table move");
         pre_move[0] = transposition.move;
         pre_move[1] = 0;
     }   
@@ -210,10 +213,10 @@ Search(const Position*  src_position,
                 continue;
             }
             ++num_legal_moves;
-            if (score == beta)
+            if (score >= beta)
             {
                 INCREMENT("beta cutoffs");
-                INCREMENT_IF(phase == PHASE_PRE_MOVES, "beta cutoffs from TT move");
+                INCREMENT_IF(phase == PHASE_PRE_MOVES, "table move beta cutoffs");
                 RecordTransposition(src_position->hash, depth, score, move, NODE_CUT, TT_MAIN);
                 RecordGoodMove(ply, move);
                 return beta;
@@ -223,13 +226,13 @@ Search(const Position*  src_position,
                 INCREMENT("pv changed");
                 alpha = score;
                 has_raised_alpha = true;
-                /* Might turn out to be a PV node but record in the TT for now */
+                /* Might turn out to be a PV node but record in the TT for now as a cut node */
                 RecordTransposition(src_position->hash, depth, score, move, NODE_CUT, TT_MAIN);
                 RecordGoodMove(ply, move);
                 best_move  = move;
             }
-        }       
-    }    
+        }
+    }
     /*
     End of main loop: we searched all moves and did not get a beta cutoff.
     */

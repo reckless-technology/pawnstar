@@ -15,7 +15,7 @@ Whether to test the Zobrist hash value at every node of a perft move gen test
 Whether to enable null move pruning
 */
 #ifndef DO_NULL_MOVE_PRUNING
-#define DO_NULL_MOVE_PRUNING 0
+#define DO_NULL_MOVE_PRUNING 1
 #endif
 /*
 Whether to skip moves in quiescence search which have a negative static

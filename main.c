@@ -13,7 +13,6 @@ void InitializeGame(Game* game)
     game->engine_color                                  = NEITHER_COLOR;
     game->do_show_thinking                              = true;
     game->position                                      = &game->stack[0];
-    game->move_ctx                                      = &game->move_ctx_stack[0];
     PositionFromString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", game->position);
 }
 

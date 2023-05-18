@@ -129,19 +129,17 @@ int SearchRootNode(const Position* src_position)
                 best_move         = scored_moves[i].move;
                 best_moves[depth] = scored_moves[i];
                 RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV, TT_MAIN);
+                if (the_game.do_show_thinking)
+                {
+                    char move_string[256];
+                    Variation display_variation = { 0 };
+                    CopyVariation(&display_variation, &pv, best_move);
+                    MoveSequenceToSanString(src_position, display_variation.moves, move_string);
+                    printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score, (GetMilliseconds() - start_ms) / 10, the_game.node_count, move_string);
+                }
             }
         }        
         stop_ms = GetMilliseconds();
-        if (the_game.do_show_thinking)
-        {
-            char move_string[256];
-            int move_sequence[MAX_PLY];
-            move_sequence[0] = best_move;
-            memcpy(&move_sequence[1], pv.moves, pv.num_moves * sizeof(int));
-            move_sequence[pv.num_moves + 1] = 0;
-            MoveSequenceToSanString(src_position, move_sequence, move_string);
-            printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score, (stop_ms - start_ms) / 10, the_game.node_count, move_string);
-        }
         if (alpha > WIN_THRESHOLD || 
             alpha < LOSE_THRESHOLD)
         {

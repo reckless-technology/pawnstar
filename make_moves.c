@@ -98,7 +98,8 @@ MakeMove(Position*       dst_position,
     dst_position->castle_flags &= ~CASTLING_RIGHTS_MASKS[from] & ~CASTLING_RIGHTS_MASKS[to];
     if (dst_position->castle_flags != src_position->castle_flags)
     {
-        dst_position->hash += CASTLING_RIGHTS_HASHES[dst_position->castle_flags] - CASTLING_RIGHTS_HASHES[src_position->castle_flags];
+        dst_position->hash += CASTLING_RIGHTS_HASHES[dst_position->castle_flags] 
+                            - CASTLING_RIGHTS_HASHES[src_position->castle_flags];
     }
     if (dst_position->en_passant_index)
     {

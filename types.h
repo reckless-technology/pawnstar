@@ -193,16 +193,16 @@ struct Position
             bitboard black_pieces;      /**< squares with a black piece on them */
         };
     };    
-    uint64_t          hash;                   /**< Zobrist hash of this position, maintained incrementally    */
+    uint64_t        hash;                   /**< Zobrist hash of this position, maintained incrementally    */
     const Position* previous;               /**< position immediately prior to this in the line of play     */
     int             move;                   /**< the move which led to this position                        */
     int             score;                  /**< piece square score from white's perspective                */
-    uint8_t           king_location[2];       /**< king square indices for each color                         */
-    uint8_t           castle_flags;           /**< castling rights                                            */
-    uint8_t           state_flags;            /**< game state-machine flags                                   */
-    uint8_t           en_passant_index;       /**< en passant capture availability square (0 if none)         */
-    uint8_t           reversible_move_count;  /**< number of consecutive reversible half-moves (plies)        */
-    uint8_t           full_move_count;        /**< number of full moves (zero indexed)                        */
+    uint8_t         king_location[2];       /**< king square indices for each color                         */
+    uint8_t         castle_flags;           /**< castling rights                                            */
+    uint8_t         state_flags;            /**< game state-machine flags                                   */
+    uint8_t         en_passant_index;       /**< en passant capture availability square (0 if none)         */
+    uint8_t         reversible_move_count;  /**< number of consecutive reversible half-moves (plies)        */
+    uint8_t         full_move_count;        /**< number of full moves (zero indexed)                        */
 };
 
 /**
@@ -284,28 +284,14 @@ typedef struct
 } Variation;
 
 /**
- * @brief Items required to restore the state of a position after undoing a move.
-*/
-typedef struct
-{
-    uint8_t           castle_flags;           /**< castling rights                                      */
-    uint8_t           state_flags;            /**< game state-machine flags                             */
-    uint8_t           en_passant_index;       /**< en passant capture availability square (0 if none)   */
-    uint8_t           reversible_move_count;  /**< number of consecutive reversible half-moves (plies)  */
-    uint8_t           full_move_count;        /**< number of full moves (zero indexed)                  */
-} MoveContext;
-
-/**
  * @brief A chess game.
 */
 typedef struct
 {
-    Position*       position;                           /**< stack pointer - current position               */
-    Position        [MAX_GAME_LENGTH];                  /**< position stack                                 */
-    MoveContext     move_ctx_stack[MAX_GAME_LENGTH];    /**< move undo stack                                */
-    MoveContext*    move_ctx;                           /**< move undo stack pointer                        */
-    TimeControl     time_control;                       /**< Clock controls for the current game            */
-    int             node_count;                         /**< Number of nodes (positions) during search      */
-    int             engine_color;                       /**< The color which pawnstar is playing            */
-    bool            do_show_thinking;                   /**< Whether to show scores and PV during search    */
+    Position*       position;               /**< stack pointer - current position               */
+    Position        stack[MAX_GAME_LENGTH]; /**< position stack                                 */
+    TimeControl     time_control;           /**< Clock controls for the current game            */
+    int             node_count;             /**< Number of nodes (positions) during search      */
+    int             engine_color;           /**< The color which pawnstar is playing            */
+    bool            do_show_thinking;       /**< Whether to show scores and PV during search    */
 } Game;

@@ -57,7 +57,7 @@ int SearchQuiescent(const Position* src_position,
             continue;
         }
         score = -SearchQuiescent(&position, depth - 1, ply + 1, -beta, -alpha, cancel);
-        if (score == beta)
+        if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
             RecordGoodMove(ply, *move);
