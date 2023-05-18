@@ -119,16 +119,16 @@ PositionFromString(const char* fen_string,
             switch (*c)
             {
             case 'K':
-                position->castle_flags |= MAY_WHITE_K;
+                position->castle_flags |= MAY_WHITE_CASTLE_KINGSIDE;
                 break;
             case 'Q':
-                position->castle_flags |= MAY_WHITE_Q;
+                position->castle_flags |= MAY_WHITE_CASTLE_QUEENSIDE;
                 break;
             case 'k':
-                position->castle_flags |= MAY_BLACK_K;
+                position->castle_flags |= MAY_BLACK_CASTLE_KINGSIDE;
                 break;
             case 'q':
-                position->castle_flags |= MAY_BLACK_Q;
+                position->castle_flags |= MAY_BLACK_CASTLE_QUEENSIDE;
                 break;
             default:
                 goto Error;
@@ -263,19 +263,19 @@ void PositionToString(const Position* position, char* fen_string)
     }
     else
     {
-        if (position->castle_flags & MAY_WHITE_K)
+        if (position->castle_flags & MAY_WHITE_CASTLE_KINGSIDE)
         {
             *fen_string++ = 'K';
         }
-        if (position->castle_flags & MAY_WHITE_Q)
+        if (position->castle_flags & MAY_WHITE_CASTLE_QUEENSIDE)
         {
             *fen_string++ = 'Q';
         }
-        if (position->castle_flags & MAY_BLACK_K)
+        if (position->castle_flags & MAY_BLACK_CASTLE_KINGSIDE)
         {
             *fen_string++ = 'k';
         }
-        if (position->castle_flags & MAY_BLACK_Q)
+        if (position->castle_flags & MAY_BLACK_CASTLE_QUEENSIDE)
         {
             *fen_string++ = 'q';
         }

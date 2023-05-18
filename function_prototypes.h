@@ -85,6 +85,7 @@ void        AddPiece(Position* position, int color, int piece, int to);
 void        RemovePiece(Position* position, int color, int piece, int from);
 void        MovePiece(Position* position, int color, int piece, int from, int to);
 void        MakeMove(Position* dst_position, const Position* src_position, int move);
+void        MakeMoveSequence(Position* dst_position, const Position* src_position, const int* moves);
 void        MakeNullMove(Position* dst_position, const Position* src_position);
 void        PlayMove(Game* game, int move);
 /*

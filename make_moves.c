@@ -7,12 +7,12 @@
 */
 static const uint8_t CASTLING_RIGHTS_MASKS[64] =
 {
-    [E1] = MAY_WHITE_K | MAY_WHITE_Q,
-    [A1] = MAY_WHITE_Q,
-    [H1] = MAY_WHITE_K,
-    [E8] = MAY_BLACK_K | MAY_BLACK_Q,
-    [A8] = MAY_BLACK_Q,
-    [H8] = MAY_BLACK_K,
+    [E1] = MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE,
+    [A1] = MAY_WHITE_CASTLE_QUEENSIDE,
+    [H1] = MAY_WHITE_CASTLE_KINGSIDE,
+    [E8] = MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE,
+    [A8] = MAY_BLACK_CASTLE_QUEENSIDE,
+    [H8] = MAY_BLACK_CASTLE_KINGSIDE,
 };
 
 /**
@@ -265,4 +265,21 @@ int PlayMoveString(Game* game, char* move_str)
         }
     }
     return 0;
+}
+
+/**
+ * @brief Make a sequence of moves.
+ * @param dst_position destination position after the sequence
+ * @param src_position source position
+ * @param moves zero terminated list of moves
+*/
+void MakeMoveSequence(Position* dst_position, const Position* src_position, const int* moves)
+{
+    Position tmp = *src_position;
+    while (*moves)
+    {
+        MakeMove(dst_position, &tmp, *moves++);
+        tmp = *dst_position;
+    }
+    dst_position->previous = dst_position; // Can't assume stack here.
 }

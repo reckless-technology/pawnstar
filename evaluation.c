@@ -1,6 +1,7 @@
 #include "pawnstar.h"
 
-static const int PAWN_SQUARE[64] = {
+static const int PAWN_SQUARE[64] = 
+{
      0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50,
     10, 10, 20, 30, 30, 20, 10, 10,
@@ -11,7 +12,8 @@ static const int PAWN_SQUARE[64] = {
      0,  0,  0,  0,  0,  0,  0,  0
     };
 
-static const int KNIGHT_SQUARE[64] = {
+static const int KNIGHT_SQUARE[64] = 
+{
     -50,-40,-30,-30,-30,-30,-40,-50,
     -40,-20,  0,  0,  0,  0,-20,-40,
     -30,  0, 10, 15, 15, 10,  0,-30,
@@ -21,7 +23,9 @@ static const int KNIGHT_SQUARE[64] = {
     -40,-20,  0,  5,  5,  0,-20,-40,
     -50,-40,-30,-30,-30,-30,-40,-50
 };
-static const int BISHOP_SQUARE[64] = {
+
+static const int BISHOP_SQUARE[64] = 
+{
     -20,-10,-10,-10,-10,-10,-10,-20,
     -10,  0,  0,  0,  0,  0,  0,-10,
     -10,  0,  5, 10, 10,  5,  0,-10,
@@ -31,7 +35,9 @@ static const int BISHOP_SQUARE[64] = {
     -10,  5,  0,  0,  0,  0,  5,-10,
     -20,-10,-10,-10,-10,-10,-10,-20
 };
-static const int ROOK_SQUARE[64] = {
+
+static const int ROOK_SQUARE[64] = 
+{
       0,  0,  0,  0,  0,  0,  0,  0,
       5, 10, 10, 10, 10, 10, 10,  5,
      -5,  0,  0,  0,  0,  0,  0, -5,
@@ -41,7 +47,9 @@ static const int ROOK_SQUARE[64] = {
      -5,  0,  0,  0,  0,  0,  0, -5,
       0,  0,  0,  5,  5,  0,  0,  0
 };
-static const int QUEEN_SQUARE[64] = {
+
+static const int QUEEN_SQUARE[64] = 
+{
     -20,-10,-10, -5, -5,-10,-10,-20,
     -10,  0,  0,  0,  0,  0,  0,-10,
     -10,  0,  5,  5,  5,  5,  0,-10,
@@ -51,7 +59,9 @@ static const int QUEEN_SQUARE[64] = {
     -10,  0,  5,  0,  0,  0,  0,-10,
     -20,-10,-10, -5, -5,-10,-10,-20
 };
-static const int KING_SQUARE_MIDGAME[64] = {
+
+static const int KING_SQUARE_MIDGAME[64] = 
+{
     -30,-40,-40,-50,-50,-40,-40,-30,
     -30,-40,-40,-50,-50,-40,-40,-30,
     -30,-40,-40,-50,-50,-40,-40,-30,
@@ -61,7 +71,9 @@ static const int KING_SQUARE_MIDGAME[64] = {
      20, 20,  0,  0,  0,  0, 20, 20,
      20, 30, 10,  0,  0, 10, 30, 20
 };
-static const int KING_SQUARE_ENDGAME[64] = {
+
+static const int KING_SQUARE_ENDGAME[64] = 
+{
       0, 10, 20, 30, 30, 20, 10,  0,
      10, 20, 30, 40, 40, 30, 20, 10,
      20, 30, 40, 50, 50, 40, 30, 20,
@@ -71,7 +83,9 @@ static const int KING_SQUARE_ENDGAME[64] = {
      10, 20, 30, 40, 40, 30, 20, 10,
       0, 10, 20, 30, 30, 20, 10,  0,
 };
-static const int* const PIECE_SQUARES[7] = {
+
+static const int* const PIECE_SQUARES[7] = 
+{
     NULL,
     PAWN_SQUARE,
     KNIGHT_SQUARE,
@@ -81,7 +95,8 @@ static const int* const PIECE_SQUARES[7] = {
     KING_SQUARE_MIDGAME,
 };
 
-static const int MATERIAL_VALUES[7] = {
+static const int MATERIAL_VALUES[7] = 
+{
     [PAWN]      = 100,
     [KNIGHT]    = 320,
     [BISHOP]    = 350,
@@ -89,6 +104,17 @@ static const int MATERIAL_VALUES[7] = {
     [QUEEN]     = 1200,
 };
 
+static const int CLASSICAL_MATERIAL[7] =
+{
+    [PAWN] = 1,
+    [KNIGHT] = 3,
+    [BISHOP] = 3,
+    [ROOK] = 5,
+    [QUEEN] = 9,
+};
+
+/* 4x3 (N) + 4x3 (B) + 4x5 (R) + 2x9 (Q) = 62 (ignoring pawns) */
+#define INITIAL_CLASSICAL_MATERIAL 62
 
 int         piece_square_scores[2][6][64];
 static int  king_endgame_delta[2][64];
@@ -110,18 +136,6 @@ InitializeEval()
         king_endgame_delta[BLACK][location] = -KING_SQUARE_ENDGAME[location            ] + KING_SQUARE_MIDGAME[location            ];
     }
 }
-
-static const int CLASSICAL_MATERIAL[7] =
-{
-    [PAWN]      = 1,
-    [KNIGHT]    = 3,
-    [BISHOP]    = 3,
-    [ROOK]      = 5,
-    [QUEEN]     = 9,
-};
-
-/* 4 x 3 (N) + 4 x 3 (B) + 4 x 5 (R) + 2 x 9 (Q) = 62 */
-#define INITIAL_CLASSICAL_MATERIAL 62
 
 static int ClassicalMaterialRemaining(const Position* position)
 {
@@ -151,10 +165,19 @@ EvaluatePosition(const Position* position,
         return DRAW_SCORE;
     }
     int score = position->score;
-    const int endgame_delta = king_endgame_delta[WHITE][position->king_location[WHITE]] 
-                            + king_endgame_delta[BLACK][position->king_location[BLACK]];
     const int material_remaining = ClassicalMaterialRemaining(position);
-    score += (endgame_delta * (INITIAL_CLASSICAL_MATERIAL - material_remaining)) / INITIAL_CLASSICAL_MATERIAL;
+    if (material_remaining < 16)
+    {
+        const int endgame_delta = king_endgame_delta[WHITE][position->king_location[WHITE]]
+                                + king_endgame_delta[BLACK][position->king_location[BLACK]];
+        score += endgame_delta;
+    }
+    else if (material_remaining < 32)
+    {
+        const int endgame_delta = king_endgame_delta[WHITE][position->king_location[WHITE]]
+                                + king_endgame_delta[BLACK][position->king_location[BLACK]];
+        score += endgame_delta * ((32 - material_remaining) / 16);
+    }
     return position->state_flags & IS_BLACK_TO_MOVE ? -score : score;
     (void)alpha;
     (void)beta;

@@ -28,6 +28,7 @@ typedef unsigned char       uint8;
 #define SHIFT_SOUTHWEST(b)  (((b) & MASK_WEST_1) >> 9)
 #define SHIFT_WEST(b)       (((b) & MASK_WEST_1) >> 1)
 #define SHIFT_NORTHWEST(b)  (((b) & MASK_WEST_1) << 7)
+#define DO_EXTRA_PAWN_EVAL  0
 
 enum Piece
 {
@@ -217,6 +218,8 @@ static uint64 KingAttacks(int location)
     return KingFill(BITBOARD(location));
 }
 
+#if DO_EXTRA_PAWN_EVAL
+
 static uint64 PassedPawnMaskWhite(int location)
 {
     uint64 result       = NO_SQUARES;
@@ -332,6 +335,8 @@ static uint64 DoubledPawnMaskBlack(int location)
     return SouthOf(location);
 }
 
+#endif
+
 static uint64 InterveningSquares(int from, int to)
 {
     for (int dir = DIR_NORTH; dir <= DIR_NORTHWEST; ++dir)
@@ -379,6 +384,8 @@ static const BitboardGen ray_generators[] =
     { NULL,                         NULL                    },
 };
 
+#if DO_EXTRA_PAWN_EVAL
+
 static const BitboardGen pawn_generators_white[] =
 {
     { "passed_pawn_mask",           PassedPawnMaskWhite,    },
@@ -402,6 +409,8 @@ static const BitboardGen* pawn_generators[] =
     pawn_generators_white,
     pawn_generators_black,
 };
+
+#endif
 
 static const char* const piece_names[7] = 
 {
@@ -439,6 +448,9 @@ int main()
         printf("\n    },");
     }
     printf("\n};\n");
+
+#if DO_EXTRA_PAWN_EVAL
+
     printf("const PawnSets PAWN_SETS[2][64] = \n{");
     for (int color = 0; color != 2; ++color)
     {
@@ -461,6 +473,9 @@ int main()
         printf("\n    },");
     }
     printf("\n};\n");
+
+#endif
+
     printf("const bitboard INTERVENING_SQUARES[64][64] = \n{");
     for (int i = 0; i != 64; ++i)
     {

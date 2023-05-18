@@ -162,22 +162,23 @@ Propagate a principal variation up to the parent node, prepending a
 "best move" before copying the child PV.
 */
 INLINE void 
-CopyVariation(Variation*       dst, 
-              const Variation* src, 
-              int              move)
+CopyVariation(Variation*       dst_variation, 
+              const Variation* src_variation, 
+              int              best_move)
 {
-    if (dst)
+    if (dst_variation)
     {
-        dst->moves[0] = move;
-        if (src)
+        int* dst = dst_variation->moves;
+        *dst++ = best_move;
+        if (src_variation)
         {
-            memcpy(&dst->moves[1], src->moves, src->num_moves * sizeof(int));
-            dst->num_moves = src->num_moves + 1;
+            const int* src = src_variation->moves;
+            while (*src)
+            {
+                *dst++ = *src++;
+            }
         }
-        else
-        {
-            dst->num_moves = 1;
-        }
+        *dst = 0; // Terminate list.
     }
 }
 

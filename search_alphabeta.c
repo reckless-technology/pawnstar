@@ -38,7 +38,7 @@ Search(const Position*  src_position,
     {
         return SEARCH_CANCELLED_SCORE;
     }
-    pv.num_moves = 0;
+    pv.moves[0] = 0;
     if (!(++the_game.node_count & 0xFFFF)         &&
         the_game.time_control.hard_stop_search_ms &&
         GetMilliseconds() >= the_game.time_control.hard_stop_search_ms)

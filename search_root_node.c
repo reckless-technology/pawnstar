@@ -21,7 +21,7 @@ int SearchRootNode(const Position* src_position)
     ScoredMove  scored_moves[MAX_MOVES_PER_POSITION];
     ScoredMove  best_moves[MAX_PLY];
     int         moves[MAX_MOVES_PER_POSITION];
-    Variation   pv = { .num_moves = 0 };
+    Variation   child_pv = { 0 };
     int         depth;
     int         start_ms;
     int         stop_ms;
@@ -93,6 +93,7 @@ int SearchRootNode(const Position* src_position)
     }   
     MergeSort(move_count, scored_moves);
     best_move = scored_moves[0].move;
+    Variation principal_variation = { 0 };
     for (depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
     {       
         if (the_game.time_control.clock_type == CLOCK_FIXED_DEPTH && depth > the_game.time_control.fixed_depth.depth)
@@ -101,22 +102,29 @@ int SearchRootNode(const Position* src_position)
         }
         the_game.node_count = 0;
         MergeSort(move_count, scored_moves);
-        pv.num_moves = 0;
+        child_pv.moves[0] = 0;
+        /* Before we start the search, do a shallow search based on the leaf node of the PV from the previous iteration. */
+        if (principal_variation.moves[0])
+        {
+            Position pos;
+            MakeMoveSequence(&pos, src_position, principal_variation.moves);
+            Search(&pos, 3, 0, ALPHA, BETA, &cancel, NULL);
+        }
         alpha = ALPHA;
         for (i = 0; i != move_count; ++i)
         {          
             if (i < NUM_ROOT_MOVES_BEFORE_PVS)
             {
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &pv, i);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &child_pv, i);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, scored_moves[i].move, &pv, i);
+                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, scored_moves[i].move, &child_pv, i);
                 if (scored_moves[i].score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &pv, i);
+                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &child_pv, i);
                 }
             }            
             if (cancel)
@@ -129,12 +137,11 @@ int SearchRootNode(const Position* src_position)
                 best_move         = scored_moves[i].move;
                 best_moves[depth] = scored_moves[i];
                 RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV, TT_MAIN);
+                CopyVariation(&principal_variation, &child_pv, best_move);
                 if (the_game.do_show_thinking)
                 {
                     char move_string[256];
-                    Variation display_variation = { 0 };
-                    CopyVariation(&display_variation, &pv, best_move);
-                    MoveSequenceToSanString(src_position, display_variation.moves, move_string);
+                    MoveSequenceToSanString(src_position, principal_variation.moves, move_string);
                     printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score, (GetMilliseconds() - start_ms) / 10, the_game.node_count, move_string);
                 }
             }

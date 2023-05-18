@@ -172,16 +172,16 @@ GeneratePseudoLegalMoves(const Position* position,
         */
         if (color == WHITE)
         {
-            if ((position->castle_flags & MAY_WHITE_K)        &&  /* if white retains the right to castle kingside and */
-                !(position->occupied_squares & (F1BB | G1BB)) &&  /* f1 and g1 are both vacant and                     */      
-                !IsAttacked(position, F1, BLACK)              &&  /* f1 is not attacked by black and                   */
-                !IsAttacked(position, G1, BLACK))                 /* the king's destination is not attacked by black   */
+            if ((position->castle_flags & MAY_WHITE_CASTLE_KINGSIDE)    &&  /* if white retains the right to castle kingside and */
+                !(position->occupied_squares & (F1BB | G1BB))           &&  /* f1 and g1 are both vacant and                     */      
+                !IsAttacked(position, F1, BLACK)                        &&  /* f1 is not attacked by black and                   */
+                !IsAttacked(position, G1, BLACK))                           /* the king's destination is not attacked by black   */
             {
                 *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
             }
-            if ((position->castle_flags & MAY_WHITE_Q)               &&
-                !(position->occupied_squares & (B1BB | C1BB | D1BB)) &&
-                !IsAttacked(position, D1, BLACK)                     &&
+            if ((position->castle_flags & MAY_WHITE_CASTLE_QUEENSIDE)   &&
+                !(position->occupied_squares & (B1BB | C1BB | D1BB))    &&
+                !IsAttacked(position, D1, BLACK)                        &&
                 !IsAttacked(position, C1, BLACK))
             {
                 *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, C1);
@@ -189,16 +189,16 @@ GeneratePseudoLegalMoves(const Position* position,
         }
         else
         {
-            if ((position->castle_flags & MAY_BLACK_K)        &&
-                !(position->occupied_squares & (F8BB | G8BB)) && 
-                !IsAttacked(position, F8, WHITE)              &&
+            if ((position->castle_flags & MAY_BLACK_CASTLE_KINGSIDE)    &&
+                !(position->occupied_squares & (F8BB | G8BB))           && 
+                !IsAttacked(position, F8, WHITE)                        &&
                 !IsAttacked(position, G8, WHITE))
             {
                 *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
             }
-            if ((position->castle_flags & MAY_BLACK_Q)               &&
-                !(position->occupied_squares & (B8BB | C8BB | D8BB)) &&
-                !IsAttacked(position, D8, WHITE)                     &&
+            if ((position->castle_flags & MAY_BLACK_CASTLE_QUEENSIDE)   &&
+                !(position->occupied_squares & (B8BB | C8BB | D8BB))    &&
+                !IsAttacked(position, D8, WHITE)                        &&
                 !IsAttacked(position, C8, WHITE))
             {
                 *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, C8);

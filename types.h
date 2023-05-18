@@ -45,10 +45,10 @@ enum ClockType
 */
 enum CastleFlags
 {
-    MAY_WHITE_K         = 0x01, /**< white has the right to castle king side    */
-    MAY_WHITE_Q         = 0x02, /**< white has the right to castle queen side   */
-    MAY_BLACK_K         = 0x04, /**< black has the right to castle king side    */
-    MAY_BLACK_Q         = 0x08, /**< black has the right to castle queen side   */
+    MAY_WHITE_CASTLE_KINGSIDE   = 0x01, /**< white has the right to castle king side    */
+    MAY_WHITE_CASTLE_QUEENSIDE  = 0x02, /**< white has the right to castle queen side   */
+    MAY_BLACK_CASTLE_KINGSIDE   = 0x04, /**< black has the right to castle king side    */
+    MAY_BLACK_CASTLE_QUEENSIDE  = 0x08, /**< black has the right to castle queen side   */
 };
 
 /**
@@ -150,6 +150,7 @@ typedef struct
     bitboard king_attacks;      /**< squares attacked by a king on this square      */
 } Sets;
 
+#if 0
 /**
  * @brief Bitsets used to efficiently determine pawn structure.
 */
@@ -160,6 +161,7 @@ typedef struct
     bitboard supported_pawn_mask;   /**< Squares which if containing a friendly pawn, make the pawn supported.      */
     bitboard doubled_pawn_mask;     /**< Squares which if containing a friendly pawn, make the pawn doubled.        */
 } PawnSets;
+#endif
 
 /**
  * @brief A chess position.
@@ -279,8 +281,7 @@ typedef struct
 */
 typedef struct
 {
-    int         num_moves;      /**< number of moves in this line   */
-    int         moves[MAX_PLY]; /**< the moves comprising the line  */
+    int moves[MAX_PLY + 1]; /**< the moves comprising the line  */
 } Variation;
 
 /**
