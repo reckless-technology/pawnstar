@@ -161,7 +161,7 @@ EvaluatePosition(const Position* position,
     {
         const int endgame_delta = king_endgame_delta[WHITE][position->king_location[WHITE]]
                                 + king_endgame_delta[BLACK][position->king_location[BLACK]];
-        score += endgame_delta * ((32 - material_remaining) / 16);
+        score += (endgame_delta * (32 - material_remaining)) / 16;
     }
     return position->state_flags & IS_BLACK_TO_MOVE ? -score : score;
     (void)alpha;
