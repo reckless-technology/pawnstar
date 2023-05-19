@@ -40,7 +40,7 @@ int main()
         "Compiled: " __DATE__ " " __TIME__                     "\n"
         );
     InitializeEval();
-    InitializeTranspositionTable(HASHTABLE_MEGABYTES, QUIESCENT_HASHTABLE_MB);
+    InitializeTranspositionTable(HASHTABLE_MEGABYTES);
     InitializeGoodMoveCounts();
     if (!InitializeOpeningBookFromFile("pawnstar.book"))
     {

@@ -17,20 +17,6 @@ void StopThinkingMoveImmediately()
 */
 int SearchRootNode(const Position* src_position)
 {
-    int         i;
-    ScoredMove  scored_moves[MAX_MOVES_PER_POSITION];
-    ScoredMove  best_moves[MAX_PLY];
-    int         moves[MAX_MOVES_PER_POSITION];
-    Variation   child_pv = { 0 };
-    int         depth;
-    int         start_ms;
-    int         stop_ms;
-    int         best_move       = 0;    /* the move we are going to return to the caller    */
-    int         timeout_ms      = 0;    /* cancel search when this time expires             */
-    int         ms_allocated    = 0;    /* soft allocated time for the move                 */
-    int         moves_to_go     = 0;    /* number of remaining moves in this clock period   */
-    int         alpha;
-
     if (src_position->state_flags & IS_GAME_OVER)
     {
         return 0;
@@ -41,6 +27,7 @@ int SearchRootNode(const Position* src_position)
     {
         return book_move;
     } 
+    int moves[MAX_MOVES_PER_POSITION];
     int move_count = GenerateLegalMoves(src_position, moves);
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (move_count == 1)
@@ -48,6 +35,9 @@ int SearchRootNode(const Position* src_position)
         return moves[0];
     }  
     /* Plan time usage for this search. */
+    int timeout_ms      = 0;    /* cancel search when this time expires             */
+    int ms_allocated    = 0;    /* soft allocated time for the move                 */
+    int moves_to_go     = 0;    /* number of remaining moves in this clock period   */
     switch (the_game.time_control.clock_type)
     {
     case CLOCK_STANDARD:
@@ -77,24 +67,26 @@ int SearchRootNode(const Position* src_position)
         break;
     }
     InitializeGoodMoveCounts();
+    DEBUG_STATEMENT(DebugXClear());
+    int start_ms = GetMilliseconds();
+    cancel = false;
     /*
     For first pass move ordering before we do any search, just use a shallow
-    search with wide open alpha beta window. Subsequent passes will use the 
-    results of the previous iteration to sort the moves (the merge sort is 
+    search with wide open alpha beta window. Subsequent passes will use the
+    results of the previous iteration to sort the moves (the merge sort is
     stable).
     */
-    DEBUG_STATEMENT(DebugXClear());
-    start_ms = GetMilliseconds();
-    cancel = false;
-    for (i = 0; i != move_count; ++i)
+    ScoredMove scored_moves[MAX_MOVES_PER_POSITION];
+    ScoredMove best_moves[MAX_PLY];
+    for (int i = 0; i != move_count; ++i)
     {
         scored_moves[i].move  = moves[i];
-        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, scored_moves[i].move, NULL, i);    
+        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, scored_moves[i].move, NULL, i);
     }   
     MergeSort(move_count, scored_moves);
-    best_move = scored_moves[0].move;
+    int best_move = scored_moves[0].move;
     Variation principal_variation = { 0 };
-    for (depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
+    for (int depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
     {       
         if (the_game.time_control.clock_type == CLOCK_FIXED_DEPTH && depth > the_game.time_control.fixed_depth.depth)
         {
@@ -102,18 +94,11 @@ int SearchRootNode(const Position* src_position)
         }
         the_game.node_count = 0;
         MergeSort(move_count, scored_moves);
-        child_pv.moves[0] = 0;
-        /* Before we start the search, do a shallow search based on the leaf node of the PV from the previous iteration. */
-        if (principal_variation.moves[0])
-        {
-            Position pos;
-            MakeMoveSequence(&pos, src_position, principal_variation.moves);
-            Search(&pos, 3, 0, ALPHA, BETA, &cancel, NULL);
-        }
-        alpha = ALPHA;
-        for (i = 0; i != move_count; ++i)
+        Variation child_pv = { 0 };
+        int alpha = ALPHA;
+        for (int i = 0; i != move_count; ++i)
         {          
-            if (i < NUM_ROOT_MOVES_BEFORE_PVS)
+            if (i == 0)
             {
                 scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &child_pv, i);
             }
@@ -136,7 +121,7 @@ int SearchRootNode(const Position* src_position)
                 alpha             = scored_moves[i].score;
                 best_move         = scored_moves[i].move;
                 best_moves[depth] = scored_moves[i];
-                RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV, TT_MAIN);
+                RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);
                 CopyVariation(&principal_variation, &child_pv, best_move);
                 if (the_game.do_show_thinking)
                 {
@@ -146,7 +131,7 @@ int SearchRootNode(const Position* src_position)
                 }
             }
         }        
-        stop_ms = GetMilliseconds();
+        int stop_ms = GetMilliseconds();
         if (alpha > WIN_THRESHOLD || 
             alpha < LOSE_THRESHOLD)
         {
@@ -164,7 +149,7 @@ int SearchRootNode(const Position* src_position)
             const int elapsed_ms = stop_ms - start_ms;
             bool is_best_move_consistent = true;
             bool is_score_stable = true;
-            for (i = STARTING_SEARCH_DEPTH; i != depth; ++i)
+            for (int i = STARTING_SEARCH_DEPTH; i != depth; ++i)
             {
                 if (best_moves[i].move != best_moves[depth].move)
                 {
@@ -187,7 +172,7 @@ int SearchRootNode(const Position* src_position)
             {
                 break;
             }
-        }             
-    }  
+        }
+    }
     return best_move;
 }

@@ -104,15 +104,6 @@ enum NodeType
 };
 
 /**
- * @brief Which transposition table to use.
-*/
-enum WhichTranspositionTable
-{
-    TT_MAIN,        /**< main alpha beta search table   */
-    TT_QUIESCENT,   /**< quiescent search only          */
-};
-
-/**
  * @brief A move and its associated score - used when sorting moves.
 */
 typedef struct

@@ -104,15 +104,6 @@ static const int MATERIAL_VALUES[7] =
     [QUEEN]     = 1200,
 };
 
-static const int CLASSICAL_MATERIAL[7] =
-{
-    [PAWN] = 1,
-    [KNIGHT] = 3,
-    [BISHOP] = 3,
-    [ROOK] = 5,
-    [QUEEN] = 9,
-};
-
 /* 4x3 (N) + 4x3 (B) + 4x5 (R) + 2x9 (Q) = 62 (ignoring pawns) */
 #define INITIAL_CLASSICAL_MATERIAL 62
 
@@ -137,16 +128,6 @@ InitializeEval()
     }
 }
 
-static int ClassicalMaterialRemaining(const Position* position)
-{
-    int material = 0;
-    for (int piece = KNIGHT; piece <= QUEEN; ++piece)
-    {
-        material += CLASSICAL_MATERIAL[piece] * PopCount(position->pieces[piece]);
-    }
-    return material;
-}
-
 /**
  * @brief Evaluate the current position, assuming neither king is in check and the position is quiet.
  * @param position position to evaluate
@@ -165,7 +146,11 @@ EvaluatePosition(const Position* position,
         return DRAW_SCORE;
     }
     int score = position->score;
-    const int material_remaining = ClassicalMaterialRemaining(position);
+    const int material_remaining =
+        3 * PopCount(position->knights)
+      + 3 * PopCount(position->bishops)
+      + 5 * PopCount(position->rooks)
+      + 9 * PopCount(position->queens);
     if (material_remaining < 16)
     {
         const int endgame_delta = king_endgame_delta[WHITE][position->king_location[WHITE]]

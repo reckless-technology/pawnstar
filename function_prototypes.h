@@ -50,10 +50,10 @@ void        DisplayAvailableBookMoves(const Position* position);
 /*
 Transposition table
 */
-void        InitializeTranspositionTable(int megabytes, int quiescent_megabytes);
+bool        InitializeTranspositionTable(int megabytes);
 void        FreeTranspositionTable(void);
-void        RecordTransposition(uint64_t hash, int depth, int score, int move, int node_type, int which_table);
-bool        FindTransposition(uint64_t hash, Transposition* transposition, int which_table);
+void        RecordTransposition(uint64_t hash, int depth, int score, int move, int node_type);
+bool        FindTransposition(uint64_t hash, Transposition* transposition);
 /*
 Generation and ordering of moves
 */

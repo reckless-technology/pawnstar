@@ -178,7 +178,7 @@ CopyVariation(Variation*       dst_variation,
                 *dst++ = *src++;
             }
         }
-        *dst = 0; // Terminate list.
+        *dst = 0;
     }
 }
 

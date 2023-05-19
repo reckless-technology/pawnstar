@@ -31,9 +31,12 @@ SearchSingleMove(const Position*    src_position,
         INCREMENT("extensions promoted");
         ++depth;
     }
-    if (beta > alpha + 1 &&
-        move_index != 0  &&
-       !(src_position->state_flags & IS_CHECK))
+    if (src_position->state_flags & IS_CHECK)
+    {
+        INCREMENT("extensions checks");
+        ++depth;
+    }
+    if (beta > alpha + 1 && move_index != 0)
     {
         INCREMENT("pvs attempts");
         score = -Search(&position, depth - 1, ply + 1, -alpha - 1, -alpha, cancel, pv);
@@ -48,4 +51,5 @@ SearchSingleMove(const Position*    src_position,
         score = -Search(&position, depth - 1, ply + 1, -beta, -alpha, cancel, pv);
     }
     return score;
+    (void)move_index;
 }
