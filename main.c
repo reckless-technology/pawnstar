@@ -18,8 +18,8 @@ void InitializeGame(Game* game)
 
 int main()
 {    
-    setbuf(stdout, NULL);
     setbuf(stdin, NULL);
+    setbuf(stdout, NULL);
     printf(
 #if 1
         "                       .::.                            \n"
@@ -52,10 +52,7 @@ int main()
     for ( ; ; )
     {
         char line_buffer[STRING_BUF_LEN];
-        if (fgets(line_buffer, sizeof(line_buffer), stdin) == NULL)
-        {
-            continue;
-        }
+        gets_s(line_buffer, sizeof(line_buffer));
         ProcessInput(line_buffer);
     }
 }

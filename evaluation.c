@@ -104,6 +104,18 @@ static const int MATERIAL_VALUES[7] =
     [QUEEN]     = 1200,
 };
 
+static const int CLASSICAL_MATERIAL_BONUS[64] =
+{
+    300, 290, 280, 270, 260, 250, 240, 230,
+    220, 210, 200, 190, 180, 170, 160, 150,
+    140, 130, 120, 110, 100,  90,  80,  70,
+     60,  50,  40,  30,  20,  10,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,
+      0,   0,   0,   0,   0,   0,   0,   0,
+};
+
 /* 4x3 (N) + 4x3 (B) + 4x5 (R) + 2x9 (Q) = 62 (ignoring pawns) */
 #define INITIAL_CLASSICAL_MATERIAL 62
 
@@ -151,6 +163,14 @@ EvaluatePosition(const Position* position,
       + 3 * PopCount(position->bishops)
       + 5 * PopCount(position->rooks)
       + 9 * PopCount(position->queens);
+    if (score > 50)
+    {
+        score += CLASSICAL_MATERIAL_BONUS[material_remaining];
+    }
+    else if (score < -50)
+    {
+        score -= CLASSICAL_MATERIAL_BONUS[material_remaining];
+    }
     if (material_remaining < 16)
     {
         const int endgame_delta = king_endgame_delta[WHITE][position->king_location[WHITE]]

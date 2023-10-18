@@ -50,7 +50,7 @@ AddPiece(Position* position,
     position->score += piece_square_scores[color][piece - 1][to];
 }
 
-void
+static void
 RemovePiece(Position* position, 
             int color, 
             int piece, 
@@ -62,7 +62,7 @@ RemovePiece(Position* position,
     position->score -= piece_square_scores[color][piece - 1][from];
 }
 
-void
+static void
 MovePiece(Position* position, 
           int color, 
           int piece, 
