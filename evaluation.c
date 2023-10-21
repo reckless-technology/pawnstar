@@ -132,6 +132,35 @@ EvaluatePosition(const Position* position,
         const int rank_flip            = color == WHITE ? RANK_FLIP : 0;
         const bitboard friendly_pieces = position->pieces_of_color[color];
         const bitboard friendly_pawns  = position->pawns & friendly_pieces;
+        const bitboard enemy_pawns     = position->pawns & ~friendly_pieces;
+        bitboard p = friendly_pawns;
+        while (p)
+        {
+            const int locn = FindAndClearLsb(&p);
+            scores[color] += PAWN_SQUARE[locn ^ rank_flip];
+            const PawnSets* pawn_masks = &PAWN_SETS[color][locn];
+            if (!(pawn_masks->passed_pawn_mask & enemy_pawns))
+            {
+                const int rank = color == WHITE ? RANK_OF(locn) : 7 - RANK_OF(locn);
+                scores[color] += 10 * rank;
+            }
+            if (!(pawn_masks->isolated_pawn_mask & friendly_pawns))
+            {
+                scores[color] -= 10;
+            }
+            if (pawn_masks->supported_pawn_mask & friendly_pawns)
+            {
+                scores[color] += 5;
+            }
+            if (pawn_masks->doubled_pawn_mask & friendly_pawns)
+            {
+                scores[color] -= 10;
+            }
+            if (SETS[locn].pawn_attacks[ENEMY(color)] & friendly_pawns)
+            {
+                scores[color] += 5;
+            }
+        }
         /* Mobility scores for knights, bishops, rooks. */
         bitboard knights = position->knights & friendly_pieces;
         while (knights)
@@ -167,31 +196,7 @@ EvaluatePosition(const Position* position,
                 }
             }
         }
-        const bitboard enemy_pawns = position->pawns & ~friendly_pieces;
-        bitboard p = friendly_pawns;
-        while (p)
-        {
-            const int locn = FindAndClearLsb(&p);
-            scores[color] += PAWN_SQUARE[locn ^ rank_flip];
-            const PawnSets* pawn_masks = &PAWN_SETS[color][locn];
-            if (!(pawn_masks->passed_pawn_mask & enemy_pawns))
-            {
-                const int rank = color == WHITE ? RANK_OF(locn) : 7 - RANK_OF(locn);
-                scores[color] += 10 * rank;
-            }
-            if (!(pawn_masks->isolated_pawn_mask & friendly_pawns))
-            {
-                scores[color] -= 10;
-            }
-            if (pawn_masks->supported_pawn_mask & friendly_pawns)
-            {
-                scores[color] += 10;
-            }
-            if (pawn_masks->doubled_pawn_mask & friendly_pawns)
-            {
-                scores[color] -= 10;
-            }
-        }
+
     }
     score = position->state_flags & IS_BLACK_TO_MOVE ?
         scores[BLACK] - scores[WHITE] :

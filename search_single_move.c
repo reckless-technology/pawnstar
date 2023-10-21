@@ -29,12 +29,12 @@ SearchSingleMove(const Position*    src_position,
     if (MOVE_PROMOTED(move))
     {
         INCREMENT("extensions promoted");
-        ++depth;
+        //++depth;
     }
     if (src_position->state_flags & IS_CHECK)
     {
         INCREMENT("extensions checks");
-        ++depth;
+        //++depth;
     }
     if (beta > alpha + 1 && move_index != 0)
     {
