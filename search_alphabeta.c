@@ -182,11 +182,11 @@ Search(const Position*  src_position,
 
         case PHASE_CAPTURES:
             GeneratePseudoLegalMoves(src_position, captures, non_captures); 
-            SortMoves(src_position, captures, ply, true);
+            SortMoves(src_position, captures, ply, false);
             break;
 
         case PHASE_NON_CAPTURES:
-            SortMoves(src_position, non_captures, ply, true);
+            SortMoves(src_position, non_captures, ply, false);
             break;
 
         default:

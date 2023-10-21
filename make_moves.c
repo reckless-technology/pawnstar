@@ -47,7 +47,6 @@ AddPiece(Position* position,
     position->pieces[piece]          ^= BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(to);
     position->hash  += PIECE_SQUARE_HASHES[color][piece - 1][to];
-    position->score += piece_square_scores[color][piece - 1][to];
 }
 
 static void
@@ -59,7 +58,6 @@ RemovePiece(Position* position,
     position->pieces[piece]          ^= BITBOARD(from);
     position->pieces_of_color[color] ^= BITBOARD(from);
     position->hash  -= PIECE_SQUARE_HASHES[color][piece - 1][from];
-    position->score -= piece_square_scores[color][piece - 1][from];
 }
 
 static void
@@ -72,7 +70,6 @@ MovePiece(Position* position,
     position->pieces[piece]          ^= BITBOARD(from) | BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(from) | BITBOARD(to);
     position->hash  += PIECE_SQUARE_HASHES[color][piece - 1][to] - PIECE_SQUARE_HASHES[color][piece - 1][from];
-    position->score += piece_square_scores[color][piece - 1][to] - piece_square_scores[color][piece - 1][from];
 }
 
 /**

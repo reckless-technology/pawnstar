@@ -39,7 +39,6 @@ int main()
         "(C) Jonny Reckless 2009 - 2023                         \n"
         "Compiled: " __DATE__ " " __TIME__                     "\n"
         );
-    InitializeEval();
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
     InitializeGoodMoveCounts();
     if (!InitializeOpeningBookFromFile("pawnstar.book"))

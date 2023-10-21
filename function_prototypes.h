@@ -67,7 +67,6 @@ void        MergeSort(int num_elements, ScoredMove values[]);
 /*
 Positional evaluation
 */
-void        InitializeEval(void);
 int         EvaluatePosition(const Position* position, int alpha, int beta);
 /*
 Game over (terminal node) detection

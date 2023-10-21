@@ -22,17 +22,17 @@ static void SearchThreadEntry(Game* game)
 
 extern "C" void StopWorker(void)
 {
-	if (worker_thread.joinable())
-	{
-		worker_thread.join();
-	}
+    if (worker_thread.joinable())
+    {
+        worker_thread.join();
+    }
 }
 /*
 Start thinking on a background worker thread
 */
 extern "C" void StartThinking(Game* game)
 {
-	StopWorker();
+    StopWorker();
     worker_thread = std::thread(SearchThreadEntry, game);
 }
 
