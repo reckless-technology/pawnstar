@@ -53,7 +53,7 @@ EvaluatePosition(const Position* position,
     {
         return DRAW_SCORE;
     }
-    int material_scores[2] = { 0 };
+    int scores[2] = { 0 };
     /* Phase 1: Evaluate material values alone. */
     for (int color = WHITE; color <= BLACK; ++color)
     {
@@ -65,40 +65,40 @@ EvaluatePosition(const Position* position,
         const bitboard queens           = position->queens  & friendly_pieces;
         const int num_friendly_pawns    = PopCount(pawns);
 
-        material_scores[color] = 
+        scores[color] = 
             PopCount(pawns)   * 100 +
             PopCount(knights) * 325 +
             PopCount(bishops) * 325 +
             PopCount(rooks)   * 600 +
             PopCount(queens)  * 1200;
-        /* Penalty for no pawns */
+        /* Penalty for no pawns. */
         if (pawns == NO_SQUARES)
         {
-            material_scores[color] -= 100;
+            scores[color] -= 100;
         }
         /* Bonus for the bishop pair. */
         if ((bishops & WHITE_SQUARES) && (bishops & BLACK_SQUARES))
         {
-            material_scores[color] += 50;
+            scores[color] += 50;
         }
         /* 
         Adjust bishop values according to number of friendly pawns. 
         Bishops are more valuable with fewer pawns. 
         */
-        material_scores[color] += PopCount(bishops) * 5 * (4 - num_friendly_pawns);
+        scores[color] += PopCount(bishops) * 5 * (4 - num_friendly_pawns);
         /* 
         Adjust knight values according to number of friendly pawns. 
         Knights are more valuable with more pawns. 
         */
-        material_scores[color] += PopCount(knights) * 5 * (num_friendly_pawns - 4);
+        scores[color] += PopCount(knights) * 5 * (num_friendly_pawns - 4);
     }
     /* 
     See if material score alone causes alpha or beta cutoff. 
     This saves time doing more expensive evaluation when clearly it's not a PV node. 
     */
     int score = (position->state_flags & IS_BLACK_TO_MOVE) ?
-        material_scores[BLACK] - material_scores[WHITE] :
-        material_scores[WHITE] - material_scores[BLACK];
+        scores[BLACK] - scores[WHITE] :
+        scores[WHITE] - scores[BLACK];
     if (score >= beta + 150)
     {
         INCREMENT("eval beta cutoff material");
@@ -115,7 +115,6 @@ EvaluatePosition(const Position* position,
       + 3 * PopCount(position->bishops)
       + 5 * PopCount(position->rooks)
       + 9 * PopCount(position->queens);
-    int scores[2] = { 0 };
     for (int color = WHITE; color <= BLACK; ++color)
     {
         const int rank_flip = color == WHITE ? RANK_FLIP : 0;
@@ -124,7 +123,14 @@ EvaluatePosition(const Position* position,
         bitboard p = pawns;
         while (p)
         {
-            scores[color] += PAWN_SQUARE[FindAndClearLsb(&p) ^ rank_flip];
+            const int locn = FindAndClearLsb(&p);
+            scores[color] += PAWN_SQUARE[locn ^ rank_flip];
+            const bitboard forward = color == WHITE ?
+                SETS[locn].north : SETS[locn].south;
+            if (forward & pawns)
+            {
+                scores[color] -= 10; /* Doubled (blocked) pawn. */
+            }
         }
         const bitboard pawn_attacks = color == WHITE ?
             SHIFT_NORTHEAST(pawns) | SHIFT_NORTHWEST(pawns) :
@@ -164,7 +170,6 @@ EvaluatePosition(const Position* position,
             scores[color] += midgame_king_score + (delta * (32 - non_pawn_classical_material)) / 16;
             bitboard b = SETS[position->king_location[color]].king_attacks;
             scores[color] += PopCount(pawns & b) * 10;
-            /* penalty for enemy pieces attacking close to our king */
             while (b)
             {
                 const int locn = FindAndClearLsb(&b);
@@ -179,7 +184,6 @@ EvaluatePosition(const Position* position,
             scores[color] += KING_SQUARE_MIDGAME[position->king_location[color] ^ rank_flip];
             bitboard b = SETS[position->king_location[color]].king_attacks;
             scores[color] += PopCount(pawns & b) * 30;
-            /* penalty for enemy pieces attacking close to our king */
             while (b)
             {
                 const int locn = FindAndClearLsb(&b);
