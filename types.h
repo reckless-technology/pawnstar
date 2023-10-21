@@ -141,7 +141,6 @@ typedef struct
     bitboard king_attacks;      /**< squares attacked by a king on this square      */
 } Sets;
 
-#if 0
 /**
  * @brief Bitsets used to efficiently determine pawn structure.
 */
@@ -152,7 +151,7 @@ typedef struct
     bitboard supported_pawn_mask;   /**< Squares which if containing a friendly pawn, make the pawn supported.      */
     bitboard doubled_pawn_mask;     /**< Squares which if containing a friendly pawn, make the pawn doubled.        */
 } PawnSets;
-#endif
+
 
 /**
  * @brief A chess position.

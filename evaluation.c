@@ -6,10 +6,22 @@ static const int PAWN_SQUARE[64] =
     60, 50, 50, 50, 50, 50, 50, 60,
     30, 30, 30, 30, 30, 30, 30, 30,
     20, 20, 20, 25, 25, 20, 20, 20,
-    10, 10, 10, 20, 20, 10, 10, 10,
+     0,  0,  0, 20, 20,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,
      0,  0,  0,-20,-20,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0
+};
+
+static const int KNIGHT_SQUARE[64] =
+{
+    -50,-40,-30,-30,-30,-30,-40,-50,
+    -40,-20,  0,  0,  0,  0,-20,-40,
+    -30,  0, 10, 15, 15, 10,  0,-30,
+    -30,  5, 15, 20, 20, 15,  5,-30,
+    -30,  0, 15, 20, 20, 15,  0,-30,
+    -30,  5, 10, 15, 15, 10,  5,-30,
+    -40,-20,  0,  5,  5,  0,-20,-40,
+    -50,-40,-30,-30,-30,-30,-40,-50
 };
 
 static const int KING_SQUARE_MIDGAME[64] =
@@ -109,39 +121,22 @@ EvaluatePosition(const Position* position,
         INCREMENT("eval alpha cutoff material");
         return alpha;
     }
-    /* Phase 2: positional features. */
+    /* Phase 2: Evaluate positional features. */
     const int non_pawn_classical_material = /* Initial value 62 */
         3 * PopCount(position->knights)
-      + 3 * PopCount(position->bishops)
-      + 5 * PopCount(position->rooks)
-      + 9 * PopCount(position->queens);
+        + 3 * PopCount(position->bishops)
+        + 5 * PopCount(position->rooks)
+        + 9 * PopCount(position->queens);
     for (int color = WHITE; color <= BLACK; ++color)
     {
-        const int rank_flip = color == WHITE ? RANK_FLIP : 0;
+        const int rank_flip            = color == WHITE ? RANK_FLIP : 0;
         const bitboard friendly_pieces = position->pieces_of_color[color];
-        const bitboard pawns = position->pawns & friendly_pieces;
-        bitboard p = pawns;
-        while (p)
-        {
-            const int locn = FindAndClearLsb(&p);
-            scores[color] += PAWN_SQUARE[locn ^ rank_flip];
-            const bitboard forward = color == WHITE ?
-                SETS[locn].north : SETS[locn].south;
-            if (forward & pawns)
-            {
-                scores[color] -= 10; /* Doubled (blocked) pawn. */
-            }
-        }
-        const bitboard pawn_attacks = color == WHITE ?
-            SHIFT_NORTHEAST(pawns) | SHIFT_NORTHWEST(pawns) :
-            SHIFT_SOUTHEAST(pawns) | SHIFT_SOUTHWEST(pawns);
-        /* Reward pawns defended by friendly pawns. */
-        scores[color] += 10 * PopCount(pawns & pawn_attacks);
-        /* Mobility scores for knights, bishops, rooks and queens */
+        const bitboard friendly_pawns  = position->pawns & friendly_pieces;
+        /* Mobility scores for knights, bishops, rooks. */
         bitboard knights = position->knights & friendly_pieces;
         while (knights)
         {
-            scores[color] += (PopCount(SETS[FindAndClearLsb(&knights)].knight_attacks) - 4) * 10;
+            scores[color] += KNIGHT_SQUARE[FindAndClearLsb(&knights) ^ rank_flip];
         }
         bitboard bishops = position->bishops & friendly_pieces;
         while (bishops)
@@ -153,44 +148,48 @@ EvaluatePosition(const Position* position,
         {
             scores[color] += (PopCount(RookAttacks(position->occupied_squares, FindAndClearLsb(&rooks))) - 7) * 5;
         }
-        bitboard queens = position->queens & friendly_pieces;
-        while (queens)
-        {
-            scores[color] += (PopCount(QueenAttacks(position->occupied_squares, FindAndClearLsb(&queens))) - 14) * 2;
-        }
-        if (non_pawn_classical_material < 16)
+        if (non_pawn_classical_material <= 20)
         {
             scores[color] += KING_SQUARE_ENDGAME[position->king_location[color] ^ rank_flip];
-        }
-        else if (non_pawn_classical_material < 32)
-        {
-            const int midgame_king_score = KING_SQUARE_MIDGAME[position->king_location[color] ^ rank_flip];
-            const int endgame_king_score = KING_SQUARE_ENDGAME[position->king_location[color] ^ rank_flip];
-            const int delta = endgame_king_score - midgame_king_score;
-            scores[color] += midgame_king_score + (delta * (32 - non_pawn_classical_material)) / 16;
-            bitboard b = SETS[position->king_location[color]].king_attacks;
-            scores[color] += PopCount(pawns & b) * 10;
-            while (b)
-            {
-                const int locn = FindAndClearLsb(&b);
-                if (IsAttacked(position, locn, ENEMY(color)))
-                {
-                    scores[color] -= 10;
-                }
-            }
         }
         else
         {
             scores[color] += KING_SQUARE_MIDGAME[position->king_location[color] ^ rank_flip];
             bitboard b = SETS[position->king_location[color]].king_attacks;
-            scores[color] += PopCount(pawns & b) * 30;
+            scores[color] += PopCount(friendly_pawns  & b) * 20;
+            scores[color] += PopCount(friendly_pieces & b) * 10;
             while (b)
             {
                 const int locn = FindAndClearLsb(&b);
                 if (IsAttacked(position, locn, ENEMY(color)))
                 {
-                    scores[color] -= 25;
+                    scores[color] -= 20;
                 }
+            }
+        }
+        const bitboard enemy_pawns = position->pawns & ~friendly_pieces;
+        bitboard p = friendly_pawns;
+        while (p)
+        {
+            const int locn = FindAndClearLsb(&p);
+            scores[color] += PAWN_SQUARE[locn ^ rank_flip];
+            const PawnSets* pawn_masks = &PAWN_SETS[color][locn];
+            if (!(pawn_masks->passed_pawn_mask & enemy_pawns))
+            {
+                const int rank = color == WHITE ? RANK_OF(locn) : 7 - RANK_OF(locn);
+                scores[color] += 10 * rank;
+            }
+            if (!(pawn_masks->isolated_pawn_mask & friendly_pawns))
+            {
+                scores[color] -= 10;
+            }
+            if (pawn_masks->supported_pawn_mask & friendly_pawns)
+            {
+                scores[color] += 10;
+            }
+            if (pawn_masks->doubled_pawn_mask & friendly_pawns)
+            {
+                scores[color] -= 10;
             }
         }
     }

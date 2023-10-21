@@ -28,7 +28,7 @@ typedef unsigned char       uint8;
 #define SHIFT_SOUTHWEST(b)  (((b) & MASK_WEST_1) >> 9)
 #define SHIFT_WEST(b)       (((b) & MASK_WEST_1) >> 1)
 #define SHIFT_NORTHWEST(b)  (((b) & MASK_WEST_1) << 7)
-#define DO_EXTRA_PAWN_EVAL  0
+#define DO_EXTRA_PAWN_EVAL  1
 
 enum Piece
 {
