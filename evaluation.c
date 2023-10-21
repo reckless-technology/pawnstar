@@ -194,7 +194,7 @@ EvaluatePosition(const Position* position,
             }
         }
     }
-    score += position->state_flags & IS_BLACK_TO_MOVE ?
+    score = position->state_flags & IS_BLACK_TO_MOVE ?
         scores[BLACK] - scores[WHITE] :
         scores[WHITE] - scores[BLACK];
     return score;
