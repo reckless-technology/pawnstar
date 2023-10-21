@@ -1,8 +1,6 @@
 #include "pawnstar.h"
 #include <ctype.h>
 
-#define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
-
 /**
  * @brief Construct a position from a Forsyth-Edwards (FEN) string.
  * @param fen_string string format of position
@@ -86,8 +84,6 @@ PositionFromString(const char* fen_string,
         goto Error;
     }
     position->occupied_squares     = position->white_pieces | position->black_pieces;
-    position->king_location[WHITE] = (uint8_t)Lsb(position->kings & position->white_pieces);
-    position->king_location[BLACK] = (uint8_t)Lsb(position->kings & position->black_pieces);
     /* Side to move */
     const char* color_to_move = strtok_r(NULL, " ", &save_ptr);
     if (!color_to_move)

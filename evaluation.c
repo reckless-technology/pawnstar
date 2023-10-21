@@ -81,8 +81,8 @@ EvaluatePosition(const Position* position,
             PopCount(pawns)   * 100 +
             PopCount(knights) * 325 +
             PopCount(bishops) * 325 +
-            PopCount(rooks)   * 600 +
-            PopCount(queens)  * 1200;
+            PopCount(rooks)   * 500 +
+            PopCount(queens)  * 1000;
         /* Penalty for no pawns. */
         if (pawns == NO_SQUARES)
         {
@@ -170,7 +170,7 @@ EvaluatePosition(const Position* position,
         bitboard bishops = position->bishops & friendly_pieces;
         while (bishops)
         {
-            scores[color] += (PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&bishops))) - 6) * 10;
+            scores[color] += (PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&bishops))) - 6) * 5;
         }
         bitboard rooks = position->rooks & friendly_pieces;
         while (rooks)
@@ -179,12 +179,12 @@ EvaluatePosition(const Position* position,
         }
         if (non_pawn_classical_material <= 20)
         {
-            scores[color] += KING_SQUARE_ENDGAME[position->king_location[color] ^ rank_flip];
+            scores[color] += KING_SQUARE_ENDGAME[KING_LOCATION(position, color) ^ rank_flip];
         }
         else
         {
-            scores[color] += KING_SQUARE_MIDGAME[position->king_location[color] ^ rank_flip];
-            bitboard b = SETS[position->king_location[color]].king_attacks;
+            scores[color] += KING_SQUARE_MIDGAME[KING_LOCATION(position, color) ^ rank_flip];
+            bitboard b = SETS[KING_LOCATION(position, color)].king_attacks;
             scores[color] += PopCount(friendly_pawns  & b) * 20;
             scores[color] += PopCount(friendly_pieces & b) * 10;
             while (b)

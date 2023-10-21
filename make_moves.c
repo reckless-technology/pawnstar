@@ -1,7 +1,5 @@
 #include "pawnstar.h"
 
-#define IS_IN_CHECK(position, color) (IsAttacked(position, position->king_location[color], ENEMY(color)))
-
 /**
  * @brief Castling rights flags to be cleared based on move from and to squares.
 */
@@ -154,7 +152,6 @@ MakeMove(Position*       dst_position,
         break;
 
     case KING:
-        dst_position->king_location[color] = (uint8_t)to;
         if (!MOVE_IS_SPECIAL(move))
         {
             goto RegularMove;

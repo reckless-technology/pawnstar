@@ -45,6 +45,8 @@ A value of 0 terminates a move list
 #define ENEMY(color)                    (!(color))
 #define COLOR_TO_MOVE(position)         (((position)->state_flags & IS_BLACK_TO_MOVE) ? BLACK : WHITE)
 #define COLOR_NOT_TO_MOVE(position)     (((position)->state_flags & IS_BLACK_TO_MOVE) ? WHITE : BLACK)
+#define KING_LOCATION(position, color)  (Lsb(position->kings & position->pieces_of_color[color]))
+#define IS_IN_CHECK(position, color)    (IsAttacked(position, KING_LOCATION(position, color), ENEMY(color)))
 
 #ifndef min
 #define min(a,b)                        ((a) < (b) ? (a) : (b))

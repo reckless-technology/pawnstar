@@ -188,7 +188,6 @@ struct Position
     uint64_t        hash;                   /**< Zobrist hash of this position, maintained incrementally    */
     const Position* previous;               /**< position immediately prior to this in the line of play     */
     int             move;                   /**< the move which led to this position                        */
-    uint8_t         king_location[2];       /**< king square indices for each color                         */
     uint8_t         castle_flags;           /**< castling rights                                            */
     uint8_t         state_flags;            /**< game state-machine flags                                   */
     uint8_t         en_passant_index;       /**< en passant capture availability square (0 if none)         */

@@ -69,13 +69,14 @@ RecordTransposition(uint64_t hash,
                     int      move, 
                     int      node_type)
 {   
-    Transposition* t    = &transposition_table[hash % table_num_entries];
-    t->hash             = hash;
-    t->move             = move;
-    t->score            = (int16_t)score;
-    t->depth            = (int8_t)depth;
-    t->node_type        = (uint8_t)node_type;
+    Transposition* const t  = &transposition_table[hash % table_num_entries];
+    t->hash                 = hash;
+    t->move                 = move;
+    t->score                = (int16_t)score;
+    t->depth                = (int8_t)depth;
+    t->node_type            = (uint8_t)node_type;
 }
+
 /*
 We get marginally better dispersion when the hashtable size is a prime number
 Determine if a candidate size is prime (excluding 1 and 2)

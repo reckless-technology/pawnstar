@@ -124,7 +124,7 @@ bool IsPositionLegal(const Position* position)
         PopCount(black_king) == 1                               &&
         white_king != black_king                                &&
         !(SETS[Lsb(white_king)].king_attacks & black_king)      &&
-        !IsAttacked(position, position->king_location[ENEMY(color)], color);
+        !IsAttacked(position, KING_LOCATION(position, ENEMY(color)), color);
 }
 /*
 If the game is over, display the xboard style result string
