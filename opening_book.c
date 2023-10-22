@@ -10,19 +10,19 @@
 Functions to use an opening book.
 Opening book text files are 1 line per line of play, with moves in SAN format.
 
-The book itself is stored as a singly linked list. Book moves are indexed 
-according to the Zobrist hash of the position. 
+The book itself is stored as a singly linked list. Book moves are indexed
+according to the Zobrist hash of the position.
 
 Structure containing a node of the opening book linked list.
 */
 typedef struct BookPosition BookPosition;
 struct BookPosition
 {
-    uint64_t          hash;       
-    int             capacity;   
-    int             count;      
-    int*            moves;      
-    BookPosition*   next;       
+    uint64_t        hash;
+    int             capacity;
+    int             count;
+    int* moves;
+    BookPosition* next;
 };
 /*
 Head pointer
@@ -33,12 +33,12 @@ Create a new BookPosition and return a pointer to it
 */
 static BookPosition* NewBookPosition(uint64_t hash)
 {
-    BookPosition* bp    = malloc(sizeof(BookPosition));
-    bp->hash            = hash;
-    bp->capacity        = 1;
-    bp->count           = 0;
-    bp->moves           = malloc(sizeof(int));
-    bp->next            = NULL;
+    BookPosition* bp = malloc(sizeof(BookPosition));
+    bp->hash = hash;
+    bp->capacity = 1;
+    bp->count = 0;
+    bp->moves = malloc(sizeof(int));
+    bp->next = NULL;
     return bp;
 }
 /*
@@ -92,7 +92,7 @@ void FreeOpeningBook()
     BookPosition* bp = opening_book;
     while (bp)
     {
-		BookPosition* next = bp->next;
+        BookPosition* next = bp->next;
         free(bp->moves);
         free(bp);
         bp = next;
@@ -104,7 +104,7 @@ Show all possible book moves for this position
 */
 void DisplayAvailableBookMoves(const Position* position)
 {
-    int book_moves [MAX_MOVES_PER_POSITION] = { 0 };
+    int book_moves[MAX_MOVES_PER_POSITION] = { 0 };
     int move_counts[MAX_MOVES_PER_POSITION] = { 0 };
     int next_move = 0;
     const BookPosition* bp = FindBookPosition(position->hash);
@@ -118,7 +118,7 @@ void DisplayAvailableBookMoves(const Position* position)
         if (!move)
         {
             /* This is the first time we have seen this book move */
-            book_moves [next_move] = bp->moves[i];
+            book_moves[next_move] = bp->moves[i];
             move_counts[next_move] = 1;
             ++next_move;
         }
@@ -136,8 +136,8 @@ void DisplayAvailableBookMoves(const Position* position)
     }
 }
 /*
-Initialize an opening book from a string, with each line containing a book 
-line of play. 
+Initialize an opening book from a string, with each line containing a book
+line of play.
 Returns true on success.
 */
 bool InitializeOpeningBookFromString(const char* book_string)
@@ -145,23 +145,23 @@ bool InitializeOpeningBookFromString(const char* book_string)
     bool result = true;
     char* const book = strdup(book_string);
     int line_number = 0;
-	char* line_ctx = NULL;
-	char* move_ctx = NULL;
+    char* line_ctx = NULL;
+    char* move_ctx = NULL;
     FreeOpeningBook();
     // Split the string into lines
     for (char* line = strtok_r(book, "\n", &line_ctx);
-	     line;
-		 line = strtok_r(NULL, "\n", &line_ctx))
+        line;
+        line = strtok_r(NULL, "\n", &line_ctx))
     {
         Game game[1];
         ++line_number;
         InitializeGame(game);
         // Split the line into tokens separated by spaces
         for (char* move_str = strtok_r(line, " ", &move_ctx);
-		     move_str;
-			 move_str = strtok_r(NULL, " ", &move_ctx))
+            move_str;
+            move_str = strtok_r(NULL, " ", &move_ctx))
         {
-            const uint64_t hash = game->position->hash;           
+            const uint64_t hash = game->position->hash;
             if (move_str[0] == '#')
             {
                 break; // comment - ignore rest of line
@@ -170,8 +170,8 @@ bool InitializeOpeningBookFromString(const char* book_string)
             {
                 continue; // move number only
             }
-			char* const c = strchr(move_str, '?');
-			const bool is_bad_move = !!c;
+            char* const c = strchr(move_str, '?');
+            const bool is_bad_move = !!c;
             if (c)
             {
                 *c = '\0';

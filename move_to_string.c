@@ -154,6 +154,7 @@ void MoveSequenceToSanString(const Position* position, const int moves[], char m
         is_first_move = false;
     }
 }
+
 static const char* const strings_to_remove[] = {
     "+",
     "#",

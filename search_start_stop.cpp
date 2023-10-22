@@ -35,4 +35,3 @@ extern "C" void StartThinking(Game* game)
     StopWorker();
     worker_thread = std::thread(SearchThreadEntry, game);
 }
-

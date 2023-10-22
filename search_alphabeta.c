@@ -131,7 +131,7 @@ Search(const Position*  src_position,
         INCREMENT("null move attempts");
         Position position;       
         MakeNullMove(&position, src_position);
-        int score = -Search(&position, depth - 2, ply + 1, -beta, -alpha, cancel, NULL);
+        int score = -Search(&position, depth - 3, ply + 1, -beta, -alpha, cancel, NULL);
         if (*cancel)
         {
             return SEARCH_CANCELLED_SCORE;

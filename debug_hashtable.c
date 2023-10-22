@@ -40,7 +40,14 @@ void DebugXIncrement(const char* key)
     the bottom 2 bits of the address before finding the index into the table
     */
     DebugEntry* const entry = &debug_dict[((uint64_t)key >> 2) % DEBUG_DICT_SIZE];
-    entry->key = key;
+    if (entry->key == NULL)
+    {
+        entry->key = key;
+    }
+    else if (entry->key != key)
+    {
+        printf("ERROR: debug hash collision '%s'\n", key);
+    }
     ++entry->count;
 }
 

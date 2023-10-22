@@ -97,7 +97,7 @@ Perft(const Position* src_position,
     int non_captures[MAX_MOVES_PER_POSITION];
     const int* move_phases[] = { captures, non_captures, NULL };
     GeneratePseudoLegalMoves(src_position, captures, non_captures);
-    if (!(++call_count & 0x3FFFF))
+    if (!(++call_count & 0x7FFFF))
     {
         printf("\rpositions processed %10u", counts->legal_moves);
     }
@@ -137,7 +137,7 @@ RunPerftTests(void)
     Position position;
     int start, first_start, stop = 0;
     bool is_good = true;
-    int total_nodes = 0;
+    uint64_t total_nodes = 0;
     const PerftTest* test;
     first_start = GetMilliseconds();
     for (test = perft_tests; test->position; ++test)
@@ -157,23 +157,23 @@ RunPerftTests(void)
         {
             stop = start + 1; // avoid divide by zero error in positions per second for short tests
         }
-        printf("\rdepth                                   %10u\n", test->depth);
-        printf(  "positions                               %10u\n", counts.legal_moves);
-        printf(  "captures                                %10u\n", counts.captures);
-        printf(  "ep captures                             %10u\n", counts.ep_captures);
-        printf(  "castles                                 %10u\n", counts.castles);
-        printf(  "promotions                              %10u\n", counts.promotions);
-        printf(  "checks                                  %10u\n", counts.checks);
-        printf(  "elapsed milliseconds                    %10u\n", stop - start);
-        printf(  "positions per second                    %10u\n", counts.legal_moves / (stop - start) * 1000);
+        printf("\rdepth                                   %10u\n",   test->depth);
+        printf(  "positions                               %10u\n",   counts.legal_moves);
+        printf(  "captures                                %10u\n",   counts.captures);
+        printf(  "ep captures                             %10u\n",   counts.ep_captures);
+        printf(  "castles                                 %10u\n",   counts.castles);
+        printf(  "promotions                              %10u\n",   counts.promotions);
+        printf(  "checks                                  %10u\n",   counts.checks);
+        printf(  "elapsed milliseconds                    %10u\n",   stop - start);
+        printf(  "positions per second                    %10llu\n", (uint64_t)counts.legal_moves * 1000 / (stop - start));
         if (!!memcmp(&counts, &test->counts, sizeof(PerftCounts)))
         {
             printf("************* ERROR on this position *************\n");
             is_good = false;
         }
     }
-    printf("total elapsed milliseconds              %10u\n", stop - first_start);
-    printf("mean positions per second               %10u\n", total_nodes / (stop - first_start) * 1000);
+    printf("total elapsed milliseconds              %10u\n",   stop - first_start);
+    printf("mean positions per second               %10llu\n", total_nodes * 1000 / (stop - first_start));
     if (is_good)
     {
         printf("******************* PERFT PASS *******************\n");

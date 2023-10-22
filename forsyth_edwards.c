@@ -83,7 +83,7 @@ PositionFromString(const char* fen_string,
     {
         goto Error;
     }
-    position->occupied_squares     = position->white_pieces | position->black_pieces;
+    position->occupied_squares = position->white_pieces | position->black_pieces;
     /* Side to move */
     const char* color_to_move = strtok_r(NULL, " ", &save_ptr);
     if (!color_to_move)

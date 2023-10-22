@@ -49,7 +49,8 @@ static const int KING_SQUARE_ENDGAME[64] =
 };
 
 /**
- * @brief Evaluate the current position, assuming neither king is in check and the position is quiet.
+ * @brief Evaluate the current position, assuming neither king is in check 
+   and the position is quiet.
  * @param position position to evaluate
  * @param alpha current alpha value
  * @param beta current beta value
@@ -78,11 +79,11 @@ EvaluatePosition(const Position* position,
         const int num_friendly_pawns    = PopCount(pawns);
 
         scores[color] = 
-            PopCount(pawns)   * 100 +
-            PopCount(knights) * 325 +
-            PopCount(bishops) * 325 +
-            PopCount(rooks)   * 500 +
-            PopCount(queens)  * 1000;
+            num_friendly_pawns * 100 +
+            PopCount(knights)  * 350 +
+            PopCount(bishops)  * 350 +
+            PopCount(rooks)    * 600 +
+            PopCount(queens)   * 1200;
         /* Penalty for no pawns. */
         if (pawns == NO_SQUARES)
         {
@@ -123,8 +124,7 @@ EvaluatePosition(const Position* position,
     }
     /* Phase 2: Evaluate positional features. */
     const int non_pawn_classical_material = /* Initial value 62 */
-        3 * PopCount(position->knights)
-        + 3 * PopCount(position->bishops)
+          3 * PopCount(position->knights | position->bishops)
         + 5 * PopCount(position->rooks)
         + 9 * PopCount(position->queens);
     for (int color = WHITE; color <= BLACK; ++color)
@@ -138,11 +138,11 @@ EvaluatePosition(const Position* position,
         {
             const int locn = FindAndClearLsb(&p);
             scores[color] += PAWN_SQUARE[locn ^ rank_flip];
-            const PawnSets* pawn_masks = &PAWN_SETS[color][locn];
+            const PawnSets* const pawn_masks = &PAWN_SETS[color][locn];
             if (!(pawn_masks->passed_pawn_mask & enemy_pawns))
             {
-                const int rank = color == WHITE ? RANK_OF(locn) : 7 - RANK_OF(locn);
-                scores[color] += 10 * rank;
+                //const int rank = color == WHITE ? RANK_OF(locn) : 7 - RANK_OF(locn);
+                scores[color] += 20;// 10 * rank;
             }
             if (!(pawn_masks->isolated_pawn_mask & friendly_pawns))
             {

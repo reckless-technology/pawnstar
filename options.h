@@ -9,13 +9,13 @@ Determine whether to enable the debugging counts dictionaries
 Whether to test the Zobrist hash value at every node of a perft move gen test
 */
 #ifndef DO_TEST_HASH_DURING_PERFT
-#define DO_TEST_HASH_DURING_PERFT 1
+#define DO_TEST_HASH_DURING_PERFT 0
 #endif
 /*
 Whether to enable null move pruning
 */
 #ifndef DO_NULL_MOVE_PRUNING
-#define DO_NULL_MOVE_PRUNING 0
+#define DO_NULL_MOVE_PRUNING 1
 #endif
 /*
 Whether to skip moves in quiescence search which have a negative static
