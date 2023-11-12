@@ -28,5 +28,4 @@ Release/
 obj/
 bin/
 x64/
-.vs/
-.vscode/
+build/

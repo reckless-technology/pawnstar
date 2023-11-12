@@ -1,0 +1,51 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch pawnstar debug",
+            "type": "cppdbg",
+            "miDebuggerPath": "gdb",
+            "request": "launch",
+            "cwd" : "${workspaceFolder}/debug",
+            "args": [],
+            "program": "${workspaceFolder}/debug/pawnstar",
+            "stopAtEntry": true,
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description":  "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "externalConsole": true,
+          },
+          {
+            "name": "Launch pawnstar release",
+            "type": "cppdbg",
+            "miDebuggerPath": "gdb",
+            "request": "launch",
+            "cwd" : "${workspaceFolder}/release",
+            "args": [],
+            "program": "${workspaceFolder}/release/pawnstar",
+            "stopAtEntry": true,
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description":  "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "externalConsole": true,
+          }
+    ]
+}
