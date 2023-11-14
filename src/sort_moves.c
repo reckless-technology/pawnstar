@@ -121,8 +121,6 @@ SortMoves(const Position* position,
     {
         moves[i] = scored_moves[i].move;
     }
-    (void)ply;
-    (void)counts;
 }
 
 /**

@@ -126,6 +126,7 @@ Search(const Position*  src_position,
         !(src_position->state_flags & IS_CHECK)         &&
         beta == alpha + 1                               &&
         PopCount(src_position->occupied_squares) > 7    &&
+        depth <= 3                                      &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
@@ -181,11 +182,11 @@ Search(const Position*  src_position,
 
         case PHASE_CAPTURES:
             GeneratePseudoLegalMoves(src_position, captures, non_captures); 
-            //SortMoves(src_position, captures, ply, false);
+            SortMoves(src_position, captures, ply, false);
             break;
 
         case PHASE_NON_CAPTURES:
-            //SortMoves(src_position, non_captures, ply, false);
+            SortMoves(src_position, non_captures, ply, false);
             break;
 
         default:
@@ -193,14 +194,18 @@ Search(const Position*  src_position,
             break;
         }
         int* moves_this_phase = move_phases[phase];
-        int num_moves_this_phase = 0;
         while (*moves_this_phase)
         {
-            if (num_moves_this_phase < 10) 
-            {
-                NextBestMove(src_position, moves_this_phase, ply, false);
-            }
             int move = *moves_this_phase++;
+            if (depth <= 2 && 
+                num_legal_moves > 0 && 
+                !(src_position->state_flags & IS_CHECK) &&
+                beta == alpha + 1 &&
+                EvaluateStaticExchange(src_position, move) < 0)
+            {
+                INCREMENT("frontier SEE skips");
+                continue;
+            }
             int score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
             if (*cancel)
             {
@@ -211,7 +216,6 @@ Search(const Position*  src_position,
                 continue;
             }
             ++num_legal_moves;
-            ++num_moves_this_phase;
             if (score >= beta)
             {
                 INCREMENT("beta cutoffs");

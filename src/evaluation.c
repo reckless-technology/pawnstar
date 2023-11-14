@@ -187,6 +187,7 @@ EvaluatePosition(const Position* position,
             bitboard b = SETS[KING_LOCATION(position, color)].king_attacks;
             scores[color] += PopCount(friendly_pawns  & b) * 20;
             scores[color] += PopCount(friendly_pieces & b) * 10;
+#if 1
             while (b)
             {
                 const int locn = FindAndClearLsb(&b);
@@ -195,6 +196,7 @@ EvaluatePosition(const Position* position,
                     scores[color] -= 20;
                 }
             }
+#endif
         }
 
     }
