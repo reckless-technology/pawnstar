@@ -193,9 +193,13 @@ Search(const Position*  src_position,
             break;
         }
         int* moves_this_phase = move_phases[phase];
+        int num_moves_this_phase = 0;
         while (*moves_this_phase)
         {
-            NextBestMove(src_position, moves_this_phase, ply, false);
+            if (num_moves_this_phase < 10) 
+            {
+                NextBestMove(src_position, moves_this_phase, ply, false);
+            }
             int move = *moves_this_phase++;
             int score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
             if (*cancel)
@@ -207,6 +211,7 @@ Search(const Position*  src_position,
                 continue;
             }
             ++num_legal_moves;
+            ++num_moves_this_phase;
             if (score >= beta)
             {
                 INCREMENT("beta cutoffs");

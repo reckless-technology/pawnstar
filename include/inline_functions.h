@@ -56,9 +56,10 @@ Find the index of and clear the least significant bit set in a bitboard
 */
 INLINE int FindAndClearLsb(bitboard* x)
 {
-    const int y = Lsb(*x);
-    *x &= (*x - 1);
-    return y;
+    const bitboard y = *x;
+    const int z = Lsb(y);
+    *x =  y ^ BITBOARD(z);
+    return z;
 }
 
 /*
