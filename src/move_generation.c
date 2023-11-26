@@ -217,7 +217,6 @@ This is relatively slow and is not used at each node of the search, since each
 move has to be tested to see if it leaves the king in check
 Returns the number of moves generated
 */
-#pragma warning(disable:4221)
 int GenerateLegalMoves(const Position* position, int moves[])
 {
     const int* const initial_ptr = moves;

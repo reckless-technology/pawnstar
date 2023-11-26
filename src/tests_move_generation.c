@@ -85,7 +85,6 @@ Refer to:
 http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
 */
-#pragma warning(disable:4221)
 static void 
 Perft(const Position* src_position, 
       int             depth, 

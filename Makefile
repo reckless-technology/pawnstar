@@ -1,9 +1,9 @@
-PROGRAM	 = pawnstar
-CC		 = gcc
-CXX		 = g++
-CFLAGS	 = -I. -Iinclude -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -Wno-unknown-pragmas -Wno-missing-field-initializers -std=gnu99
-CXXFLAGS = -I. -Iinclude -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -Wno-unknown-pragmas -Wno-missing-field-initializers -std=c++11
-LDFLAGS	 = -lpthread
+PROGRAM     = pawnstar
+CC          = gcc
+CXX         = g++
+COMMONFLAGS = -I include -Wall -Wextra
+CFLAGS      = $(COMMONFLAGS) -std=c99
+CXXFLAGS    = $(COMMONFLAGS) -std=c++11
 
 HDRS = \
 	bitboard_constants.h \
@@ -14,9 +14,9 @@ HDRS = \
 	pawnstar.h \
 	types.h
 	
-GEN_DATA = generated_data.c
-GEN_SRC	 = generate_constants/generate_constants.c
-GEN_EXE	 = generate_constants/gen_constants
+GENERATED_DATA      = generated_data.c
+GENERATED_DATA_SRC  = generate_constants/generate_constants.c
+GENERATED_DATA_EXE  = generate_constants/gen_constants
 
 CSRCS = \
 	attacks.c \
@@ -45,24 +45,23 @@ CSRCS = \
 	tests_static_exchange.c \
 	transposition_table.c \
 	zobrist.c \
-	$(GEN_DATA)
-	
+	$(GENERATED_DATA)
 
-CPPSRCS	 = \
+CPPSRCS = \
 	search_start_stop.cpp \
 	timer.cpp
-	
-OBJS = $(notdir $(CSRCS:.c=.o) $(CPPSRCS:.cpp=.o) )
 
-DBGDIR = debug
-DBGEXE = $(DBGDIR)/$(PROGRAM)
-DBGOBJS = $(addprefix $(DBGDIR)/,$(OBJS))
-DBGCFLAGS = -g -O0 -DDEBUG
+OBJS = $(CSRCS:.c=.o) $(CPPSRCS:.cpp=.o)
 
-RELDIR = release
-RELEXE = $(RELDIR)/$(PROGRAM)
-RELOBJS = $(addprefix $(RELDIR)/, $(OBJS))
-RELCFLAGS = -g -O3 -DNDEBUG
+DBGDIR    = debug
+DBGEXE    = $(DBGDIR)/$(PROGRAM)
+DBGOBJS   = $(addprefix $(DBGDIR)/,$(OBJS))
+DBGFLAGS  = -g -O0 -DDEBUG
+
+RELDIR    = release
+RELEXE    = $(RELDIR)/$(PROGRAM)
+RELOBJS   = $(addprefix $(RELDIR)/, $(OBJS))
+RELFLAGS  = -O3 -DNDEBUG
 
 .PHONY: all clean debug prep release remake
 
@@ -70,29 +69,29 @@ all: prep debug release
 
 debug: $(DBGEXE)
 
-$(DBGEXE): $(DBGOBJS) 
-	$(CXX) $(CFLAGS) $(DBGCFLAGS) $(LDFLAGS) -o $(DBGEXE) $^
+$(DBGEXE): $(DBGOBJS)
+	$(CXX) $(CXXFLAGS) $(DBGFLAGS) -o $(DBGEXE) $^
 
 $(DBGDIR)/%.o: src/%.c $(addprefix include/, $(HDRS))
-	$(CC) -c $(CFLAGS) $(DBGCFLAGS) -o $@ $<
+	$(CC) -c $(CFLAGS) $(DBGFLAGS) -o $@ $<
 	
 $(DBGDIR)/%.o: src/%.cpp $(addprefix include/, $(HDRS))
-	$(CXX) -c $(CXXFLAGS) $(DBGCFLAGS) -o $@ $<
+	$(CXX) -c $(CXXFLAGS) $(DBGFLAGS) -o $@ $<
 
 release: $(RELEXE)
 
 $(RELEXE): $(RELOBJS)
-	$(CXX) $(CFLAGS) $(RELCFLAGS) $(LDFLAGS) -o $(RELEXE) $^
+	$(CXX) $(CXXFLAGS) $(RELFLAGS) -o $(RELEXE) $^
 
 $(RELDIR)/%.o: src/%.c $(addprefix include/, $(HDRS))
-	$(CC) -c $(CFLAGS) $(RELCFLAGS) -o $@ $<
+	$(CC) -c $(CFLAGS) $(RELFLAGS) -o $@ $<
 	
 $(RELDIR)/%.o: src/%.cpp $(addprefix include/, $(HDRS))
-	$(CXX) -c $(CXXFLAGS) $(RELCFLAGS) -o $@ $<
+	$(CXX) -c $(CXXFLAGS) $(RELFLAGS) -o $@ $<
 
-src/$(GEN_DATA) : $(GEN_SRC)
-	$(CC) $< -o $(GEN_EXE) $(CFLAGS)
-	$(GEN_EXE) > $@
+src/$(GENERATED_DATA) : $(GENERATED_DATA_SRC)
+	$(CC) $< -o $(GENERATED_DATA_EXE) $(CFLAGS)
+	$(GENERATED_DATA_EXE) > $@
 	
 prep:
 	mkdir -p $(DBGDIR) $(RELDIR)
@@ -100,5 +99,5 @@ prep:
 remake: clean all
 
 clean:
-	rm -f $(RELEXE) $(RELOBJS) $(DBGEXE) $(DBGOBJS) src/$(GEN_DATA) $(GEN_EXE)
+	rm -f $(RELEXE) $(RELOBJS) $(DBGEXE) $(DBGOBJS) src/$(GENERATED_DATA) $(GENERATED_DATA_EXE)
 	rm -r $(DBGDIR) $(RELDIR)

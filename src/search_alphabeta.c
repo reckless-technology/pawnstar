@@ -1,6 +1,4 @@
 #include "pawnstar.h"
-#pragma warning(disable:4221)
-
 /**
  * @brief Fail hard alpha beta main search algorithm.
  * @param src_position position to search

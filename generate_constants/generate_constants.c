@@ -91,26 +91,6 @@ PopCount(uint64 x)
     return count;
 }
 
-static int
-Lsb(uint64 x)
-{
-    int result = 0;
-    while (!(x & 1))
-    {
-        ++result;
-        x >>= 1;
-    }
-    return result;
-}
-
-static int
-FindAndClearLsb(uint64* x)
-{
-    const uint64 y = *x;
-    *x = y & (y - 1);
-    return Lsb(y);
-}
-
 static uint64 VectorFrom(int location, int direction)
 {
     uint64 result = NO_SQUARES;
