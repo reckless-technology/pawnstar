@@ -117,14 +117,6 @@ typedef struct
 */
 typedef struct
 {
-    bitboard north;     /**< all squares due north of this square */
-    bitboard northeast;
-    bitboard east;
-    bitboard southeast;
-    bitboard south;
-    bitboard southwest;
-    bitboard west;
-    bitboard northwest;
     union
     {
         bitboard pawn_attacks[2];   /**< indexed by color */

@@ -346,14 +346,6 @@ static uint64 PseudoRandom64(void)
 
 static const BitboardGen ray_generators[] = 
 {
-    { "north",                      NorthOf                 },
-    { "northeast",                  NortheastOf             },
-    { "east",                       EastOf                  },
-    { "southeast",                  SoutheastOf             },
-    { "south",                      SouthOf                 },
-    { "southwest",                  SouthwestOf             },
-    { "west",                       WestOf                  },
-    { "northwest",                  NorthwestOf             },
     { "pawn_attacks_white",         PawnAttacksWhite        },
     { "pawn_attacks_black",         PawnAttacksBlack        },
     { "knight_attacks",             KnightAttacks           },

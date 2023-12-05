@@ -8,16 +8,39 @@
 */
 bitboard BishopAttacks(uint64_t occupied_squares, int location)
 {
-    const Sets* const sets = &SETS[location];
-    bitboard result = sets->bishop_attacks;
-    bitboard ray = sets->northeast & occupied_squares;
-    result ^= SETS[Lsb(ray | H8BB)].northeast;
-    ray = sets->northwest & occupied_squares;
-    result ^= SETS[Lsb(ray | H8BB)].northwest;
-    ray = sets->southwest & occupied_squares;
-    result ^= SETS[Msb(ray | A1BB)].southwest;
-    ray = sets->southeast & occupied_squares;
-    result ^= SETS[Msb(ray | A1BB)].southeast;
+    bitboard result = NO_SQUARES;
+    for (bitboard b = SHIFT_NORTHEAST(BITBOARD(location)) ; b; b = SHIFT_NORTHEAST(b))
+    {
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (bitboard b = SHIFT_NORTHWEST(BITBOARD(location)) ; b; b = SHIFT_NORTHWEST(b))
+    {
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (bitboard b = SHIFT_SOUTHEAST(BITBOARD(location)) ; b; b = SHIFT_SOUTHEAST(b))
+    {
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (bitboard b = SHIFT_SOUTHWEST(BITBOARD(location)) ; b; b = SHIFT_SOUTHWEST(b))
+    {
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
     return result;
 }
 
@@ -29,16 +52,39 @@ bitboard BishopAttacks(uint64_t occupied_squares, int location)
 */
 bitboard RookAttacks(uint64_t occupied_squares, int location)
 {
-    const Sets* const sets = &SETS[location];
-    bitboard result = sets->rook_attacks;
-    bitboard ray = sets->north & occupied_squares;
-    result ^= SETS[Lsb(ray | H8BB)].north;
-    ray = sets->east & occupied_squares;
-    result ^= SETS[Lsb(ray | H8BB)].east;
-    ray = sets->south & occupied_squares;
-    result ^= SETS[Msb(ray | A1BB)].south;
-    ray = sets->west & occupied_squares;
-    result ^= SETS[Msb(ray | A1BB)].west;
+    bitboard result = NO_SQUARES;
+    for (bitboard b = SHIFT_NORTH(BITBOARD(location)) ; b; b = SHIFT_NORTH(b))
+    {
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (bitboard b = SHIFT_WEST(BITBOARD(location)) ; b; b = SHIFT_WEST(b))
+    {
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (bitboard b = SHIFT_SOUTH(BITBOARD(location)) ; b; b = SHIFT_SOUTH(b))
+    {
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
+    for (bitboard b = SHIFT_EAST(BITBOARD(location)) ; b; b = SHIFT_EAST(b))
+    {
+        result |= b;
+        if (b & occupied_squares)
+        {
+            break;
+        }
+    }
     return result;
 }
 
