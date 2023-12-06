@@ -3,13 +3,13 @@
 static const int PAWN_SQUARE[64] =
 {
      0,  0,  0,  0,  0,  0,  0,  0,
-    60, 50, 50, 50, 50, 50, 50, 60,
-    30, 30, 30, 30, 30, 30, 30, 30,
-    20, 20, 20, 25, 25, 20, 20, 20,
+    70, 70, 70, 70, 70, 70, 70, 70, 
+    40, 40, 40, 40, 40, 40, 40, 40, 
+    20, 20, 20, 30, 30, 20, 20, 20,
      0,  0,  0, 20, 20,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0,
-     0,  0,  0,-20,-20,  0,  0,  0,
-     0,  0,  0,  0,  0,  0,  0,  0
+     0,  0,  0,  0,  0,  0,  0,  0,
+     0,  0,  0,-20,-20,  0,  0,  0
 };
 
 static const int KNIGHT_SQUARE[64] =
@@ -21,7 +21,43 @@ static const int KNIGHT_SQUARE[64] =
     -30,  0, 15, 20, 20, 15,  0,-30,
     -30,  5, 10, 15, 15, 10,  5,-30,
     -40,-20,  0,  5,  5,  0,-20,-40,
-    -50,-40,-30,-30,-30,-30,-40,-50
+    -50,-40,-30,-30,-30,-30,-40,-50,
+};
+
+static const int BISHOP_SQUARE[64] = 
+{
+    -20,-10,-10,-10,-10,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5, 10, 10,  5,  0,-10,
+    -10,  5,  5, 10, 10,  5,  5,-10,
+    -10,  0, 10, 10, 10, 10,  0,-10,
+    -10, 10, 10, 10, 10, 10, 10,-10,
+    -10,  5,  0,  0,  0,  0,  5,-10,
+    -20,-10,-10,-10,-10,-10,-10,-20,
+};
+
+static const int ROOK_SQUARE[64] = 
+{
+     0,  0,  0,  0,  0,  0,  0,  0,
+     5, 10, 10, 10, 10, 10, 10,  5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+    -5,  0,  0,  0,  0,  0,  0, -5,
+     0,  0,  0,  5,  5,  0,  0,  0
+};
+
+static const int QUEEN_SQUARE[64] = 
+{
+    -20,-10,-10, -5, -5,-10,-10,-20,
+    -10,  0,  0,  0,  0,  0,  0,-10,
+    -10,  0,  5,  5,  5,  5,  0,-10,
+     -5,  0,  5,  5,  5,  5,  0, -5,
+      0,  0,  5,  5,  5,  5,  0, -5,
+    -10,  5,  5,  5,  5,  5,  0,-10,
+    -10,  0,  5,  0,  0,  0,  0,-10,
+    -20,-10,-10, -5, -5,-10,-10,-20
 };
 
 static const int KING_SQUARE_MIDGAME[64] =
@@ -33,7 +69,7 @@ static const int KING_SQUARE_MIDGAME[64] =
     -20,-30,-30,-40,-40,-30,-30,-20,
     -10,-20,-20,-20,-20,-20,-20,-10,
      20, 20,  0,  0,  0,  0, 20, 20,
-     20, 30, 10,  0,  0, 10, 30, 20,
+     20, 40, 10,  0,  0, 10, 40, 20
 };
 
 static const int KING_SQUARE_ENDGAME[64] =
@@ -47,6 +83,18 @@ static const int KING_SQUARE_ENDGAME[64] =
      10, 20, 30, 40, 40, 30, 20, 10,
       0, 10, 20, 30, 30, 20, 10,  0,
 };
+
+static const int* const PIECE_SQUARE_SCORES[] = 
+{
+    [PAWN]      = PAWN_SQUARE,
+    [KNIGHT]    = KNIGHT_SQUARE,
+    [BISHOP]    = BISHOP_SQUARE,
+    [ROOK]      = ROOK_SQUARE,
+    [QUEEN]     = QUEEN_SQUARE,
+    [KING]      = KING_SQUARE_MIDGAME
+};
+
+static const int KING_HOME_SQUARE[2] = { E1, E8 };
 
 /**
  * @brief Evaluate the current position, assuming neither king is in check 
@@ -76,34 +124,12 @@ EvaluatePosition(const Position* position,
         const bitboard bishops          = position->bishops & friendly_pieces;
         const bitboard rooks            = position->rooks   & friendly_pieces;
         const bitboard queens           = position->queens  & friendly_pieces;
-        const int num_friendly_pawns    = PopCount(pawns);
-
         scores[color] = 
-            num_friendly_pawns * 100 +
-            PopCount(knights)  * 350 +
+            PopCount(pawns)    * 100 +
+            PopCount(knights)  * 325 +
             PopCount(bishops)  * 350 +
-            PopCount(rooks)    * 600 +
-            PopCount(queens)   * 1200;
-        /* Penalty for no pawns. */
-        if (pawns == NO_SQUARES)
-        {
-            scores[color] -= 100;
-        }
-        /* Bonus for the bishop pair. */
-        if ((bishops & WHITE_SQUARES) && (bishops & BLACK_SQUARES))
-        {
-            scores[color] += 50;
-        }
-        /* 
-        Adjust bishop values according to number of friendly pawns. 
-        Bishops are more valuable with fewer pawns. 
-        */
-        scores[color] += PopCount(bishops) * 5 * (4 - num_friendly_pawns);
-        /* 
-        Adjust knight values according to number of friendly pawns. 
-        Knights are more valuable with more pawns. 
-        */
-        scores[color] += PopCount(knights) * 5 * (num_friendly_pawns - 4);
+            PopCount(rooks)    * 500 +
+            PopCount(queens)   * 1000;
     }
     /* 
     See if material score alone causes alpha or beta cutoff. 
@@ -122,81 +148,33 @@ EvaluatePosition(const Position* position,
         INCREMENT("eval alpha cutoff material");
         return alpha;
     }
-    /* Phase 2: Evaluate positional features. */
-    const int non_pawn_classical_material = /* Initial value 62 */
-          3 * PopCount(position->knights | position->bishops)
-        + 5 * PopCount(position->rooks)
-        + 9 * PopCount(position->queens);
     for (int color = WHITE; color <= BLACK; ++color)
     {
         const int rank_flip            = color == WHITE ? RANK_FLIP : 0;
         const bitboard friendly_pieces = position->pieces_of_color[color];
-        const bitboard friendly_pawns  = position->pawns & friendly_pieces;
-        const bitboard enemy_pawns     = position->pawns & ~friendly_pieces;
-        bitboard p = friendly_pawns;
-        while (p)
+        /* Piece square scores */
+        for (int piece = PAWN; piece <= QUEEN; ++piece)
         {
-            const int locn = FindAndClearLsb(&p);
-            scores[color] += PAWN_SQUARE[locn ^ rank_flip];
-            const PawnSets* const pawn_masks = &PAWN_SETS[color][locn];
-            if (!(pawn_masks->passed_pawn_mask & enemy_pawns))
+            const int* pst = PIECE_SQUARE_SCORES[piece];
+            bitboard p = position->piece[piece - 1] & friendly_pieces;
+            while (p)
             {
-                //const int rank = color == WHITE ? RANK_OF(locn) : 7 - RANK_OF(locn);
-                scores[color] += 20;// 10 * rank;
-            }
-            if (!(pawn_masks->isolated_pawn_mask & friendly_pawns))
-            {
-                scores[color] -= 10;
-            }
-            if (pawn_masks->supported_pawn_mask & friendly_pawns)
-            {
-                scores[color] += 5;
-            }
-            if (pawn_masks->doubled_pawn_mask & friendly_pawns)
-            {
-                scores[color] -= 10;
-            }
-            if (SETS[locn].pawn_attacks[ENEMY(color)] & friendly_pawns)
-            {
-                scores[color] += 5;
+                const int locn = FindAndClearLsb(&p);
+                scores[color] += pst[locn ^ rank_flip];
             }
         }
-        /* Mobility scores for knights, bishops, rooks. */
-        bitboard knights = position->knights & friendly_pieces;
-        while (knights)
-        {
-            scores[color] += KNIGHT_SQUARE[FindAndClearLsb(&knights) ^ rank_flip];
-        }
-        bitboard bishops = position->bishops & friendly_pieces;
-        while (bishops)
-        {
-            scores[color] += (PopCount(BishopAttacks(position->occupied_squares, FindAndClearLsb(&bishops))) - 6) * 5;
-        }
-        bitboard rooks = position->rooks & friendly_pieces;
-        while (rooks)
-        {
-            scores[color] += (PopCount(RookAttacks(position->occupied_squares, FindAndClearLsb(&rooks))) - 7) * 5;
-        }
-        if (non_pawn_classical_material <= 20)
+        if (position->queens == NO_SQUARES)
         {
             scores[color] += KING_SQUARE_ENDGAME[KING_LOCATION(position, color) ^ rank_flip];
         }
         else
         {
-            scores[color] += KING_SQUARE_MIDGAME[KING_LOCATION(position, color) ^ rank_flip];
-            bitboard b = SETS[KING_LOCATION(position, color)].king_attacks;
-            scores[color] += PopCount(friendly_pawns  & b) * 20;
-            scores[color] += PopCount(friendly_pieces & b) * 10;
-#if 1
-            while (b)
+            const int king_location = KING_LOCATION(position, color);
+            scores[color] += KING_SQUARE_MIDGAME[king_location ^ rank_flip];
+            if (king_location != KING_HOME_SQUARE[color])
             {
-                const int locn = FindAndClearLsb(&b);
-                if (IsAttacked(position, locn, ENEMY(color)))
-                {
-                    scores[color] -= 20;
-                }
+                scores[color] += 20 * PopCount(SETS[king_location].king_attacks & position->pawns & friendly_pieces);
             }
-#endif
         }
 
     }
@@ -204,6 +182,4 @@ EvaluatePosition(const Position* position,
         scores[BLACK] - scores[WHITE] :
         scores[WHITE] - scores[BLACK];
     return score;
-    (void)alpha;
-    (void)beta;
 }

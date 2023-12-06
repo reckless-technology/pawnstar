@@ -159,10 +159,9 @@ struct Position
 {    
     union
     {
-        bitboard pieces[7];             /**< used to index pieces by piece type */
+        bitboard piece[6];             /**< used to index pieces by [piece - 1] */
         struct
         {
-            bitboard occupied_squares;  /**< all squares with a piece on them   */
             bitboard pawns;             /**< squares with a pawn on them        */
             bitboard knights;           /**< squares with a knight on them      */  
             bitboard bishops;           /**< squares with a bishop on them      */

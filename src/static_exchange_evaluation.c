@@ -30,9 +30,10 @@ be super fast.
 */
 static int EvaluateSwapOff(Position* position, int location, int color, int piece_on_square)
 {
-    const Sets* const sets = &SETS[location];
-    const bitboard square = BITBOARD(location);
+    const Sets* const sets                    = &SETS[location];
+    const bitboard square                     = BITBOARD(location);
     const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
+    bitboard occupied_squares                 = position->white_pieces | position->black_pieces;
     int scores[32];
     int ply;
     /* First pass: perform all the captures onto the square least valuable piece first */
@@ -59,7 +60,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(&sliders);
-            if (!(intervening_squares[slider_locn] & position->occupied_squares))
+            if (!(intervening_squares[slider_locn] & occupied_squares))
             {
                 capturing_piece = BISHOP;
                 attacker = BITBOARD(slider_locn);
@@ -70,7 +71,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(&sliders);
-            if (!(intervening_squares[slider_locn] & position->occupied_squares))
+            if (!(intervening_squares[slider_locn] & occupied_squares))
             {
                 capturing_piece = ROOK;
                 attacker = BITBOARD(slider_locn);
@@ -81,7 +82,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(&sliders);
-            if (!(intervening_squares[slider_locn] & position->occupied_squares))
+            if (!(intervening_squares[slider_locn] & occupied_squares))
             {
                 capturing_piece = QUEEN;
                 attacker = BITBOARD(slider_locn);
@@ -100,11 +101,11 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         break;
 
 FoundAttacker:
-        position->pieces[piece_on_square]       ^= square;
+        position->piece[piece_on_square - 1]    ^= square;
         position->pieces_of_color[ENEMY(color)] ^= square;
-        position->pieces[capturing_piece]       ^= attacker | square;
+        position->piece[capturing_piece - 1]    ^= attacker | square;
         position->pieces_of_color[color]        ^= attacker | square;
-        position->occupied_squares              ^= attacker;        
+        occupied_squares                        ^= attacker;        
         scores[ply]                             = piece_values[piece_on_square];
         piece_on_square                         = capturing_piece;
         color                                   = ENEMY(color);

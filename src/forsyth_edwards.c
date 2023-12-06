@@ -83,7 +83,6 @@ PositionFromString(const char* fen_string,
     {
         goto Error;
     }
-    position->occupied_squares = position->white_pieces | position->black_pieces;
     /* Side to move */
     const char* color_to_move = strtok_r(NULL, " ", &save_ptr);
     if (!color_to_move)
@@ -217,12 +216,13 @@ Error:
 void PositionToString(const Position* position, char* fen_string)
 {
     /* Pieces on the board */
+    const bitboard occupied_squares = position->white_pieces | position->black_pieces;
     for (int y = 7; y >= 0; --y)
     {
         int num_empty_squares = 0;
         for (int x = 0; x < 8; ++x)
         {
-            if (!(position->occupied_squares & BITBOARD_XY(x, y)))
+            if (!(occupied_squares & BITBOARD_XY(x, y)))
             {
                 ++num_empty_squares;
             }

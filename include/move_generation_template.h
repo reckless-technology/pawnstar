@@ -2,10 +2,11 @@
  * @file Used by move_generation.c to generate moves, both captures only and all moves.
 */
 {
-    const int color                = COLOR_TO_MOVE(position);
-    const bitboard vacant_squares  = ~position->occupied_squares;
-    const bitboard friendly_pieces = position->pieces_of_color[color];
-    const bitboard enemy_pieces    = position->occupied_squares ^ friendly_pieces;
+    const int color                 = COLOR_TO_MOVE(position);
+    const bitboard occupied_squares = position->white_pieces | position->black_pieces;
+    const bitboard vacant_squares   = ~occupied_squares;
+    const bitboard friendly_pieces  = position->pieces_of_color[color];
+    const bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
     /*
     Pawn move variables
     */
@@ -140,7 +141,7 @@
     while (bishops)
     {
         const int from = FindAndClearLsb(&bishops);
-        const bitboard attacks = BishopAttacks(position->occupied_squares, from);
+        const bitboard attacks = BishopAttacks(occupied_squares, from);
         bitboard capture_targets = attacks & enemy_pieces;
         while (capture_targets)
         {
@@ -162,7 +163,7 @@
     while (rooks)
     {
         const int from = FindAndClearLsb(&rooks);
-        const bitboard attacks = RookAttacks(position->occupied_squares, from);
+        const bitboard attacks = RookAttacks(occupied_squares, from);
         bitboard capture_targets = attacks & enemy_pieces;
         while (capture_targets)
         {
@@ -184,7 +185,7 @@
     while (queens)
     {
         const int from = FindAndClearLsb(&queens);
-        const bitboard attacks = QueenAttacks(position->occupied_squares, from);
+        const bitboard attacks = QueenAttacks(occupied_squares, from);
         bitboard capture_targets = attacks & enemy_pieces;
         while (capture_targets)
         {
@@ -225,14 +226,14 @@
         if (color == WHITE)
         {
             if ((position->state_flags & MAY_WHITE_CASTLE_KINGSIDE) && /* if white retains the right to castle kingside and */
-                !(position->occupied_squares & (F1BB | G1BB)) &&        /* f1 and g1 are both vacant and                     */
+                !(occupied_squares & (F1BB | G1BB)) &&        /* f1 and g1 are both vacant and                     */
                 !IsAttacked(position, F1, BLACK) &&                     /* f1 is not attacked by black and                   */
                 !IsAttacked(position, G1, BLACK))                       /* the king's destination is not attacked by black   */
             {
                 *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
             }
             if ((position->state_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
-                !(position->occupied_squares & (B1BB | C1BB | D1BB)) &&
+                !(occupied_squares & (B1BB | C1BB | D1BB)) &&
                 !IsAttacked(position, D1, BLACK) &&
                 !IsAttacked(position, C1, BLACK))
             {
@@ -242,14 +243,14 @@
         else
         {
             if ((position->state_flags & MAY_BLACK_CASTLE_KINGSIDE) &&
-                !(position->occupied_squares & (F8BB | G8BB)) &&
+                !(occupied_squares & (F8BB | G8BB)) &&
                 !IsAttacked(position, F8, WHITE) &&
                 !IsAttacked(position, G8, WHITE))
             {
                 *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
             }
             if ((position->state_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
-                !(position->occupied_squares & (B8BB | C8BB | D8BB)) &&
+                !(occupied_squares & (B8BB | C8BB | D8BB)) &&
                 !IsAttacked(position, D8, WHITE) &&
                 !IsAttacked(position, C8, WHITE))
             {

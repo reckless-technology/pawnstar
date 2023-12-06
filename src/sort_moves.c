@@ -27,8 +27,8 @@ empirically confirmed that it does indeed measurably speed up the search on a
 wide variety of positions.
 */
 
-#define MOVE_MASK   0x7FFF                  // piece, from, to fields only
-#define MERIT(move) ((move) & 0x1F8000)     // promoted and captured material only
+#define MOVE_MASK   0x7FFF
+#define MERIT(move) ((MOVE_CAPTURED(move) - MOVE_PIECE(move) + MOVE_PROMOTED(move) * 3) * 100)
 
 static int good_move_counts[MAX_PLY][8 * 64 * 64];
 /*

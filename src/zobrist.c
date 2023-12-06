@@ -16,12 +16,12 @@ ComputeHash(const Position* position)
     }
     for (int piece = PAWN; piece <= KING; ++piece)
     {
-        bitboard b = position->pieces[piece] & position->white_pieces;
+        bitboard b = position->piece[piece - 1] & position->white_pieces;
         while (b)
         {
             hash += PIECE_SQUARE_HASHES[WHITE][piece - 1][FindAndClearLsb(&b)];
         }
-        b = position->pieces[piece] & position->black_pieces;
+        b = position->piece[piece - 1] & position->black_pieces;
         while (b)
         {
             hash += PIECE_SQUARE_HASHES[BLACK][piece - 1][FindAndClearLsb(&b)];

@@ -3,12 +3,10 @@
 * function, which might be called tens of millions of times per move, does not 
 * slow down the program too much). This is useful for counting nodes, cutoffs, 
 * table hits etc when debugging. The hash function is null, i.e. just use the 
-* address of the string literal. There is no thread locking per se, and no 
-* checking of hash collisions; this is intentional and for fastest speed, which 
-* is the main goal. It seems to work OK in practice, provided you have a 
-* hashtable array which is prime sized and has lots of free space.
+* address of the string literal. It seems to work OK in practice, provided you 
+* have a hashtable array which is prime sized and has lots of free space.
 *
-* Only included in Debug and ReleaseX configurations.
+* Only included when CPP flag DEBUGX is nonzero.
 */
 
 #include "pawnstar.h"
@@ -23,15 +21,17 @@ typedef struct
 } DebugEntry;
 
 static DebugEntry debug_dict[DEBUG_DICT_SIZE];
-/*
-Initialize or reset the dictionary
+
+/**
+* @brief Initialize or reset the dictionary
 */
 void DebugXClear()
 {
     memset(debug_dict, 0, sizeof(debug_dict));
 }
-/*
-Increment the count associated with the string literal in key
+
+/**
+* @brief Increment the count associated with the string literal in key
 */
 void DebugXIncrement(const char* key)
 {
@@ -51,6 +51,9 @@ void DebugXIncrement(const char* key)
     ++entry->count;
 }
 
+/**
+* @brief Conditionally increment the count associated with the string literal in key
+*/
 void DebugXIncrementIf(bool condition, const char* key)
 {
     if (condition)
@@ -58,31 +61,33 @@ void DebugXIncrementIf(bool condition, const char* key)
         DebugXIncrement(key);
     }
 }
-/*
-Write out the various debugging counts to file in alphabetical order
+
+/**
+ * @brief Write the debug dictionary out in alphabetic order.
+ * @param file File to write to (typically stdout)
 */
 void DebugXWrite(FILE* file)
 {
-    char* const strings = (char*)calloc(DEBUG_DICT_SIZE, STRING_LEN);
-    char* s = strings;
-    const DebugEntry* entry;
-    for (entry = debug_dict; entry != debug_dict + DEBUG_DICT_SIZE; ++entry)
+    DebugEntry* entries[DEBUG_DICT_SIZE];
+    int num_entries = 0;
+    for (int i = 0; i != DEBUG_DICT_SIZE; ++i)
     {
-        if (entry->key)
+        if (debug_dict[i].key != NULL)
         {
-            sprintf(s, "%-50s%10u\n", entry->key, entry->count);
-            s += STRING_LEN;
+            entries[num_entries++] = &debug_dict[i];
         }
-    }
-    typedef int (*CompareFn)(const void*, const void*);
-    qsort(strings, (s - strings) / STRING_LEN, STRING_LEN, (CompareFn)strcmp);
-    s = strings;
-    fputs("************************** DEBUGX **************************\n", file);
-    while (*s)
+    }    
+    int CompareEntries(const DebugEntry** left, const DebugEntry** right)
     {
-        fputs(s, file);
-        s += STRING_LEN;
+        return strcmp((*left)->key, (*right)->key);
     }
-    free(strings);
+    qsort(entries, num_entries, sizeof(DebugEntry*), (int(*)(const void*, const void*))CompareEntries);
+    fputs("************************** DEBUGX **************************\n", file);
+    for (int i = 0; i != num_entries; ++i)
+    {
+        fprintf(file, "%-50s%10u\n", entries[i]->key, entries[i]->count);
+    }
+    fputs("************************************************************\n", file);
 }
+
 #endif

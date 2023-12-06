@@ -3,33 +3,33 @@
 */
 #include <stdio.h>
 #include <stdbool.h>
-#include <memory.h>
+#include <stdint.h>
 #include <string.h>
-#include <math.h>
 
+#ifndef DO_EXTRA_PAWN_EVAL
 #define DO_EXTRA_PAWN_EVAL  1
+#endif
 
-typedef unsigned long long  uint64_t;
-typedef unsigned char       uint8_t;
-
-#define MASK_EAST_1         0x7F7F7F7F7F7F7F7Full
-#define MASK_WEST_1         0xFEFEFEFEFEFEFEFEull
+/* Fixed square definitions */
+#define MASK_EAST_1         0x7F7F7F7F7F7F7F7Full       /**< Mask off the H file to prevent wraparound when shifting east. */
+#define MASK_WEST_1         0xFEFEFEFEFEFEFEFEull       /**< Mask off the A file to prevent wraparound when shifting west. */ 
 #define NO_SQUARES          0x0000000000000000ull
-#define OUTSIDE_SQUARES     0xFF818181818181FFull
-#define FILE_OF(locn)       ((locn) & 7)
-#define RANK_OF(locn)       ((locn) >> 3)
-#define FILE_CHAR(locn)     ('a' + FILE_OF(locn))
-#define RANK_CHAR(locn)     ('1' + RANK_OF(locn))
-#define BITBOARD(locn)      (1ull << (locn))
-#define BITBOARD_XY(x,y)    (1ull << ((x) + 8 * (y)))
-#define SHIFT_NORTH(b)      ((b) << 8)
-#define SHIFT_NORTHEAST(b)  (((b) & MASK_EAST_1) << 9)
-#define SHIFT_EAST(b)       (((b) & MASK_EAST_1) << 1)
-#define SHIFT_SOUTHEAST(b)  (((b) & MASK_EAST_1) >> 7)
-#define SHIFT_SOUTH(b)      ((b) >> 8)
-#define SHIFT_SOUTHWEST(b)  (((b) & MASK_WEST_1) >> 9)
-#define SHIFT_WEST(b)       (((b) & MASK_WEST_1) >> 1)
-#define SHIFT_NORTHWEST(b)  (((b) & MASK_WEST_1) << 7)
+
+/* Function like macros */
+#define FILE_OF(locn)       ((locn) & 7)                /**< Convert square index to file. */
+#define RANK_OF(locn)       ((locn) >> 3)               /**< Convert square index to rank. */
+#define FILE_CHAR(locn)     ('a' + FILE_OF(locn))       /**< Convert square index to file character. */
+#define RANK_CHAR(locn)     ('1' + RANK_OF(locn))       /**< Convert square index to rank character. */
+#define BITBOARD(locn)      (1ull << (locn))            /**< Convert square index to bitboard. */
+#define BITBOARD_XY(x,y)    (1ull << ((x) + 8 * (y)))   /**< Convert square (file,rank) co-ords to bitboard. */
+#define SHIFT_NORTH(b)      ((b) << 8)                  /**< Shift a bitboard one square to the north. */
+#define SHIFT_NORTHEAST(b)  (((b) & MASK_EAST_1) << 9)  /**< Shift a bitboard one square to the northeast. */
+#define SHIFT_EAST(b)       (((b) & MASK_EAST_1) << 1)  /**< Shift a bitboard one square to the east. */
+#define SHIFT_SOUTHEAST(b)  (((b) & MASK_EAST_1) >> 7)  /**< Shift a bitboard one square to the southeast. */
+#define SHIFT_SOUTH(b)      ((b) >> 8)                  /**< Shift a bitboard one square to the south. */
+#define SHIFT_SOUTHWEST(b)  (((b) & MASK_WEST_1) >> 9)  /**< Shift a bitboard one square to the southwest. */
+#define SHIFT_WEST(b)       (((b) & MASK_WEST_1) >> 1)  /**< Shift a bitboard one square to the west. */
+#define SHIFT_NORTHWEST(b)  (((b) & MASK_WEST_1) << 7)  /**< Shift a bitboard one square to the northwest. */
 
 /**
  * @brief Chess piece types.
@@ -46,7 +46,7 @@ enum Piece
 };
 
 /**
- * @brief Compass rose directions from White's perspective.
+ * @brief Compass rose directions from white's perspective.
  */
 enum Direction
 {
@@ -70,21 +70,6 @@ typedef struct DirectionVector
 } DirectionVector;
 
 /**
- * @brief Function pointer for a bitboard generator function, i.e. a function
- * which converts a square location into a bitboard.
-*/
-typedef uint64_t(*BitboardFn)(int location);
-
-/**
- * @brief Bitboard generator.
- */
-typedef struct BitboardGen
-{
-    const char* name;       /**< Name of generated output.      */
-    BitboardFn  function;   /**< Function to generate output.   */
-} BitboardGen;
-
-/**
  * @brief Each of the directions on the compass.
  */
 static const DirectionVector direction_vectors[] =
@@ -101,7 +86,7 @@ static const DirectionVector direction_vectors[] =
 
 /**
  * @brief Population count (number of bits set).
- * @param x Value to count bits of.
+ * @param x Input value.
  * @return Number of 1 bits in x.
  */
 static int
@@ -118,7 +103,7 @@ PopCount(uint64_t x)
 
 /**
  * @brief Find the index of the least significant bit.
- * @param x Value scan.
+ * @param x Input value.
  * @return Index of least significant 1 bit in x.
  */
 static int
@@ -135,7 +120,7 @@ Lsb(uint64_t x)
 
 /**
  * @brief Find and clear the LSB.
- * @param x On return has its LSB cleared.
+ * @param x Pointer to input value. On return has its LSB cleared.
  * @return Index of bit which was cleared in x.
  */
 static int
@@ -148,7 +133,7 @@ FindAndClearLsb(uint64_t* x)
 }
 
 /**
- * @brief Generate a pseudo random 64 bit int. Uses XORSHIFT twice.
+ * @brief Generate a pseudo random number. Uses XORSHIFT twice.
  * @return Next value in sequence.
  */
 static uint64_t PseudoRandom64(void)
@@ -174,9 +159,8 @@ static uint64_t PseudoRandom64(void)
 static uint64_t VectorFrom(int location, int direction)
 {
     uint64_t result = NO_SQUARES;
-    int x, y;
     const DirectionVector* dv = &direction_vectors[direction];
-    for (x = FILE_OF(location) + dv->dx, y = RANK_OF(location) + dv->dy;
+    for (int x = FILE_OF(location) + dv->dx, y = RANK_OF(location) + dv->dy;
          x >= 0 && x < 8 && y >= 0 && y < 8;
          x += dv->dx, y += dv->dy)
     {
@@ -252,19 +236,19 @@ static uint64_t PawnAttacksBlack(int location)
  */
 static uint64_t KnightFill(uint64_t b)
 {
-    const uint64_t west1 = SHIFT_WEST(b);
-    const uint64_t west2 = SHIFT_WEST(west1);
-    const uint64_t east1 = SHIFT_EAST(b);
-    const uint64_t east2 = SHIFT_EAST(east1);
+    const uint64_t west1     = SHIFT_WEST(b);
+    const uint64_t west2     = SHIFT_WEST(west1);
+    const uint64_t east1     = SHIFT_EAST(b);
+    const uint64_t east2     = SHIFT_EAST(east1);
     const uint64_t eastwest1 = west1 | east1;
     const uint64_t eastwest2 = west2 | east2;
     return (eastwest1 << 16) | (eastwest1 >> 16) | (eastwest2 << 8) | (eastwest2 >> 8);
 }
 
 /**
- * @brief Knight attacks from location.
+ * @brief Knight attacks from square location.
  * @param location Square index.
- * @return Squares attacked by a knight on location.
+ * @return Squares attacked by a knight standing on location.
  */
 static uint64_t KnightAttacks(int location)
 {
@@ -314,9 +298,14 @@ static uint64_t QueenAttacks(int location)
  */
 static uint64_t KingFill(uint64_t b)
 {
-    uint64_t x = SHIFT_WEST(b) | SHIFT_EAST(b);
-    x |= SHIFT_NORTH(x) | SHIFT_SOUTH(x);
-    return x | SHIFT_NORTH(b) | SHIFT_SOUTH(b);
+    return SHIFT_NORTH(b)       |
+           SHIFT_NORTHEAST(b)   |
+           SHIFT_EAST(b)        |
+           SHIFT_SOUTHEAST(b)   |
+           SHIFT_SOUTH(b)       |
+           SHIFT_SOUTHWEST(b)   |
+           SHIFT_WEST(b)        |
+           SHIFT_NORTHWEST(b);
 }
 
 /**
@@ -486,7 +475,7 @@ static uint64_t DoubledPawnMaskBlack(int location)
  * @brief Intervening squares on colinear ray.
  * @param from Source square index.
  * @param to Destination square index.
- * @return If from and to are colinear, the set of intervening squares between them.
+ * @return If from and to are colinear, the set of squares between them.
  */
 static uint64_t InterveningSquares(int from, int to)
 {
@@ -502,85 +491,20 @@ static uint64_t InterveningSquares(int from, int to)
 }
 
 /**
- * @brief Occupancy mask forward diagonal.
+ * @brief Occupancy mask vector for a single direction. 
+ * Occupancy masks exclude the final end square of the ray 
+ * as this does not affect slider move targets.
  * @param location Square index.
- * @return Occupancy mask for sliding moves in the a1->h8 direction.
+ * @param direction Compass direction.
+ * @return Occupancy mask for that location and direction.
  */
-static uint64_t
-DiagonalOccupancyMask(int location)
+static uint64_t OccupancyMaskVector(int location, int direction)
 {
     uint64_t result = NO_SQUARES;
-    int x, y;
-    for (x = FILE_OF(location) + 1, y = RANK_OF(location) + 1; x < 7 && y < 7; ++x, ++y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    for (x = FILE_OF(location) - 1, y = RANK_OF(location) - 1; x > 0 && y > 0; --x, --y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    return result;
-}
-
-/**
- * @brief Occupancy mask anti diagonal.
- * @param location Square index.
- * @return Occupancy mask for sliding moves in the a8->h1 direction.
- */
-static uint64_t
-AntiDiagonalOccupancyMask(int location)
-{
-    uint64_t result = NO_SQUARES;
-    int x, y;
-    for (x = FILE_OF(location) + 1, y = RANK_OF(location) - 1; x < 7 && y > 0; ++x, --y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    for (x = FILE_OF(location) - 1, y = RANK_OF(location) + 1; x > 0 && y < 7; --x, ++y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    return result;
-}
-
-/**
- * @brief File occupancy mask.
- * @param location Square index.
- * @return Occupancy mask for sliding moves along a file.
- */
-static uint64_t
-FileOccupancyMask(int location)
-{
-    uint64_t result = NO_SQUARES;
-    int x, y;
-    x = FILE_OF(location);
-    for (y = RANK_OF(location) + 1; y < 7; ++y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    for (y = RANK_OF(location) - 1; y > 0; --y)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    return result;
-}
-
-/**
- * @brief Rank occupancy mask.
- * @param location Square index.
- * @return Occupancy mask for sliding moves along a rank.
- */
-static uint64_t
-RankOccupancyMask(int location)
-{
-    uint64_t result = NO_SQUARES;
-    int x, y;
-    y = RANK_OF(location);
-    for (x = FILE_OF(location) + 1; x < 7; ++x)
-    {
-        result |= BITBOARD_XY(x, y);
-    }
-    for (x = FILE_OF(location) - 1; x > 0; --x)
+    const DirectionVector* dv = &direction_vectors[direction];
+    for (int x = FILE_OF(location) + dv->dx, y = RANK_OF(location) + dv->dy;
+         x + dv->dx >= 0 && x + dv->dx < 8 && y + dv->dy >= 0 && y + dv->dy < 8;
+         x += dv->dx, y += dv->dy)
     {
         result |= BITBOARD_XY(x, y);
     }
@@ -595,7 +519,10 @@ RankOccupancyMask(int location)
 static uint64_t
 BishopOccupancyMask(int location)
 {
-    return DiagonalOccupancyMask(location) | AntiDiagonalOccupancyMask(location);
+    return OccupancyMaskVector(location, DIR_NORTHEAST) |
+           OccupancyMaskVector(location, DIR_NORTHWEST) |
+           OccupancyMaskVector(location, DIR_SOUTHEAST) |
+           OccupancyMaskVector(location, DIR_SOUTHWEST);
 }
 
 /**
@@ -606,138 +533,32 @@ BishopOccupancyMask(int location)
 static uint64_t
 RookOccupancyMask(int location)
 {
-    return FileOccupancyMask(location) | RankOccupancyMask(location);
+    return OccupancyMaskVector(location, DIR_NORTH) |
+           OccupancyMaskVector(location, DIR_SOUTH) |
+           OccupancyMaskVector(location, DIR_EAST)  |
+           OccupancyMaskVector(location, DIR_WEST);
 }
 
 /**
- * @brief Diagonal move targets.
- * @param occupied_squares Set of squares occupied by a piece.
+ * @brief Vector move targets for sliding pieces considering occupancy.
+ * @param occupied_squares Set of squares with a piece on them.
  * @param location Source square index.
- * @return Set of forward diagonal move targets which a piece on location can slide to.
+ * @param direction Compass rose direction.
+ * @return Set of sliding move squares in the specified direction.
  */
 static uint64_t
-DiagonalMoveTargets(uint64_t occupied_squares, 
-                    int      location)
+VectorMoveTargets(uint64_t occupied_squares,
+                  int      location,
+                  int      direction)
 {
     uint64_t result = NO_SQUARES;
-    for (uint64_t square = SHIFT_NORTHEAST(BITBOARD(location)); 
-         square; 
-         square = SHIFT_NORTHEAST(square))
+    const DirectionVector* dv = &direction_vectors[direction];
+    for (int x = FILE_OF(location) + dv->dx, y = RANK_OF(location) + dv->dy;
+         x >= 0 && x < 8 && y >= 0 && y < 8;
+         x += dv->dx, y += dv->dy)
     {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (uint64_t square = SHIFT_SOUTHWEST(BITBOARD(location)); 
-         square; 
-         square = SHIFT_SOUTHWEST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    return result;
-}
-
-/**
- * @brief Antidiagonal move targets.
- * @param occupied_squares Set of squares occupied by a piece.
- * @param location Source square index.
- * @return Set of anti diagonal move targets which a piece on location can slide to.
- */
-static uint64_t
-AntiDiagonalMoveTargets(uint64_t occupied_squares,
-                        int      location)
-{
-    uint64_t result = NO_SQUARES;
-    for (uint64_t square = SHIFT_SOUTHEAST(BITBOARD(location)); 
-        square; 
-        square = SHIFT_SOUTHEAST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (uint64_t square = SHIFT_NORTHWEST(BITBOARD(location)); 
-         square; 
-         square = SHIFT_NORTHWEST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    return result;
-}
-
-/**
- * @brief Rank move targets.
- * @param occupied_squares Set of squares occupied by a piece.
- * @param location Source square index.
- * @return Set of rank move targets which a piece on location can slide to.
- */
-static uint64_t
-RankMoveTargets(uint64_t occupied_squares,
-                int      location)
-{
-    uint64_t result = NO_SQUARES;
-    for (uint64_t square = SHIFT_EAST(BITBOARD(location)); 
-         square; 
-         square = SHIFT_EAST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (uint64_t square = SHIFT_WEST(BITBOARD(location)); 
-         square; 
-         square = SHIFT_WEST(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    return result;
-}
-
-/**
- * @brief File move targets.
- * @param occupied_squares Set of squares occupied by a piece.
- * @param location Source square index.
- * @return Set of file move targets which a piece on location can slide to.
- */
-static uint64_t
-FileMoveTargets(uint64_t occupied_squares,
-                int      location)
-{
-    uint64_t result = NO_SQUARES;
-    for (uint64_t square = SHIFT_NORTH(BITBOARD(location)); 
-         square; 
-         square = SHIFT_NORTH(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (uint64_t square = SHIFT_SOUTH(BITBOARD(location)); 
-         square; 
-         square = SHIFT_SOUTH(square))
-    {
-        result |= square;
-        if (square & occupied_squares)
+        result |= BITBOARD_XY(x, y);
+        if (BITBOARD_XY(x, y) & occupied_squares)
         {
             break;
         }
@@ -755,8 +576,10 @@ static uint64_t
 BishopMoveTargets(uint64_t occupied_squares, 
                     int    location)
 {
-    return DiagonalMoveTargets(occupied_squares, location) | 
-           AntiDiagonalMoveTargets(occupied_squares, location);
+    return VectorMoveTargets(occupied_squares, location, DIR_NORTHEAST) |
+           VectorMoveTargets(occupied_squares, location, DIR_SOUTHEAST) |
+           VectorMoveTargets(occupied_squares, location, DIR_SOUTHWEST) |
+           VectorMoveTargets(occupied_squares, location, DIR_NORTHWEST);
 }
 
 /**
@@ -769,12 +592,15 @@ static uint64_t
 RookMoveTargets(uint64_t occupied_squares, 
                   int    location)
 {
-    return RankMoveTargets(occupied_squares, location) | 
-           FileMoveTargets(occupied_squares, location);
+    return VectorMoveTargets(occupied_squares, location, DIR_NORTH) |
+           VectorMoveTargets(occupied_squares, location, DIR_SOUTH) |
+           VectorMoveTargets(occupied_squares, location, DIR_EAST)  |
+           VectorMoveTargets(occupied_squares, location, DIR_WEST);
 }
 
 /**
- * @brief Given a bit mask, enumerate all the possible combinations of bits set from that mask.
+ * @brief Given a bit mask, enumerate all the possible combinations 
+ * of bits set from that mask.
  * @param mask The mask value.
  * @param values Array to store the combination bitset values.
  * @return Number of combinations generated.
@@ -783,21 +609,22 @@ static int
 EnumerateMaskCombinations(uint64_t mask,
                           uint64_t values[])
 {
+    int bit_indices[64] = { 0 };
+    int* bi = bit_indices;
+    uint64_t b = mask;
+    while (b)
+    {
+        *bi++ = FindAndClearLsb(&b);
+    }
     const int num_bits_in_mask = PopCount(mask);
     const int num_combinations = 1 << num_bits_in_mask;
-    int bit_indices[64] = { 0 };
-    uint64_t b = mask;
-    for (int i = 0; i != num_bits_in_mask; ++i)
-    {
-        bit_indices[i] = FindAndClearLsb(&b);
-    }
     for (int i = 0; i != num_combinations; ++i)
     {
-        uint64_t value = 0;
-        uint64_t j = i;
-        while (j)
+        uint64_t value = NO_SQUARES;
+        b = i;
+        while (b)
         {
-            value |= BITBOARD(bit_indices[FindAndClearLsb(&j)]);
+            value |= BITBOARD(bit_indices[FindAndClearLsb(&b)]);
         }
         values[i] = value;
     }
@@ -806,7 +633,7 @@ EnumerateMaskCombinations(uint64_t mask,
 
 typedef uint64_t(*OccupancyFn)   (int location);
 typedef uint64_t(*MoveTargetFn)  (uint64_t occupied_squares, int location);
-#define MAX_ATTACK_SET_SIZE 4096 /* 12 bit occupancy mask for rooks */
+#define MAX_ATTACK_SET_SIZE 4096 /* Rooks have a 12 bit occupancy mask. */
 
 /**
  * @brief Parameters for magic bitboard search.
@@ -838,7 +665,7 @@ FindMagic(int    location,
     magic->shift = 64 - PopCount(magic->mask);
     /*
     Enumerate all possible occupancy values and compute what the actual
-    attack sets for each occupancy are, so we can check to see if the trial
+    attack sets for each occupancy are, so we can check to see if a trial
     magic value works.
     */
     const int num_values = EnumerateMaskCombinations(magic->mask, occupancies);
@@ -848,23 +675,21 @@ FindMagic(int    location,
     }
     /*
     Try a random magic multiplicand and test it for success.
-    Keep going round until we find a magic number that works!
     */
     for (; ; )
     {
         bool is_hash_collision = false;
-        /* Magics are typically fairly sparse so AND a few random numbers together. */
+        /* Magics are typically fairly sparse, so AND a few random numbers together. */
         const uint64_t trial_magic = PseudoRandom64() & PseudoRandom64() & PseudoRandom64();
-        memset(magic->attacks, 0, sizeof(magic->attacks));
-        memset(magic->indices, 0, sizeof(magic->indices));
+        memset(magic->attacks, 0xFF, sizeof(magic->attacks));
+        memset(magic->indices, 0xFF, sizeof(magic->indices));
         for (int i = 0; i != num_values; ++i)
         {
             const unsigned int index = (unsigned int)((occupancies[i] * trial_magic) >> magic->shift);
-            if (magic->attacks[index] == NO_SQUARES)
+            if (magic->attacks[index] == ~NO_SQUARES)
             {
                 /* Nothing here yet so store the attack. */
                 magic->attacks[index] = actual_attacks[i];
-                continue;
             }
             if (magic->attacks[index] != actual_attacks[i])
             {
@@ -1009,46 +834,62 @@ GenerateMagics(void)
 }
 
 /**
+ * @brief Function pointer for a bitboard generator function, 
+ * i.e. a function which converts a square location into a bitboard
+ * based on some property.
+*/
+typedef uint64_t(*BitboardFn)(int location);
+
+/**
+ * @brief Bitboard generator.
+ */
+typedef struct BitboardGen
+{
+    const char* name;       /**< Name of generated output.      */
+    BitboardFn  function;   /**< Function to generate output.   */
+} BitboardGen;
+
+/**
  * @brief Generators for the main precomputed bitboard arrays.
  */
 static const BitboardGen ray_generators[] = 
 {
-    { "north",                      NorthOf                 },
-    { "northeast",                  NortheastOf             },
-    { "east",                       EastOf                  },
-    { "southeast",                  SoutheastOf             },
-    { "south",                      SouthOf                 },
-    { "southwest",                  SouthwestOf             },
-    { "west",                       WestOf                  },
-    { "northwest",                  NorthwestOf             },
-    { "pawn_attacks_white",         PawnAttacksWhite        },
-    { "pawn_attacks_black",         PawnAttacksBlack        },
-    { "knight_attacks",             KnightAttacks           },
-    { "bishop_attacks",             BishopAttacks           },
-    { "rook_attacks",               RookAttacks             },
-    { "queen_attacks",              QueenAttacks            },
-    { "king_attacks",               KingAttacks             },
-    { NULL,                         NULL                    },
+    { "north",              NorthOf             },
+    { "northeast",          NortheastOf         },
+    { "east",               EastOf              },
+    { "southeast",          SoutheastOf         },
+    { "south",              SouthOf             },
+    { "southwest",          SouthwestOf         },
+    { "west",               WestOf              },
+    { "northwest",          NorthwestOf         },
+    { "pawn_attacks_white", PawnAttacksWhite    },
+    { "pawn_attacks_black", PawnAttacksBlack    },
+    { "knight_attacks",     KnightAttacks       },
+    { "bishop_attacks",     BishopAttacks       },
+    { "rook_attacks",       RookAttacks         },
+    { "queen_attacks",      QueenAttacks        },
+    { "king_attacks",       KingAttacks         },
+    { NULL,                 NULL                },
 };
 
 #if DO_EXTRA_PAWN_EVAL
 
 static const BitboardGen pawn_generators_white[] =
 {
-    { "passed_pawn_mask",           PassedPawnMaskWhite,    },
-    { "isolated_pawn_mask",         IsolatedPawnMaskWhite,  },
-    { "supported_pawn_mask",        SupportedPawnMaskWhite, },
-    { "doubled_pawn_mask",          DoubledPawnMaskWhite,   },
-    { NULL,                         NULL                    },
+    { "passed_pawn_mask",       PassedPawnMaskWhite,    },
+    { "isolated_pawn_mask",     IsolatedPawnMaskWhite,  },
+    { "supported_pawn_mask",    SupportedPawnMaskWhite, },
+    { "doubled_pawn_mask",      DoubledPawnMaskWhite,   },
+    { NULL,                     NULL                    },
 };
 
 static const BitboardGen pawn_generators_black[] =
 {
-    { "passed_pawn_mask",           PassedPawnMaskBlack,    },
-    { "isolated_pawn_mask",         IsolatedPawnMaskBlack,  },
-    { "supported_pawn_mask",        SupportedPawnMaskBlack, },
-    { "doubled_pawn_mask",          DoubledPawnMaskBlack,   },
-    { NULL,                         NULL                    },
+    { "passed_pawn_mask",       PassedPawnMaskBlack,    },
+    { "isolated_pawn_mask",     IsolatedPawnMaskBlack,  },
+    { "supported_pawn_mask",    SupportedPawnMaskBlack, },
+    { "doubled_pawn_mask",      DoubledPawnMaskBlack,   },
+    { NULL,                     NULL                    },
 };
 
 static const BitboardGen* pawn_generators[] =

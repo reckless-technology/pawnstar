@@ -47,7 +47,8 @@ d) king and bishop vs king and bishop, with bishops on the same color square
 */
 bool IsDrawByMaterial(const Position* position)
 {
-    switch (PopCount(position->occupied_squares))
+    const bitboard occupied_squares = position->white_pieces | position->black_pieces;
+    switch (PopCount(occupied_squares))
     {
     case 0:
     case 1:

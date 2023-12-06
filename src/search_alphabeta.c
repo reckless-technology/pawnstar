@@ -120,10 +120,10 @@ Search(const Position*  src_position,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    if (!(src_position->state_flags & IS_NULL_MOVE)     &&
-        !(src_position->state_flags & IS_CHECK)         &&
-        beta == alpha + 1                               &&
-        PopCount(src_position->occupied_squares) > 7    &&
+    if (!(src_position->state_flags & IS_NULL_MOVE)                             &&
+        !(src_position->state_flags & IS_CHECK)                                 &&
+        beta == alpha + 1                                                       &&
+        PopCount(src_position->white_pieces | src_position->black_pieces) > 7   &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
@@ -194,15 +194,6 @@ Search(const Position*  src_position,
         while (*moves_this_phase)
         {
             int move = *moves_this_phase++;
-            if (depth <= 2 && 
-                num_legal_moves > 0 && 
-                !(src_position->state_flags & IS_CHECK) &&
-                beta == alpha + 1 &&
-                EvaluateStaticExchange(src_position, move) < 0)
-            {
-                INCREMENT("frontier SEE skips");
-                continue;
-            }
             int score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
             if (*cancel)
             {

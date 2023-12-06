@@ -3,7 +3,7 @@
 Determine whether to enable the debugging counts dictionaries
 */
 #ifndef DEBUGX
-#define DEBUGX 0
+#define DEBUGX 1
 #endif 
 /*
 Whether to test the Zobrist hash value at every node of a perft move gen test
@@ -27,7 +27,7 @@ exchange evaluation (SEE)
 /*
 Global constants
 */
-#define HASHTABLE_MEGABYTES                 512 // default transposition table size in MB
+#define HASHTABLE_MEGABYTES                   8 // default transposition table size in MB
 #define STRING_BUF_LEN                      256 // default line buffer size
 #define MAX_MOVES_PER_POSITION              256 // maximum possible number of pseudo-legal moves for a chess position
 #define BETA                              11000 // greater than any possible evaluation score including checkmate

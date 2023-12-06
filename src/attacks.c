@@ -1,6 +1,7 @@
 #include "pawnstar.h"
 
 #if 1
+
 bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
     const MagicMoveEntry* const m = BISHOP_MAGICS[location];
@@ -12,7 +13,9 @@ bitboard RookAttacks(bitboard occupied_squares, int location)
     const MagicMoveEntry* const m = ROOK_MAGICS[location];
     return m->attacks[m->indices[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift]];
 }
+
 #else
+
 bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
     const Sets* sets= &SETS[location];
@@ -34,6 +37,7 @@ bitboard RookAttacks(bitboard occupied_squares, int location)
     attacks ^= SETS[Msb((sets->west  & occupied_squares) | A1BB)].west;
     return attacks;
 }
+
 #endif
 
 /**
@@ -59,6 +63,7 @@ bool IsAttacked(const Position* position, int location, int color)
     const Sets* const sets = &SETS[location];
     const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
     const bitboard attacking_pieces = position->pieces_of_color[color];
+    const bitboard occupied_squares = position->white_pieces | position->black_pieces;
     /*
     Pawn, knight and king attacks can be done by direct lookup since blockers 
     do not affect their attack set.
@@ -76,7 +81,7 @@ bool IsAttacked(const Position* position, int location, int color)
     bitboard sliding_attackers = (position->rooks | position->queens) & sets->rook_attacks & attacking_pieces;
     while (sliding_attackers)
     {
-        if (!(intervening_squares[FindAndClearLsb(&sliding_attackers)] & position->occupied_squares))
+        if (!(intervening_squares[FindAndClearLsb(&sliding_attackers)] & occupied_squares))
         {
             return true;
         }
@@ -87,7 +92,7 @@ bool IsAttacked(const Position* position, int location, int color)
     sliding_attackers = (position->bishops | position->queens) & sets->bishop_attacks & attacking_pieces;
     while (sliding_attackers)
     {
-        if (!(intervening_squares[FindAndClearLsb(&sliding_attackers)] & position->occupied_squares))
+        if (!(intervening_squares[FindAndClearLsb(&sliding_attackers)] & occupied_squares))
         {
             return true;
         }

@@ -42,7 +42,7 @@ AddPiece(Position* position,
          int piece, 
          int to)
 {
-    position->pieces[piece]          ^= BITBOARD(to);
+    position->piece[piece - 1]       ^= BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(to);
     position->hash  += PIECE_SQUARE_HASHES[color][piece - 1][to];
 }
@@ -53,7 +53,7 @@ RemovePiece(Position* position,
             int piece, 
             int from)
 {
-    position->pieces[piece]          ^= BITBOARD(from);
+    position->piece[piece - 1]       ^= BITBOARD(from);
     position->pieces_of_color[color] ^= BITBOARD(from);
     position->hash  -= PIECE_SQUARE_HASHES[color][piece - 1][from];
 }
@@ -65,7 +65,7 @@ MovePiece(Position* position,
           int from, 
           int to)
 {
-    position->pieces[piece]          ^= BITBOARD(from) | BITBOARD(to);
+    position->piece[piece - 1]       ^= BITBOARD(from) | BITBOARD(to);
     position->pieces_of_color[color] ^= BITBOARD(from) | BITBOARD(to);
     position->hash  += PIECE_SQUARE_HASHES[color][piece - 1][to] - PIECE_SQUARE_HASHES[color][piece - 1][from];
 }
@@ -176,8 +176,7 @@ MakeMove(Position*       dst_position,
             break;
         }
         break;
-    }
-    dst_position->occupied_squares = dst_position->white_pieces | dst_position->black_pieces;  
+    };  
     dst_position->state_flags ^= IS_BLACK_TO_MOVE;
     dst_position->hash += (dst_position->state_flags & IS_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : -BLACK_MOVE_HASH;
     dst_position->full_move_count += (color == BLACK);
