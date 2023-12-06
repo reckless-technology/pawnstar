@@ -283,6 +283,6 @@ typedef struct MagicMoveEntry
     uint64_t        magic;
     bitboard        occupancy_mask;
     int             shift;
-    int             padding;
-    uint64_t        attacks[];
+    const uint64_t* attacks;
+    const uint8_t*  indices;
 } MagicMoveEntry;

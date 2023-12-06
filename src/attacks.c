@@ -4,13 +4,13 @@
 bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
     const MagicMoveEntry* const m = BISHOP_MAGICS[location];
-    return m->attacks[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift];
+    return m->attacks[m->indices[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift]];
 }
 
 bitboard RookAttacks(bitboard occupied_squares, int location)
 {
     const MagicMoveEntry* const m = ROOK_MAGICS[location];
-    return m->attacks[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift];
+    return m->attacks[m->indices[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift]];
 }
 #else
 bitboard BishopAttacks(bitboard occupied_squares, int location)
