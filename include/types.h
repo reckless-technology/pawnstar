@@ -41,31 +41,26 @@ enum ClockType
 };
 
 /**
- * @brief Bitset of castling rights flags.
-*/
-enum CastleFlags
-{
-    MAY_WHITE_CASTLE_KINGSIDE   = 0x01, /**< white has the right to castle king side    */
-    MAY_WHITE_CASTLE_QUEENSIDE  = 0x02, /**< white has the right to castle queen side   */
-    MAY_BLACK_CASTLE_KINGSIDE   = 0x04, /**< black has the right to castle king side    */
-    MAY_BLACK_CASTLE_QUEENSIDE  = 0x08, /**< black has the right to castle queen side   */
-};
-
-/**
  * @brief Bitset of position state flags.
 */
 enum StateFlags
-{                                                                                               
-    IS_BLACK_TO_MOVE    = 0x01, /**< it is black's turn to move                                 */
-    IS_CHECK            = 0x02, /**< is the side to move in check                               */
-    IS_MOVED_INTO_CHECK = 0x04, /**< is the side not to move in check (illegal position)        */
-    IS_CHECKMATE        = 0x08, /**< position represents checkmate                              */
-    IS_STALEMATE        = 0x10, /**< position represents stalemate                              */
-    IS_DRAW_REPETITION  = 0x20, /**< position represents draw by repetition 3 times             */
-    IS_DRAW_MATERIAL    = 0x40, /**< position represents draw by insufficient material to mate  */
-    IS_DRAW_50_MOVES    = 0x80, /**< position represents draw by the 50 move rule               */
-    IS_GAME_DRAWN       = (IS_STALEMATE | IS_DRAW_REPETITION | IS_DRAW_MATERIAL | IS_DRAW_50_MOVES),
-    IS_GAME_OVER        = (IS_GAME_DRAWN | IS_CHECKMATE),
+{
+    MAY_WHITE_CASTLE_KINGSIDE   = 1 <<  0,  /**< white has the right to castle king side                    */
+    MAY_WHITE_CASTLE_QUEENSIDE  = 1 <<  1,  /**< white has the right to castle queen side                   */
+    MAY_BLACK_CASTLE_KINGSIDE   = 1 <<  2,  /**< black has the right to castle king side                    */
+    MAY_BLACK_CASTLE_QUEENSIDE  = 1 <<  3,  /**< black has the right to castle queen side                   */
+    IS_BLACK_TO_MOVE            = 1 <<  4,  /**< it is black's turn to move                                 */
+    IS_CHECK                    = 1 <<  5,  /**< is the side to move in check                               */
+    IS_MOVED_INTO_CHECK         = 1 <<  6,  /**< is the side not to move in check (illegal position)        */
+    IS_CHECKMATE                = 1 <<  7,  /**< position represents checkmate                              */
+    IS_STALEMATE                = 1 <<  8,  /**< position represents stalemate                              */
+    IS_DRAW_REPETITION          = 1 <<  9,  /**< position represents draw by repetition 3 times             */
+    IS_DRAW_MATERIAL            = 1 << 10,  /**< position represents draw by insufficient material to mate  */
+    IS_DRAW_50_MOVES            = 1 << 11,  /**< position represents draw by the 50 move rule               */
+    IS_NULL_MOVE                = 1 << 12,  /**< position was the result of a null move                     */
+    IS_GAME_DRAWN               = (IS_STALEMATE | IS_DRAW_REPETITION | IS_DRAW_MATERIAL | IS_DRAW_50_MOVES),
+    IS_GAME_OVER                = (IS_GAME_DRAWN | IS_CHECKMATE),
+    CASTLING_RIGHTS_MASK        = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE),
 };
 
 /**
@@ -106,7 +101,7 @@ enum NodeType
 /**
  * @brief A move and its associated score - used when sorting moves.
 */
-typedef struct
+typedef struct ScoredMove
 {
     int move;
     int score;
@@ -115,7 +110,7 @@ typedef struct
 /**
  * @brief Bitboard bit sets for a specific square.
 */
-typedef struct
+typedef struct Sets
 {
     bitboard north;
     bitboard northeast;
@@ -144,7 +139,7 @@ typedef struct
 /**
  * @brief Bitsets used to efficiently determine pawn structure.
 */
-typedef struct
+typedef struct PawnSets
 {
     bitboard passed_pawn_mask;      /**< Squares which if not containing an enemy pawn, make the pawn passed.       */
     bitboard isolated_pawn_mask;    /**< Squares which if not containing a friendly pawn, make the pawn isolated.   */
@@ -187,9 +182,7 @@ struct Position
     };    
     uint64_t        hash;                   /**< Zobrist hash of this position, maintained incrementally    */
     const Position* previous;               /**< position immediately prior to this in the line of play     */
-    int             move;                   /**< the move which led to this position                        */
-    uint8_t         castle_flags;           /**< castling rights                                            */
-    uint8_t         state_flags;            /**< game state-machine flags                                   */
+    uint16_t        state_flags;            /**< game state-machine flags                                   */
     uint8_t         en_passant_index;       /**< en passant capture availability square (0 if none)         */
     uint8_t         reversible_move_count;  /**< number of consecutive reversible half-moves (plies)        */
     uint8_t         full_move_count;        /**< number of full moves (zero indexed)                        */
@@ -198,7 +191,7 @@ struct Position
 /**
  * @brief Clock for a standard time control game.
 */
-typedef struct
+typedef struct StandardTimeControl
 {
     int     milliseconds_remaining;  /**< how many milliseconds does the computer have left on its clock             */
     int     milliseconds_per_period; /**< how many milliseconds in each period for a standard chess clock            */
@@ -208,7 +201,7 @@ typedef struct
 /**
  * @brief Clock for an incremental time control game.
 */
-typedef struct
+typedef struct IncrementalTimeControl
 {
     int     milliseconds_remaining;  /**< how many milliseconds does the computer have left on its clock             */
     int     base_milliseconds;       /**< how many milliseconds for the game for an incremental chess clock          */
@@ -218,7 +211,7 @@ typedef struct
 /**
  * @brief Clock for a fixed depth of search game.
 */
-typedef struct
+typedef struct FixedDepthTimeControl
 {
     int     depth;                  /**< search depth to search to when using fixed depth                           */
 } FixedDepthTimeControl;
@@ -226,7 +219,7 @@ typedef struct
 /**
  * @brief Clock for a fixed time per move game.
 */
-typedef struct
+typedef struct FixedTimeTimeControl
 {
     int     milliseconds;           /**< how many milliseconds to spend on each move when using fixed time          */
 } FixedTimeTimeControl;
@@ -234,7 +227,7 @@ typedef struct
 /**
  * @brief Clock and time controls.
 */
-typedef struct
+typedef struct TimeControl
 {
     int             hard_stop_search_ms;    /**< Wall clock time to hard stop searching and move    */
     enum ClockType  clock_type;             /**< standard chess clock, incremental clock, fixed time or fixed depth         */
@@ -254,7 +247,7 @@ typedef struct
  * A transposition is the result of a previous search containing pertinent
  * information about what was found when this position was searched earlier.
 */
-typedef struct
+typedef struct Transposition
 {
     uint64_t    hash;       /**< Zobrist hash of this position                          */
     int         move;       /**< Best move from this position, if any                   */
@@ -267,7 +260,7 @@ typedef struct
  * @brief A variation, or line of play.
  * Typically used to record the principal variation during search.
 */
-typedef struct
+typedef struct Variation
 {
     int moves[MAX_PLY + 1]; /**< the moves comprising the line  */
 } Variation;
@@ -275,7 +268,7 @@ typedef struct
 /**
  * @brief A chess game.
 */
-typedef struct
+typedef struct Game
 {
     Position*       position;               /**< stack pointer - current position               */
     Position        stack[MAX_GAME_LENGTH]; /**< position stack                                 */
@@ -285,7 +278,7 @@ typedef struct
     bool            do_show_thinking;       /**< Whether to show scores and PV during search    */
 } Game;
 
-typedef struct
+typedef struct MagicMoveEntry
 {
     uint64_t        magic;
     bitboard        occupancy_mask;

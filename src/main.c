@@ -39,6 +39,8 @@ int main()
         "(C) Jonny Reckless 2009 - 2023                         \n"
         "Compiled: " __DATE__ " " __TIME__                     "\n"
         );
+    printf("state flag size %zu\n", sizeof(enum StateFlags));
+    printf("board size %zu\n", sizeof(Position));
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
     InitializeGoodMoveCounts();
     if (!InitializeOpeningBookFromFile("pawnstar.book"))

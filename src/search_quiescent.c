@@ -39,7 +39,7 @@ int SearchQuiescent(const Position* src_position,
         alpha = score;
     }
     int captures[MAX_MOVES_PER_POSITION];
-    GeneratePseudoLegalMoves(src_position, captures, NULL);
+    GeneratePseudoLegalCaptures(src_position, captures);
     SortMoves(src_position, captures, ply, false);
     for (const int* move = captures; *move; ++move)
     {

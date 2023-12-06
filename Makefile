@@ -10,6 +10,7 @@ HDRS = \
 	function_prototypes.h \
 	inline_functions.h \
 	macros.h \
+	move_generation_template.h \
 	options.h \
 	pawnstar.h \
 	types.h
@@ -22,7 +23,6 @@ CSRCS = \
 	attacks.c \
 	debug_hashtable.c \
 	evaluation.c \
-	evaluation_full.c \
 	forsyth_edwards.c \
 	game_over_detection.c \
 	input_handling.c \

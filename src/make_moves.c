@@ -3,7 +3,7 @@
 /**
  * @brief Castling rights flags to be cleared based on move from and to squares.
 */
-static const uint8_t CASTLING_RIGHTS_MASKS[64] =
+static const uint16_t CASTLING_RIGHTS_MASKS[64] =
 {
     [E1] = MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE,
     [A1] = MAY_WHITE_CASTLE_QUEENSIDE,
@@ -26,7 +26,7 @@ MakeNullMove(Position* dst_position,
 {
     memcpy(dst_position, src_position, sizeof(Position));
     dst_position->previous = src_position;
-    dst_position->move = 0;
+    dst_position->state_flags |= IS_NULL_MOVE;
     if (dst_position->en_passant_index)
     {
         dst_position->hash -= EN_PASSANT_HASHES[FILE_OF(dst_position->en_passant_index)];
@@ -89,13 +89,10 @@ MakeMove(Position*       dst_position,
      
     *dst_position = *src_position;
     dst_position->previous = src_position;
-    dst_position->move = move;
-    dst_position->castle_flags &= ~CASTLING_RIGHTS_MASKS[from] & ~CASTLING_RIGHTS_MASKS[to];
-    if (dst_position->castle_flags != src_position->castle_flags)
-    {
-        dst_position->hash += CASTLING_RIGHTS_HASHES[dst_position->castle_flags] 
-                            - CASTLING_RIGHTS_HASHES[src_position->castle_flags];
-    }
+    dst_position->state_flags &= ~IS_NULL_MOVE;
+    dst_position->state_flags &= ~CASTLING_RIGHTS_MASKS[from] & ~CASTLING_RIGHTS_MASKS[to];
+    dst_position->hash += CASTLING_RIGHTS_HASHES[dst_position->state_flags & CASTLING_RIGHTS_MASK] 
+                        - CASTLING_RIGHTS_HASHES[src_position->state_flags & CASTLING_RIGHTS_MASK];
     if (dst_position->en_passant_index)
     {
         dst_position->hash -= EN_PASSANT_HASHES[FILE_OF(dst_position->en_passant_index)];

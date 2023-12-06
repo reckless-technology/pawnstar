@@ -120,11 +120,10 @@ Search(const Position*  src_position,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    if ((src_position->move)                            &&
+    if (!(src_position->state_flags & IS_NULL_MOVE)     &&
         !(src_position->state_flags & IS_CHECK)         &&
         beta == alpha + 1                               &&
         PopCount(src_position->occupied_squares) > 7    &&
-        depth <= 3                                      &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");

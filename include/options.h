@@ -3,7 +3,7 @@
 Determine whether to enable the debugging counts dictionaries
 */
 #ifndef DEBUGX
-#define DEBUGX 1
+#define DEBUGX 0
 #endif 
 /*
 Whether to test the Zobrist hash value at every node of a perft move gen test

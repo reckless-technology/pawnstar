@@ -1,6 +1,6 @@
 #include "pawnstar.h"
 
-#if 0
+#if 1
 bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
     const MagicMoveEntry* const m = BISHOP_MAGICS[location];

@@ -106,7 +106,7 @@ PositionFromString(const char* fen_string,
     }
     if (!strcmp("-", castling_rights))
     {
-        position->castle_flags = 0;
+        position->state_flags &= ~CASTLING_RIGHTS_MASK;
     }
     else
     {
@@ -115,16 +115,16 @@ PositionFromString(const char* fen_string,
             switch (*c)
             {
             case 'K':
-                position->castle_flags |= MAY_WHITE_CASTLE_KINGSIDE;
+                position->state_flags |= MAY_WHITE_CASTLE_KINGSIDE;
                 break;
             case 'Q':
-                position->castle_flags |= MAY_WHITE_CASTLE_QUEENSIDE;
+                position->state_flags |= MAY_WHITE_CASTLE_QUEENSIDE;
                 break;
             case 'k':
-                position->castle_flags |= MAY_BLACK_CASTLE_KINGSIDE;
+                position->state_flags |= MAY_BLACK_CASTLE_KINGSIDE;
                 break;
             case 'q':
-                position->castle_flags |= MAY_BLACK_CASTLE_QUEENSIDE;
+                position->state_flags |= MAY_BLACK_CASTLE_QUEENSIDE;
                 break;
             default:
                 goto Error;
@@ -253,25 +253,25 @@ void PositionToString(const Position* position, char* fen_string)
     *fen_string++ = position->state_flags & IS_BLACK_TO_MOVE ? 'b' : 'w';
     *fen_string++ = ' ';;
     /* Castling rights */
-    if (!position->castle_flags)
+    if (!(position->state_flags & CASTLING_RIGHTS_MASK))
     {
         *fen_string++ = '-';
     }
     else
     {
-        if (position->castle_flags & MAY_WHITE_CASTLE_KINGSIDE)
+        if (position->state_flags & MAY_WHITE_CASTLE_KINGSIDE)
         {
             *fen_string++ = 'K';
         }
-        if (position->castle_flags & MAY_WHITE_CASTLE_QUEENSIDE)
+        if (position->state_flags & MAY_WHITE_CASTLE_QUEENSIDE)
         {
             *fen_string++ = 'Q';
         }
-        if (position->castle_flags & MAY_BLACK_CASTLE_KINGSIDE)
+        if (position->state_flags & MAY_BLACK_CASTLE_KINGSIDE)
         {
             *fen_string++ = 'k';
         }
-        if (position->castle_flags & MAY_BLACK_CASTLE_QUEENSIDE)
+        if (position->state_flags & MAY_BLACK_CASTLE_QUEENSIDE)
         {
             *fen_string++ = 'q';
         }
