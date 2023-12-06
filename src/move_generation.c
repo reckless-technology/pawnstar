@@ -33,9 +33,9 @@ INLINE void GenerateUnderpromotions(int **pmoves)
 Generate pseudo-legal moves for all pieces
 If do_non_captures is false, just do captures and promotions (when not in check)
 */
-void GeneratePseudoLegalMoves(const Position *position,
-                              int captures[],
-                              int non_captures[])
+void GeneratePseudoLegalMoves(const Position* position,
+                              int             captures[],
+                              int             non_captures[])
 {
     const int color                = COLOR_TO_MOVE(position);
     const bitboard vacant_squares  = ~position->occupied_squares;
@@ -127,17 +127,20 @@ void GeneratePseudoLegalMoves(const Position *position,
     {
         *captures++ = CONSTRUCT_EP_CAPTURE_MOVE(FindAndClearLsb(&en_passant_sources), position->en_passant_index);
     }
-    push_delta <<= 1;
-    while (double_pushes)
+    if (non_captures)
     {
-        const int to = FindAndClearLsb(&double_pushes);
-        *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(to - push_delta, to, PAWN);
-    }
-    push_delta >>= 1;
-    while (single_pushes)
-    {
-        const int to = FindAndClearLsb(&single_pushes);
-        *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(to - push_delta, to, PAWN);
+        push_delta <<= 1;
+        while (double_pushes)
+        {
+            const int to = FindAndClearLsb(&double_pushes);
+            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(to - push_delta, to, PAWN);
+        }
+        push_delta >>= 1;
+        while (single_pushes)
+        {
+            const int to = FindAndClearLsb(&single_pushes);
+            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(to - push_delta, to, PAWN);
+        }
     }
     /*
     Generate knight moves
@@ -152,10 +155,13 @@ void GeneratePseudoLegalMoves(const Position *position,
             const int to = FindAndClearLsb(&capture_targets);
             *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, KNIGHT, PieceAt(position, to));
         }
-        bitboard non_capture_targets = SETS[from].knight_attacks & vacant_squares;
-        while (non_capture_targets)
+        if (non_captures)
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), KNIGHT);
+            bitboard non_capture_targets = SETS[from].knight_attacks & vacant_squares;
+            while (non_capture_targets)
+            {
+                *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), KNIGHT);
+            }
         }
     }
     /*
@@ -165,57 +171,20 @@ void GeneratePseudoLegalMoves(const Position *position,
     while (bishops)
     {
         const int from = FindAndClearLsb(&bishops);
-        for (bitboard b = SHIFT_NORTHEAST(BITBOARD(from)); b; b = SHIFT_NORTHEAST(b))
+        const bitboard attacks = BishopAttacks(position->occupied_squares, from);
+        bitboard capture_targets = attacks & enemy_pieces;
+        while (capture_targets)
         {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, BISHOP);
+            const int to = FindAndClearLsb(&capture_targets);
+            *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
         }
-        for (bitboard b = SHIFT_NORTHWEST(BITBOARD(from)); b; b = SHIFT_NORTHWEST(b))
+        if (non_captures)
         {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
+            bitboard non_capture_targets = attacks & vacant_squares;
+            while (non_capture_targets)
             {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
-                }
-                break;
+                *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), BISHOP);
             }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, BISHOP);
-        }
-        for (bitboard b = SHIFT_SOUTHEAST(BITBOARD(from)); b; b = SHIFT_SOUTHEAST(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, BISHOP);
-        }
-        for (bitboard b = SHIFT_SOUTHWEST(BITBOARD(from)); b; b = SHIFT_SOUTHWEST(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, BISHOP);
         }
     }
     /*
@@ -225,57 +194,20 @@ void GeneratePseudoLegalMoves(const Position *position,
     while (rooks)
     {
         const int from = FindAndClearLsb(&rooks);
-        for (bitboard b = SHIFT_NORTH(BITBOARD(from)); b; b = SHIFT_NORTH(b))
+        const bitboard attacks = RookAttacks(position->occupied_squares, from);
+        bitboard capture_targets = attacks & enemy_pieces;
+        while (capture_targets)
         {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, ROOK);
+            const int to = FindAndClearLsb(&capture_targets);
+            *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
         }
-        for (bitboard b = SHIFT_WEST(BITBOARD(from)); b; b = SHIFT_WEST(b))
+        if (non_captures)
         {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
+            bitboard non_capture_targets = attacks & vacant_squares;
+            while (non_capture_targets)
             {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
-                }
-                break;
+                *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), ROOK);
             }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, ROOK);
-        }
-        for (bitboard b = SHIFT_EAST(BITBOARD(from)); b; b = SHIFT_EAST(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, ROOK);
-        }
-        for (bitboard b = SHIFT_SOUTH(BITBOARD(from)); b; b = SHIFT_SOUTH(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, ROOK);
         }
     }
     /*
@@ -285,110 +217,22 @@ void GeneratePseudoLegalMoves(const Position *position,
     while (queens)
     {
         const int from = FindAndClearLsb(&queens);
-        for (bitboard b = SHIFT_NORTHEAST(BITBOARD(from)); b; b = SHIFT_NORTHEAST(b))
+        const bitboard attacks = QueenAttacks(position->occupied_squares, from);
+        bitboard capture_targets = attacks & enemy_pieces;
+        while (capture_targets)
         {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, QUEEN);
+            const int to = FindAndClearLsb(&capture_targets);
+            *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
         }
-        for (bitboard b = SHIFT_NORTHWEST(BITBOARD(from)); b; b = SHIFT_NORTHWEST(b))
+        if (non_captures)
         {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
+            bitboard non_capture_targets = attacks & vacant_squares;
+            while (non_capture_targets)
             {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
-                }
-                break;
+                *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), QUEEN);
             }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, QUEEN);
         }
-        for (bitboard b = SHIFT_SOUTHEAST(BITBOARD(from)); b; b = SHIFT_SOUTHEAST(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, QUEEN);
-        }
-        for (bitboard b = SHIFT_SOUTHWEST(BITBOARD(from)); b; b = SHIFT_SOUTHWEST(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, QUEEN);
-        }
-        for (bitboard b = SHIFT_NORTH(BITBOARD(from)); b; b = SHIFT_NORTH(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, QUEEN);
-        }
-        for (bitboard b = SHIFT_WEST(BITBOARD(from)); b; b = SHIFT_WEST(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, QUEEN);
-        }
-        for (bitboard b = SHIFT_EAST(BITBOARD(from)); b; b = SHIFT_EAST(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, QUEEN);
-        }
-        for (bitboard b = SHIFT_SOUTH(BITBOARD(from)); b; b = SHIFT_SOUTH(b))
-        {
-            const int to = Lsb(b);
-            if (b & position->occupied_squares)
-            {
-                if (b & enemy_pieces)
-                {
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
-                }
-                break;
-            }
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, QUEEN);
-        }
+        
     }
     /*
     Generate King Moves
@@ -401,53 +245,59 @@ void GeneratePseudoLegalMoves(const Position *position,
         const int to = FindAndClearLsb(&capture_targets);
         *captures++ = CONSTRUCT_CAPTURE_MOVE(king_location, to, KING, PieceAt(position, to));
     }
-    bitboard non_capture_targets = targets & vacant_squares;
-    while (non_capture_targets)
+    if (non_captures)
     {
-        *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(king_location, FindAndClearLsb(&non_capture_targets), KING);
-    }
-    if (!(position->state_flags & IS_CHECK))
-    {
-        /*
-        Generate castling moves
-        */
-        if (color == WHITE)
+        bitboard non_capture_targets = targets & vacant_squares;
+        while (non_capture_targets)
         {
-            if ((position->castle_flags & MAY_WHITE_CASTLE_KINGSIDE) && /* if white retains the right to castle kingside and */
-                !(position->occupied_squares & (F1BB | G1BB)) &&        /* f1 and g1 are both vacant and                     */
-                !IsAttacked(position, F1, BLACK) &&                     /* f1 is not attacked by black and                   */
-                !IsAttacked(position, G1, BLACK))                       /* the king's destination is not attacked by black   */
-            {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
-            }
-            if ((position->castle_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
-                !(position->occupied_squares & (B1BB | C1BB | D1BB)) &&
-                !IsAttacked(position, D1, BLACK) &&
-                !IsAttacked(position, C1, BLACK))
-            {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, C1);
-            }
+            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(king_location, FindAndClearLsb(&non_capture_targets), KING);
         }
-        else
+        if (!(position->state_flags & IS_CHECK))
         {
-            if ((position->castle_flags & MAY_BLACK_CASTLE_KINGSIDE) &&
-                !(position->occupied_squares & (F8BB | G8BB)) &&
-                !IsAttacked(position, F8, WHITE) &&
-                !IsAttacked(position, G8, WHITE))
+            /*
+            Generate castling moves
+            */
+            if (color == WHITE)
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
+                if ((position->castle_flags & MAY_WHITE_CASTLE_KINGSIDE) && /* if white retains the right to castle kingside and */
+                    !(position->occupied_squares & (F1BB | G1BB)) &&        /* f1 and g1 are both vacant and                     */
+                    !IsAttacked(position, F1, BLACK) &&                     /* f1 is not attacked by black and                   */
+                    !IsAttacked(position, G1, BLACK))                       /* the king's destination is not attacked by black   */
+                {
+                    *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
+                }
+                if ((position->castle_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
+                    !(position->occupied_squares & (B1BB | C1BB | D1BB)) &&
+                    !IsAttacked(position, D1, BLACK) &&
+                    !IsAttacked(position, C1, BLACK))
+                {
+                    *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, C1);
+                }
             }
-            if ((position->castle_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
-                !(position->occupied_squares & (B8BB | C8BB | D8BB)) &&
-                !IsAttacked(position, D8, WHITE) &&
-                !IsAttacked(position, C8, WHITE))
+            else
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, C8);
+                if ((position->castle_flags & MAY_BLACK_CASTLE_KINGSIDE) &&
+                    !(position->occupied_squares & (F8BB | G8BB)) &&
+                    !IsAttacked(position, F8, WHITE) &&
+                    !IsAttacked(position, G8, WHITE))
+                {
+                    *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
+                }
+                if ((position->castle_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
+                    !(position->occupied_squares & (B8BB | C8BB | D8BB)) &&
+                    !IsAttacked(position, D8, WHITE) &&
+                    !IsAttacked(position, C8, WHITE))
+                {
+                    *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, C8);
+                }
             }
         }
     }
     *captures = 0;
-    *non_captures = 0;
+    if (non_captures)
+    {
+        *non_captures = 0;
+    }
 }
 /*
 Generate all strictly legal moves for this position

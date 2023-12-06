@@ -117,6 +117,14 @@ typedef struct
 */
 typedef struct
 {
+    bitboard north;
+    bitboard northeast;
+    bitboard east;
+    bitboard southeast;
+    bitboard south;
+    bitboard southwest;
+    bitboard west;
+    bitboard northwest;
     union
     {
         bitboard pawn_attacks[2];   /**< indexed by color */
@@ -276,3 +284,12 @@ typedef struct
     int             engine_color;           /**< The color which pawnstar is playing            */
     bool            do_show_thinking;       /**< Whether to show scores and PV during search    */
 } Game;
+
+typedef struct
+{
+    uint64_t        magic;
+    bitboard        occupancy_mask;
+    int             shift;
+    int             padding;
+    uint64_t        attacks[];
+} MagicMoveEntry;

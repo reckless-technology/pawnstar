@@ -1,92 +1,40 @@
 #include "pawnstar.h"
 
-/**
- * @brief Determine bishop attacks based on occupied squares.
- * @param occupied_squares set of occupied squares
- * @param location location where bishop is
- * @return bitset of attacked squares
-*/
-bitboard BishopAttacks(uint64_t occupied_squares, int location)
+#if 0
+bitboard BishopAttacks(bitboard occupied_squares, int location)
 {
-    bitboard result = NO_SQUARES;
-    for (bitboard b = SHIFT_NORTHEAST(BITBOARD(location)) ; b; b = SHIFT_NORTHEAST(b))
-    {
-        result |= b;
-        if (b & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard b = SHIFT_NORTHWEST(BITBOARD(location)) ; b; b = SHIFT_NORTHWEST(b))
-    {
-        result |= b;
-        if (b & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard b = SHIFT_SOUTHEAST(BITBOARD(location)) ; b; b = SHIFT_SOUTHEAST(b))
-    {
-        result |= b;
-        if (b & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard b = SHIFT_SOUTHWEST(BITBOARD(location)) ; b; b = SHIFT_SOUTHWEST(b))
-    {
-        result |= b;
-        if (b & occupied_squares)
-        {
-            break;
-        }
-    }
-    return result;
+    const MagicMoveEntry* const m = BISHOP_MAGICS[location];
+    return m->attacks[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift];
 }
 
-/**
- * @brief Determine rook attacks based on occupied squares.
- * @param occupied_squares set of occupied squares
- * @param location location where rook is
- * @return bitset of attacked squares
-*/
-bitboard RookAttacks(uint64_t occupied_squares, int location)
+bitboard RookAttacks(bitboard occupied_squares, int location)
 {
-    bitboard result = NO_SQUARES;
-    for (bitboard b = SHIFT_NORTH(BITBOARD(location)) ; b; b = SHIFT_NORTH(b))
-    {
-        result |= b;
-        if (b & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard b = SHIFT_WEST(BITBOARD(location)) ; b; b = SHIFT_WEST(b))
-    {
-        result |= b;
-        if (b & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard b = SHIFT_SOUTH(BITBOARD(location)) ; b; b = SHIFT_SOUTH(b))
-    {
-        result |= b;
-        if (b & occupied_squares)
-        {
-            break;
-        }
-    }
-    for (bitboard b = SHIFT_EAST(BITBOARD(location)) ; b; b = SHIFT_EAST(b))
-    {
-        result |= b;
-        if (b & occupied_squares)
-        {
-            break;
-        }
-    }
-    return result;
+    const MagicMoveEntry* const m = ROOK_MAGICS[location];
+    return m->attacks[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift];
 }
+#else
+bitboard BishopAttacks(bitboard occupied_squares, int location)
+{
+    const Sets* sets= &SETS[location];
+    bitboard attacks = sets->bishop_attacks;
+    attacks ^= SETS[Lsb((sets->northeast & occupied_squares) | H8BB)].northeast;
+    attacks ^= SETS[Lsb((sets->northwest & occupied_squares) | H8BB)].northwest;
+    attacks ^= SETS[Msb((sets->southeast & occupied_squares) | A1BB)].southeast;
+    attacks ^= SETS[Msb((sets->southwest & occupied_squares) | A1BB)].southwest;
+    return attacks;
+}
+
+bitboard RookAttacks(bitboard occupied_squares, int location)
+{
+    const Sets* sets= &SETS[location];
+    bitboard attacks = sets->rook_attacks;
+    attacks ^= SETS[Lsb((sets->north & occupied_squares) | H8BB)].north;
+    attacks ^= SETS[Lsb((sets->east  & occupied_squares) | H8BB)].east;
+    attacks ^= SETS[Msb((sets->south & occupied_squares) | A1BB)].south;
+    attacks ^= SETS[Msb((sets->west  & occupied_squares) | A1BB)].west;
+    return attacks;
+}
+#endif
 
 /**
  * @brief Determine queen attacks based on occupied squares.
@@ -145,33 +93,4 @@ bool IsAttacked(const Position* position, int location, int color)
         }
     }
     return false;
-}
-
-/**
- * @brief Determine the set of squares attacked from a piece
- * @param position the chess position
- * @param location square index
- * @param piece piece standing on location
- * @return set of squares attacked / defended by piece
-*/
-bitboard AttacksFromSquare(const Position* position, int location, int piece)
-{
-    switch (piece)
-    {
-    case NO_PIECE:
-        return NO_SQUARES;
-    case PAWN:
-        return ColorAt(position, location) == WHITE ? SETS[location].pawn_attacks_white : SETS[location].pawn_attacks_black;
-    case KNIGHT:
-        return SETS[location].knight_attacks;
-    case BISHOP:
-        return BishopAttacks(position->occupied_squares, location);
-    case ROOK:
-        return RookAttacks(position->occupied_squares, location);
-    case QUEEN:
-        return QueenAttacks(position->occupied_squares, location);
-    case KING:
-        return SETS[location].king_attacks;
-    }
-    return NO_SQUARES;
 }
