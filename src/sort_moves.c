@@ -28,7 +28,7 @@ wide variety of positions.
 */
 
 #define MOVE_MASK   0x7FFF
-#define MERIT(move) ((MOVE_CAPTURED(move) - MOVE_PIECE(move) + MOVE_PROMOTED(move) * 3) * 100)
+#define MERIT(move) ((MOVE_CAPTURED(move) + MOVE_PROMOTED(move)  - MOVE_PIECE(move)) * 10)
 
 static int good_move_counts[MAX_PLY][8 * 64 * 64];
 /*

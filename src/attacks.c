@@ -99,3 +99,52 @@ bool IsAttacked(const Position* position, int location, int color)
     }
     return false;
 }
+
+/**
+ * @brief Determine attacks to a square by a color.
+ * @param position Board position.
+ * @param location Square index.
+ * @param color Attacking color.
+ * @return Set of squares of color containing a piece attacking location.
+ */
+bitboard AttacksTo(const Position* position, int location, int color)
+{
+    const Sets* const sets = &SETS[location];
+    const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
+    const bitboard attacking_pieces = position->pieces_of_color[color];
+    const bitboard occupied_squares = position->white_pieces | position->black_pieces;
+    /*
+    Pawn, knight and king attacks can be done by direct lookup since blockers 
+    do not affect their attack set.
+    */
+    bitboard result = 
+        (attacking_pieces & 
+        ((sets->pawn_attacks[ENEMY(color)] & position->pawns)   |
+        (             sets->knight_attacks & position->knights) | 
+        (               sets->king_attacks & position->kings)));
+    /*
+    Rook and queen horizontal and vertical sliding attacks
+    */
+    bitboard sliding_attackers = (position->rooks | position->queens) & sets->rook_attacks & attacking_pieces;
+    while (sliding_attackers)
+    {
+        const int locn = FindAndClearLsb(&sliding_attackers);
+        if (!(intervening_squares[locn] & occupied_squares))
+        {
+            result |= BITBOARD(locn);
+        }
+    }
+    /*
+    Bishop and queen diagonal and antidiagonal sliding attacks
+    */
+    sliding_attackers = (position->bishops | position->queens) & sets->bishop_attacks & attacking_pieces;
+    while (sliding_attackers)
+    {
+        const int locn = FindAndClearLsb(&sliding_attackers);
+        if (!(intervening_squares[locn] & occupied_squares))
+        {
+            result |= BITBOARD(locn);
+        }
+    }
+    return result;
+}

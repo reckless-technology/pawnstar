@@ -37,6 +37,7 @@ Attacks
 bitboard    BishopAttacks(bitboard occupied_squares, int location);
 bitboard    RookAttacks  (bitboard occupied_squares, int location);
 bitboard    QueenAttacks (bitboard occupied_squares, int location);
+bitboard    AttacksTo(const Position* position, int location, int color);
 bool        IsAttacked(const Position* position, int location, int color);
 /*
 Opening book
