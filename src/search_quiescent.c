@@ -38,18 +38,16 @@ int SearchQuiescent(const Position* src_position,
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
-    int captures[MAX_MOVES_PER_POSITION];
+    Move captures[MAX_MOVES_PER_POSITION];
     GeneratePseudoLegalCaptures(src_position, captures);
-    SortMoves(src_position, captures, ply, false);
-    for (const int* move = captures; *move; ++move)
+    SortMoves(src_position, captures, ply);
+    for (const Move* move = captures; *move; ++move)
     {
-#if DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-        if (EvaluateStaticExchange(src_position, *move) < 0)
+        if (MOVE_SCORE(*move) < 0)
         {
-            INCREMENT("quiescent SEE skips");
+            INCREMENT("negative SEE quiescent skips");
             continue;
         }
-#endif
         Position position;
         MakeMove(&position, src_position, *move);
         if (position.state_flags & IS_MOVED_INTO_CHECK)

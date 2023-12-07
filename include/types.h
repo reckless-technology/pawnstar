@@ -3,7 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef uint64_t bitboard; /**<  64 bit unsigned bitset mapping to squares on the chess board. */
+typedef uint64_t Bitboard;
+typedef int64_t  Move;
 
 /**
  * @brief Chess pieces.
@@ -65,16 +66,6 @@ enum StateFlags
 };
 
 /**
- * @brief Move generation and search phases.
-*/
-enum MovePhase
-{
-    PHASE_PRE_MOVES,        /**< moves from the principal variation or transposition table              */
-    PHASE_CAPTURES,         /**< capture and promotion moves with a non negative static exchange eval   */
-    PHASE_NON_CAPTURES,     /**< non captures moves with a non negative static exchange eval            */
-};
-
-/**
  * @brief Chess board square indices.
 */
 enum Squares
@@ -100,41 +91,32 @@ enum NodeType
 };
 
 /**
- * @brief A move and its associated score - used when sorting moves.
-*/
-typedef struct ScoredMove
-{
-    int move;
-    int score;
-} ScoredMove;
-
-/**
  * @brief Bitboard bit sets for a specific square.
 */
 typedef struct Sets
 {
-    bitboard north;
-    bitboard northeast;
-    bitboard east;
-    bitboard southeast;
-    bitboard south;
-    bitboard southwest;
-    bitboard west;
-    bitboard northwest;
+    Bitboard north;
+    Bitboard northeast;
+    Bitboard east;
+    Bitboard southeast;
+    Bitboard south;
+    Bitboard southwest;
+    Bitboard west;
+    Bitboard northwest;
     union
     {
-        bitboard pawn_attacks[2];   /**< indexed by color */
+        Bitboard pawn_attacks[2];   /**< indexed by color */
         struct
         {
-            bitboard pawn_attacks_white;    /**< squares attacked by a white pawn on this square    */
-            bitboard pawn_attacks_black;    /**< squares attacked by a black pawn on this square    */
+            Bitboard pawn_attacks_white;    /**< squares attacked by a white pawn on this square    */
+            Bitboard pawn_attacks_black;    /**< squares attacked by a black pawn on this square    */
         };
     };
-    bitboard knight_attacks;    /**< squares attacked by a knight on this square    */
-    bitboard bishop_attacks;    /**< squares attacked by a bishop on an empty board */
-    bitboard rook_attacks;      /**< squares attacked by a rook on an empty board   */
-    bitboard queen_attacks;     /**< squares attacked by a queen on an empty board  */
-    bitboard king_attacks;      /**< squares attacked by a king on this square      */
+    Bitboard knight_attacks;    /**< squares attacked by a knight on this square    */
+    Bitboard bishop_attacks;    /**< squares attacked by a bishop on an empty board */
+    Bitboard rook_attacks;      /**< squares attacked by a rook on an empty board   */
+    Bitboard queen_attacks;     /**< squares attacked by a queen on an empty board  */
+    Bitboard king_attacks;      /**< squares attacked by a king on this square      */
 } Sets;
 
 /**
@@ -142,10 +124,10 @@ typedef struct Sets
 */
 typedef struct PawnSets
 {
-    bitboard passed_pawn_mask;      /**< Squares which if not containing an enemy pawn, make the pawn passed.       */
-    bitboard isolated_pawn_mask;    /**< Squares which if not containing a friendly pawn, make the pawn isolated.   */
-    bitboard supported_pawn_mask;   /**< Squares which if containing a friendly pawn, make the pawn supported.      */
-    bitboard doubled_pawn_mask;     /**< Squares which if containing a friendly pawn, make the pawn doubled.        */
+    Bitboard passed_pawn_mask;      /**< Squares which if not containing an enemy pawn, make the pawn passed.       */
+    Bitboard isolated_pawn_mask;    /**< Squares which if not containing a friendly pawn, make the pawn isolated.   */
+    Bitboard supported_pawn_mask;   /**< Squares which if containing a friendly pawn, make the pawn supported.      */
+    Bitboard doubled_pawn_mask;     /**< Squares which if containing a friendly pawn, make the pawn doubled.        */
 } PawnSets;
 
 
@@ -160,24 +142,24 @@ struct Position
 {    
     union
     {
-        bitboard piece[6];             /**< used to index pieces by [piece - 1] */
+        Bitboard piece[6];             /**< used to index pieces by [piece - 1] */
         struct
         {
-            bitboard pawns;             /**< squares with a pawn on them        */
-            bitboard knights;           /**< squares with a knight on them      */  
-            bitboard bishops;           /**< squares with a bishop on them      */
-            bitboard rooks;             /**< squares with a rook on them        */
-            bitboard queens;            /**< squares with a queen on them       */
-            bitboard kings;             /**< squares with a king on them        */
+            Bitboard pawns;             /**< squares with a pawn on them        */
+            Bitboard knights;           /**< squares with a knight on them      */  
+            Bitboard bishops;           /**< squares with a bishop on them      */
+            Bitboard rooks;             /**< squares with a rook on them        */
+            Bitboard queens;            /**< squares with a queen on them       */
+            Bitboard kings;             /**< squares with a king on them        */
         };
     };
     union
     {
-        bitboard pieces_of_color[2];    /**< used to index pieces by color */
+        Bitboard pieces_of_color[2];    /**< used to index pieces by color */
         struct
         {
-            bitboard white_pieces;      /**< squares with a white piece on them */
-            bitboard black_pieces;      /**< squares with a black piece on them */
+            Bitboard white_pieces;      /**< squares with a white piece on them */
+            Bitboard black_pieces;      /**< squares with a black piece on them */
         };
     };    
     uint64_t        hash;                   /**< Zobrist hash of this position, maintained incrementally    */
@@ -250,7 +232,7 @@ typedef struct TimeControl
 typedef struct Transposition
 {
     uint64_t    hash;       /**< Zobrist hash of this position                          */
-    int         move;       /**< Best move from this position, if any                   */
+    Move        move;       /**< Best move from this position, if any                   */
     int16_t     score;      /**< The score computed from this position                  */
     int8_t      depth;      /**< The depth to which this position was searched          */
     uint8_t     node_type;  /**< The alpha-beta tree search node type (cut, all, pv)    */
@@ -262,7 +244,7 @@ typedef struct Transposition
 */
 typedef struct Variation
 {
-    int moves[MAX_PLY + 1]; /**< the moves comprising the line  */
+    Move moves[MAX_PLY + 1]; /**< the moves comprising the line  */
 } Variation;
 
 /**
@@ -281,7 +263,7 @@ typedef struct Game
 typedef struct MagicMoveEntry
 {
     uint64_t        magic;
-    bitboard        occupancy_mask;
+    Bitboard        occupancy_mask;
     int             shift;
     const uint64_t* attacks;
     const uint8_t*  indices;

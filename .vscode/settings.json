@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "move_generation_template.h": "c",
+        "ios": "c",
+        "xstring": "c",
+        "cstdlib": "c"
+    }
+}

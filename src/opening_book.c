@@ -21,8 +21,8 @@ struct BookPosition
     uint64_t        hash;
     int             capacity;
     int             count;
-    int* moves;
-    BookPosition* next;
+    Move*           moves;
+    BookPosition*   next;
 };
 /*
 Head pointer
@@ -37,7 +37,7 @@ static BookPosition* NewBookPosition(uint64_t hash)
     bp->hash = hash;
     bp->capacity = 1;
     bp->count = 0;
-    bp->moves = malloc(sizeof(int));
+    bp->moves = malloc(sizeof(Move));
     bp->next = NULL;
     return bp;
 }
@@ -59,7 +59,7 @@ static BookPosition* FindBookPosition(uint64_t hash)
 /*
 Add a new move to the opening book
 */
-static void AddMove(uint64_t hash, int move)
+static void AddMove(uint64_t hash, Move move)
 {
     BookPosition* bp = FindBookPosition(hash);
     if (!bp)
@@ -71,7 +71,7 @@ static void AddMove(uint64_t hash, int move)
     if (bp->count == bp->capacity)
     {
         bp->capacity <<= 1;
-        bp->moves = realloc(bp->moves, bp->capacity * sizeof(int));
+        bp->moves = realloc(bp->moves, bp->capacity * sizeof(Move));
     }
     bp->moves[bp->count++] = move;
 }
@@ -79,7 +79,7 @@ static void AddMove(uint64_t hash, int move)
 Select one from the possible book moves for the current position
 Returns 0 if there is no book move for this position.
 */
-int GetBookMove(uint64_t hash)
+Move GetBookMove(uint64_t hash)
 {
     const BookPosition* bp = FindBookPosition(hash);
     return bp ? bp->moves[(unsigned)NextRandom() % bp->count] : 0;
@@ -104,9 +104,9 @@ Show all possible book moves for this position
 */
 void DisplayAvailableBookMoves(const Position* position)
 {
-    int book_moves[MAX_MOVES_PER_POSITION] = { 0 };
+    Move book_moves[MAX_MOVES_PER_POSITION] = { 0 };
     int move_counts[MAX_MOVES_PER_POSITION] = { 0 };
-    int next_move = 0;
+    int num_discrete_moves = 0;
     const BookPosition* bp = FindBookPosition(position->hash);
     if (!bp)
     {
@@ -114,13 +114,13 @@ void DisplayAvailableBookMoves(const Position* position)
     }
     for (int i = 0; i != bp->count; ++i)
     {
-        const int* move = FindMove(book_moves, bp->moves[i]);
+        const Move* move = FindMove(book_moves, bp->moves[i]);
         if (!move)
         {
             /* This is the first time we have seen this book move */
-            book_moves[next_move] = bp->moves[i];
-            move_counts[next_move] = 1;
-            ++next_move;
+            book_moves[num_discrete_moves] = bp->moves[i];
+            move_counts[num_discrete_moves] = 1;
+            ++num_discrete_moves;
         }
         else
         {
@@ -128,7 +128,7 @@ void DisplayAvailableBookMoves(const Position* position)
         }
     }
     printf("move   count\n");
-    for (int i = 0; i != next_move; ++i)
+    for (int i = 0; i != num_discrete_moves; ++i)
     {
         char buffer[16];
         MoveToString(position, book_moves[i], buffer);

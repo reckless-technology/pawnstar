@@ -1,26 +1,28 @@
 /**
- * @file Used by move_generation.c to generate moves, both captures only and all moves.
+ * @file Used by move_generation.c to generate moves.
+ * This file is a form of "template" and gets incluced twice, to generate 2 functions,
+ * generating all moves and captures only (for quiescent search).
 */
 {
     const int color                 = COLOR_TO_MOVE(position);
-    const bitboard occupied_squares = position->white_pieces | position->black_pieces;
-    const bitboard vacant_squares   = ~occupied_squares;
-    const bitboard friendly_pieces  = position->pieces_of_color[color];
-    const bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
+    const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
+    const Bitboard vacant_squares   = ~occupied_squares;
+    const Bitboard friendly_pieces  = position->pieces_of_color[color];
+    const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
     /*
     Pawn move variables
     */
-    bitboard pawns;
-    bitboard promotions_west;
-    bitboard promotions_east;
-    bitboard promotions;
-    bitboard captures_west;
-    bitboard captures_east;
+    Bitboard pawns;
+    Bitboard promotions_west;
+    Bitboard promotions_east;
+    Bitboard promotions;
+    Bitboard captures_west;
+    Bitboard captures_east;
 #if GENERATE_NON_CAPTURES
-    bitboard double_pushes;
+    Bitboard double_pushes;
 #endif
-    bitboard single_pushes;
-    bitboard en_passant_sources;
+    Bitboard single_pushes;
+    Bitboard en_passant_sources;
     int push_delta;
     int west_delta;
     int east_delta;
@@ -104,7 +106,7 @@
     while (double_pushes)
     {
         const int to = FindAndClearLsb(&double_pushes);
-        *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(to - push_delta, to, PAWN);
+        *non_captures++ = CONSTRUCT_PAWN_DOUBLE_PUSH_MOVE(to - push_delta, to);
     }
     push_delta >>= 1;
     while (single_pushes)
@@ -116,18 +118,18 @@
     /*
     Generate knight moves
     */
-    bitboard knights = position->knights & friendly_pieces;
+    Bitboard knights = position->knights & friendly_pieces;
     while (knights)
     {
         const int from = FindAndClearLsb(&knights);
-        bitboard capture_targets = SETS[from].knight_attacks & enemy_pieces;
+        Bitboard capture_targets = SETS[from].knight_attacks & enemy_pieces;
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
             *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, KNIGHT, PieceAt(position, to));
         }
 #if GENERATE_NON_CAPTURES
-        bitboard non_capture_targets = SETS[from].knight_attacks & vacant_squares;
+        Bitboard non_capture_targets = SETS[from].knight_attacks & vacant_squares;
         while (non_capture_targets)
         {
             *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), KNIGHT);
@@ -137,19 +139,19 @@
     /*
     Generate bishop sliding moves
     */
-    bitboard bishops = position->bishops & friendly_pieces;
+    Bitboard bishops = position->bishops & friendly_pieces;
     while (bishops)
     {
         const int from = FindAndClearLsb(&bishops);
-        const bitboard attacks = BishopAttacks(occupied_squares, from);
-        bitboard capture_targets = attacks & enemy_pieces;
+        const Bitboard attacks = BishopAttacks(occupied_squares, from);
+        Bitboard capture_targets = attacks & enemy_pieces;
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
             *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
         }
 #if GENERATE_NON_CAPTURES
-        bitboard non_capture_targets = attacks & vacant_squares;
+        Bitboard non_capture_targets = attacks & vacant_squares;
         while (non_capture_targets)
         {
             *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), BISHOP);
@@ -159,19 +161,19 @@
     /*
     Generate rook sliding moves
     */
-    bitboard rooks = position->rooks & friendly_pieces;
+    Bitboard rooks = position->rooks & friendly_pieces;
     while (rooks)
     {
         const int from = FindAndClearLsb(&rooks);
-        const bitboard attacks = RookAttacks(occupied_squares, from);
-        bitboard capture_targets = attacks & enemy_pieces;
+        const Bitboard attacks = RookAttacks(occupied_squares, from);
+        Bitboard capture_targets = attacks & enemy_pieces;
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
             *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
         }
 #if GENERATE_NON_CAPTURES
-        bitboard non_capture_targets = attacks & vacant_squares;
+        Bitboard non_capture_targets = attacks & vacant_squares;
         while (non_capture_targets)
         {
             *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), ROOK);
@@ -181,19 +183,19 @@
     /*
     Generate Queen sliding moves
     */
-    bitboard queens = position->queens & friendly_pieces;
+    Bitboard queens = position->queens & friendly_pieces;
     while (queens)
     {
         const int from = FindAndClearLsb(&queens);
-        const bitboard attacks = QueenAttacks(occupied_squares, from);
-        bitboard capture_targets = attacks & enemy_pieces;
+        const Bitboard attacks = QueenAttacks(occupied_squares, from);
+        Bitboard capture_targets = attacks & enemy_pieces;
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
             *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
         }
 #if GENERATE_NON_CAPTURES
-        bitboard non_capture_targets = attacks & vacant_squares;
+        Bitboard non_capture_targets = attacks & vacant_squares;
         while (non_capture_targets)
         {
             *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), QUEEN);
@@ -204,8 +206,8 @@
     Generate King Moves
     */
     const int king_location = Lsb(position->kings & position->pieces_of_color[color]);
-    const bitboard targets = SETS[king_location].king_attacks;
-    bitboard capture_targets = targets & enemy_pieces;
+    const Bitboard targets = SETS[king_location].king_attacks;
+    Bitboard capture_targets = targets & enemy_pieces;
     while (capture_targets)
     {
         const int to = FindAndClearLsb(&capture_targets);
@@ -213,7 +215,7 @@
     }
     *captures = 0;
 #if GENERATE_NON_CAPTURES
-    bitboard non_capture_targets = targets & vacant_squares;
+    Bitboard non_capture_targets = targets & vacant_squares;
     while (non_capture_targets)
     {
         *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(king_location, FindAndClearLsb(&non_capture_targets), KING);
@@ -225,8 +227,8 @@
         */
         if (color == WHITE)
         {
-            if ((position->state_flags & MAY_WHITE_CASTLE_KINGSIDE) && /* if white retains the right to castle kingside and */
-                !(occupied_squares & (F1BB | G1BB)) &&        /* f1 and g1 are both vacant and                     */
+            if ((position->state_flags & MAY_WHITE_CASTLE_KINGSIDE) &&  /* if white retains the right to castle kingside and */
+                !(occupied_squares & (F1BB | G1BB)) &&                  /* f1 and g1 are both vacant and                     */
                 !IsAttacked(position, F1, BLACK) &&                     /* f1 is not attacked by black and                   */
                 !IsAttacked(position, G1, BLACK))                       /* the king's destination is not attacked by black   */
             {

@@ -5,9 +5,9 @@ Convert a move into standard algebraic notation
 Refer to:
 http://en.wikipedia.org/wiki/Portable_Game_Notation#Movetext
 */
-char* MoveToString(const Position* position, int the_move, char move_string[])
+char* MoveToString(const Position* position, Move the_move, char move_string[])
 {
-    int legal_moves[MAX_MOVES_PER_POSITION];
+    Move legal_moves[MAX_MOVES_PER_POSITION];
     Position dst_position[1];
     char disambiguation[3]   = { 0 };
     char from_square[3]      = { FILE_CHAR(MOVE_FROM(the_move)), RANK_CHAR(MOVE_FROM(the_move)), 0 };
@@ -21,7 +21,7 @@ char* MoveToString(const Position* position, int the_move, char move_string[])
     of moving to the target square, and will require further disambiguation
     */
     GenerateLegalMoves(position, legal_moves);
-    for (const int* move = legal_moves; *move; ++move)
+    for (const Move* move = legal_moves; *move; ++move)
     {
         if (MOVE_PIECE(*move) == MOVE_PIECE(the_move) && 
             MOVE_TO   (*move) == MOVE_TO   (the_move) &&
@@ -77,7 +77,7 @@ char* MoveToString(const Position* position, int the_move, char move_string[])
         break;
     
     case KING:
-        if (MOVE_IS_SPECIAL(the_move))
+        if (MOVE_IS_CASTLING(the_move))
         {
             switch (MOVE_TO(the_move))
             {
@@ -101,7 +101,7 @@ char* MoveToString(const Position* position, int the_move, char move_string[])
         if (MOVE_CAPTURED(the_move))
         {
             move_string += sprintf(move_string, "%cx%s", from_square[0], to_square);
-            if (MOVE_IS_SPECIAL(the_move))
+            if (MOVE_IS_EP_CAPTURE(the_move))
             {
                 /* ep capture */
                 move_string += sprintf(move_string, "e.p.");
@@ -135,12 +135,12 @@ char* MoveToString(const Position* position, int the_move, char move_string[])
 Convert a sequence of moves into SAN representation with each move separated by
 a space
 */
-void MoveSequenceToSanString(const Position* position, const int moves[], char move_string[])
+void MoveSequenceToSanString(const Position* position, const Move moves[], char move_string[])
 {
     bool is_first_move = true;
     Position src_position[1];
     Position dst_position[1];
-    const int* move;
+    const Move* move;
     *src_position = *position;
     for (move = moves; *move; ++move)
     {

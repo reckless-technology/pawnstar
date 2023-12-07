@@ -66,7 +66,7 @@ void
 RecordTransposition(uint64_t hash, 
                     int      depth, 
                     int      score, 
-                    int      move, 
+                    Move     move, 
                     int      node_type)
 {   
     Transposition* const t  = &transposition_table[hash % table_num_entries];

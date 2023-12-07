@@ -15,7 +15,7 @@ PositionFromString(const char* fen_string,
     static const char* const black_pieces = "pnbrqk";
     static const char* const ep_files     = "abcdefgh";
     static const char* const ep_ranks     = "36";
-    char buffer[STRING_BUF_LEN];
+    char buffer[256];
     const size_t len = strlen(fen_string);
     if (len == 0 || len >= sizeof(buffer))
     {
@@ -216,7 +216,7 @@ Error:
 void PositionToString(const Position* position, char* fen_string)
 {
     /* Pieces on the board */
-    const bitboard occupied_squares = position->white_pieces | position->black_pieces;
+    const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
     for (int y = 7; y >= 0; --y)
     {
         int num_empty_squares = 0;

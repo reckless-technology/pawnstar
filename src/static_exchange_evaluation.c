@@ -10,7 +10,7 @@ static const int piece_values[7] = { 0, 100, 300, 300, 500, 900, 10000 };
 Determine the SEE (static exchange evaluation) for a move.
 Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
 */
-int EvaluateStaticExchange(const Position* src_position, int move)
+int EvaluateStaticExchange(const Position* src_position, Move move)
 {
     Position position;
     MakeMove(&position, src_position, move);
@@ -31,9 +31,9 @@ be super fast.
 static int EvaluateSwapOff(Position* position, int location, int color, int piece_on_square)
 {
     const Sets* const sets                    = &SETS[location];
-    const bitboard square                     = BITBOARD(location);
-    const bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
-    bitboard occupied_squares                 = position->white_pieces | position->black_pieces;
+    const Bitboard square                     = BITBOARD(location);
+    const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
+    Bitboard occupied_squares                 = position->white_pieces | position->black_pieces;
     int scores[32];
     int ply;
     /* First pass: perform all the captures onto the square least valuable piece first */
@@ -41,8 +41,8 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
     {
         /* Find the least valuable piece of color which directly attacks location */
         int capturing_piece;       
-        const bitboard attacking_pieces = position->pieces_of_color[color];
-        bitboard attacker = sets->pawn_attacks[ENEMY(color)] & attacking_pieces & position->pawns;
+        const Bitboard attacking_pieces = position->pieces_of_color[color];
+        Bitboard attacker = sets->pawn_attacks[ENEMY(color)] & attacking_pieces & position->pawns;
         if (attacker)
         {
             attacker &= -attacker; /* isolate LSB in case there is more than 1 pawn attacker */
@@ -56,7 +56,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
             capturing_piece = KNIGHT;
             goto FoundAttacker;
         }
-        bitboard sliders = sets->bishop_attacks & attacking_pieces & position->bishops;
+        Bitboard sliders = sets->bishop_attacks & attacking_pieces & position->bishops;
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(&sliders);

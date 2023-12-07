@@ -77,7 +77,7 @@ MovePiece(Position* position,
 void 
 MakeMove(Position*       dst_position, 
          const Position* src_position, 
-         int             move)
+         Move            move)
 {                          
     const int color    = COLOR_TO_MOVE(src_position);
     const int from     = MOVE_FROM(move);
@@ -100,7 +100,7 @@ MakeMove(Position*       dst_position,
         dst_position->reversible_move_count = 0;
         if (captured)
         {
-            if (MOVE_IS_SPECIAL(move))
+            if (MOVE_IS_EP_CAPTURE(move))
             {
                 // En passant capture: capture location is source rank, destination file
                 const int en_passant_capture_location = (from & 0x38) | (to & 0x07);
@@ -111,7 +111,7 @@ MakeMove(Position*       dst_position,
                 RemovePiece(dst_position, ENEMY(color), captured, to);
             }
         }                
-        else if (((to - from) & 0x0F) == 0)
+        else if (MOVE_IS_PAWN_DOUBLE_PUSH(move))
         {
             // Pawn double push: affects en passant.
             dst_position->en_passant_index = (uint8_t)((from + to) >> 1);
@@ -128,12 +128,11 @@ MakeMove(Position*       dst_position,
         }
         break;
 
-    RegularMove:
-    default:
     case KNIGHT:
     case BISHOP:
     case ROOK:
     case QUEEN:
+    default:
         if (captured)
         {
             RemovePiece(dst_position, ENEMY(color), captured, to);
@@ -143,11 +142,17 @@ MakeMove(Position*       dst_position,
         break;
 
     case KING:
-        if (!MOVE_IS_SPECIAL(move))
+        if (!MOVE_IS_CASTLING(move))
         {
-            goto RegularMove;
+            if (captured)
+            {
+                RemovePiece(dst_position, ENEMY(color), captured, to);
+                dst_position->reversible_move_count = 0;
+            }
+            MovePiece(dst_position, color, KING, from, to);
+            break;
         }
-        // Castling move.
+        /* Castling move. */
         switch (to)
         {
         case G1:
@@ -194,7 +199,7 @@ MakeMove(Position*       dst_position,
 /*
 Make a move and update the game end status flags
 */
-void PlayMove(Game* game, int move)
+void PlayMove(Game* game, Move move)
 {
     if (game->position->state_flags & IS_GAME_OVER)
     {
@@ -237,9 +242,9 @@ int PlayMoveString(Game* game, char* move_str)
     {
         return 0;
     }  
-    int moves[MAX_MOVES_PER_POSITION];
+    Move moves[MAX_MOVES_PER_POSITION];
     GenerateLegalMoves(game->position, moves);
-    for (const int* move = moves; *move; ++move)
+    for (const Move* move = moves; *move; ++move)
     {
         char buffer[16];
         MoveToString(game->position, *move,  buffer);
@@ -258,7 +263,7 @@ int PlayMoveString(Game* game, char* move_str)
  * @param src_position source position
  * @param moves zero terminated list of moves
 */
-void MakeMoveSequence(Position* dst_position, const Position* src_position, const int* moves)
+void MakeMoveSequence(Position* dst_position, const Position* src_position, const Move* moves)
 {
     Position tmp = *src_position;
     while (*moves)

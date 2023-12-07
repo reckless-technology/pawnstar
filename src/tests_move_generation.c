@@ -42,11 +42,11 @@ moves of various types, storing the result in counts
 */
 static void 
 CategorizeMoves(const Position* src_position, 
-                const int       moves[], 
+                const Move      moves[], 
                 PerftCounts*    counts)
 {
     Position position;
-    for (const int* move = moves; *move; ++move)
+    for (const Move* move = moves; *move; ++move)
     {
         MakeMove(&position, src_position, *move);
         if (position.state_flags & IS_MOVED_INTO_CHECK)
@@ -66,16 +66,13 @@ CategorizeMoves(const Position* src_position,
         {
             ++counts->promotions;
         }
-        if (MOVE_IS_SPECIAL(*move))
+        if (MOVE_IS_EP_CAPTURE(*move))
         {
-            if (MOVE_PIECE(*move) == PAWN)
-            {
-                ++counts->ep_captures;
-            }
-            else
-            {
-                ++counts->castles;
-            }
+            ++counts->ep_captures;
+        }
+        if (MOVE_IS_CASTLING(*move))
+        {
+            ++counts->castles;
         }
     }
 }
@@ -92,9 +89,9 @@ Perft(const Position* src_position,
       PerftCounts*    counts)
 {
     static int call_count = 0;
-    int captures[MAX_MOVES_PER_POSITION];
-    int non_captures[MAX_MOVES_PER_POSITION];
-    const int* move_phases[] = { captures, non_captures, NULL };
+    Move captures[MAX_MOVES_PER_POSITION];
+    Move non_captures[MAX_MOVES_PER_POSITION];
+    const Move* move_phases[] = { captures, non_captures, NULL };
     GeneratePseudoLegalMoves(src_position, captures, non_captures);
     if (!(++call_count & 0x7FFFF))
     {
@@ -102,9 +99,9 @@ Perft(const Position* src_position,
     }
     if (depth > 1)
     {
-        for (const int** phase = move_phases; *phase; ++phase)
+        for (const Move** phase = move_phases; *phase; ++phase)
         {
-            for (const int* move = *phase; *move; ++move)
+            for (const Move* move = *phase; *move; ++move)
             {
                 Position position;
                 MakeMove(&position, src_position, *move);

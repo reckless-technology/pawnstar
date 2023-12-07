@@ -1,10 +1,10 @@
 #pragma once
 /**
- * @brief Various useful bitboard constants.
+ * @brief Various useful Bitboard constants.
  */
 
 /*
-A bitboard is just a set-wise interpretation of a 64-bit unsigned integer, with 
+A Bitboard is just a set-wise interpretation of a 64-bit unsigned integer, with 
 each bit mapping to a square on the chessboard. 
 
 If the bit is 1, then the corresponding square is a member of that set, for example:
@@ -21,7 +21,7 @@ Bit 63 maps to square h8 (MSB)
 
 This is commonly referred to as LERF (little endian rank file mapping). 
 If you treat the board as a 2D array, with square (0,0) being a1 and square 
-(7,7) being h8, then the bitboard for a given square is just 
+(7,7) being h8, then the Bitboard for a given square is just 
 
 (1ull << (x + 8 * y))
 

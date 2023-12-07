@@ -10,6 +10,7 @@ HDRS = \
 	function_prototypes.h \
 	inline_functions.h \
 	macros.h \
+	move.h \
 	move_generation_template.h \
 	options.h \
 	pawnstar.h \

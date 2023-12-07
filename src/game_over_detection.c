@@ -47,7 +47,7 @@ d) king and bishop vs king and bishop, with bishops on the same color square
 */
 bool IsDrawByMaterial(const Position* position)
 {
-    const bitboard occupied_squares = position->white_pieces | position->black_pieces;
+    const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
     switch (PopCount(occupied_squares))
     {
     case 0:
@@ -76,8 +76,8 @@ bool IsDrawByMaterial(const Position* position)
         king and bishop vs king and bishop with bishops on same color square
         */
         {
-            const bitboard white_bishops = position->bishops & position->white_pieces;
-            const bitboard black_bishops = position->bishops ^ white_bishops;
+            const Bitboard white_bishops = position->bishops & position->white_pieces;
+            const Bitboard black_bishops = position->bishops ^ white_bishops;
             if (white_bishops && black_bishops && (!(white_bishops & WHITE_SQUARES) == !(black_bishops & WHITE_SQUARES)))
             {
                 INCREMENT("draws by material (4)");
@@ -94,7 +94,7 @@ Determine if the current position represents stalemate
 */
 bool IsStalemate(const Position* position)
 {
-    int moves[MAX_MOVES_PER_POSITION];
+    Move moves[MAX_MOVES_PER_POSITION];
     return 
         !(position->state_flags & IS_CHECK) && 
         GenerateLegalMoves(position, moves) == 0;
@@ -104,7 +104,7 @@ Determine if the current position represents checkmate
 */
 bool IsCheckmate(const Position* position)
 {
-    int moves[MAX_MOVES_PER_POSITION];
+    Move moves[MAX_MOVES_PER_POSITION];
     return 
         (position->state_flags & IS_CHECK) && 
         GenerateLegalMoves(position, moves) == 0;
@@ -118,8 +118,8 @@ c) the side not on move shall not be in check
 bool IsPositionLegal(const Position* position)
 {
     const int color           = COLOR_TO_MOVE(position);
-    const bitboard white_king = position->kings & position->white_pieces;
-    const bitboard black_king = position->kings & position->black_pieces;
+    const Bitboard white_king = position->kings & position->white_pieces;
+    const Bitboard black_king = position->kings & position->black_pieces;
     return
         PopCount(white_king) == 1                               &&
         PopCount(black_king) == 1                               &&

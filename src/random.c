@@ -10,7 +10,10 @@ int NextRandom(void)
     if (x == 0)
     {
         x = (uint64_t)time(NULL);
-        x *= NextRandom();
+        for (int i = 0; i != 1000; ++i)
+        {
+            NextRandom();
+        }
     }
     x ^= x >> 12;
     x ^= x << 25;

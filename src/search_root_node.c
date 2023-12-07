@@ -10,6 +10,20 @@ void StopThinkingMoveImmediately()
     cancel = true;
 }
 
+#define max(a,b)             \
+({                           \
+    __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a > _b ? _a : _b;       \
+})
+
+#define min(a,b)             \
+({                           \
+    __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a < _b ? _a : _b;       \
+})
+
 /**
  * @brief Search the root node and find the best move
  * @param src_position the position to search
@@ -22,12 +36,12 @@ int SearchRootNode(const Position* src_position)
         return 0;
     }
     /* If there is a book move for this position, do not bother with search. */
-    int book_move = GetBookMove(src_position->hash);
+    Move book_move = GetBookMove(src_position->hash);
     if (book_move)
     {
         return book_move;
     } 
-    int moves[MAX_MOVES_PER_POSITION];
+    Move moves[MAX_MOVES_PER_POSITION];
     int move_count = GenerateLegalMoves(src_position, moves);
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (move_count == 1)
@@ -76,15 +90,14 @@ int SearchRootNode(const Position* src_position)
     results of the previous iteration to sort the moves (the merge sort is
     stable).
     */
-    ScoredMove scored_moves[MAX_MOVES_PER_POSITION];
-    ScoredMove best_moves[MAX_PLY];
+    Move best_moves[MAX_PLY];
     for (int i = 0; i != move_count; ++i)
     {
-        scored_moves[i].move  = moves[i];
-        scored_moves[i].score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, scored_moves[i].move, NULL, i);
+        const int score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, moves[i], NULL, i);
+        moves[i] = SCORED_MOVE(moves[i], score);
     }   
-    MergeSort(move_count, scored_moves);
-    int best_move = scored_moves[0].move;
+    MergeSort(move_count, moves);
+    Move best_move = moves[0];
     Variation principal_variation = { 0 };
     for (int depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
     {       
@@ -93,41 +106,45 @@ int SearchRootNode(const Position* src_position)
             break;
         }
         the_game.node_count = 0;
-        MergeSort(move_count, scored_moves);
+        MergeSort(move_count, moves);
         Variation child_pv = { 0 };
         int alpha = ALPHA;
         for (int i = 0; i != move_count; ++i)
-        {          
+        {      
+            int score;    
             if (i == 0)
             {
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &child_pv, i);
+                score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, moves[i], &child_pv, i);
+                moves[i] = SCORED_MOVE(moves[i], score);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, scored_moves[i].move, &child_pv, i);
-                if (scored_moves[i].score > alpha)
+                score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &cancel, moves[i], &child_pv, i);
+                moves[i] = SCORED_MOVE(moves[i], score);
+                if (score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    scored_moves[i].score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, scored_moves[i].move, &child_pv, i);
+                    score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &cancel, moves[i], &child_pv, i);
+                    moves[i] = SCORED_MOVE(moves[i], score);
                 }
             }            
             if (cancel)
             {
                 return best_move;
             }
-            if (scored_moves[i].score > alpha)
+            if (score > alpha)
             {
-                alpha             = scored_moves[i].score;
-                best_move         = scored_moves[i].move;
-                best_moves[depth] = scored_moves[i];
+                alpha             = score;
+                best_move         = moves[i];
+                best_moves[depth] = moves[i];
                 RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);
                 CopyVariation(&principal_variation, &child_pv, best_move);
                 if (the_game.do_show_thinking)
                 {
                     char move_string[256];
                     MoveSequenceToSanString(src_position, principal_variation.moves, move_string);
-                    printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score, (GetMilliseconds() - start_ms) / 10, the_game.node_count, move_string);
+                    printf("%2u %5d %4u %8u %s\n", depth, (int)MOVE_SCORE(best_moves[depth]), (GetMilliseconds() - start_ms) / 10, the_game.node_count, move_string);
                 }
             }
         }        
@@ -151,11 +168,11 @@ int SearchRootNode(const Position* src_position)
             bool is_score_stable = true;
             for (int i = STARTING_SEARCH_DEPTH; i != depth; ++i)
             {
-                if (best_moves[i].move != best_moves[depth].move)
+                if (MOVE_BITS(best_moves[i]) != MOVE_BITS(best_moves[depth]))
                 {
                     is_best_move_consistent = false;
                 }
-                if (abs(best_moves[i].score - best_moves[depth].score) > SCORE_INSTABILITY_THRESHOLD)
+                if (abs(MOVE_SCORE(best_moves[i]) - MOVE_SCORE(best_moves[depth])) > SCORE_INSTABILITY_THRESHOLD)
                 {
                     is_score_stable = false;
                 }

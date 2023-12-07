@@ -1,18 +1,8 @@
 #include "pawnstar.h"
+
+#define MOVE_MASK 0x7FFF /* piece, from, to only */
+
 /*
-Moves are contained within the least significant 22 bits of an integer
-
-  Bits      Interpretation
-  
- 0 -  5     to (destination square index)
- 6 - 11     from (source square index)
-12 - 14     moving piece type
-15 - 17     captured piece type in the case of capture moves
-18 - 20     promoted piece type in the case of pawn promotions
-21 - 21     special flag (en passant capture or castling)
-
-A value of 0 terminates a move list
-
 The good_move_counts array maintains a count, indexed for each ply of search, 
 moving piece type, source and destination square (4 dimensions), how many  
 times that move has raised alpha or caused a cutoff in all the various 
@@ -21,23 +11,20 @@ subtrees at that ply (depth from root node).
 This is based on the premise that moves which are good in one subtree might 
 well be also good in another subtree, and thus moves which have caused more 
 cutoffs should generally be preferred over moves which have caused fewer 
-cutoffs. It's sort of my generalization of the history table and killer move 
+cutoffs. It's sort of a generalization of the history table and killer move 
 concepts. Whilst this assumption is questionable in theory, it has been 
-empirically confirmed that it does indeed measurably speed up the search on a 
-wide variety of positions.
+experimentally confirmed that it does indeed measurably speed up the search 
+on a wide variety of positions.
 */
-
-#define MOVE_MASK   0x7FFF
-#define MERIT(move) ((MOVE_CAPTURED(move) + MOVE_PROMOTED(move)  - MOVE_PIECE(move)) * 10)
-
 static int good_move_counts[MAX_PLY][8 * 64 * 64];
+
 /*
-This function gets called by the search when we find an interesting move, i.e.
-one which raises alpha or causes a beta cutoff. 
+This function gets called by the search when we find an "interesting" move, 
+i.e. one which raises alpha or causes a beta cutoff. 
 */
 void 
-RecordGoodMove(int ply, 
-               int move)
+RecordGoodMove(int  ply, 
+               Move move)
 {
     INCREMENT("good moves");
     ++good_move_counts[ply][move & MOVE_MASK];
@@ -51,31 +38,6 @@ void InitializeGoodMoveCounts(void)
     memset(good_move_counts, 0, sizeof(good_move_counts));
 }
 
-int 
-NextBestMove(const Position* position,
-             int moves[], 
-             int ply,
-             bool use_see)
-{
-    int *best_move = NULL;
-    int best_score = ALPHA;
-    const int* const counts = &good_move_counts[ply][0];
-    for (int* move = moves; *move; ++move)
-    {
-        const int score = use_see ? EvaluateStaticExchange(position, *move) : MERIT(*move) + counts[*move & MOVE_MASK];
-        if (score > best_score)
-        {
-            best_score = score;
-            best_move = move;
-        }
-    }
-    /* Swap best move and first move place in the list. */
-    int tmp = moves[0];
-    moves[0] = *best_move;
-    *best_move = tmp;
-    return moves[0];
-}
-
 /**
  * @brief Sort moves "best first" using a stable merge sort.
  * A stable sort is required so that root node moves with equal alpha score
@@ -83,45 +45,31 @@ NextBestMove(const Position* position,
  * @param position position for which the moves were generated
  * @param moves null terminated list of moves to be sorted
  * @param ply distance from root node
- * @param use_see true to use static exchange evaluation for scoring
- *                false to use the number of cutoffs / alpha raises in the tree
 */
 void 
 SortMoves(const Position* position,
-          int moves[], 
-          int ply,
-          bool use_see)
+          Move            moves[], 
+          int             ply)
 {   
-    int i;
-    ScoredMove scored_moves[MAX_MOVES_PER_POSITION];    
+    Move* move;
     const int* const counts = &good_move_counts[ply][0];
-    int move;
-    if (use_see)
+    for (move = moves; *move; ++move)
     {
-        for (i = 0; (move = moves[i]) != 0; ++i)
-        {
-            scored_moves[i].move  = move;
-            scored_moves[i].score = EvaluateStaticExchange(position, move);
-        }
+        /* 
+        Assign provisional scores based on static exchange evaluation
+        and how many cutoffs this move has caused in the search history.
+        */
+        *move = SCORED_MOVE(*move, EvaluateStaticExchange(position, *move) * 1000 + counts[*move & MOVE_MASK]);
     }
-    else
-    {
-        for (i = 0; (move = moves[i]) != 0; ++i)
-        {
-            scored_moves[i].move  = move;
-            scored_moves[i].score = MERIT(move) + counts[move & MOVE_MASK];
-        }
-    }
-    if (i < 2)
-    {
-        return;
-    }
-    MergeSort(i, scored_moves);
-    for ( --i; i >= 0; --i)
-    {
-        moves[i] = scored_moves[i].move;
-    }
+    MergeSort((int)(move - moves), moves);
 }
+
+#define min(a,b)             \
+({                           \
+    __typeof__ (a) _a = (a); \
+    __typeof__ (b) _b = (b); \
+    _a < _b ? _a : _b;       \
+})
 
 /**
  * @brief Sort moves best first.
@@ -131,24 +79,24 @@ SortMoves(const Position* position,
  * @param values pointer to the elements
 */
 void 
-MergeSort(int        num_elements, 
-          ScoredMove values[])
+MergeSort(int   num_elements, 
+          Move  values[])
 {
-    ScoredMove work[MAX_MOVES_PER_POSITION];
-    ScoredMove* merge_src = values;
-    ScoredMove* merge_dst = work;
+    Move work[MAX_MOVES_PER_POSITION];
+    Move* merge_src = values;
+    Move* merge_dst = work;
     for (int width = 1; width < num_elements; width *= 2)
     {
         for (int begin = 0; begin < num_elements; begin += width * 2)
         {
-            const ScoredMove* const mid = &merge_src[min(begin + width,     num_elements)];
-            const ScoredMove* const end = &merge_src[min(begin + width * 2, num_elements)];           
-            const ScoredMove* i         = &merge_src[begin];
-            const ScoredMove* j         = mid;
-            ScoredMove* dst             = &merge_dst[begin];
+            const Move* const mid = &merge_src[min(begin + width,     num_elements)];
+            const Move* const end = &merge_src[min(begin + width * 2, num_elements)];
+            const Move* i         = &merge_src[begin];
+            const Move* j         = mid;
+            Move* dst             = &merge_dst[begin];
             while (i < mid && j < end)
             {
-                *dst++ = (i->score >= j->score) ? *i++ : *j++;
+                *dst++ = (MOVE_SCORE(*i) >= MOVE_SCORE(*j)) ? *i++ : *j++;
             }
             while (i < mid)
             {
@@ -159,12 +107,12 @@ MergeSort(int        num_elements,
                 *dst++ = *j++;
             }
         }
-        ScoredMove* tmp = merge_src;
-        merge_src       = merge_dst;
-        merge_dst       = tmp;
+        Move* tmp = merge_src;
+        merge_src = merge_dst;
+        merge_dst = tmp;
     }
     if (merge_dst == values)
     {
-        memcpy(values, work, num_elements * sizeof(ScoredMove));
+        memcpy(values, work, num_elements * sizeof(Move));
     }
 }

@@ -11,7 +11,7 @@ SearchSingleMove(const Position*    src_position,
                  int                alpha, 
                  int                beta, 
                  volatile bool*     cancel, 
-                 int                move,
+                 Move               move,
                  Variation*         pv,
                  int                move_index)
 {      

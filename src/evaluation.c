@@ -94,7 +94,8 @@ static const int* const PIECE_SQUARE_SCORES[] =
     [KING]      = KING_SQUARE_MIDGAME
 };
 
-static const int KING_HOME_SQUARE[2] = { E1, E8 };
+static const int KING_HOME_SQUARE[2]    = { E1, E8 };
+static const Bitboard FILES_BB[8]       = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
 
 /**
  * @brief Evaluate the current position, assuming neither king is in check 
@@ -118,22 +119,27 @@ EvaluatePosition(const Position* position,
     /* Phase 1: Evaluate material values alone. */
     for (int color = WHITE; color <= BLACK; ++color)
     {
-        const bitboard friendly_pieces  = position->pieces_of_color[color];
-        const bitboard pawns            = position->pawns   & friendly_pieces;
-        const bitboard knights          = position->knights & friendly_pieces;
-        const bitboard bishops          = position->bishops & friendly_pieces;
-        const bitboard rooks            = position->rooks   & friendly_pieces;
-        const bitboard queens           = position->queens  & friendly_pieces;
+        const Bitboard friendly_pieces  = position->pieces_of_color[color];
+        const Bitboard pawns            = position->pawns   & friendly_pieces;
+        const Bitboard knights          = position->knights & friendly_pieces;
+        const Bitboard bishops          = position->bishops & friendly_pieces;
+        const Bitboard rooks            = position->rooks   & friendly_pieces;
+        const Bitboard queens           = position->queens  & friendly_pieces;
         scores[color] = 
             PopCount(pawns)    * 100 +
             PopCount(knights)  * 325 +
-            PopCount(bishops)  * 350 +
-            PopCount(rooks)    * 500 +
+            PopCount(bishops)  * 325 +
+            PopCount(rooks)    * 525 +
             PopCount(queens)   * 1000;
+        if ((bishops & WHITE_SQUARES) && (bishops & BLACK_SQUARES))
+        {
+            scores[color] += 50;
+        }
     }
     /* 
     See if material score alone causes alpha or beta cutoff. 
-    This saves time doing more expensive evaluation when clearly it's not a PV node. 
+    This saves time doing more expensive evaluation when clearly it's
+    not a PV node so evaluation accuracy is not as important. 
     */
     int score = (position->state_flags & IS_BLACK_TO_MOVE) ?
         scores[BLACK] - scores[WHITE] :
@@ -150,33 +156,38 @@ EvaluatePosition(const Position* position,
     }
     for (int color = WHITE; color <= BLACK; ++color)
     {
-        const int rank_flip            = color == WHITE ? RANK_FLIP : 0;
-        const bitboard friendly_pieces = position->pieces_of_color[color];
-        /* Piece square scores */
+        const int rank_flip = color == WHITE ? RANK_FLIP : 0;
+        const Bitboard friendly_pieces = position->pieces_of_color[color];
+        const int king_location = KING_LOCATION(position, color);
         for (int piece = PAWN; piece <= QUEEN; ++piece)
         {
-            const int* pst = PIECE_SQUARE_SCORES[piece];
-            bitboard p = position->piece[piece - 1] & friendly_pieces;
+            const int* const pst = PIECE_SQUARE_SCORES[piece];
+            Bitboard p = position->piece[piece - 1] & friendly_pieces;
             while (p)
             {
                 const int locn = FindAndClearLsb(&p);
                 scores[color] += pst[locn ^ rank_flip];
             }
-        }
+        }        
         if (position->queens == NO_SQUARES)
         {
-            scores[color] += KING_SQUARE_ENDGAME[KING_LOCATION(position, color) ^ rank_flip];
+            scores[color] += KING_SQUARE_ENDGAME[king_location ^ rank_flip];
         }
         else
         {
-            const int king_location = KING_LOCATION(position, color);
             scores[color] += KING_SQUARE_MIDGAME[king_location ^ rank_flip];
             if (king_location != KING_HOME_SQUARE[color])
             {
-                scores[color] += 20 * PopCount(SETS[king_location].king_attacks & position->pawns & friendly_pieces);
+                const Bitboard friendly_pawns = position->pawns & friendly_pieces;
+                scores[color] +=  
+                     5 * PopCount(SETS[king_location].king_attacks & friendly_pieces) + 
+                    15 * PopCount(SETS[king_location].king_attacks & friendly_pawns);
+                if ((FILES_BB[FILE_OF(king_location)] & friendly_pawns) == NO_SQUARES)
+                {
+                    scores[color] -= 100;
+                }
             }
         }
-
     }
     score = position->state_flags & IS_BLACK_TO_MOVE ?
         scores[BLACK] - scores[WHITE] :

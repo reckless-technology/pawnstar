@@ -18,17 +18,9 @@ Whether to enable null move pruning
 #define DO_NULL_MOVE_PRUNING 1
 #endif
 /*
-Whether to skip moves in quiescence search which have a negative static
-exchange evaluation (SEE)
-*/
-#ifndef DO_QUIESCENCE_STATIC_EXCHANGE_EVAL
-#define DO_QUIESCENCE_STATIC_EXCHANGE_EVAL 1
-#endif
-/*
 Global constants
 */
 #define HASHTABLE_MEGABYTES                   8 // default transposition table size in MB
-#define STRING_BUF_LEN                      256 // default line buffer size
 #define MAX_MOVES_PER_POSITION              256 // maximum possible number of pseudo-legal moves for a chess position
 #define BETA                              11000 // greater than any possible evaluation score including checkmate
 #define ALPHA                            -11000 // smaller than any possible evaluation score including being checkmated

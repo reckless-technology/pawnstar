@@ -1,4 +1,16 @@
 #include "pawnstar.h"
+
+/**
+ * @brief Move generation and search phases.
+*/
+enum MovePhase
+{
+    PHASE_PRE_MOVES,        /**< moves from the principal variation or transposition table              */
+    PHASE_CAPTURES,         /**< capture and promotion moves with a non negative static exchange eval   */
+    PHASE_NON_CAPTURES,     /**< non captures moves with a non negative static exchange eval            */
+};
+
+
 /**
  * @brief Fail hard alpha beta main search algorithm.
  * @param src_position position to search
@@ -20,13 +32,13 @@ Search(const Position*  src_position,
        Variation*       parent_pv)
 {    
     Variation           pv;
-    int                 pre_move[2];
-    int                 captures[MAX_MOVES_PER_POSITION];
-    int                 non_captures[MAX_MOVES_PER_POSITION]; 
+    Move                pre_move[2];
+    Move                captures[MAX_MOVES_PER_POSITION];
+    Move                non_captures[MAX_MOVES_PER_POSITION]; 
     int                 num_legal_moves     = 0;
-    int                 best_move           = 0;
+    Move                best_move           = 0;
     bool                has_raised_alpha    = false;
-    int* const          move_phases[]       = 
+    Move* const         move_phases[]       = 
     { 
         [PHASE_PRE_MOVES]        = pre_move,
         [PHASE_CAPTURES]         = captures,
@@ -56,7 +68,12 @@ Search(const Position*  src_position,
         INCREMENT("max ply reached");
         return EvaluatePosition(src_position, alpha, beta);
     }
-    if (!(src_position->state_flags & IS_CHECK) && depth <= 0)
+    if (src_position->state_flags & IS_CHECK)
+    {
+        INCREMENT("extensions check");
+        ++depth;
+    }
+    else if (depth <= 0)
     {
         return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
     } 
@@ -179,22 +196,36 @@ Search(const Position*  src_position,
 
         case PHASE_CAPTURES:
             GeneratePseudoLegalMoves(src_position, captures, non_captures); 
-            SortMoves(src_position, captures, ply, false);
+            SortMoves(src_position, captures, ply);
             break;
 
         case PHASE_NON_CAPTURES:
-            SortMoves(src_position, non_captures, ply, false);
+            SortMoves(src_position, non_captures, ply);
             break;
 
         default:
             printf("ERROR: illegal move phase\n");
             break;
         }
-        int* moves_this_phase = move_phases[phase];
+        Move* moves_this_phase = move_phases[phase];
         while (*moves_this_phase)
         {
-            int move = *moves_this_phase++;
-            int score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
+            Move move = *moves_this_phase++;
+            int search_depth_this_move = depth;
+            if (!(src_position->state_flags & IS_CHECK) && MOVE_SCORE(move) < 0)
+            {
+                if (depth <= 1)
+                {
+                    INCREMENT("negative SEE frontier skips");
+                    continue;
+                }
+                else
+                {
+                    INCREMENT("negative SEE reductions");
+                    --search_depth_this_move;
+                }
+            }
+            int score = SearchSingleMove(src_position, search_depth_this_move, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
             if (*cancel)
             {
                 return SEARCH_CANCELLED_SCORE;

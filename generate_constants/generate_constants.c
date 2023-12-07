@@ -20,16 +20,16 @@
 #define RANK_OF(locn)       ((locn) >> 3)               /**< Convert square index to rank. */
 #define FILE_CHAR(locn)     ('a' + FILE_OF(locn))       /**< Convert square index to file character. */
 #define RANK_CHAR(locn)     ('1' + RANK_OF(locn))       /**< Convert square index to rank character. */
-#define BITBOARD(locn)      (1ull << (locn))            /**< Convert square index to bitboard. */
-#define BITBOARD_XY(x,y)    (1ull << ((x) + 8 * (y)))   /**< Convert square (file,rank) co-ords to bitboard. */
-#define SHIFT_NORTH(b)      ((b) << 8)                  /**< Shift a bitboard one square to the north. */
-#define SHIFT_NORTHEAST(b)  (((b) & MASK_EAST_1) << 9)  /**< Shift a bitboard one square to the northeast. */
-#define SHIFT_EAST(b)       (((b) & MASK_EAST_1) << 1)  /**< Shift a bitboard one square to the east. */
-#define SHIFT_SOUTHEAST(b)  (((b) & MASK_EAST_1) >> 7)  /**< Shift a bitboard one square to the southeast. */
-#define SHIFT_SOUTH(b)      ((b) >> 8)                  /**< Shift a bitboard one square to the south. */
-#define SHIFT_SOUTHWEST(b)  (((b) & MASK_WEST_1) >> 9)  /**< Shift a bitboard one square to the southwest. */
-#define SHIFT_WEST(b)       (((b) & MASK_WEST_1) >> 1)  /**< Shift a bitboard one square to the west. */
-#define SHIFT_NORTHWEST(b)  (((b) & MASK_WEST_1) << 7)  /**< Shift a bitboard one square to the northwest. */
+#define BITBOARD(locn)      (1ull << (locn))            /**< Convert square index to Bitboard. */
+#define BITBOARD_XY(x,y)    (1ull << ((x) + 8 * (y)))   /**< Convert square (file,rank) co-ords to Bitboard. */
+#define SHIFT_NORTH(b)      ((b) << 8)                  /**< Shift a Bitboard one square to the north. */
+#define SHIFT_NORTHEAST(b)  (((b) & MASK_EAST_1) << 9)  /**< Shift a Bitboard one square to the northeast. */
+#define SHIFT_EAST(b)       (((b) & MASK_EAST_1) << 1)  /**< Shift a Bitboard one square to the east. */
+#define SHIFT_SOUTHEAST(b)  (((b) & MASK_EAST_1) >> 7)  /**< Shift a Bitboard one square to the southeast. */
+#define SHIFT_SOUTH(b)      ((b) >> 8)                  /**< Shift a Bitboard one square to the south. */
+#define SHIFT_SOUTHWEST(b)  (((b) & MASK_WEST_1) >> 9)  /**< Shift a Bitboard one square to the southwest. */
+#define SHIFT_WEST(b)       (((b) & MASK_WEST_1) >> 1)  /**< Shift a Bitboard one square to the west. */
+#define SHIFT_NORTHWEST(b)  (((b) & MASK_WEST_1) << 7)  /**< Shift a Bitboard one square to the northwest. */
 
 /**
  * @brief Chess piece types.
@@ -230,7 +230,7 @@ static uint64_t PawnAttacksBlack(int location)
 }
 
 /**
- * @brief Knight attacks from bitboard.
+ * @brief Knight attacks from Bitboard.
  * @param b Bitboard containing knight square.
  * @return Squares attacked by a knight on b.
  */
@@ -636,7 +636,7 @@ typedef uint64_t(*MoveTargetFn)  (uint64_t occupied_squares, int location);
 #define MAX_ATTACK_SET_SIZE 4096 /* Rooks have a 12 bit occupancy mask. */
 
 /**
- * @brief Parameters for magic bitboard search.
+ * @brief Parameters for magic Bitboard search.
  */
 typedef struct Magic
 {
@@ -651,7 +651,7 @@ typedef struct Magic
 } Magic;
 
 /**
- * @brief Trial and error search for a magic bitboard entry.
+ * @brief Trial and error search for a magic Bitboard entry.
  * @param location Square index.
  * @param magic Where to store the found magic values.
  */
@@ -736,7 +736,7 @@ FindMagic(int    location,
 }
 
 /**
- * @brief A magic bitboard search vector entry.
+ * @brief A magic Bitboard search vector entry.
  */
 typedef struct MagicVector
 {
@@ -798,44 +798,28 @@ GenerateMagics(void)
                 printf("0x%016llXull, ", magics[i].attacks[j]);
             }
             printf("\n};\n");
-            /* Next print the MagicMoveEntry for this piece / square combination. */
-            printf("static const MagicMoveEntry %s_MAGIC_%s = \n{\n", v->name, square_name);
-            printf("    .magic          = 0x%016llXull,\n", magics[i].magic);
-            printf("    .occupancy_mask = 0x%016llXull,\n", magics[i].mask);
-            printf("    .shift          = %d,\n", magics[i].shift);
-            printf("    .attacks        = %s_MAGIC_ATTACKS_%s,\n", v->name, square_name);
-            printf("    .indices        = %s_MAGIC_INDICES_%s,\n", v->name, square_name);
-            printf("};\n");
+           
         }
-    }
-    /* Finally print the arrays of pointers to the magic move entries. */
-    printf("const MagicMoveEntry* ROOK_MAGICS[64] = \n{");
-    for (int i = 0; i != 64; ++i)
-    {
-        char square_name[3] = { 'A' + FILE_OF(i), RANK_CHAR(i), 0 };
-        if (i % 8 == 0)
+         /* Next print the MagicMoveEntry for this piece / square combination. */
+        printf("const MagicMoveEntry %s_MAGICS[64] = \n{\n", v->name);
+        for (int i = 0; i != 64; ++i)
         {
-            printf("\n    ");
+            char square_name[3] = { 'A' + FILE_OF(i), RANK_CHAR(i), 0 };
+            printf("    {\n");
+            printf("        .magic          = 0x%016llXull,\n", magics[i].magic);
+            printf("        .occupancy_mask = 0x%016llXull,\n", magics[i].mask);
+            printf("        .shift          = %d,\n", magics[i].shift);
+            printf("        .attacks        = %s_MAGIC_ATTACKS_%s,\n", v->name, square_name);
+            printf("        .indices        = %s_MAGIC_INDICES_%s,\n", v->name, square_name);
+            printf("    },\n");
         }
-        printf("&ROOK_MAGIC_%s, ", square_name);
+        printf("};\n");
     }
-    printf("\n};\n");
-    printf("const MagicMoveEntry* BISHOP_MAGICS[64] = \n{");
-    for (int i = 0; i != 64; ++i)
-    {
-        char square_name[3] = { 'A' + FILE_OF(i), RANK_CHAR(i), 0 };
-        if (i % 8 == 0)
-        {
-            printf("\n    ");
-        }
-        printf("&BISHOP_MAGIC_%s, ", square_name);
-    }
-    printf("\n};\n");
 }
 
 /**
- * @brief Function pointer for a bitboard generator function, 
- * i.e. a function which converts a square location into a bitboard
+ * @brief Function pointer for a Bitboard generator function, 
+ * i.e. a function which converts a square location into a Bitboard
  * based on some property.
 */
 typedef uint64_t(*BitboardFn)(int location);
@@ -850,7 +834,7 @@ typedef struct BitboardGen
 } BitboardGen;
 
 /**
- * @brief Generators for the main precomputed bitboard arrays.
+ * @brief Generators for the main precomputed Bitboard arrays.
  */
 static const BitboardGen ray_generators[] = 
 {
@@ -975,7 +959,7 @@ int main()
 
 #endif
 
-    printf("const bitboard INTERVENING_SQUARES[64][64] = \n{");
+    printf("const Bitboard INTERVENING_SQUARES[64][64] = \n{");
     for (int i = 0; i != 64; ++i)
     {
         printf("\n    { /* square %c%c */", FILE_CHAR(i), RANK_CHAR(i));
