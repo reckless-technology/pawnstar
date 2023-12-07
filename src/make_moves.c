@@ -27,11 +27,9 @@ MakeNullMove(Position* dst_position,
     memcpy(dst_position, src_position, sizeof(Position));
     dst_position->previous = src_position;
     dst_position->state_flags |= IS_NULL_MOVE;
-    if (dst_position->en_passant_index)
-    {
-        dst_position->hash -= EN_PASSANT_HASHES[FILE_OF(dst_position->en_passant_index)];
-        dst_position->en_passant_index = 0;
-    }
+    dst_position->hash -= EN_PASSANT_HASHES[dst_position->en_passant_index];
+    dst_position->en_passant_index = 0;
+    dst_position->hash += EN_PASSANT_HASHES[dst_position->en_passant_index];
     dst_position->state_flags ^= IS_BLACK_TO_MOVE;
     dst_position->hash += (dst_position->state_flags & IS_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : -BLACK_MOVE_HASH;
 }
@@ -93,11 +91,8 @@ MakeMove(Position*       dst_position,
     dst_position->state_flags &= ~CASTLING_RIGHTS_MASKS[from] & ~CASTLING_RIGHTS_MASKS[to];
     dst_position->hash += CASTLING_RIGHTS_HASHES[dst_position->state_flags & CASTLING_RIGHTS_MASK] 
                         - CASTLING_RIGHTS_HASHES[src_position->state_flags & CASTLING_RIGHTS_MASK];
-    if (dst_position->en_passant_index)
-    {
-        dst_position->hash -= EN_PASSANT_HASHES[FILE_OF(dst_position->en_passant_index)];
-        dst_position->en_passant_index = 0;
-    }
+    dst_position->hash -= EN_PASSANT_HASHES[dst_position->en_passant_index];
+    dst_position->en_passant_index = 0;
     ++dst_position->reversible_move_count;
     switch (piece)
     {
@@ -116,11 +111,10 @@ MakeMove(Position*       dst_position,
                 RemovePiece(dst_position, ENEMY(color), captured, to);
             }
         }                
-        else if (((to - from) & 0xF) == 0)
+        else if (((to - from) & 0x0F) == 0)
         {
             // Pawn double push: affects en passant.
             dst_position->en_passant_index = (uint8_t)((from + to) >> 1);
-            dst_position->hash += EN_PASSANT_HASHES[FILE_OF(from)];
         }       
         if (MOVE_PROMOTED(move))
         {
@@ -178,6 +172,7 @@ MakeMove(Position*       dst_position,
         break;
     };  
     dst_position->state_flags ^= IS_BLACK_TO_MOVE;
+    dst_position->hash += EN_PASSANT_HASHES[dst_position->en_passant_index];
     dst_position->hash += (dst_position->state_flags & IS_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : -BLACK_MOVE_HASH;
     dst_position->full_move_count += (color == BLACK);
     if (IS_IN_CHECK(dst_position, color))

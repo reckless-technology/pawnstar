@@ -1020,8 +1020,8 @@ int main()
         printf("0x%016llXull,", PseudoRandom64());
     }
     printf("\n};\n");
-    printf("const uint64_t EN_PASSANT_HASHES[8] = \n{");
-    for (int i = 0; i != 8; ++i)
+    printf("const uint64_t EN_PASSANT_HASHES[64] = \n{");
+    for (int i = 0; i != 64; ++i)
     {
         if ((i & 3) == 0)
         {

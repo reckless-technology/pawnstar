@@ -60,7 +60,8 @@ enum StateFlags
     IS_NULL_MOVE                = 1 << 12,  /**< position was the result of a null move                     */
     IS_GAME_DRAWN               = (IS_STALEMATE | IS_DRAW_REPETITION | IS_DRAW_MATERIAL | IS_DRAW_50_MOVES),
     IS_GAME_OVER                = (IS_GAME_DRAWN | IS_CHECKMATE),
-    CASTLING_RIGHTS_MASK        = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE),
+    CASTLING_RIGHTS_MASK        = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | 
+                                   MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE),
 };
 
 /**

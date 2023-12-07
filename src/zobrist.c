@@ -10,10 +10,8 @@ ComputeHash(const Position* position)
 {
     uint64_t hash = position->state_flags & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
     hash += CASTLING_RIGHTS_HASHES[position->state_flags & CASTLING_RIGHTS_MASK];
-    if (position->en_passant_index)
-    {
-        hash += EN_PASSANT_HASHES[FILE_OF(position->en_passant_index)];
-    }
+    hash += EN_PASSANT_HASHES[position->en_passant_index];
+
     for (int piece = PAWN; piece <= KING; ++piece)
     {
         bitboard b = position->piece[piece - 1] & position->white_pieces;

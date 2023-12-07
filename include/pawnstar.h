@@ -23,7 +23,7 @@ extern const Sets               SETS[64];
 extern const PawnSets           PAWN_SETS[2][64];
 extern const bitboard           INTERVENING_SQUARES[64][64];
 extern const uint64_t           CASTLING_RIGHTS_HASHES[16];
-extern const uint64_t           EN_PASSANT_HASHES[8];
+extern const uint64_t           EN_PASSANT_HASHES[64];
 extern const uint64_t           PIECE_SQUARE_HASHES[2][6][64];
 extern const MagicMoveEntry*    ROOK_MAGICS[64];
 extern const MagicMoveEntry*    BISHOP_MAGICS[64];
