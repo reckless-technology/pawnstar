@@ -51,7 +51,8 @@ void InitializeGoodMoveCounts(void)
 void 
 ScoreAndSortMoves(const Position* position,
                   Move            moves[], 
-                  int             ply)
+                  int             ply,
+                  int             depth)
 {   
     Move* move;
     const int* const counts = &good_move_counts[ply][0];
@@ -64,6 +65,7 @@ ScoreAndSortMoves(const Position* position,
         *move = SCORED_MOVE(*move, EvaluateStaticExchange(position, *move) * 1000 + counts[*move & MOVE_MASK]);
     }
     SortMoves((int)(move - moves), moves);
+    (void)depth;
 }
 
 #define min(a,b)             \

@@ -180,7 +180,7 @@ Search(const Position*  src_position,
     } 
     Move moves[MAX_MOVES_PER_POSITION];
     GeneratePseudoLegalMoves(src_position, moves);
-    ScoreAndSortMoves(src_position, moves, ply);
+    ScoreAndSortMoves(src_position, moves, ply, depth);
     /* 
     This is the main move loop. 
     */

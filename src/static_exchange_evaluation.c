@@ -14,6 +14,10 @@ int EvaluateStaticExchange(const Position* src_position, Move move)
 {
     Position position;
     MakeMove(&position, src_position, move);
+    if (position.state_flags & IS_MOVED_INTO_CHECK)
+    {
+        return ALPHA;
+    }
     if (MOVE_PROMOTED(move))
     {
         return piece_values[MOVE_CAPTURED(move)] + piece_values[MOVE_PROMOTED(move)] - piece_values[PAWN] - 

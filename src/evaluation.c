@@ -163,12 +163,12 @@ EvaluatePosition(const Position* position,
     int score = (position->state_flags & IS_BLACK_TO_MOVE) ?
         scores[BLACK] - scores[WHITE] :
         scores[WHITE] - scores[BLACK];
-    if (score >= beta + 200)
+    if (score >= beta + 150)
     {
         INCREMENT("eval beta cutoff material");
         return beta;
     }
-    if (score <= alpha - 200)
+    if (score <= alpha - 150)
     {
         INCREMENT("eval alpha cutoff material");
         return alpha;
@@ -235,7 +235,7 @@ EvaluatePosition(const Position* position,
             while (b)
             {
                 const int locn = FindAndClearLsb(&b);
-                scores[color] -= 10 * PopCount(AttacksTo(position, locn, ENEMY(color)));
+                scores[color] -= 5 * PopCount(AttacksTo(position, locn, ENEMY(color)));
             }
         }
     }

@@ -64,7 +64,7 @@ int         GenerateLegalMoves(const Position* position, Move moves[]);
 void        GeneratePseudoLegalMoves(const Position* position, Move moves[]);
 void        GeneratePseudoLegalCaptures(const Position* position, Move moves[]);
 int         EvaluateStaticExchange(const Position* src_position, Move move);
-void        ScoreAndSortMoves(const Position* position, Move moves[], int ply);
+void        ScoreAndSortMoves(const Position* position, Move moves[], int ply, int depth);
 void        SortMoves(int num_elements, Move values[]);
 /*
 Positional evaluation

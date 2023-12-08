@@ -44,7 +44,7 @@ int main()
     if (!InitializeOpeningBookFromFile("pawnstar.book"))
     {
         printf("NOTE: using built in opening book\n");
-        InitializeOpeningBookFromString(OPENING_BOOK_MOVES);
+        //InitializeOpeningBookFromString(OPENING_BOOK_MOVES);
     }
     InitializeGame(&the_game);
     DEBUG_STATEMENT(DebugXClear());
