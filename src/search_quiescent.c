@@ -52,6 +52,7 @@ int SearchQuiescent(const Position* src_position,
         MakeMove(&position, src_position, *move);
         if (position.state_flags & IS_MOVED_INTO_CHECK)
         {
+            INCREMENT("quiescent moved into check");
             continue;
         }
         score = -SearchQuiescent(&position, depth - 1, ply + 1, -beta, -alpha, cancel);

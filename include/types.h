@@ -117,6 +117,7 @@ typedef struct Sets
     Bitboard rook_attacks;      /**< squares attacked by a rook on an empty board   */
     Bitboard queen_attacks;     /**< squares attacked by a queen on an empty board  */
     Bitboard king_attacks;      /**< squares attacked by a king on this square      */
+    Bitboard king_attacks2;     /**< squares within 2 king moves from this square   */
 } Sets;
 
 /**
@@ -268,3 +269,12 @@ typedef struct MagicMoveEntry
     const uint64_t* attacks;
     const uint8_t*  indices;
 } MagicMoveEntry;
+
+/**
+ * @brief Holds information about pinned pieces.
+ */
+typedef struct Pins
+{
+    Bitboard pinned_pieces;         /**< Set of squares which are pinned. */
+    Bitboard allowed_squares[64];   /**< Contains the set of allowed squares a pinned piece may safely move to. */
+} Pins;

@@ -20,7 +20,7 @@ Whether to enable null move pruning
 /*
 Global constants
 */
-#define HASHTABLE_MEGABYTES                   8 // default transposition table size in MB
+#define HASHTABLE_MEGABYTES                1024 // default transposition table size in MB
 #define MAX_MOVES_PER_POSITION              256 // maximum possible number of pseudo-legal moves for a chess position
 #define BETA                              11000 // greater than any possible evaluation score including checkmate
 #define ALPHA                            -11000 // smaller than any possible evaluation score including being checkmated

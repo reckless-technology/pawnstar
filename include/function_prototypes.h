@@ -59,6 +59,7 @@ Generation and ordering of moves
 */
 void        InitializeGoodMoveCounts(void);
 void        RecordGoodMove(int ply, Move move);
+void        DeterminePins(const Position* position, Pins* pins);
 int         GenerateLegalMoves(const Position* position, Move moves[]);
 void        GeneratePseudoLegalMoves(const Position* position, Move captures[], Move non_captures[]);
 void        GeneratePseudoLegalCaptures(const Position* position, Move captures[]);

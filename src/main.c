@@ -48,7 +48,6 @@ int main()
     }
     InitializeGame(&the_game);
     DEBUG_STATEMENT(DebugXClear());
-    RunMergeSortTests();
     for ( ; ; )
     {
         char line_buffer[256];

@@ -121,6 +121,7 @@ Search(const Position*  src_position,
             searching these few principal variation nodes is trivial.
             */
             INCREMENT("table hit pv node");
+            ++depth;
             break;
         }
     }
@@ -132,15 +133,15 @@ Search(const Position*  src_position,
     # the previous move was not a null move
     # we are not in check   
     # this is not a PV node
-    # this is not the endgame
+    # we are not down to king and pawns
     # static eval is at least beta
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    if (!(src_position->state_flags & IS_NULL_MOVE)                             &&
-        !(src_position->state_flags & IS_CHECK)                                 &&
-        beta == alpha + 1                                                       &&
-        PopCount(src_position->white_pieces | src_position->black_pieces) > 7   &&
+    if (!(src_position->state_flags & IS_NULL_MOVE) &&
+        !(src_position->state_flags & IS_CHECK)     &&
+        beta == alpha + 1                           &&
+        (src_position->knights | src_position->bishops | src_position->rooks | src_position->queens) &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
@@ -210,9 +211,12 @@ Search(const Position*  src_position,
         Move* moves_this_phase = move_phases[phase];
         while (*moves_this_phase)
         {
+            int score;
             Move move = *moves_this_phase++;
-            int search_depth_this_move = depth;
-            if (!(src_position->state_flags & IS_CHECK) && MOVE_SCORE(move) < 0)
+            if (!(src_position->state_flags & IS_CHECK) && 
+                 num_legal_moves > 2                    &&
+                 MOVE_SCORE(move) < 0                   &&
+                 beta == alpha + 1)
             {
                 if (depth <= 1)
                 {
@@ -221,17 +225,21 @@ Search(const Position*  src_position,
                 }
                 else
                 {
-                    INCREMENT("negative SEE reductions");
-                    --search_depth_this_move;
+                    INCREMENT("negative SEE reduction attempts");
+                    score = SearchSingleMove(src_position, depth - 1, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
                 }
             }
-            int score = SearchSingleMove(src_position, search_depth_this_move, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
+            else
+            {
+                score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
+            }
             if (*cancel)
             {
                 return SEARCH_CANCELLED_SCORE;
             }
             if (score == MOVED_INTO_CHECK_SCORE)
             {
+                INCREMENT("moved into check");
                 continue;
             }
             ++num_legal_moves;

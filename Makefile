@@ -33,6 +33,7 @@ CSRCS = \
 	move_to_string.c \
 	opening_book.c \
 	opening_book_moves.c \
+	pins.c \
 	random.c \
 	search_alphabeta.c \
 	search_quiescent.c \

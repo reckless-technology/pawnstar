@@ -177,11 +177,11 @@ int SearchRootNode(const Position* src_position)
                     is_score_stable = false;
                 }
             }
-            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 6) > ms_allocated)
+            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 4) > ms_allocated)
             {
                 break;
             }
-            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 4) > ms_allocated)
+            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 3) > ms_allocated)
             {
                 break;
             }

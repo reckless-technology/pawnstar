@@ -318,6 +318,11 @@ static uint64_t KingAttacks(int location)
     return KingFill(BITBOARD(location));
 }
 
+static uint64_t KingAttacks2(int location)
+{
+    return KingFill(KingFill(BITBOARD(location)));
+}
+
 #if DO_EXTRA_PAWN_EVAL
 
 /**
@@ -853,6 +858,7 @@ static const BitboardGen ray_generators[] =
     { "rook_attacks",       RookAttacks         },
     { "queen_attacks",      QueenAttacks        },
     { "king_attacks",       KingAttacks         },
+    { "king_attacks2",      KingAttacks2        },
     { NULL,                 NULL                },
 };
 
