@@ -29,7 +29,7 @@ void StopThinkingMoveImmediately()
  * @param src_position the position to search
  * @return the best move found
 */
-int SearchRootNode(const Position* src_position)
+Move SearchRootNode(const Position* src_position)
 {
     if (src_position->state_flags & IS_GAME_OVER)
     {
@@ -42,9 +42,9 @@ int SearchRootNode(const Position* src_position)
         return book_move;
     } 
     Move moves[MAX_MOVES_PER_POSITION];
-    int move_count = GenerateLegalMoves(src_position, moves);
+    int num_legal_moves = GenerateLegalMoves(src_position, moves);
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
-    if (move_count == 1)
+    if (num_legal_moves == 1)
     {
         return moves[0];
     }  
@@ -90,14 +90,15 @@ int SearchRootNode(const Position* src_position)
     results of the previous iteration to sort the moves (the merge sort is
     stable).
     */
-    Move best_moves[MAX_PLY];
-    for (int i = 0; i != move_count; ++i)
+    Move best_moves[MAX_PLY]; /* Best move found at each ply of search. */
+    for (int i = 0; i != num_legal_moves; ++i)
     {
         const int score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &cancel, moves[i], NULL, i);
         moves[i] = SCORED_MOVE(moves[i], score);
     }   
-    MergeSort(move_count, moves);
+    SortMoves(num_legal_moves, moves);
     Move best_move = moves[0];
+    best_moves[STARTING_SEARCH_DEPTH] = best_move;
     Variation principal_variation = { 0 };
     for (int depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
     {       
@@ -106,10 +107,10 @@ int SearchRootNode(const Position* src_position)
             break;
         }
         the_game.node_count = 0;
-        MergeSort(move_count, moves);
+        SortMoves(num_legal_moves, moves); /* Sort moves from previous iteration depth. */
         Variation child_pv = { 0 };
         int alpha = ALPHA;
-        for (int i = 0; i != move_count; ++i)
+        for (int i = 0; i != num_legal_moves; ++i)
         {      
             int score;    
             if (i == 0)
@@ -158,10 +159,12 @@ int SearchRootNode(const Position* src_position)
             the_game.time_control.clock_type == CLOCK_INCREMENTAL)
         {
             /* 
-            Plan our use of the time with some care. If both the score we find and the best move are consistent
-            between successive iterations, we can probably stop searchning before our allocated time is elapsed and
-            save the time for other, more difficult positions. Similarly we can save a smaller amount of time if either
-            of these but not both are true.
+            Plan our use of the time with some care. If both the score we find
+            and the best move are consistent between successive iterations, 
+            we can probably stop searching before our allocated time is elapsed 
+            and save some time for other, potentially more difficult positions. 
+            Similarly we can save a smaller amount of time if either of these 
+            conditions but not both are true.
             */
             const int elapsed_ms = stop_ms - start_ms;
             bool is_best_move_consistent = true;
@@ -177,11 +180,11 @@ int SearchRootNode(const Position* src_position)
                     is_score_stable = false;
                 }
             }
-            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 4) > ms_allocated)
+            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 6) > ms_allocated)
             {
                 break;
             }
-            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 3) > ms_allocated)
+            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 4) > ms_allocated)
             {
                 break;
             }

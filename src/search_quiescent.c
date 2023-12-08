@@ -38,10 +38,10 @@ int SearchQuiescent(const Position* src_position,
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
-    Move captures[MAX_MOVES_PER_POSITION];
-    GeneratePseudoLegalCaptures(src_position, captures);
-    SortMoves(src_position, captures, ply);
-    for (const Move* move = captures; *move; ++move)
+    Move moves[MAX_MOVES_PER_POSITION];
+    GeneratePseudoLegalCaptures(src_position, moves);
+    ScoreAndSortMoves(src_position, moves, ply);
+    for (const Move* move = moves; *move; ++move)
     {
         if (MOVE_SCORE(*move) < 0)
         {

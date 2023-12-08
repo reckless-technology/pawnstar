@@ -39,17 +39,19 @@ void InitializeGoodMoveCounts(void)
 }
 
 /**
- * @brief Sort moves "best first" using a stable merge sort.
+ * @brief Sort moves "best first" using a stable sort.
  * A stable sort is required so that root node moves with equal alpha score
  * have their relative sequence preserved.
+ * Uses static exchange evaluation (SEE) to provide a provisional
+ * score for each move for sorting.
  * @param position position for which the moves were generated
  * @param moves null terminated list of moves to be sorted
  * @param ply distance from root node
 */
 void 
-SortMoves(const Position* position,
-          Move            moves[], 
-          int             ply)
+ScoreAndSortMoves(const Position* position,
+                  Move            moves[], 
+                  int             ply)
 {   
     Move* move;
     const int* const counts = &good_move_counts[ply][0];
@@ -61,7 +63,7 @@ SortMoves(const Position* position,
         */
         *move = SCORED_MOVE(*move, EvaluateStaticExchange(position, *move) * 1000 + counts[*move & MOVE_MASK]);
     }
-    MergeSort((int)(move - moves), moves);
+    SortMoves((int)(move - moves), moves);
 }
 
 #define min(a,b)             \
@@ -79,7 +81,7 @@ SortMoves(const Position* position,
  * @param values pointer to the elements
 */
 void 
-MergeSort(int   num_elements, 
+SortMoves(int   num_elements, 
           Move  values[])
 {
     Move work[MAX_MOVES_PER_POSITION];

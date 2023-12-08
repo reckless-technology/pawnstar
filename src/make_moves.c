@@ -14,9 +14,10 @@ static const uint16_t CASTLING_RIGHTS_MASKS[64] =
 };
 
 /**
- * @brief Make a non (null) move
+ * @brief Make a null move: don't actually move any pieces on the board.
  * - Flip side to move
  * - Clear en passant capture availablity
+ * - Set the flag indicating this position is the result of a null move
  * @param dst_position destination position
  * @param src_position source position
 */
@@ -24,12 +25,12 @@ void
 MakeNullMove(Position* dst_position, 
              const Position* src_position)
 {
-    memcpy(dst_position, src_position, sizeof(Position));
+    *dst_position = *src_position;
     dst_position->previous = src_position;
     dst_position->state_flags |= IS_NULL_MOVE;
     dst_position->hash -= EN_PASSANT_HASHES[dst_position->en_passant_index];
     dst_position->en_passant_index = 0;
-    dst_position->hash += EN_PASSANT_HASHES[dst_position->en_passant_index];
+    dst_position->hash += EN_PASSANT_HASHES[0];
     dst_position->state_flags ^= IS_BLACK_TO_MOVE;
     dst_position->hash += (dst_position->state_flags & IS_BLACK_TO_MOVE) ? BLACK_MOVE_HASH : -BLACK_MOVE_HASH;
 }

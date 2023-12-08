@@ -19,15 +19,14 @@ INLINE void GenerateUnderpromotions(Move **pmoves)
 #define GENERATE_NON_CAPTURES 1
 
 void GeneratePseudoLegalMoves(const Position* position,
-                              Move            captures[],
-                              Move            non_captures[])
+                              Move            moves[])
 #include "move_generation_template.h"
 
 #undef GENERATE_NON_CAPTURES
 #define GENERATE_NON_CAPTURES 0
 
 void GeneratePseudoLegalCaptures(const Position* position,
-                                 Move            captures[])
+                                 Move            moves[])
 #include "move_generation_template.h"
 
 #undef GENERATE_NON_CAPTURES
@@ -310,26 +309,17 @@ Returns the number of moves generated
 int GenerateLegalMoves(const Position *position, Move moves[])
 {
     const Move *const initial_ptr = moves;
-    const Move *move;
-    Move captures[MAX_MOVES_PER_POSITION];
-    Move non_captures[MAX_MOVES_PER_POSITION];
-    Move *phases[] = {captures, non_captures, NULL};
-    Position dst_position[1];
-    GeneratePseudoLegalMoves(position, captures, non_captures);
-    for (Move **phase = phases; *phase; ++phase)
+    Move pseudo_legal_moves[MAX_MOVES_PER_POSITION];
+    GeneratePseudoLegalMoves(position, pseudo_legal_moves);
+    for (const Move* move = pseudo_legal_moves; *move; ++move)
     {
-        for (move = *phase; *move; ++move)
+        Position dst_position;
+        MakeMove(&dst_position, position, *move);
+        if (!(dst_position.state_flags & IS_MOVED_INTO_CHECK))
         {
-            MakeMove(dst_position, position, *move);
-            if (!(dst_position->state_flags & IS_MOVED_INTO_CHECK))
-            {
-                *moves++ = *move;
-            }
+            *moves++ = *move;
         }
     }
     *moves = 0;
     return (int)(moves - initial_ptr);
 }
-
-
-

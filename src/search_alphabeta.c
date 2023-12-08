@@ -1,17 +1,6 @@
 #include "pawnstar.h"
 
 /**
- * @brief Move generation and search phases.
-*/
-enum MovePhase
-{
-    PHASE_PRE_MOVES,        /**< moves from the principal variation or transposition table              */
-    PHASE_CAPTURES,         /**< capture and promotion moves with a non negative static exchange eval   */
-    PHASE_NON_CAPTURES,     /**< non captures moves with a non negative static exchange eval            */
-};
-
-
-/**
  * @brief Fail hard alpha beta main search algorithm.
  * @param src_position position to search
  * @param depth search depth
@@ -31,24 +20,11 @@ Search(const Position*  src_position,
        volatile bool*   cancel, 
        Variation*       parent_pv)
 {    
-    Variation           pv;
-    Move                pre_move[2];
-    Move                captures[MAX_MOVES_PER_POSITION];
-    Move                non_captures[MAX_MOVES_PER_POSITION]; 
-    int                 num_legal_moves     = 0;
-    Move                best_move           = 0;
-    bool                has_raised_alpha    = false;
-    Move* const         move_phases[]       = 
-    { 
-        [PHASE_PRE_MOVES]        = pre_move,
-        [PHASE_CAPTURES]         = captures,
-        [PHASE_NON_CAPTURES]     = non_captures,
-    };
     if (*cancel)
     {
         return SEARCH_CANCELLED_SCORE;
     }
-    pv.moves[0] = 0;
+    
     if (!(++the_game.node_count & 0xFFFF)         &&
         the_game.time_control.hard_stop_search_ms &&
         GetMilliseconds() >= the_game.time_control.hard_stop_search_ms)
@@ -78,8 +54,8 @@ Search(const Position*  src_position,
         return SearchQuiescent(src_position, depth, ply, alpha, beta, cancel);
     } 
     /*
-    Determine if there is an entry in the transposition table for this 
-    position.
+    Determine if there is an entry in the transposition table 
+    for this position.
     */
     Transposition transposition;
     const bool is_transposition = FindTransposition(src_position->hash, &transposition);
@@ -91,7 +67,7 @@ Search(const Position*  src_position,
         case NODE_CUT:
             /*
             We don't know the exact score of the best move from this
-            position, but we do know it is at least transposition->score
+            position, but we do know it is at least transposition.score
             */
             INCREMENT("table hit cut node");
             if (transposition.score >= beta)
@@ -104,7 +80,7 @@ Search(const Position*  src_position,
         case NODE_ALL:
             /*
             We don't know the exact score of the best move from this
-            position, but we do know it is at most transposition->score
+            position, but we do know it is at most transposition.score
             */
             INCREMENT("table hit all node");
             if (transposition.score <= alpha)
@@ -138,10 +114,11 @@ Search(const Position*  src_position,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    if (!(src_position->state_flags & IS_NULL_MOVE) &&
-        !(src_position->state_flags & IS_CHECK)     &&
-        beta == alpha + 1                           &&
-        (src_position->knights | src_position->bishops | src_position->rooks | src_position->queens) &&
+    if (!(src_position->state_flags & IS_NULL_MOVE)         &&
+        !(src_position->state_flags & IS_CHECK)             &&
+        beta == alpha + 1                                   &&
+        (src_position->knights | src_position->bishops | 
+         src_position->rooks   | src_position->queens)      &&
         EvaluatePosition(src_position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
@@ -158,109 +135,108 @@ Search(const Position*  src_position,
         }
         INCREMENT("null move fails");
     }
-#endif
-    
+#endif /* DO_NULL_MOVE_PRUNING */
+
     /*
-    Before we generate any moves, try any transposition table move first. 
-    This might save us the cost of move generation, or provide better alpha 
-    beta bounds for the main search.
-    In any case, it's always a good idea to search the PV first.
+    Before we generate any moves, try the transposition table move first. 
+    This might save us the cost of move generation altogether, or provide 
+    better alpha beta bounds for the main search.
     */
+    Variation   pv;
+    int         num_legal_moves     = 0;
+    Move        best_move           = 0;
+    bool        has_raised_alpha    = false;
+    pv.moves[0]                     = 0;
+    
     if (is_transposition && transposition.move)
     {
         INCREMENT("table move");
-        pre_move[0] = transposition.move;
-        pre_move[1] = 0;
-    }   
-    else
-    {
-        pre_move[0] = 0;
-    }
-    INCREMENT_IF(!is_transposition && depth > 1, "nodes without transposition");   
-    /*
-    Start of main loop - we go through the following move phases:
-    
-    1) pre move from the transposition table
-    2) captures
-    3) non captures
-    
-    Move generation is deferred until after the pre move has been searched,
-    in the hope that in the case of a cutoff we don't actually have to bother
-    with move generation at all.
-    */
-    for (int phase = PHASE_PRE_MOVES; phase <= PHASE_NON_CAPTURES; ++phase)
-    {            
-        switch (phase)
+        ++num_legal_moves;
+        int score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, transposition.move, &pv, 0);
+        if (*cancel)
         {
-        case PHASE_PRE_MOVES:
-            break;
-
-        case PHASE_CAPTURES:
-            GeneratePseudoLegalMoves(src_position, captures, non_captures); 
-            SortMoves(src_position, captures, ply);
-            break;
-
-        case PHASE_NON_CAPTURES:
-            SortMoves(src_position, non_captures, ply);
-            break;
-
-        default:
-            printf("ERROR: illegal move phase\n");
-            break;
+            return SEARCH_CANCELLED_SCORE;
         }
-        Move* moves_this_phase = move_phases[phase];
-        while (*moves_this_phase)
+        if (score >= beta)
         {
-            int score;
-            Move move = *moves_this_phase++;
-            if (!(src_position->state_flags & IS_CHECK) && 
-                 num_legal_moves > 2                    &&
-                 MOVE_SCORE(move) < 0                   &&
-                 beta == alpha + 1)
+            INCREMENT("table move beta cutoffs");
+            RecordTransposition(src_position->hash, depth, beta, transposition.move, NODE_CUT);
+            RecordGoodMove(ply, transposition.move);
+            return beta;
+        }
+        if (score > alpha)
+        {
+            INCREMENT("table move raised alpha");
+            alpha = score;
+            has_raised_alpha = true;
+            best_move = transposition.move;
+            /* 
+            Provisionally store this move as a CUT node - it 
+            may later turn out to be a PV but we don't know that yet.
+            */
+            RecordTransposition(src_position->hash, depth, alpha, transposition.move, NODE_CUT);
+            RecordGoodMove(ply, transposition.move);
+        }
+    } 
+    Move moves[MAX_MOVES_PER_POSITION];
+    GeneratePseudoLegalMoves(src_position, moves);
+    ScoreAndSortMoves(src_position, moves, ply);
+    /* 
+    This is the main move loop. 
+    */
+    for (const Move* move = moves; *move; ++move)
+    {
+        int score;
+        /* Consider candidate move reductions. */
+        if (!(src_position->state_flags & IS_CHECK)  && 
+              num_legal_moves > 2                    &&
+              MOVE_SCORE(*move) < 0                  &&
+              beta == alpha + 1)
+        {
+            if (depth <= 1)
             {
-                if (depth <= 1)
-                {
-                    INCREMENT("negative SEE frontier skips");
-                    continue;
-                }
-                else
-                {
-                    INCREMENT("negative SEE reduction attempts");
-                    score = SearchSingleMove(src_position, depth - 1, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
-                }
+                INCREMENT("negative SEE frontier skips");
+                continue;
             }
             else
             {
-                score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, move, &pv, num_legal_moves);
+                INCREMENT("negative SEE reduction attempts");
+                score = SearchSingleMove(src_position, depth - 1, ply, alpha, beta, cancel, *move, &pv, num_legal_moves);
             }
-            if (*cancel)
-            {
-                return SEARCH_CANCELLED_SCORE;
-            }
-            if (score == MOVED_INTO_CHECK_SCORE)
-            {
-                INCREMENT("moved into check");
-                continue;
-            }
-            ++num_legal_moves;
-            if (score >= beta)
-            {
-                INCREMENT("beta cutoffs");
-                INCREMENT_IF(phase == PHASE_PRE_MOVES, "table move beta cutoffs");
-                RecordTransposition(src_position->hash, depth, score, move, NODE_CUT);
-                RecordGoodMove(ply, move);
-                return beta;
-            }
-            if (score > alpha)
-            {
-                INCREMENT("pv changed");
-                alpha = score;
-                has_raised_alpha = true;
-                /* Might turn out to be a PV node but record in the TT for now as a cut node */
-                RecordTransposition(src_position->hash, depth, score, move, NODE_CUT);
-                RecordGoodMove(ply, move);
-                best_move  = move;
-            }
+        }
+        else
+        {
+            score = SearchSingleMove(src_position, depth, ply, alpha, beta, cancel, *move, &pv, num_legal_moves);
+        }
+        if (*cancel)
+        {
+            return SEARCH_CANCELLED_SCORE;
+        }
+        if (score == MOVED_INTO_CHECK_SCORE)
+        {
+            INCREMENT("moved into check");
+            continue;
+        }
+        ++num_legal_moves;
+        if (score >= beta)
+        {
+            INCREMENT("beta cutoffs");
+            RecordTransposition(src_position->hash, depth, beta, *move, NODE_CUT);
+            RecordGoodMove(ply, *move);
+            return beta;
+        }
+        if (score > alpha)
+        {
+            INCREMENT("pv changed");
+            alpha = score;
+            has_raised_alpha = true;
+            /* 
+            Provisionally store this move as a CUT node - it 
+            may later turn out to be a PV but we don't know that yet.
+            */
+            RecordTransposition(src_position->hash, depth, score, *move, NODE_CUT);
+            RecordGoodMove(ply, *move);
+            best_move = *move;
         }
     }
     /*
@@ -287,7 +263,9 @@ Search(const Position*  src_position,
     if (has_raised_alpha)
     {
         /*
-        We raised alpha but did not cutoff; this was a PV node
+        We raised alpha but did not cutoff; this was a 
+        PV node (these are rare) so copy the PV up the 
+        tree to our parent node.
         */
         INCREMENT("pv nodes");
         RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);
@@ -304,4 +282,3 @@ Search(const Position*  src_position,
     }
     return alpha;
 }
-

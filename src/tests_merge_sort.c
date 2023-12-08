@@ -10,7 +10,7 @@ bool RunMergeSortTests(void)
             const int score = NextRandom() % 10000;
             values[i] = SCORED_MOVE(i, score);
         }
-        MergeSort(num_elements, values);
+        SortMoves(num_elements, values);
         for (int i = 0; i < num_elements - 1; ++i)
         {
             const int score_left     = MOVE_SCORE(values[i    ]);

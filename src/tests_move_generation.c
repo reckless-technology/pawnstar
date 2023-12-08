@@ -89,39 +89,33 @@ Perft(const Position* src_position,
       PerftCounts*    counts)
 {
     static int call_count = 0;
-    Move captures[MAX_MOVES_PER_POSITION];
-    Move non_captures[MAX_MOVES_PER_POSITION];
-    const Move* move_phases[] = { captures, non_captures, NULL };
-    GeneratePseudoLegalMoves(src_position, captures, non_captures);
-    if (!(++call_count & 0x7FFFF))
+    Move moves[MAX_MOVES_PER_POSITION];
+    GeneratePseudoLegalMoves(src_position, moves);
+    if (!(++call_count & 0x3FFFF))
     {
         printf("\rpositions processed %10u", counts->legal_moves);
     }
     if (depth > 1)
     {
-        for (const Move** phase = move_phases; *phase; ++phase)
+        for (const Move* move = moves; *move; ++move)
         {
-            for (const Move* move = *phase; *move; ++move)
-            {
-                Position position;
-                MakeMove(&position, src_position, *move);
+            Position position;
+            MakeMove(&position, src_position, *move);
 #if DO_TEST_HASH_DURING_PERFT
-                if (position.hash != ComputeHash(&position))
-                {
-                    printf("ERROR in hash during perft\n");
-                }
+            if (position.hash != ComputeHash(&position))
+            {
+                printf("ERROR in hash during perft\n");
+            }
 #endif
-                if (position.state_flags & IS_MOVED_INTO_CHECK)
-                {
-                    continue;
-                }
-                Perft(&position, depth - 1, ENEMY(color), counts);
-            }           
-        }
+            if (position.state_flags & IS_MOVED_INTO_CHECK)
+            {
+                continue;
+            }
+            Perft(&position, depth - 1, ENEMY(color), counts);
+        }           
         return;
     }
-    CategorizeMoves(src_position, captures, counts);
-    CategorizeMoves(src_position, non_captures, counts);
+    CategorizeMoves(src_position, moves, counts);
 }
 /*
 Run perft test on the standard test positions

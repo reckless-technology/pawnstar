@@ -4,5 +4,6 @@
         "ios": "c",
         "xstring": "c",
         "cstdlib": "c"
-    }
+    },
+    "editor.fontSize": 16
 }

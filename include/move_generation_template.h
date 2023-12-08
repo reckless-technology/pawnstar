@@ -1,7 +1,7 @@
 /**
  * @file Used by move_generation.c to generate moves.
  * This file is a form of "template" and gets incluced twice, to generate 2 functions,
- * generating all moves and captures only (for quiescent search).
+ * generating all moves and moves only (for quiescent search).
 */
 {
     const int color                 = COLOR_TO_MOVE(position);
@@ -82,8 +82,8 @@
                 continue;
             }
         }
-        *captures = CONSTRUCT_PROMOTION_MOVE(from, to, PieceAt(position, to), QUEEN);
-        GenerateUnderpromotions(&captures);
+        *moves = CONSTRUCT_PROMOTION_MOVE(from, to, PieceAt(position, to), QUEEN);
+        GenerateUnderpromotions(&moves);
     }
     while (promotions_east)
     {
@@ -96,8 +96,8 @@
                 continue;
             }
         }
-        *captures = CONSTRUCT_PROMOTION_MOVE(from, to, PieceAt(position, to), QUEEN);
-        GenerateUnderpromotions(&captures);
+        *moves = CONSTRUCT_PROMOTION_MOVE(from, to, PieceAt(position, to), QUEEN);
+        GenerateUnderpromotions(&moves);
     }
     while (promotions)
     {
@@ -110,8 +110,8 @@
                 continue;
             }
         }
-        *captures = CONSTRUCT_PROMOTION_MOVE(from, to, NO_PIECE, QUEEN);
-        GenerateUnderpromotions(&captures);
+        *moves = CONSTRUCT_PROMOTION_MOVE(from, to, NO_PIECE, QUEEN);
+        GenerateUnderpromotions(&moves);
     }
     while (captures_west)
     {
@@ -124,7 +124,7 @@
                 continue;
             }
         }
-        *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, PAWN, PieceAt(position, to));
+        *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, PAWN, PieceAt(position, to));
     }
     while (captures_east)
     {
@@ -137,7 +137,7 @@
                 continue;
             }
         }
-        *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, PAWN, PieceAt(position, to));
+        *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, PAWN, PieceAt(position, to));
     }
     while (en_passant_sources)
     {
@@ -149,7 +149,7 @@
                 continue;
             }
         }
-        *captures++ = CONSTRUCT_EP_CAPTURE_MOVE(from, position->en_passant_index);
+        *moves++ = CONSTRUCT_EP_CAPTURE_MOVE(from, position->en_passant_index);
     }
 #if GENERATE_NON_CAPTURES
     push_delta <<= 1;
@@ -164,7 +164,7 @@
                 continue;
             }
         }
-        *non_captures++ = CONSTRUCT_PAWN_DOUBLE_PUSH_MOVE(from, to);
+        *moves++ = CONSTRUCT_PAWN_DOUBLE_PUSH_MOVE(from, to);
     }
     push_delta >>= 1;
     while (single_pushes)
@@ -178,7 +178,7 @@
                 continue;
             }
         }
-        *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, PAWN);
+        *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, PAWN);
     }
 #endif
     /*
@@ -197,13 +197,13 @@
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
-            *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, KNIGHT, PieceAt(position, to));
+            *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, KNIGHT, PieceAt(position, to));
         }
 #if GENERATE_NON_CAPTURES
         Bitboard non_capture_targets = targets & vacant_squares;
         while (non_capture_targets)
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), KNIGHT);
+            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), KNIGHT);
         }
 #endif
     }
@@ -223,13 +223,13 @@
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
-            *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
+            *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
         }
 #if GENERATE_NON_CAPTURES
         Bitboard non_capture_targets = targets & vacant_squares;
         while (non_capture_targets)
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), BISHOP);
+            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), BISHOP);
         }
 #endif
     }
@@ -249,13 +249,13 @@
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
-            *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
+            *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
         }
 #if GENERATE_NON_CAPTURES
         Bitboard non_capture_targets = targets & vacant_squares;
         while (non_capture_targets)
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), ROOK);
+            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), ROOK);
         }
 #endif
     }
@@ -275,13 +275,13 @@
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
-            *captures++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
+            *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
         }
 #if GENERATE_NON_CAPTURES
         Bitboard non_capture_targets = targets & vacant_squares;
         while (non_capture_targets)
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), QUEEN);
+            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), QUEEN);
         }
 #endif
     }
@@ -294,14 +294,14 @@
     while (capture_targets)
     {
         const int to = FindAndClearLsb(&capture_targets);
-        *captures++ = CONSTRUCT_CAPTURE_MOVE(king_location, to, KING, PieceAt(position, to));
+        *moves++ = CONSTRUCT_CAPTURE_MOVE(king_location, to, KING, PieceAt(position, to));
     }
-    *captures = 0;
+    *moves = 0;
 #if GENERATE_NON_CAPTURES
     Bitboard non_capture_targets = targets & vacant_squares;
     while (non_capture_targets)
     {
-        *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(king_location, FindAndClearLsb(&non_capture_targets), KING);
+        *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(king_location, FindAndClearLsb(&non_capture_targets), KING);
     }
     if (!(position->state_flags & IS_CHECK))
     {
@@ -315,14 +315,14 @@
                 !IsAttacked(position, F1, BLACK) &&                     /* f1 is not attacked by black and                   */
                 !IsAttacked(position, G1, BLACK))                       /* the king's destination is not attacked by black   */
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
+                *moves++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
             }
             if ((position->state_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
                 !(occupied_squares & (B1BB | C1BB | D1BB)) &&
                 !IsAttacked(position, D1, BLACK) &&
                 !IsAttacked(position, C1, BLACK))
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, C1);
+                *moves++ = CONSTRUCT_CASTLING_MOVE(E1, C1);
             }
         }
         else
@@ -332,17 +332,17 @@
                 !IsAttacked(position, F8, WHITE) &&
                 !IsAttacked(position, G8, WHITE))
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
+                *moves++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
             }
             if ((position->state_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
                 !(occupied_squares & (B8BB | C8BB | D8BB)) &&
                 !IsAttacked(position, D8, WHITE) &&
                 !IsAttacked(position, C8, WHITE))
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, C8);
+                *moves++ = CONSTRUCT_CASTLING_MOVE(E8, C8);
             }
         }
     }
-    *non_captures = 0;
+    *moves = 0;
 #endif
 }

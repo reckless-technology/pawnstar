@@ -11,7 +11,7 @@ Search
 int         SearchQuiescent (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
 int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, Variation* parent_pv);
 int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, Move move, Variation* pv, int move_index);
-int         SearchRootNode  (const Position* position);
+Move        SearchRootNode  (const Position* position);
 /*
 Thinking and time control
 */
@@ -61,11 +61,11 @@ void        InitializeGoodMoveCounts(void);
 void        RecordGoodMove(int ply, Move move);
 void        DeterminePins(const Position* position, Pins* pins);
 int         GenerateLegalMoves(const Position* position, Move moves[]);
-void        GeneratePseudoLegalMoves(const Position* position, Move captures[], Move non_captures[]);
-void        GeneratePseudoLegalCaptures(const Position* position, Move captures[]);
+void        GeneratePseudoLegalMoves(const Position* position, Move moves[]);
+void        GeneratePseudoLegalCaptures(const Position* position, Move moves[]);
 int         EvaluateStaticExchange(const Position* src_position, Move move);
-void        SortMoves(const Position* position, Move moves[], int ply);
-void        MergeSort(int num_elements, Move values[]);
+void        ScoreAndSortMoves(const Position* position, Move moves[], int ply);
+void        SortMoves(int num_elements, Move values[]);
 /*
 Positional evaluation
 */
