@@ -77,19 +77,19 @@ GeneratePseudoLegalMoves(const Position* position,
     while (pawn_promotions_capture_west)
     {
         const int to = FindAndClearLsb(&pawn_promotions_capture_west);
-        *captures = CONSTRUCT_PROMOTION_MOVE(to - pawn_capture_west_delta, to, PieceAt(position, to), QUEEN);
+        *captures = PromotionMove(to - pawn_capture_west_delta, to, PieceAt(position, to), QUEEN);
         GenerateUnderpromotions(&captures);
     }
     while (pawn_promotions_capture_east)
     {
         const int to = FindAndClearLsb(&pawn_promotions_capture_east);
-        *captures = CONSTRUCT_PROMOTION_MOVE(to - pawn_capture_east_delta, to, PieceAt(position, to), QUEEN);
+        *captures = PromotionMove(to - pawn_capture_east_delta, to, PieceAt(position, to), QUEEN);
         GenerateUnderpromotions(&captures);
     }
     while (pawn_promotions)
     {
         const int to = FindAndClearLsb(&pawn_promotions);
-        *captures = CONSTRUCT_PROMOTION_MOVE(to - pawn_push_delta, to, NO_PIECE, QUEEN);
+        *captures = PromotionMove(to - pawn_push_delta, to, NO_PIECE, QUEEN);
         GenerateUnderpromotions(&captures);
     }
     /*
@@ -100,7 +100,7 @@ GeneratePseudoLegalMoves(const Position* position,
         Bitboard en_passant_sources = SETS[position->en_passant_index].pawn_attacks[ENEMY(color)] & friendly_pawns;
         while (en_passant_sources)
         {
-            *captures++ = CONSTRUCT_EP_CAPTURE_MOVE(FindAndClearLsb(&en_passant_sources), position->en_passant_index);
+            *captures++ = EpCaptureMove(FindAndClearLsb(&en_passant_sources), position->en_passant_index);
         }
     }
     /*
@@ -129,7 +129,7 @@ GeneratePseudoLegalMoves(const Position* position,
                 while (a)
                 {
                     const int attacker_locn = FindAndClearLsb(&a);
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(attacker_locn, victim_locn, attacker, victim);
+                    *captures++ = CaptureMove(attacker_locn, victim_locn, attacker, victim);
                 }
             }
         }
@@ -158,7 +158,7 @@ GeneratePseudoLegalMoves(const Position* position,
                 while (a)
                 {
                     const int attacker_locn = FindAndClearLsb(&a);
-                    *captures++ = CONSTRUCT_CAPTURE_MOVE(attacker_locn, victim_locn, attacker, victim);
+                    *captures++ = CaptureMove(attacker_locn, victim_locn, attacker, victim);
                 }
             }
         }
@@ -186,13 +186,13 @@ GeneratePseudoLegalMoves(const Position* position,
     while (pawn_double_pushes)
     {
         const int to = FindAndClearLsb(&pawn_double_pushes);
-        *non_captures++ = CONSTRUCT_PAWN_DOUBLE_PUSH_MOVE(to - pawn_push_delta, to);
+        *non_captures++ = DoublePushMove(to - pawn_push_delta, to);
     }
     pawn_push_delta >>= 1;
     while (pawn_single_pushes)
     {
         const int to = FindAndClearLsb(&pawn_single_pushes);
-        *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(to - pawn_push_delta, to, PAWN);
+        *non_captures++ = NonCaptureMove(to - pawn_push_delta, to, PAWN);
     }
     /* Knight non captures */
     Bitboard knights = position->knights & friendly_pieces;
@@ -202,7 +202,7 @@ GeneratePseudoLegalMoves(const Position* position,
         Bitboard targets = SETS[from].knight_attacks & vacant_squares;
         while (targets)
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&targets), KNIGHT);
+            *non_captures++ = NonCaptureMove(from, FindAndClearLsb(&targets), KNIGHT);
         }
     }
     /* Bishop non captures */
@@ -213,7 +213,7 @@ GeneratePseudoLegalMoves(const Position* position,
         Bitboard targets = BishopAttacks(occupied_squares, from) & vacant_squares;
         while (targets)
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&targets), BISHOP);
+            *non_captures++ = NonCaptureMove(from, FindAndClearLsb(&targets), BISHOP);
         }
 
     }
@@ -225,7 +225,7 @@ GeneratePseudoLegalMoves(const Position* position,
         Bitboard targets = RookAttacks(occupied_squares, from) & vacant_squares;
         while (targets)
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&targets), ROOK);
+            *non_captures++ = NonCaptureMove(from, FindAndClearLsb(&targets), ROOK);
         }
 
     }
@@ -237,7 +237,7 @@ GeneratePseudoLegalMoves(const Position* position,
         Bitboard targets = QueenAttacks(occupied_squares, from) & vacant_squares;
         while (targets)
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&targets), QUEEN);
+            *non_captures++ = NonCaptureMove(from, FindAndClearLsb(&targets), QUEEN);
         }
     }
     /* King non captures */
@@ -248,7 +248,7 @@ GeneratePseudoLegalMoves(const Position* position,
         const int to = FindAndClearLsb(&targets);
         if (!IsAttacked(position, to, ENEMY(color)))
         {
-            *non_captures++ = CONSTRUCT_NON_CAPTURE_MOVE(king_locn, to, KING);
+            *non_captures++ = NonCaptureMove(king_locn, to, KING);
         }
 
     }
@@ -265,14 +265,14 @@ GeneratePseudoLegalMoves(const Position* position,
                 !IsAttacked(position, F1, BLACK) &&                    /* f1 is not attacked by black and                   */
                 !IsAttacked(position, G1, BLACK))                      /* the king's destination is not attacked by black   */
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
+                *non_captures++ = CastlingMove(E1, G1);
             }
             if ((position->state_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
                 !(occupied_squares & (B1BB | C1BB | D1BB)) &&
                 !IsAttacked(position, D1, BLACK) &&
                 !IsAttacked(position, C1, BLACK))
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E1, C1);
+                *non_captures++ = CastlingMove(E1, C1);
             }
         }
         else
@@ -282,14 +282,14 @@ GeneratePseudoLegalMoves(const Position* position,
                 !IsAttacked(position, F8, WHITE) &&
                 !IsAttacked(position, G8, WHITE))
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
+                *non_captures++ = CastlingMove(E8, G8);
             }
             if ((position->state_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
                 !(occupied_squares & (B8BB | C8BB | D8BB)) &&
                 !IsAttacked(position, D8, WHITE) &&
                 !IsAttacked(position, C8, WHITE))
             {
-                *non_captures++ = CONSTRUCT_CASTLING_MOVE(E8, C8);
+                *non_captures++ = CastlingMove(E8, C8);
             }
         }
     }

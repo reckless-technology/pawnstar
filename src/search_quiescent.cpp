@@ -43,7 +43,7 @@ int SearchQuiescent(const Position* src_position,
     ScoreAndSortMoves(src_position, moves, ply, depth);
     for (const Move* move = moves; *move; ++move)
     {
-        if (MOVE_SCORE(*move) < 0)
+        if (MoveScore(*move) < 0)
         {
             INCREMENT("negative SEE quiescent skips");
             continue;

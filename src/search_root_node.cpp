@@ -94,7 +94,7 @@ Move SearchRootNode(const Position* src_position)
     for (int i = 0; i != num_legal_moves; ++i)
     {
         const int score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &is_cancel_pending, moves[i], NULL, i);
-        moves[i] = SCORED_MOVE(moves[i], score);
+        moves[i] = ScoredMove(moves[i], score);
     }   
     SortMoves(num_legal_moves, moves);
     Move best_move = moves[0];
@@ -116,18 +116,18 @@ Move SearchRootNode(const Position* src_position)
             if (i == 0)
             {
                 score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &is_cancel_pending, moves[i], &child_pv, i);
-                moves[i] = SCORED_MOVE(moves[i], score);
+                moves[i] = ScoredMove(moves[i], score);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
                 score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &is_cancel_pending, moves[i], &child_pv, i);
-                moves[i] = SCORED_MOVE(moves[i], score);
+                moves[i] = ScoredMove(moves[i], score);
                 if (score > alpha)
                 {
                     INCREMENT("pvs root node fails");
                     score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &is_cancel_pending, moves[i], &child_pv, i);
-                    moves[i] = SCORED_MOVE(moves[i], score);
+                    moves[i] = ScoredMove(moves[i], score);
                 }
             }            
             if (is_cancel_pending)
@@ -145,7 +145,7 @@ Move SearchRootNode(const Position* src_position)
                 {
                     char move_string[256];
                     MoveSequenceToSanString(src_position, principal_variation.moves, move_string);
-                    printf("%2u %5d %4u %8u %s\n", depth, (int)MOVE_SCORE(best_moves[depth]), (GetMilliseconds() - start_ms) / 10, the_game.node_count, move_string);
+                    printf("%2u %5d %4u %8u %s\n", depth, (int)MoveScore(best_moves[depth]), (GetMilliseconds() - start_ms) / 10, the_game.node_count, move_string);
                 }
             }
         }        
@@ -171,11 +171,11 @@ Move SearchRootNode(const Position* src_position)
             bool is_score_stable = true;
             for (int i = STARTING_SEARCH_DEPTH; i != depth; ++i)
             {
-                if (MOVE_BITS(best_moves[i]) != MOVE_BITS(best_moves[depth]))
+                if (MoveBits(best_moves[i]) != MoveBits(best_moves[depth]))
                 {
                     is_best_move_consistent = false;
                 }
-                if (abs(MOVE_SCORE(best_moves[i]) - MOVE_SCORE(best_moves[depth])) > SCORE_INSTABILITY_THRESHOLD)
+                if (abs(MoveScore(best_moves[i]) - MoveScore(best_moves[depth])) > SCORE_INSTABILITY_THRESHOLD)
                 {
                     is_score_stable = false;
                 }

@@ -190,7 +190,7 @@ Search(const Position*  src_position,
         /* Consider candidate move reductions. */
         if (!(src_position->state_flags & IS_CHECK)  && 
               num_legal_moves > 2                    &&
-              MOVE_SCORE(*move) < 0                  &&
+              MoveScore(*move) < 0                  &&
               beta == alpha + 1)
         {
             if (depth <= 1)

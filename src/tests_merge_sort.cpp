@@ -8,15 +8,15 @@ bool RunMergeSortTests(void)
         for (int i = 0; i != num_elements; ++i)
         {
             const int score = NextRandom() % 10000;
-            values[i] = SCORED_MOVE(i, score);
+            values[i] = ScoredMove(i, score);
         }
         SortMoves(num_elements, values);
         for (int i = 0; i < num_elements - 1; ++i)
         {
-            const int score_left     = MOVE_SCORE(values[i    ]);
-            const int score_right    = MOVE_SCORE(values[i + 1]);
-            const int sequence_left  = MOVE_BITS (values[i    ]);
-            const int sequence_right = MOVE_BITS (values[i + 1]);
+            const int score_left     = MoveScore(values[i    ]);
+            const int score_right    = MoveScore(values[i + 1]);
+            const int sequence_left  = MoveBits (values[i    ]);
+            const int sequence_right = MoveBits (values[i + 1]);
             if (score_left < score_right)
             {
                 return false;

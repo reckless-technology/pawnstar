@@ -10,12 +10,12 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
     Move legal_moves[MAX_MOVES_PER_POSITION];
     Position dst_position[1];
     char disambiguation[3]   = { 0 };
-    char from_square[3]      = { FILE_CHAR(MOVE_FROM(the_move)), RANK_CHAR(MOVE_FROM(the_move)), 0 };
-    char to_square[3]        = { FILE_CHAR(MOVE_TO  (the_move)), RANK_CHAR(MOVE_TO  (the_move)), 0 };
+    char from_square[3]      = { FILE_CHAR(MoveFrom(the_move)), RANK_CHAR(MoveFrom(the_move)), 0 };
+    char to_square[3]        = { FILE_CHAR(MoveTo  (the_move)), RANK_CHAR(MoveTo  (the_move)), 0 };
     bool is_source_ambiguous = false;
     bool is_file_unique      = true;
     bool is_rank_unique      = true;   
-    const char move_piece    = " PNBRQK"[MOVE_PIECE(the_move)];
+    const char move_piece    = " PNBRQK"[MovePiece(the_move)];
     /*
     Determine if there is more than one piece of the same type which is capable 
     of moving to the target square, and will require further disambiguation
@@ -23,16 +23,16 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
     GenerateLegalMoves(position, legal_moves);
     for (const Move* move = legal_moves; *move; ++move)
     {
-        if (MOVE_PIECE(*move) == MOVE_PIECE(the_move) && 
-            MOVE_TO   (*move) == MOVE_TO   (the_move) &&
-            MOVE_FROM (*move) != MOVE_FROM (the_move))
+        if (MovePiece(*move) == MovePiece(the_move) && 
+            MoveTo   (*move) == MoveTo   (the_move) &&
+            MoveFrom (*move) != MoveFrom (the_move))
         {
             is_source_ambiguous = true;
-            if (FILE_OF(MOVE_FROM(*move)) == FILE_OF(MOVE_FROM(the_move)))
+            if (FILE_OF(MoveFrom(*move)) == FILE_OF(MoveFrom(the_move)))
             {
                 is_file_unique = false;
             }
-            if (RANK_OF(MOVE_FROM(*move)) == RANK_OF(MOVE_FROM(the_move)))
+            if (RANK_OF(MoveFrom(*move)) == RANK_OF(MoveFrom(the_move)))
             {
                 is_rank_unique = false;
             }   
@@ -58,7 +58,7 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
             disambiguation[1] = from_square[1];
         }
     }
-    switch (MOVE_PIECE(the_move))
+    switch (MovePiece(the_move))
     {
     RegularMove:
     default:
@@ -66,7 +66,7 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
     case BISHOP:
     case ROOK:
     case QUEEN:
-        if (MOVE_CAPTURED(the_move))
+        if (MoveCaptured(the_move))
         {
             move_string += sprintf(move_string, "%c%sx%s", move_piece, disambiguation, to_square);
         }
@@ -77,9 +77,9 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
         break;
     
     case KING:
-        if (MOVE_IS_CASTLING(the_move))
+        if (IsCastlingMove(the_move))
         {
-            switch (MOVE_TO(the_move))
+            switch (MoveTo(the_move))
             {
             case G1:
             case G8:
@@ -98,10 +98,10 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
         break;
 
     case PAWN:
-        if (MOVE_CAPTURED(the_move))
+        if (MoveCaptured(the_move))
         {
             move_string += sprintf(move_string, "%cx%s", from_square[0], to_square);
-            if (MOVE_IS_EP_CAPTURE(the_move))
+            if (IsEpCaptureMove(the_move))
             {
                 /* ep capture */
                 move_string += sprintf(move_string, "e.p.");
@@ -111,9 +111,9 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
         {
             move_string += sprintf(move_string, "%s", to_square); 
         }
-        if (MOVE_PROMOTED(the_move))
+        if (MovePromoted(the_move))
         {
-            move_string += sprintf(move_string, "=%c", "  NBRQ"[MOVE_PROMOTED(the_move)]);
+            move_string += sprintf(move_string, "=%c", "  NBRQ"[MovePromoted(the_move)]);
         }
         break;
     }    

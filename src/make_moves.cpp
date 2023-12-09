@@ -94,10 +94,10 @@ MakeMove(Position*       position,
          Move            move)
 {                          
     const int color    = COLOR_TO_MOVE(src_position);
-    const int from     = MOVE_FROM(move);
-    const int to       = MOVE_TO(move);
-    const int piece    = MOVE_PIECE(move);
-    const int captured = MOVE_CAPTURED(move);
+    const int from     = MoveFrom(move);
+    const int to       = MoveTo(move);
+    const int piece    = MovePiece(move);
+    const int captured = MoveCaptured(move);
      
     *position = *src_position;
     position->previous = src_position;
@@ -114,7 +114,7 @@ MakeMove(Position*       position,
         position->reversible_move_count = 0;
         if (captured)
         {
-            if (MOVE_IS_EP_CAPTURE(move))
+            if (IsEpCaptureMove(move))
             {
                 /* En passant capture: capture location is source rank, destination file. */
                 const int captured_pawn_locn = (from & 0x38) | (to & 0x07);
@@ -125,17 +125,17 @@ MakeMove(Position*       position,
                 RemovePiece(position, ENEMY(color), captured, to);
             }
         }                
-        else if (MOVE_IS_PAWN_DOUBLE_PUSH(move))
+        else if (IsPawnDoublePushMove(move))
         {
             /* Pawn double push: affects en passant. */
             position->en_passant_index = (uint8_t)((from + to) >> 1);
             position->hash ^= EN_PASSANT_HASHES[position->en_passant_index];
         }       
-        if (MOVE_PROMOTED(move))
+        if (MovePromoted(move))
         {
             /* Replace the pawn with the promoted piece. */
             RemovePiece(position, color, PAWN, from);
-            AddPiece(position, color, MOVE_PROMOTED(move), to);
+            AddPiece(position, color, MovePromoted(move), to);
         }
         else
         {
@@ -157,7 +157,7 @@ MakeMove(Position*       position,
         break;
 
     case KING:
-        if (!MOVE_IS_CASTLING(move))
+        if (!IsCastlingMove(move))
         {
             if (captured)
             {

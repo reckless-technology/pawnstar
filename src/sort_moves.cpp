@@ -62,7 +62,7 @@ ScoreAndSortMoves(const Position* position,
         Assign provisional scores based on static exchange evaluation
         and how many cutoffs this move has caused in the search history.
         */
-        *move = SCORED_MOVE(*move, EvaluateStaticExchange(position, *move) * 1000 + counts[*move & MOVE_MASK]);
+        *move = ScoredMove(*move, EvaluateStaticExchange(position, *move) * 1000 + counts[*move & MOVE_MASK]);
     }
     SortMoves((int)(move - moves), moves);
     (void)depth;
@@ -100,7 +100,7 @@ SortMoves(int   num_elements,
             Move* dst             = &merge_dst[begin];
             while (i < mid && j < end)
             {
-                *dst++ = (MOVE_SCORE(*i) >= MOVE_SCORE(*j)) ? *i++ : *j++;
+                *dst++ = (MoveScore(*i) >= MoveScore(*j)) ? *i++ : *j++;
             }
             while (i < mid)
             {

@@ -35,11 +35,11 @@ DebugPrintMove(Move move, char* buffer)
         "king",
     };
     buffer += sprintf(buffer, "piece:%s captured:%s promoted:%s from:%c%c to:%c%c flags:%d",
-                      names[MOVE_PIECE(move)], 
-                      names[MOVE_CAPTURED(move)], 
-                      names[MOVE_PROMOTED(move)],
-                      FILE_CHAR(MOVE_FROM(move)), RANK_CHAR(MOVE_FROM(move)),
-                      FILE_CHAR(MOVE_TO  (move)), RANK_CHAR(MOVE_TO  (move)), 
+                      names[MovePiece(move)], 
+                      names[MoveCaptured(move)], 
+                      names[MovePromoted(move)],
+                      FILE_CHAR(MoveFrom(move)), RANK_CHAR(MoveFrom(move)),
+                      FILE_CHAR(MoveTo  (move)), RANK_CHAR(MoveTo  (move)), 
                       (int)((move >> 21) & 7));
     return buffer;
 }
@@ -124,19 +124,19 @@ CategorizeMoves(const Position* src_position,
         {
             ++counts->checks;
         }
-        if (MOVE_CAPTURED(*move))
+        if (MoveCaptured(*move))
         {
             ++counts->captures;
         }
-        if (MOVE_PROMOTED(*move))
+        if (MovePromoted(*move))
         {
             ++counts->promotions;
         }
-        if (MOVE_IS_EP_CAPTURE(*move))
+        if (IsEpCaptureMove(*move))
         {
             ++counts->ep_captures;
         }
-        if (MOVE_IS_CASTLING(*move))
+        if (IsCastlingMove(*move))
         {
             ++counts->castles;
         }

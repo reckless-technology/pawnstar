@@ -7,20 +7,6 @@
 #include "move.h"
 
 /**
- * @brief Chess pieces.
-*/
-enum Piece
-{
-    NO_PIECE,
-    PAWN,
-    KNIGHT,
-    BISHOP,
-    ROOK,
-    QUEEN,
-    KING,
-};
-
-/**
  * @brief Chess piece colors.
 */
 enum Color
