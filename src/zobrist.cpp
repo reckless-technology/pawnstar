@@ -8,8 +8,8 @@
 uint64_t
 ComputeHash(const Position* position)
 {
-    uint64_t hash = position->state_flags & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
-    hash ^= CASTLING_RIGHTS_HASHES[position->state_flags & CASTLING_RIGHTS_MASK];
+    uint64_t hash = position->flags & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
+    hash ^= CASTLING_RIGHTS_HASHES[position->flags & CASTLING_RIGHTS_MASK];
     hash ^= EN_PASSANT_HASHES[position->en_passant_index];
     for (int piece = PAWN - 1; piece <= KING - 1; ++piece) /* -1 because the arrays are zero indexed and PAWN value is 1 */
     {

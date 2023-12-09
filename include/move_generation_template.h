@@ -249,7 +249,7 @@ void GenerateMoves(const Position *position,
         {
             *moves++ = NonCaptureMove(king_location, FindAndClearLsb(non_capture_targets), KING);
         }
-        if (!(position->state_flags & IS_CHECK))
+        if (!(position->flags & IS_CHECK))
         {
             /*
             Generate castling moves
@@ -263,14 +263,14 @@ void GenerateMoves(const Position *position,
                 - f1 is not attacked by black AND
                 - the king's destination is not attacked by black
                 */
-                if ((position->state_flags & MAY_WHITE_CASTLE_KINGSIDE) && 
+                if ((position->flags & MAY_WHITE_CASTLE_KINGSIDE) && 
                     !(occupied_squares & (BITBOARD("f1") | BITBOARD("g1"))) &&
                     !IsAttacked(position, F1, BLACK) &&
                     !IsAttacked(position, G1, BLACK))
                 {
                     *moves++ = CastlingMove(E1, G1);
                 }
-                if ((position->state_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
+                if ((position->flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
                     !(occupied_squares & (BITBOARD("b1") | BITBOARD("c1") | BITBOARD("d1"))) &&
                     !IsAttacked(position, D1, BLACK) &&
                     !IsAttacked(position, C1, BLACK))
@@ -280,14 +280,14 @@ void GenerateMoves(const Position *position,
             }
             else
             {
-                if ((position->state_flags & MAY_BLACK_CASTLE_KINGSIDE) &&
+                if ((position->flags & MAY_BLACK_CASTLE_KINGSIDE) &&
                     !(occupied_squares & (BITBOARD("f8") | BITBOARD("g8"))) &&
                     !IsAttacked(position, F8, WHITE) &&
                     !IsAttacked(position, G8, WHITE))
                 {
                     *moves++ = CastlingMove(E8, G8);
                 }
-                if ((position->state_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
+                if ((position->flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
                     !(occupied_squares & (BITBOARD("b8") | BITBOARD("c8") | BITBOARD("d8"))) &&
                     !IsAttacked(position, D8, WHITE) &&
                     !IsAttacked(position, C8, WHITE))

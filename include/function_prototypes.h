@@ -4,13 +4,12 @@
 #include "bitboard.h"
 #include "types.h"
 
-constexpr int  FILE_OF(int locn)                            { return locn & 7;                      }
-constexpr int  RANK_OF(int locn)                            { return locn >> 3;                     }
-constexpr char FILE_CHAR(int locn)                          { return (char)('a' + FILE_OF(locn));   }
-constexpr char RANK_CHAR(int locn)                          { return (char)('1' + RANK_OF(locn));   }
-constexpr int  ENEMY(int color)                             { return !color;                        }
-constexpr int  COLOR_TO_MOVE(const Position* position)      { return position->state_flags & IS_BLACK_TO_MOVE ? BLACK : WHITE; }
-constexpr int  COLOR_NOT_TO_MOVE(const Position* position)  { return position->state_flags & IS_BLACK_TO_MOVE ? WHITE : BLACK; }
+constexpr uint8_t   FileOf(int locn)                        { return locn & 7;              }
+constexpr uint8_t   RankOf(int locn)                        { return locn >> 3;             }
+constexpr char      FileChar(int locn)                      { return 'a' + FileOf(locn);    }
+constexpr char      RankChar(int locn)                      { return '1' + RankOf(locn);    }
+constexpr uint8_t   EnemyOf(int color)                      { return !color;                }
+constexpr uint8_t   ColorToMove(const Position* position)   { return position->flags & IS_BLACK_TO_MOVE ? BLACK : WHITE; }
 
 constexpr void 
 CopyVariation(Variation*       dst_variation, 
@@ -33,7 +32,7 @@ CopyVariation(Variation*       dst_variation,
     }
 }
 
-constexpr int
+constexpr uint8_t
 PieceAt(const Position* position, 
         int             location)
 {
@@ -50,10 +49,10 @@ PieceAt(const Position* position,
 /*
 Search
 */
-int         Search          (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, Variation* parent_pv);
-int         SearchQuiescent (const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
+int         Search          (const Position* position, int depth, int ply, int alpha, int beta, volatile bool* cancel, Variation* parent_pv);
+int         SearchQuiescent (const Position* position, int depth, int ply, int alpha, int beta, volatile bool* cancel);
 Move        SearchRootNode  (const Position* position);
-int         SearchSingleMove(const Position* src_position, int depth, int ply, int alpha, int beta, volatile bool* cancel, Move move, Variation* pv, int move_index);
+int         SearchSingleMove(const Position* position, int depth, int ply, int alpha, int beta, volatile bool* cancel, Move move, Variation* pv, int move_index);
 /*
 Thinking and time control
 */
@@ -68,11 +67,11 @@ bool        AreMoveStringsEquivalent(char* str1, char* str2);
 uint64_t    ComputeHash(const Position* position);
 void        InitializeGame(Game* game);
 bool        IsPositionLegal(const Position* position);
-int         PlayMoveString(Game* game, char* move_string);
+Move        PlayMoveString(Game* game, char* move_string);
 bool        PositionFromString(const char* fen_string, Position* position);
 void        PositionToString(const Position* position, char* fen_string);
-void        MoveSequenceToSanString(const Position* position, const Move moves[], char* move_string);
-char*       MoveToString(const Position* position, Move the_move, char* move_string);
+int         MoveSequenceToSanString(const Position* position, const Move* moves, char* move_string);
+int         MoveToString(const Position* position, Move move, char* move_string);
 /*
 Attacks
 */

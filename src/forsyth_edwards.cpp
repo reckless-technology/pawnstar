@@ -93,7 +93,7 @@ PositionFromString(const char* fen_string,
     }
     if (!strcmp(color_to_move, "b"))
     {
-        position->state_flags |= IS_BLACK_TO_MOVE;
+        position->flags |= IS_BLACK_TO_MOVE;
     }
     else if (!!strcmp(color_to_move, "w"))
     {
@@ -109,7 +109,7 @@ PositionFromString(const char* fen_string,
     }
     if (!strcmp("-", castling_rights))
     {
-        position->state_flags &= ~CASTLING_RIGHTS_MASK;
+        position->flags &= ~CASTLING_RIGHTS_MASK;
     }
     else
     {
@@ -118,16 +118,16 @@ PositionFromString(const char* fen_string,
             switch (*c)
             {
             case 'K':
-                position->state_flags |= MAY_WHITE_CASTLE_KINGSIDE;
+                position->flags |= MAY_WHITE_CASTLE_KINGSIDE;
                 break;
             case 'Q':
-                position->state_flags |= MAY_WHITE_CASTLE_QUEENSIDE;
+                position->flags |= MAY_WHITE_CASTLE_QUEENSIDE;
                 break;
             case 'k':
-                position->state_flags |= MAY_BLACK_CASTLE_KINGSIDE;
+                position->flags |= MAY_BLACK_CASTLE_KINGSIDE;
                 break;
             case 'q':
-                position->state_flags |= MAY_BLACK_CASTLE_QUEENSIDE;
+                position->flags |= MAY_BLACK_CASTLE_QUEENSIDE;
                 break;
             default:
                 BAD_FEN_STRING;
@@ -181,10 +181,10 @@ PositionFromString(const char* fen_string,
         BAD_FEN_STRING;
     }
     /* Is the position in check? */
-    const int color = COLOR_TO_MOVE(position);
-    if (IsAttacked(position, position->king_location[color], ENEMY(color)))
+    const int color = ColorToMove(position);
+    if (IsAttacked(position, position->king_location[color], EnemyOf(color)))
     {
-        position->state_flags |= IS_CHECK;
+        position->flags |= IS_CHECK;
     }
     /*
     Check to see if this position represents checkmate, stalemate or 
@@ -193,17 +193,17 @@ PositionFromString(const char* fen_string,
     if (IsCheckmate(position))
     {
         printf("NOTE: FEN string specifies a checkmate position\n");
-        position->state_flags |= IS_CHECKMATE;
+        position->flags |= IS_CHECKMATE;
     }
     else if (IsStalemate(position))
     {
         printf("NOTE: FEN string specifies a stalemate position\n");
-        position->state_flags |= IS_STALEMATE;
+        position->flags |= IS_STALEMATE;
     }
     else if (IsDrawByMaterial(position))
     {
         printf("NOTE: FEN string specifies a draw by insufficient material position\n");
-        position->state_flags |= IS_DRAW_MATERIAL;
+        position->flags |= IS_DRAW_MATERIAL;
     }
     return true;
 }
@@ -251,28 +251,28 @@ void PositionToString(const Position* position, char* fen_string)
     }
     /* Side to move */
     *fen_string++ = ' ';
-    *fen_string++ = position->state_flags & IS_BLACK_TO_MOVE ? 'b' : 'w';
+    *fen_string++ = position->flags & IS_BLACK_TO_MOVE ? 'b' : 'w';
     *fen_string++ = ' ';;
     /* Castling rights */
-    if (!(position->state_flags & CASTLING_RIGHTS_MASK))
+    if (!(position->flags & CASTLING_RIGHTS_MASK))
     {
         *fen_string++ = '-';
     }
     else
     {
-        if (position->state_flags & MAY_WHITE_CASTLE_KINGSIDE)
+        if (position->flags & MAY_WHITE_CASTLE_KINGSIDE)
         {
             *fen_string++ = 'K';
         }
-        if (position->state_flags & MAY_WHITE_CASTLE_QUEENSIDE)
+        if (position->flags & MAY_WHITE_CASTLE_QUEENSIDE)
         {
             *fen_string++ = 'Q';
         }
-        if (position->state_flags & MAY_BLACK_CASTLE_KINGSIDE)
+        if (position->flags & MAY_BLACK_CASTLE_KINGSIDE)
         {
             *fen_string++ = 'k';
         }
-        if (position->state_flags & MAY_BLACK_CASTLE_QUEENSIDE)
+        if (position->flags & MAY_BLACK_CASTLE_QUEENSIDE)
         {
             *fen_string++ = 'q';
         }
@@ -285,8 +285,8 @@ void PositionToString(const Position* position, char* fen_string)
     }
     else
     {
-        *fen_string++ = FILE_CHAR(position->en_passant_index);
-        *fen_string++ = RANK_CHAR(position->en_passant_index);
+        *fen_string++ = FileChar(position->en_passant_index);
+        *fen_string++ = RankChar(position->en_passant_index);
     }
     *fen_string++ = ' ';
     /* Half move clock and full move number */

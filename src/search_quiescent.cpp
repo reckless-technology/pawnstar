@@ -9,7 +9,7 @@
  * @param beta parent ceiling value
  * @return score
 */
-int SearchQuiescent(const Position* src_position, 
+int SearchQuiescent(const Position* position, 
                     int             depth,
                     int             ply, 
                     int             alpha, 
@@ -20,14 +20,14 @@ int SearchQuiescent(const Position* src_position,
     if (ply == MAX_PLY)
     {
         INCREMENT("quiescent max ply");
-        return EvaluatePosition(src_position, alpha, beta);
+        return EvaluatePosition(position, alpha, beta);
     }
-    if (src_position->state_flags & IS_CHECK)
+    if (position->flags & IS_CHECK)
     {
         INCREMENT("quiescent checks");
-        return Search(src_position, depth, ply, alpha, beta, cancel, NULL);
+        return Search(position, depth, ply, alpha, beta, cancel, NULL);
     }
-    int score = EvaluatePosition(src_position, alpha, beta);
+    int score = EvaluatePosition(position, alpha, beta);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
@@ -39,8 +39,8 @@ int SearchQuiescent(const Position* src_position,
         alpha = score;
     }
     Move moves[MAX_MOVES_PER_POSITION];
-    GeneratePseudoLegalCaptures(src_position, moves);
-    ScoreAndSortMoves(src_position, moves, ply, depth);
+    GeneratePseudoLegalCaptures(position, moves);
+    ScoreAndSortMoves(position, moves, ply, depth);
     for (const Move* move = moves; *move; ++move)
     {
         if (MoveScore(*move) < 0)
@@ -48,14 +48,14 @@ int SearchQuiescent(const Position* src_position,
             INCREMENT("negative SEE quiescent skips");
             continue;
         }
-        Position position;
-        MakeMove(&position, src_position, *move);
-        if (position.state_flags & IS_MOVED_INTO_CHECK)
+        Position child_position;
+        MakeMove(&child_position, position, *move);
+        if (child_position.flags & IS_MOVED_INTO_CHECK)
         {
             INCREMENT("quiescent moved into check");
             continue;
         }
-        score = -SearchQuiescent(&position, depth - 1, ply + 1, -beta, -alpha, cancel);
+        score = -SearchQuiescent(&child_position, depth - 1, ply + 1, -beta, -alpha, cancel);
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");

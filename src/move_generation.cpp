@@ -7,7 +7,7 @@
 void GeneratePseudoLegalMoves(const Position* position,
                               Move            moves[])
 {
-    if (COLOR_TO_MOVE(position) == WHITE)
+    if (ColorToMove(position) == WHITE)
     {
         GenerateMoves<true, WHITE>(position, moves);
     }
@@ -20,7 +20,7 @@ void GeneratePseudoLegalMoves(const Position* position,
 void GeneratePseudoLegalCaptures(const Position* position,
                                  Move            moves[])
 {
-    if (COLOR_TO_MOVE(position) == WHITE)
+    if (ColorToMove(position) == WHITE)
     {
         GenerateMoves<false, WHITE>(position, moves);
     }
@@ -41,9 +41,9 @@ GeneratePseudoLegalMoves(const Position* position,
 {   
     Bitboard has_attacks_to = NO_SQUARES;
     Bitboard attacks_to[64];
-    const int color = COLOR_TO_MOVE(position);
+    const int color = ColorToMove(position);
     const Bitboard friendly_pieces = position->pieces_of_color[color];
-    const Bitboard enemy_pieces = position->pieces_of_color[ENEMY(color)];
+    const Bitboard enemy_pieces = position->pieces_of_color[EnemyOf(color)];
     const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
     const Bitboard vacant_squares = ~occupied_squares;
     /* Generate pawn promotions. */
@@ -97,7 +97,7 @@ GeneratePseudoLegalMoves(const Position* position,
     */
     if (position->en_passant_index)
     {
-        Bitboard en_passant_sources = SETS[position->en_passant_index].pawn_attacks[ENEMY(color)] & friendly_pawns;
+        Bitboard en_passant_sources = SETS[position->en_passant_index].pawn_attacks[EnemyOf(color)] & friendly_pawns;
         while (en_passant_sources)
         {
             *captures++ = EpCaptureMove(FindAndClearLsb(&en_passant_sources), position->en_passant_index);
@@ -120,7 +120,7 @@ GeneratePseudoLegalMoves(const Position* position,
             }
             for (int attacker = PAWN; attacker <= victim; ++attacker)
             {
-                if (attacker == PAWN && RANK_OF(victim_locn) == FINAL_RANK[color])
+                if (attacker == PAWN && RankOf(victim_locn) == FINAL_RANK[color])
                 {
                     /* Pawn promotion captures: already handled. */
                     continue;
@@ -149,7 +149,7 @@ GeneratePseudoLegalMoves(const Position* position,
             }
             for (int attacker = victim + 1; attacker <= KING; ++attacker)
             {
-                if (attacker == PAWN && RANK_OF(victim_locn) == FINAL_RANK[color])
+                if (attacker == PAWN && RankOf(victim_locn) == FINAL_RANK[color])
                 {
                     /* Pawn promotion captures: already handled. */
                     continue;
@@ -246,7 +246,7 @@ GeneratePseudoLegalMoves(const Position* position,
     while (targets)
     {
         const int to = FindAndClearLsb(&targets);
-        if (!IsAttacked(position, to, ENEMY(color)))
+        if (!IsAttacked(position, to, EnemyOf(color)))
         {
             *non_captures++ = NonCaptureMove(king_locn, to, KING);
         }
@@ -313,7 +313,7 @@ int GenerateLegalMoves(const Position *position, Move moves[])
     {
         Position dst_position;
         MakeMove(&dst_position, position, *move);
-        if (!(dst_position.state_flags & IS_MOVED_INTO_CHECK))
+        if (!(dst_position.flags & IS_MOVED_INTO_CHECK))
         {
             *moves++ = *move;
         }

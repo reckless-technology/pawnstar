@@ -96,7 +96,7 @@ bool IsStalemate(const Position* position)
 {
     Move moves[MAX_MOVES_PER_POSITION];
     return 
-        !(position->state_flags & IS_CHECK) && 
+        !(position->flags & IS_CHECK) && 
         GenerateLegalMoves(position, moves) == 0;
 }
 /*
@@ -106,7 +106,7 @@ bool IsCheckmate(const Position* position)
 {
     Move moves[MAX_MOVES_PER_POSITION];
     return 
-        (position->state_flags & IS_CHECK) && 
+        (position->flags & IS_CHECK) && 
         GenerateLegalMoves(position, moves) == 0;
 }
 /*
@@ -117,7 +117,7 @@ c) the side not on move shall not be in check
 */
 bool IsPositionLegal(const Position* position)
 {
-    const int color           = COLOR_TO_MOVE(position);
+    const int color           = ColorToMove(position);
     const Bitboard white_king = position->kings & position->white_pieces;
     const Bitboard black_king = position->kings & position->black_pieces;
     return
@@ -125,19 +125,19 @@ bool IsPositionLegal(const Position* position)
         PopCount(black_king) == 1                           &&
         white_king != black_king                            &&
         !(SETS[Lsb(white_king)].king_attacks & black_king)  &&
-        !IsAttacked(position, position->king_location[ENEMY(color)], color);
+        !IsAttacked(position, position->king_location[EnemyOf(color)], color);
 }
 /*
 If the game is over, display the xboard style result string
 */
 void DisplayResultIfGameOver(const Position* position)
 {
-    switch (position->state_flags & IS_GAME_OVER)
+    switch (position->flags & IS_GAME_OVER)
     {
     default:
         break;
     case IS_CHECKMATE:
-        printf((position->state_flags & IS_BLACK_TO_MOVE) ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
+        printf((position->flags & IS_BLACK_TO_MOVE) ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
         break;
     case IS_STALEMATE:
         printf("1/2-1/2 {stalemate}\n");

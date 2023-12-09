@@ -38,8 +38,8 @@ DebugPrintMove(Move move, char* buffer)
                       names[MovePiece(move)], 
                       names[MoveCaptured(move)], 
                       names[MovePromoted(move)],
-                      FILE_CHAR(MoveFrom(move)), RANK_CHAR(MoveFrom(move)),
-                      FILE_CHAR(MoveTo  (move)), RANK_CHAR(MoveTo  (move)), 
+                      FileChar(MoveFrom(move)), RankChar(MoveFrom(move)),
+                      FileChar(MoveTo  (move)), RankChar(MoveTo  (move)), 
                       (int)((move >> 21) & 7));
     return buffer;
 }
@@ -115,12 +115,12 @@ CategorizeMoves(const Position* src_position,
     for (const Move* move = moves; *move; ++move)
     {
         MakeMove(&position, src_position, *move);
-        if (position.state_flags & IS_MOVED_INTO_CHECK)
+        if (position.flags & IS_MOVED_INTO_CHECK)
         {
             continue;
         }
         ++counts->legal_moves;
-        if (position.state_flags & IS_CHECK)
+        if (position.flags & IS_CHECK)
         {
             ++counts->checks;
         }
@@ -173,11 +173,11 @@ Perft(const Position* src_position,
                 printf("\nERROR in hash during perft\n");
             }
 #endif
-            if (position.state_flags & IS_MOVED_INTO_CHECK)
+            if (position.flags & IS_MOVED_INTO_CHECK)
             {
                 continue;
             }
-            Perft(&position, depth - 1, ENEMY(color), counts);
+            Perft(&position, depth - 1, EnemyOf(color), counts);
         }           
         return;
     }
@@ -209,7 +209,7 @@ RunPerftTests(void)
         memset(&counts, 0, sizeof(counts));
         total_nodes += test->counts.legal_moves;
         start = GetMilliseconds();
-        Perft(&position, test->depth, COLOR_TO_MOVE(&position), &counts);
+        Perft(&position, test->depth, ColorToMove(&position), &counts);
         stop = GetMilliseconds();
         if (stop == start)
         {

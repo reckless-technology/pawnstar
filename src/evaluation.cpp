@@ -161,7 +161,7 @@ EvaluatePosition(const Position* position,
     This saves time doing more expensive evaluation when clearly it's
     not a PV node so evaluation accuracy is not as important. 
     */
-    int score = (position->state_flags & IS_BLACK_TO_MOVE) ?
+    int score = (position->flags & IS_BLACK_TO_MOVE) ?
         scores[BLACK] - scores[WHITE] :
         scores[WHITE] - scores[BLACK];
     if (score >= beta + 150)
@@ -227,7 +227,7 @@ EvaluatePosition(const Position* position,
                 scores[color] +=  
                     10 * PopCount(SETS[king_location].king_attacks & friendly_pieces) + 
                     10 * PopCount(SETS[king_location].king_attacks & friendly_pawns);
-                if ((FILES_BB[FILE_OF(king_location)] & friendly_pawns) == NO_SQUARES)
+                if ((FILES_BB[FileOf(king_location)] & friendly_pawns) == NO_SQUARES)
                 {
                     scores[color] -= 50;
                 }
@@ -236,11 +236,11 @@ EvaluatePosition(const Position* position,
             while (b)
             {
                 const int locn = FindAndClearLsb(b);
-                scores[color] -= 5 * PopCount(AttacksTo(position, locn, ENEMY(color)));
+                scores[color] -= 5 * PopCount(AttacksTo(position, locn, EnemyOf(color)));
             }
         }
     }
-    score = position->state_flags & IS_BLACK_TO_MOVE ?
+    score = position->flags & IS_BLACK_TO_MOVE ?
         scores[BLACK] - scores[WHITE] :
         scores[WHITE] - scores[BLACK];
     eval_hash->hash = position->hash;

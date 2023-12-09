@@ -69,7 +69,7 @@ bool IsAttacked(const Position* position, int location, int color)
     do not affect their attack set.
     */
     if (attacking_pieces & 
-        ((sets->pawn_attacks[ENEMY(color)] & position->pawns)   |
+        ((sets->pawn_attacks[EnemyOf(color)] & position->pawns)   |
         (             sets->knight_attacks & position->knights) | 
         (               sets->king_attacks & position->kings)))
     {
@@ -119,7 +119,7 @@ Bitboard AttacksTo(const Position* position, int location, int color)
     */
     Bitboard result = 
         (attacking_pieces & 
-        ((sets->pawn_attacks[ENEMY(color)] & position->pawns)   |
+        ((sets->pawn_attacks[EnemyOf(color)] & position->pawns)   |
         (             sets->knight_attacks & position->knights) | 
         (               sets->king_attacks & position->kings)));
     /*

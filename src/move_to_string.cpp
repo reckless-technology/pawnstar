@@ -1,38 +1,41 @@
 #include "pawnstar.h"
 
-/*
-Convert a move into standard algebraic notation
-Refer to:
-http://en.wikipedia.org/wiki/Portable_Game_Notation#Movetext
-*/
-char* MoveToString(const Position* position, Move the_move, char move_string[])
+/**
+ * @brief Convert a move to standard algebraic notation string.
+ * @param position Current position corresponding to the move.
+ * @param the_move The move input to be formatted as a string.
+ * @param move_string Where to store the move string.
+ * @return Number of characters written to output.
+ */
+int MoveToString(const Position* position, Move move, char move_string[])
 {
+    const char* initial_ptr = move_string;
     Move legal_moves[MAX_MOVES_PER_POSITION];
-    Position dst_position[1];
+    Position dst_position;
     char disambiguation[3]   = { 0 };
-    char from_square[3]      = { FILE_CHAR(MoveFrom(the_move)), RANK_CHAR(MoveFrom(the_move)), 0 };
-    char to_square[3]        = { FILE_CHAR(MoveTo  (the_move)), RANK_CHAR(MoveTo  (the_move)), 0 };
+    char from_square[3]      = { FileChar(MoveFrom(move)), RankChar(MoveFrom(move)), 0 };
+    char to_square[3]        = { FileChar(MoveTo  (move)), RankChar(MoveTo  (move)), 0 };
     bool is_source_ambiguous = false;
     bool is_file_unique      = true;
     bool is_rank_unique      = true;   
-    const char move_piece    = " PNBRQK"[MovePiece(the_move)];
+    const char move_piece    = " PNBRQK"[MovePiece(move)];
     /*
     Determine if there is more than one piece of the same type which is capable 
     of moving to the target square, and will require further disambiguation
     */
     GenerateLegalMoves(position, legal_moves);
-    for (const Move* move = legal_moves; *move; ++move)
+    for (const Move* m = legal_moves; *m; ++m)
     {
-        if (MovePiece(*move) == MovePiece(the_move) && 
-            MoveTo   (*move) == MoveTo   (the_move) &&
-            MoveFrom (*move) != MoveFrom (the_move))
+        if (MovePiece(*m) == MovePiece(move) && 
+            MoveTo   (*m) == MoveTo   (move) &&
+            MoveFrom (*m) != MoveFrom (move))
         {
             is_source_ambiguous = true;
-            if (FILE_OF(MoveFrom(*move)) == FILE_OF(MoveFrom(the_move)))
+            if (FileOf(MoveFrom(*m)) == FileOf(MoveFrom(move)))
             {
                 is_file_unique = false;
             }
-            if (RANK_OF(MoveFrom(*move)) == RANK_OF(MoveFrom(the_move)))
+            if (RankOf(MoveFrom(*m)) == RankOf(MoveFrom(move)))
             {
                 is_rank_unique = false;
             }   
@@ -58,7 +61,7 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
             disambiguation[1] = from_square[1];
         }
     }
-    switch (MovePiece(the_move))
+    switch (MovePiece(move))
     {
     RegularMove:
     default:
@@ -66,7 +69,7 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
     case BISHOP:
     case ROOK:
     case QUEEN:
-        if (MoveCaptured(the_move))
+        if (MoveCaptured(move))
         {
             move_string += sprintf(move_string, "%c%sx%s", move_piece, disambiguation, to_square);
         }
@@ -77,9 +80,9 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
         break;
     
     case KING:
-        if (IsCastlingMove(the_move))
+        if (IsCastlingMove(move))
         {
-            switch (MoveTo(the_move))
+            switch (MoveTo(move))
             {
             case G1:
             case G8:
@@ -98,10 +101,10 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
         break;
 
     case PAWN:
-        if (MoveCaptured(the_move))
+        if (MoveCaptured(move))
         {
             move_string += sprintf(move_string, "%cx%s", from_square[0], to_square);
-            if (IsEpCaptureMove(the_move))
+            if (IsEpCaptureMove(move))
             {
                 /* ep capture */
                 move_string += sprintf(move_string, "e.p.");
@@ -111,32 +114,37 @@ char* MoveToString(const Position* position, Move the_move, char move_string[])
         {
             move_string += sprintf(move_string, "%s", to_square); 
         }
-        if (MovePromoted(the_move))
+        if (MovePromoted(move))
         {
-            move_string += sprintf(move_string, "=%c", "  NBRQ"[MovePromoted(the_move)]);
+            move_string += sprintf(move_string, "=%c", "  NBRQ"[MovePromoted(move)]);
         }
         break;
     }    
     /*
     Determine if this move results in check or checkmate
     */
-    MakeMove(dst_position, position, the_move);
-    if (IsCheckmate(dst_position))
+    MakeMove(&dst_position, position, move);
+    if (IsCheckmate(&dst_position))
     {
         move_string += sprintf(move_string, "#");
     }
-    else if (dst_position->state_flags & IS_CHECK)
+    else if (dst_position.flags & IS_CHECK)
     {
         move_string += sprintf(move_string, "+");
     }
-    return move_string;
+    return (int)(move_string - initial_ptr);
 }
-/*
-Convert a sequence of moves into SAN representation with each move separated by
-a space
-*/
-void MoveSequenceToSanString(const Position* position, const Move moves[], char move_string[])
+
+/**
+ * @brief Convert a sequence of moves into a string in SAN format.
+ * @param position Starting position.
+ * @param moves Zero terminated list of moves.
+ * @param move_string Pointer to store the formatted string.
+ * @return Number of characters written to output.
+ */
+int MoveSequenceToSanString(const Position* position, const Move* moves, char* move_string)
 {
+    const char* const initial_ptr = move_string;
     bool is_first_move = true;
     Position src_position[1];
     Position dst_position[1];
@@ -148,11 +156,12 @@ void MoveSequenceToSanString(const Position* position, const Move moves[], char 
         {
             *move_string++ = ' ';
         }
-        move_string = MoveToString(src_position, *move, move_string);
+        move_string += MoveToString(src_position, *move, move_string);
         MakeMove(dst_position, src_position, *move);
         *src_position = *dst_position;
         is_first_move = false;
     }
+    return (int)(move_string - initial_ptr);
 }
 
 static const char* const strings_to_remove[] = {
@@ -164,11 +173,13 @@ static const char* const strings_to_remove[] = {
     "?",
     NULL,
 };
-/*
-Compare two move strings for equality. Sometimes GUIs don't bother to put the 
-"e.p.", "+" or "#" at the end of the move string; we still want these to 
-compare as equal.
-*/
+
+/**
+ * @brief Compare two move strings for equality, disregarding extraneous characters.
+ * @param str1 first move string
+ * @param str2 second move string
+ * @return true if moves are equivalent
+ */
 bool AreMoveStringsEquivalent(char* str1, char* str2)
 {
     if (!str1 || !str2 || !strlen(str1) || !strlen(str2))

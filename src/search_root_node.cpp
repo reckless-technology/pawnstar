@@ -29,20 +29,20 @@ void StopThinking()
  * @param src_position the position to search
  * @return the best move found
 */
-Move SearchRootNode(const Position* src_position)
+Move SearchRootNode(const Position* position)
 {
-    if (src_position->state_flags & IS_GAME_OVER)
+    if (position->flags & IS_GAME_OVER)
     {
         return 0;
     }
     /* If there is a book move for this position, do not bother with search. */
-    Move book_move = GetBookMove(src_position->hash);
+    Move book_move = GetBookMove(position->hash);
     if (book_move)
     {
         return book_move;
     } 
     Move moves[MAX_MOVES_PER_POSITION];
-    int num_legal_moves = GenerateLegalMoves(src_position, moves);
+    int num_legal_moves = GenerateLegalMoves(position, moves);
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (num_legal_moves == 1)
     {
@@ -56,7 +56,7 @@ Move SearchRootNode(const Position* src_position)
     {
     case CLOCK_STANDARD:
     default:
-        moves_to_go     = the_game.time_control.standard.moves_per_period - (src_position->full_move_count % the_game.time_control.standard.moves_per_period);
+        moves_to_go     = the_game.time_control.standard.moves_per_period - (position->full_move_count % the_game.time_control.standard.moves_per_period);
         ms_allocated    = the_game.time_control.standard.milliseconds_remaining / moves_to_go;
         timeout_ms      = max(100, min(ms_allocated * 2, the_game.time_control.standard.milliseconds_remaining - 3000));
         the_game.time_control.hard_stop_search_ms = GetMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
@@ -93,7 +93,7 @@ Move SearchRootNode(const Position* src_position)
     Move best_moves[MAX_PLY]; /* Best move found at each ply of search. */
     for (int i = 0; i != num_legal_moves; ++i)
     {
-        const int score = SearchSingleMove(src_position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &is_cancel_pending, moves[i], NULL, i);
+        const int score = SearchSingleMove(position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, &is_cancel_pending, moves[i], NULL, i);
         moves[i] = ScoredMove(moves[i], score);
     }   
     SortMoves(num_legal_moves, moves);
@@ -115,21 +115,21 @@ Move SearchRootNode(const Position* src_position)
             int score;    
             if (i == 0)
             {
-                score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &is_cancel_pending, moves[i], &child_pv, i);
+                score = SearchSingleMove(position, depth, 0, alpha, BETA, &is_cancel_pending, moves[i], &child_pv, i);
                 moves[i] = ScoredMove(moves[i], score);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                score = SearchSingleMove(src_position, depth, 0, alpha, alpha + 1, &is_cancel_pending, moves[i], &child_pv, i);
+                score = SearchSingleMove(position, depth, 0, alpha, alpha + 1, &is_cancel_pending, moves[i], &child_pv, i);
                 moves[i] = ScoredMove(moves[i], score);
                 if (score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    score = SearchSingleMove(src_position, depth, 0, alpha, BETA, &is_cancel_pending, moves[i], &child_pv, i);
+                    score = SearchSingleMove(position, depth, 0, alpha, BETA, &is_cancel_pending, moves[i], &child_pv, i);
                     moves[i] = ScoredMove(moves[i], score);
                 }
-            }            
+            }
             if (is_cancel_pending)
             {
                 return best_move;
@@ -139,12 +139,12 @@ Move SearchRootNode(const Position* src_position)
                 alpha             = score;
                 best_move         = moves[i];
                 best_moves[depth] = moves[i];
-                RecordTransposition(src_position->hash, depth, alpha, best_move, NODE_PV);
+                RecordTransposition(position->hash, depth, alpha, best_move, NODE_PV);
                 CopyVariation(&principal_variation, &child_pv, best_move);
                 if (the_game.do_show_thinking)
                 {
                     char move_string[256];
-                    MoveSequenceToSanString(src_position, principal_variation.moves, move_string);
+                    MoveSequenceToSanString(position, principal_variation.moves, move_string);
                     printf("%2u %5d %4u %8u %s\n", depth, (int)MoveScore(best_moves[depth]), (GetMilliseconds() - start_ms) / 10, the_game.node_count, move_string);
                 }
             }

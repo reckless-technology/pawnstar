@@ -16,10 +16,10 @@
 #define NO_SQUARES          0x0000000000000000ull
 
 /* Function like macros */
-#define FILE_OF(locn)       ((locn) & 7)                /**< Convert square index to file. */
-#define RANK_OF(locn)       ((locn) >> 3)               /**< Convert square index to rank. */
-#define FILE_CHAR(locn)     (char)('a' + FILE_OF(locn)) /**< Convert square index to file character. */
-#define RANK_CHAR(locn)     (char)('1' + RANK_OF(locn)) /**< Convert square index to rank character. */
+#define FileOf(locn)       ((locn) & 7)                /**< Convert square index to file. */
+#define RankOf(locn)       ((locn) >> 3)               /**< Convert square index to rank. */
+#define FileChar(locn)     (char)('a' + FileOf(locn)) /**< Convert square index to file character. */
+#define RankChar(locn)     (char)('1' + RankOf(locn)) /**< Convert square index to rank character. */
 #define BITBOARD(locn)      (1ull << (locn))            /**< Convert square index to Bitboard. */
 #define BITBOARD_XY(x,y)    (1ull << ((x) + 8 * (y)))   /**< Convert square (file,rank) co-ords to Bitboard. */
 #define ShiftNorth(b)      ((b) << 8)                  /**< Shift a Bitboard one square to the north. */
@@ -160,7 +160,7 @@ static uint64_t VectorFrom(int location, int direction)
 {
     uint64_t result = NO_SQUARES;
     const DirectionVector* dv = &direction_vectors[direction];
-    for (int x = FILE_OF(location) + dv->dx, y = RANK_OF(location) + dv->dy;
+    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy;
          x >= 0 && x < 8 && y >= 0 && y < 8;
          x += dv->dx, y += dv->dy)
     {
@@ -333,8 +333,8 @@ static uint64_t KingAttacks2(int location)
 static uint64_t PassedPawnMaskWhite(int location)
 {
     uint64_t result     = NO_SQUARES;
-    const int locn_x    = FILE_OF(location);
-    const int locn_y    = RANK_OF(location);
+    const int locn_x    = FileOf(location);
+    const int locn_y    = RankOf(location);
     for (int x = locn_x - 1; x <= locn_x + 1; ++x)
     {
         if (x < 0 || x > 7)
@@ -357,8 +357,8 @@ static uint64_t PassedPawnMaskWhite(int location)
 static uint64_t PassedPawnMaskBlack(int location)
 {
     uint64_t result     = NO_SQUARES;
-    const int locn_x    = FILE_OF(location);
-    const int locn_y    = RANK_OF(location);
+    const int locn_x    = FileOf(location);
+    const int locn_y    = RankOf(location);
     for (int x = locn_x - 1; x <= locn_x + 1; ++x)
     {
         if (x < 0 || x > 7)
@@ -381,7 +381,7 @@ static uint64_t PassedPawnMaskBlack(int location)
 static uint64_t IsolatedPawnMaskWhite(int location)
 {
     uint64_t result     = NO_SQUARES;
-    const int locn_x    = FILE_OF(location);
+    const int locn_x    = FileOf(location);
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
     {
         if (x < 0 || x > 7)
@@ -414,8 +414,8 @@ static uint64_t IsolatedPawnMaskBlack(int location)
 static uint64_t SupportedPawnMaskWhite(int location)
 {
     uint64_t result       = NO_SQUARES;
-    const int locn_x    = FILE_OF(location);
-    const int locn_y    = RANK_OF(location);;
+    const int locn_x    = FileOf(location);
+    const int locn_y    = RankOf(location);;
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
     {
         if (x < 0 || x > 7)
@@ -438,8 +438,8 @@ static uint64_t SupportedPawnMaskWhite(int location)
 static uint64_t SupportedPawnMaskBlack(int location)
 {
     uint64_t result    = NO_SQUARES;
-    const int locn_x = FILE_OF(location);
-    const int locn_y = RANK_OF(location);
+    const int locn_x = FileOf(location);
+    const int locn_y = RankOf(location);
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
     {
         if (x < 0 || x > 7)
@@ -507,7 +507,7 @@ static uint64_t OccupancyMaskVector(int location, int direction)
 {
     uint64_t result = NO_SQUARES;
     const DirectionVector* dv = &direction_vectors[direction];
-    for (int x = FILE_OF(location) + dv->dx, y = RANK_OF(location) + dv->dy;
+    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy;
          x + dv->dx >= 0 && x + dv->dx < 8 && y + dv->dy >= 0 && y + dv->dy < 8;
          x += dv->dx, y += dv->dy)
     {
@@ -558,7 +558,7 @@ VectorMoveTargets(uint64_t occupied_squares,
 {
     uint64_t result = NO_SQUARES;
     const DirectionVector* dv = &direction_vectors[direction];
-    for (int x = FILE_OF(location) + dv->dx, y = RANK_OF(location) + dv->dy;
+    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy;
          x >= 0 && x < 8 && y >= 0 && y < 8;
          x += dv->dx, y += dv->dy)
     {
@@ -781,7 +781,7 @@ GenerateMagics(void)
         /* First print the arrays for the discrete attacks and the attack indices. */
         for (int i = 0; i != 64; ++i)
         {
-            char square_name[3] = { (char)('A' + FILE_OF(i)), RANK_CHAR(i), 0 };
+            char square_name[3] = { (char)('A' + FileOf(i)), RankChar(i), 0 };
             const int num_attacks = 1 << (64 - magics[i].shift);
             printf("static const uint8_t %s_MAGIC_INDICES_%s[%d] = \n{", v->name, square_name, num_attacks);
             for (int j = 0; j != num_attacks; ++j)
@@ -809,7 +809,7 @@ GenerateMagics(void)
         printf("extern const MagicMoveEntry %s_MAGICS[64] = \n{\n", v->name);
         for (int i = 0; i != 64; ++i)
         {
-            char square_name[3] = { (char)('A' + FILE_OF(i)), RANK_CHAR(i), 0 };
+            char square_name[3] = { (char)('A' + FileOf(i)), RankChar(i), 0 };
             printf("    {\n");
             printf("        .magic          = 0x%016llXull,\n", magics[i].magic);
             printf("        .occupancy_mask = 0x%016llXull,\n", magics[i].mask);
@@ -925,7 +925,7 @@ int main()
     printf("extern const Sets SETS[64] = \n{");
     for (int location = 0; location != 64; ++location)
     {
-        printf("\n    { /* square %c%c */", FILE_CHAR(location), RANK_CHAR(location));
+        printf("\n    { /* square %c%c */", FileChar(location), RankChar(location));
         for (const BitboardGen* generator = ray_generators; generator->name; ++generator)
         {
             const uint64_t b = generator->function(location);
@@ -946,7 +946,7 @@ int main()
         printf("\n    {");
         for (int location = 0; location != 64; ++location)
         {
-            printf("\n        { /* %s square %c%c */", color_names[color], FILE_CHAR(location), RANK_CHAR(location));
+            printf("\n        { /* %s square %c%c */", color_names[color], FileChar(location), RankChar(location));
             for (const BitboardGen* generator = pawn_generators[color];
                  generator->name; 
                 ++generator)
@@ -968,7 +968,7 @@ int main()
     printf("extern const Bitboard INTERVENING_SQUARES[64][64] = \n{");
     for (int i = 0; i != 64; ++i)
     {
-        printf("\n    { /* square %c%c */", FILE_CHAR(i), RANK_CHAR(i));
+        printf("\n    { /* square %c%c */", FileChar(i), RankChar(i));
         for (int j = 0; j != 64; ++j)
         {
             if ((j & 7) == 0)
@@ -1017,7 +1017,7 @@ int main()
         {
             printf("\n    ");
         }
-        const int rank = RANK_OF(i);
+        const int rank = RankOf(i);
         printf("0x%016llXull,", rank == 2 || rank == 5 ? PseudoRandom64() : 0ull);
     }
     printf("\n};\n");

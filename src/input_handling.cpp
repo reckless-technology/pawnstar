@@ -105,8 +105,8 @@ static void handle_force(int argc, char* argv[])
 
 static void handle_go(int argc, char* argv[])
 {
-    the_game.engine_color = COLOR_TO_MOVE(the_game.position);
-    if (!(the_game.position->state_flags & IS_GAME_OVER))
+    the_game.engine_color = ColorToMove(the_game.position);
+    if (!(the_game.position->flags & IS_GAME_OVER))
     {
         StartThinking(&the_game);
     }
@@ -116,7 +116,7 @@ static void handle_go(int argc, char* argv[])
 
 static void handle_playother(int argc, char* argv[])
 {
-    the_game.engine_color = ENEMY(COLOR_TO_MOVE(the_game.position));
+    the_game.engine_color = EnemyOf(ColorToMove(the_game.position));
     (void)argc;
     (void)argv;
 }
@@ -135,7 +135,7 @@ static void handle_usermove(int argc, char* argv[])
     }
     else
     {
-        if (!(the_game.position->state_flags & IS_GAME_OVER) && the_game.engine_color == (int)COLOR_TO_MOVE(the_game.position))
+        if (!(the_game.position->flags & IS_GAME_OVER) && the_game.engine_color == (int)ColorToMove(the_game.position))
         {
             StartThinking(&the_game);
         }

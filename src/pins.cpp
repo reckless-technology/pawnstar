@@ -9,7 +9,7 @@
 void DeterminePins(const Position* position, Pins* pins)
 {
     pins->pinned_pieces             = NO_SQUARES;
-    const int color                 = COLOR_TO_MOVE(position);
+    const int color                 = ColorToMove(position);
     const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
     const Bitboard friendly_pieces  = position->pieces_of_color[color];
     const int king_location         = position->king_location[color];
@@ -39,12 +39,12 @@ void DeterminePins(const Position* position, Pins* pins)
         while (b)
         {
             const int locn = FindAndClearLsb(&b);
-            printf("Piece pinned at %c%c may move to ", FILE_CHAR(locn), RANK_CHAR(locn));
+            printf("Piece pinned at %c%c may move to ", FileChar(locn), RankChar(locn));
             Bitboard c = pins->allowed_squares[locn];
             while (c)
             {
                 const int allowed_locn = FindAndClearLsb(&c);
-                printf("%c%c ", FILE_CHAR(allowed_locn), RANK_CHAR(allowed_locn));
+                printf("%c%c ", FileChar(allowed_locn), RankChar(allowed_locn));
             }
             printf("\n");
         }

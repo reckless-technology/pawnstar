@@ -129,7 +129,7 @@ struct Position
 {    
     union
     {
-        Bitboard piece[6];             /**< used to index pieces by [piece - 1] */
+        Bitboard piece[6];              /**< used to index pieces by [piece - 1] */
         struct
         {
             Bitboard pawns;             /**< squares with a pawn on them        */
@@ -151,7 +151,7 @@ struct Position
     };    
     uint64_t        hash;                   /**< Zobrist hash of this position, maintained incrementally    */
     const Position* previous;               /**< position immediately prior to this in the line of play     */
-    uint16_t        state_flags;            /**< game state-machine flags                                   */
+    uint16_t        flags;                  /**< game state-machine flags                                   */
     uint8_t         king_location[2];       /**< square index of white and black kings                      */
     uint8_t         en_passant_index;       /**< en passant capture availability square (0 if none)         */
     uint8_t         reversible_move_count;  /**< number of consecutive reversible half-moves (plies)        */

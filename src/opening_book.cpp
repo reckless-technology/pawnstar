@@ -6,30 +6,32 @@
 #define strtok_r strtok_s
 #endif
 
-/*
-Functions to use an opening book.
-Opening book text files are 1 line per line of play, with moves in SAN format.
-
-The book itself is stored as a singly linked list. Book moves are indexed
-according to the Zobrist hash of the position.
-
-Structure containing a node of the opening book linked list.
+/**
+ * @file Functions to use an opening book.
+ * Opening book text files are 1 line per line of play, with moves in SAN format.
+ * The book itself is stored as a singly linked list. 
+ * Book moves are indexed according to the Zobrist hash of the position.
 */
+
 typedef struct BookPosition BookPosition;
+/**
+ * @brief Structure containing a node of the opening book linked list.
+ */
 struct BookPosition
 {
-    uint64_t        hash;
-    int             capacity;
-    int             count;
-    Move*           moves;
-    BookPosition*   next;
+    uint64_t        hash;       /**< Hash of the position for this entry    */
+    int             capacity;   /**< Current capacity of moves array        */
+    int             count;      /**< Current number of moves in array       */
+    Move*           moves;      /**< The moves available for this position  */
+    BookPosition*   next;       /**< Next entry in the linked list          */
 };
-/*
-Head pointer
-*/
-static BookPosition* opening_book = NULL;
-/*
-Create a new BookPosition and return a pointer to it
+
+static BookPosition* opening_book = NULL;   /**< Head of opening book linked list   */
+
+/**
+ * @brief Create a new book entry and return a pointer to it.
+ * @param hash Zobrist hash for this position.
+ * @return Pointer to new position entry.
 */
 static BookPosition* NewBookPosition(uint64_t hash)
 {
@@ -41,9 +43,12 @@ static BookPosition* NewBookPosition(uint64_t hash)
     bp->next = NULL;
     return bp;
 }
-/*
-Find a BookPosition from a position hash (NULL if not found)
-*/
+
+/**
+ * @brief Find an entry in the book
+ * @param hash Zobrist hash to search for
+ * @return Pointer to entry if found, else NULL
+ */
 static BookPosition* FindBookPosition(uint64_t hash)
 {
     BookPosition* bp;
@@ -56,9 +61,12 @@ static BookPosition* FindBookPosition(uint64_t hash)
     }
     return bp;
 }
-/*
-Add a new move to the opening book
-*/
+
+/**
+ * @brief Add a new book move
+ * @param hash Zobrist hash of the position
+ * @param move Move to add
+ */
 static void AddMove(uint64_t hash, Move move)
 {
     BookPosition* bp = FindBookPosition(hash);
@@ -75,17 +83,20 @@ static void AddMove(uint64_t hash, Move move)
     }
     bp->moves[bp->count++] = move;
 }
-/*
-Select one from the possible book moves for the current position
-Returns 0 if there is no book move for this position.
+
+/**
+ * @brief Pseudo randomly select from available book moves
+ * @param hash the position hash
+ * @return Move selected from book, or 0 if no move found
 */
 Move GetBookMove(uint64_t hash)
 {
     const BookPosition* bp = FindBookPosition(hash);
     return bp ? bp->moves[(unsigned)NextRandom() % bp->count] : 0;
 }
-/*
-Free the heap memory used by the opening book
+
+/**
+ * @brief Free the opening book
 */
 void FreeOpeningBook()
 {
@@ -100,6 +111,12 @@ void FreeOpeningBook()
     opening_book = NULL;
 }
 
+/**
+ * @brief Find a move in an array of moves.
+ * @param moves Array to search
+ * @param move move to search for
+ * @return Pointer to move found or NULL if not found
+*/
 constexpr const Move* 
 FindMove(const Move* moves, Move move)
 {
@@ -114,8 +131,9 @@ FindMove(const Move* moves, Move move)
     return NULL;
 }
 
-/*
-Show all possible book moves for this position
+/**
+ * @brief Print available book moves for a position
+ * @param position Position to consider for book moves
 */
 void DisplayAvailableBookMoves(const Position* position)
 {
@@ -150,11 +168,13 @@ void DisplayAvailableBookMoves(const Position* position)
         printf("%-8s %3u\n", buffer, move_counts[i]);
     }
 }
-/*
-Initialize an opening book from a string, with each line containing a book
-line of play.
-Returns true on success.
-*/
+
+/**
+ * @brief Parse a multiline string containing open book lines of play
+ *        and create the opening book from it.
+ * @param book_string String to be parsed, newline per line of play.
+ * @return true on success
+ */
 bool InitializeOpeningBookFromString(const char* book_string)
 {
     bool result = true;
@@ -208,9 +228,11 @@ bool InitializeOpeningBookFromString(const char* book_string)
     return result;
 }
 
-/*
-Parse the book text file and build the opening book from it
-*/
+/**
+ * @brief Parse the opening book file and create the opening book from it.
+ * @param filename Filename of book file.
+ * @return true on success.
+ */
 bool InitializeOpeningBookFromFile(const char filename[])
 {
     char* buffer;

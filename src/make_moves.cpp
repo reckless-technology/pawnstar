@@ -10,6 +10,7 @@
 
 /**
  * @brief Castling rights flags based on move square from and to index.
+ * Moves to and from king and rook squares invalidate castling rights.
 */
 static const uint16_t CASTLING_RIGHTS_MASKS[64] =
 {
@@ -25,9 +26,9 @@ static const uint16_t CASTLING_RIGHTS_MASKS[64] =
 
 /**
  * @brief Make a null move: don't actually move any pieces on the board.
- * - Flip side to move
- * - Clear en passant capture availablity
- * - Set the flag indicating this position is the result of a null move
+ * # Flip side to move
+ * # Clear en passant capture availablity
+ * # Set the flag indicating this position is the result of a null move
  * @param position destination position
  * @param src_position source position
 */
@@ -37,8 +38,8 @@ MakeNullMove(Position*       position,
 {
     *position = *src_position;
     position->previous = src_position;
-    position->state_flags |= IS_NULL_MOVE;
-    position->state_flags ^= IS_BLACK_TO_MOVE;
+    position->flags |= IS_NULL_MOVE;
+    position->flags ^= IS_BLACK_TO_MOVE;
     position->hash ^= EN_PASSANT_HASHES[position->en_passant_index];
     position->hash ^= BLACK_MOVE_HASH;
     position->en_passant_index = 0;
@@ -93,7 +94,7 @@ MakeMove(Position*       position,
          const Position* src_position, 
          Move            move)
 {                          
-    const int color    = COLOR_TO_MOVE(src_position);
+    const int color    = ColorToMove(src_position);
     const int from     = MoveFrom(move);
     const int to       = MoveTo(move);
     const int piece    = MovePiece(move);
@@ -101,10 +102,10 @@ MakeMove(Position*       position,
      
     *position = *src_position;
     position->previous = src_position;
-    position->state_flags &= ~IS_NULL_MOVE;
-    position->state_flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
-    position->hash ^= CASTLING_RIGHTS_HASHES[position->state_flags & CASTLING_RIGHTS_MASK] 
-                    ^ CASTLING_RIGHTS_HASHES[src_position->state_flags & CASTLING_RIGHTS_MASK];
+    position->flags &= ~IS_NULL_MOVE;
+    position->flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
+    position->hash ^= CASTLING_RIGHTS_HASHES[position->flags & CASTLING_RIGHTS_MASK] 
+                    ^ CASTLING_RIGHTS_HASHES[src_position->flags & CASTLING_RIGHTS_MASK];
     position->hash ^= EN_PASSANT_HASHES[position->en_passant_index];
     position->en_passant_index = 0;
     ++position->reversible_move_count;
@@ -118,19 +119,13 @@ MakeMove(Position*       position,
             {
                 /* En passant capture: capture location is source rank, destination file. */
                 const int captured_pawn_locn = (from & 0x38) | (to & 0x07);
-                RemovePiece(position, ENEMY(color), PAWN, captured_pawn_locn);
+                RemovePiece(position, EnemyOf(color), PAWN, captured_pawn_locn);
             }
             else
             {
-                RemovePiece(position, ENEMY(color), captured, to);
+                RemovePiece(position, EnemyOf(color), captured, to);
             }
         }                
-        else if (IsPawnDoublePushMove(move))
-        {
-            /* Pawn double push: affects en passant. */
-            position->en_passant_index = (uint8_t)((from + to) >> 1);
-            position->hash ^= EN_PASSANT_HASHES[position->en_passant_index];
-        }       
         if (MovePromoted(move))
         {
             /* Replace the pawn with the promoted piece. */
@@ -140,6 +135,12 @@ MakeMove(Position*       position,
         else
         {
             MovePiece(position, color, PAWN, from, to);
+            if (IsPawnDoublePushMove(move))
+            {
+                /* Pawn double push: affects en passant. */
+                position->en_passant_index = (uint8_t)((from + to) >> 1);
+                position->hash ^= EN_PASSANT_HASHES[position->en_passant_index];
+            } 
         }
         break;
 
@@ -150,7 +151,7 @@ MakeMove(Position*       position,
     default:
         if (captured)
         {
-            RemovePiece(position, ENEMY(color), captured, to);
+            RemovePiece(position, EnemyOf(color), captured, to);
             position->reversible_move_count = 0;
         }
         MovePiece(position, color, piece, from, to);
@@ -161,7 +162,7 @@ MakeMove(Position*       position,
         {
             if (captured)
             {
-                RemovePiece(position, ENEMY(color), captured, to);
+                RemovePiece(position, EnemyOf(color), captured, to);
                 position->reversible_move_count = 0;
             }
             MovePiece(position, color, KING, from, to);
@@ -191,24 +192,24 @@ MakeMove(Position*       position,
         }
         break;
     };  
-    position->state_flags ^= IS_BLACK_TO_MOVE;
+    position->flags ^= IS_BLACK_TO_MOVE;
     position->hash ^= BLACK_MOVE_HASH;
     position->full_move_count += color;
     position->king_location[WHITE] = Lsb(position->kings & position->white_pieces);
     position->king_location[BLACK] = Lsb(position->kings & position->black_pieces);
-    if (IsAttacked(position, position->king_location[color], ENEMY(color)))
+    if (IsAttacked(position, position->king_location[color], EnemyOf(color)))
     {
-        position->state_flags |= IS_MOVED_INTO_CHECK;
+        position->flags |= IS_MOVED_INTO_CHECK;
     }
     else
     {
-        if (IsAttacked(position, position->king_location[ENEMY(color)], color))
+        if (IsAttacked(position, position->king_location[EnemyOf(color)], color))
         {
-            position->state_flags |= IS_CHECK;
+            position->flags |= IS_CHECK;
         }
         else
         {
-            position->state_flags &= ~IS_CHECK;
+            position->flags &= ~IS_CHECK;
         }
     }
 }
@@ -217,7 +218,7 @@ Make a move and update the game end status flags
 */
 void PlayMove(Game* game, Move move)
 {
-    if (game->position->state_flags & IS_GAME_OVER)
+    if (game->position->flags & IS_GAME_OVER)
     {
         printf("ERROR: attempt to play move after game is over\n");
         return;
@@ -226,23 +227,23 @@ void PlayMove(Game* game, Move move)
     ++game->position;
     if (IsCheckmate(game->position))
     {
-        game->position->state_flags |= IS_CHECKMATE;
+        game->position->flags |= IS_CHECKMATE;
     }
     else if (IsStalemate(game->position))
     {
-        game->position->state_flags |= IS_STALEMATE;
+        game->position->flags |= IS_STALEMATE;
     }
     else if (IsDrawByRepetition(game->position, false))
     {
-        game->position->state_flags |= IS_DRAW_REPETITION;
+        game->position->flags |= IS_DRAW_REPETITION;
     }
     else if (IsDrawByMaterial(game->position))
     {
-        game->position->state_flags |= IS_DRAW_MATERIAL;
+        game->position->flags |= IS_DRAW_MATERIAL;
     }
     else if (IsDrawByFiftyMoves(game->position))
     {
-        game->position->state_flags |= IS_DRAW_50_MOVES;
+        game->position->flags |= IS_DRAW_50_MOVES;
     }
 }
 /*
@@ -252,9 +253,9 @@ format, and update game state_flags accordingly
 returns the move if a legal move was played
 returns zero if the move was illegal or the game is over
 */
-int PlayMoveString(Game* game, char* move_str)
+Move PlayMoveString(Game* game, char* move_str)
 {
-    if (game->position->state_flags & IS_GAME_OVER)
+    if (game->position->flags & IS_GAME_OVER)
     {
         return 0;
     }  

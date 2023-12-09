@@ -14,17 +14,17 @@ int EvaluateStaticExchange(const Position* src_position, Move move)
 {
     Position position;
     MakeMove(&position, src_position, move);
-    if (position.state_flags & IS_MOVED_INTO_CHECK)
+    if (position.flags & IS_MOVED_INTO_CHECK)
     {
         return ALPHA;
     }
     if (MovePromoted(move))
     {
         return piece_values[MoveCaptured(move)] + piece_values[MovePromoted(move)] - piece_values[PAWN] - 
-            EvaluateSwapOff(&position, MoveTo(move), COLOR_TO_MOVE(&position), MovePromoted(move));
+            EvaluateSwapOff(&position, MoveTo(move), ColorToMove(&position), MovePromoted(move));
     }
     return piece_values[MoveCaptured(move)] - 
-        EvaluateSwapOff(&position, MoveTo(move), COLOR_TO_MOVE(&position), MovePiece(move));
+        EvaluateSwapOff(&position, MoveTo(move), ColorToMove(&position), MovePiece(move));
 }
 /*
 Determine the swap off value of a capture move onto a fixed square. This 
@@ -47,7 +47,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         int capturing_piece;
         Bitboard sliders; 
         const Bitboard attacking_pieces = position->pieces_of_color[color];
-        Bitboard attacker = sets->pawn_attacks[ENEMY(color)] & attacking_pieces & position->pawns;
+        Bitboard attacker = sets->pawn_attacks[EnemyOf(color)] & attacking_pieces & position->pawns;
         if (attacker)
         {
             attacker &= -attacker; /* isolate Lsb in case there is more than 1 pawn attacker */
@@ -107,13 +107,13 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
 
 FoundAttacker:
         position->piece[piece_on_square - 1]    ^= square;
-        position->pieces_of_color[ENEMY(color)] ^= square;
+        position->pieces_of_color[EnemyOf(color)] ^= square;
         position->piece[capturing_piece - 1]    ^= attacker | square;
         position->pieces_of_color[color]        ^= attacker | square;
         occupied_squares                        ^= attacker;        
         scores[ply]                             = piece_values[piece_on_square];
         piece_on_square                         = capturing_piece;
-        color                                   = ENEMY(color);
+        color                                   = EnemyOf(color);
     }
     /* Second pass: unwind the capture stack and propagate values 
        back to the top for material winning sequences */
