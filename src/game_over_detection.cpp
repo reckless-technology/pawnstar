@@ -48,7 +48,7 @@ d) king and bishop vs king and bishop, with bishops on the same color square
 bool IsDrawByMaterial(const Position* position)
 {
     const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
-    switch (POPCOUNT(occupied_squares))
+    switch (PopCount(occupied_squares))
     {
     case 0:
     case 1:
@@ -121,10 +121,10 @@ bool IsPositionLegal(const Position* position)
     const Bitboard white_king = position->kings & position->white_pieces;
     const Bitboard black_king = position->kings & position->black_pieces;
     return
-        POPCOUNT(white_king) == 1                           &&
-        POPCOUNT(black_king) == 1                           &&
+        PopCount(white_king) == 1                           &&
+        PopCount(black_king) == 1                           &&
         white_king != black_king                            &&
-        !(SETS[LSB(white_king)].king_attacks & black_king)  &&
+        !(SETS[Lsb(white_king)].king_attacks & black_king)  &&
         !IsAttacked(position, position->king_location[ENEMY(color)], color);
 }
 /*

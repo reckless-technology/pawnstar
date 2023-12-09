@@ -22,14 +22,14 @@
 #define RANK_CHAR(locn)     (char)('1' + RANK_OF(locn)) /**< Convert square index to rank character. */
 #define BITBOARD(locn)      (1ull << (locn))            /**< Convert square index to Bitboard. */
 #define BITBOARD_XY(x,y)    (1ull << ((x) + 8 * (y)))   /**< Convert square (file,rank) co-ords to Bitboard. */
-#define SHIFT_NORTH(b)      ((b) << 8)                  /**< Shift a Bitboard one square to the north. */
-#define SHIFT_NORTHEAST(b)  (((b) & MASK_EAST_1) << 9)  /**< Shift a Bitboard one square to the northeast. */
-#define SHIFT_EAST(b)       (((b) & MASK_EAST_1) << 1)  /**< Shift a Bitboard one square to the east. */
-#define SHIFT_SOUTHEAST(b)  (((b) & MASK_EAST_1) >> 7)  /**< Shift a Bitboard one square to the southeast. */
-#define SHIFT_SOUTH(b)      ((b) >> 8)                  /**< Shift a Bitboard one square to the south. */
-#define SHIFT_SOUTHWEST(b)  (((b) & MASK_WEST_1) >> 9)  /**< Shift a Bitboard one square to the southwest. */
-#define SHIFT_WEST(b)       (((b) & MASK_WEST_1) >> 1)  /**< Shift a Bitboard one square to the west. */
-#define SHIFT_NORTHWEST(b)  (((b) & MASK_WEST_1) << 7)  /**< Shift a Bitboard one square to the northwest. */
+#define ShiftNorth(b)      ((b) << 8)                  /**< Shift a Bitboard one square to the north. */
+#define ShiftNortheast(b)  (((b) & MASK_EAST_1) << 9)  /**< Shift a Bitboard one square to the northeast. */
+#define ShiftEast(b)       (((b) & MASK_EAST_1) << 1)  /**< Shift a Bitboard one square to the east. */
+#define ShiftSoutheast(b)  (((b) & MASK_EAST_1) >> 7)  /**< Shift a Bitboard one square to the southeast. */
+#define ShiftSouth(b)      ((b) >> 8)                  /**< Shift a Bitboard one square to the south. */
+#define ShiftSouthwest(b)  (((b) & MASK_WEST_1) >> 9)  /**< Shift a Bitboard one square to the southwest. */
+#define ShiftWest(b)       (((b) & MASK_WEST_1) >> 1)  /**< Shift a Bitboard one square to the west. */
+#define ShiftNorthwest(b)  (((b) & MASK_WEST_1) << 7)  /**< Shift a Bitboard one square to the northwest. */
 
 /**
  * @brief Chess piece types.
@@ -90,7 +90,7 @@ static const DirectionVector direction_vectors[] =
  * @return Number of 1 bits in x.
  */
 static int
-POPCOUNT(uint64_t x)
+PopCount(uint64_t x)
 {
     int count = 0;
     while (x)
@@ -107,7 +107,7 @@ POPCOUNT(uint64_t x)
  * @return Index of least significant 1 bit in x.
  */
 static int
-LSB(uint64_t x)
+Lsb(uint64_t x)
 {
     int result = 0;
     while (!(x & 1))
@@ -119,15 +119,15 @@ LSB(uint64_t x)
 }
 
 /**
- * @brief Find and clear the LSB.
- * @param x Pointer to input value. On return has its LSB cleared.
+ * @brief Find and clear the Lsb.
+ * @param x Pointer to input value. On return has its Lsb cleared.
  * @return Index of bit which was cleared in x.
  */
 static int
 FindAndClearLsb(uint64_t* x)
 {
     const uint64_t y = *x;
-    const int result = LSB(y);
+    const int result = Lsb(y);
     *x = y & (y - 1);
     return result;
 }
@@ -216,7 +216,7 @@ static uint64_t NorthwestOf(int location)
  */
 static uint64_t PawnAttacksWhite(int location)
 {
-    return SHIFT_NORTHWEST(BITBOARD(location)) | SHIFT_NORTHEAST(BITBOARD(location));
+    return ShiftNorthwest(BITBOARD(location)) | ShiftNortheast(BITBOARD(location));
 }
 
 /**
@@ -226,7 +226,7 @@ static uint64_t PawnAttacksWhite(int location)
  */
 static uint64_t PawnAttacksBlack(int location)
 {
-    return SHIFT_SOUTHWEST(BITBOARD(location)) | SHIFT_SOUTHEAST(BITBOARD(location));
+    return ShiftSouthwest(BITBOARD(location)) | ShiftSoutheast(BITBOARD(location));
 }
 
 /**
@@ -236,10 +236,10 @@ static uint64_t PawnAttacksBlack(int location)
  */
 static uint64_t KnightFill(uint64_t b)
 {
-    const uint64_t west1     = SHIFT_WEST(b);
-    const uint64_t west2     = SHIFT_WEST(west1);
-    const uint64_t east1     = SHIFT_EAST(b);
-    const uint64_t east2     = SHIFT_EAST(east1);
+    const uint64_t west1     = ShiftWest(b);
+    const uint64_t west2     = ShiftWest(west1);
+    const uint64_t east1     = ShiftEast(b);
+    const uint64_t east2     = ShiftEast(east1);
     const uint64_t eastwest1 = west1 | east1;
     const uint64_t eastwest2 = west2 | east2;
     return (eastwest1 << 16) | (eastwest1 >> 16) | (eastwest2 << 8) | (eastwest2 >> 8);
@@ -298,14 +298,14 @@ static uint64_t QueenAttacks(int location)
  */
 static uint64_t KingFill(uint64_t b)
 {
-    return SHIFT_NORTH(b)       |
-           SHIFT_NORTHEAST(b)   |
-           SHIFT_EAST(b)        |
-           SHIFT_SOUTHEAST(b)   |
-           SHIFT_SOUTH(b)       |
-           SHIFT_SOUTHWEST(b)   |
-           SHIFT_WEST(b)        |
-           SHIFT_NORTHWEST(b);
+    return ShiftNorth(b)       |
+           ShiftNortheast(b)   |
+           ShiftEast(b)        |
+           ShiftSoutheast(b)   |
+           ShiftSouth(b)       |
+           ShiftSouthwest(b)   |
+           ShiftWest(b)        |
+           ShiftNorthwest(b);
 }
 
 /**
@@ -621,7 +621,7 @@ EnumerateMaskCombinations(uint64_t mask,
     {
         *bi++ = FindAndClearLsb(&b);
     }
-    const int num_bits_in_mask = POPCOUNT(mask);
+    const int num_bits_in_mask = PopCount(mask);
     const int num_combinations = 1 << num_bits_in_mask;
     for (int i = 0; i != num_combinations; ++i)
     {
@@ -667,7 +667,7 @@ FindMagic(int    location,
     uint64_t occupancies[MAX_ATTACK_SET_SIZE];
     uint64_t actual_attacks[MAX_ATTACK_SET_SIZE];
     magic->mask = magic->occupancy_mask_fn(location);
-    magic->shift = 64 - POPCOUNT(magic->mask);
+    magic->shift = 64 - PopCount(magic->mask);
     /*
     Enumerate all possible occupancy values and compute what the actual
     attack sets for each occupancy are, so we can check to see if a trial
@@ -932,7 +932,7 @@ int main()
             printf("\n        .%-20s = 0x%016llXull, /* popcnt %2d */",
                 generator->name,
                 b,
-                POPCOUNT(b));
+                PopCount(b));
         }
         printf("\n    },");
     }
@@ -955,7 +955,7 @@ int main()
                 printf("\n            .%-28s = 0x%016llXull, /* popcnt %2d */",
                     generator->name,
                     b,
-                    POPCOUNT(b));
+                    PopCount(b));
             }
             printf("\n        },");
         }

@@ -194,8 +194,8 @@ MakeMove(Position*       position,
     position->state_flags ^= IS_BLACK_TO_MOVE;
     position->hash ^= BLACK_MOVE_HASH;
     position->full_move_count += color;
-    position->king_location[WHITE] = LSB(position->kings & position->white_pieces);
-    position->king_location[BLACK] = LSB(position->kings & position->black_pieces);
+    position->king_location[WHITE] = Lsb(position->kings & position->white_pieces);
+    position->king_location[BLACK] = Lsb(position->kings & position->black_pieces);
     if (IsAttacked(position, position->king_location[color], ENEMY(color)))
     {
         position->state_flags |= IS_MOVED_INTO_CHECK;

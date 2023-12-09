@@ -50,21 +50,21 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         Bitboard attacker = sets->pawn_attacks[ENEMY(color)] & attacking_pieces & position->pawns;
         if (attacker)
         {
-            attacker &= -attacker; /* isolate LSB in case there is more than 1 pawn attacker */
+            attacker &= -attacker; /* isolate Lsb in case there is more than 1 pawn attacker */
             capturing_piece = PAWN;
             goto FoundAttacker;
         }
         attacker = sets->knight_attacks & attacking_pieces & position->knights;
         if (attacker)
         {
-            attacker &= -attacker; /* isolate LSB in case there is more than 1 knight attacker */
+            attacker &= -attacker; /* isolate Lsb in case there is more than 1 knight attacker */
             capturing_piece = KNIGHT;
             goto FoundAttacker;
         }
         sliders = sets->bishop_attacks & attacking_pieces & position->bishops;
         while (sliders)
         {
-            const int slider_locn = FindAndClearLsb(&sliders);
+            const int slider_locn = FindAndClearLsb(sliders);
             if (!(intervening_squares[slider_locn] & occupied_squares))
             {
                 capturing_piece = BISHOP;
@@ -75,7 +75,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         sliders = sets->rook_attacks & attacking_pieces & position->rooks;
         while (sliders)
         {
-            const int slider_locn = FindAndClearLsb(&sliders);
+            const int slider_locn = FindAndClearLsb(sliders);
             if (!(intervening_squares[slider_locn] & occupied_squares))
             {
                 capturing_piece = ROOK;
@@ -86,7 +86,7 @@ static int EvaluateSwapOff(Position* position, int location, int color, int piec
         sliders = sets->queen_attacks & attacking_pieces & position->queens;
         while (sliders)
         {
-            const int slider_locn = FindAndClearLsb(&sliders);
+            const int slider_locn = FindAndClearLsb(sliders);
             if (!(intervening_squares[slider_locn] & occupied_squares))
             {
                 capturing_piece = QUEEN;

@@ -99,8 +99,8 @@ PositionFromString(const char* fen_string,
     {
         BAD_FEN_STRING;
     }
-    position->king_location[WHITE] = LSB(position->kings & position->white_pieces);
-    position->king_location[BLACK] = LSB(position->kings & position->black_pieces);
+    position->king_location[WHITE] = Lsb(position->kings & position->white_pieces);
+    position->king_location[BLACK] = Lsb(position->kings & position->black_pieces);
     /* Castling rights */
     const char* castling_rights = strtok_r(NULL, " ", &save_ptr);
     if (!castling_rights)

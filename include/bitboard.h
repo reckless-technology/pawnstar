@@ -13,10 +13,10 @@
  * The set of squares to which a knight on e4 may move
  * The set of squares attacked by black queens
  * 
- * Bit  0 maps to square a1 (LSB)
+ * Bit  0 maps to square a1 (Lsb)
  * Bit  7 maps to square h1
  * Bit 56 maps to square a8
- * Bit 63 maps to square h8 (MSB)
+ * Bit 63 maps to square h8 (Msb)
  * 
  * This is commonly referred to as LERF (little endian rank file mapping). 
  * If you treat the board as a 2D array, with square (0,0) being a1 and square 
@@ -62,35 +62,34 @@ const Bitboard CTR_16_SQUARES  = 0x00003C3C3C3C0000ull;
 const Bitboard CTR_4_SQUARES   = 0x0000001818000000ull;
 const Bitboard BLACK_MOVE_HASH = 0xB92B78FCCF92F8CDull;
 
-constexpr uint8_t  LSB(Bitboard x)              { return (uint8_t)__builtin_ctzll(x);           }
-constexpr uint8_t  MSB(Bitboard x)              { return 63 - (uint8_t)__builtin_clzll(x);      }
-constexpr uint8_t  POPCOUNT(Bitboard x)         { return (uint8_t)__builtin_popcountll(x);      }
-constexpr Bitboard SHIFT_NORTH(Bitboard b)      { return b << 8;                                }
-constexpr Bitboard SHIFT_NORTHEAST(Bitboard b)  { return (b & MASK_EAST_1) << 9;                }
-constexpr Bitboard SHIFT_EAST(Bitboard b)       { return (b & MASK_EAST_1) << 1;                }
-constexpr Bitboard SHIFT_SOUTHEAST(Bitboard b)  { return (b & MASK_EAST_1) >> 7;                }
-constexpr Bitboard SHIFT_SOUTH(Bitboard b)      { return b >> 8;                                }
-constexpr Bitboard SHIFT_SOUTHWEST(Bitboard b)  { return (b & MASK_WEST_1) >> 9;                }
-constexpr Bitboard SHIFT_WEST(Bitboard b)       { return (b & MASK_WEST_1) >> 1;                }
-constexpr Bitboard SHIFT_NORTHWEST(Bitboard b)  { return (b & MASK_WEST_1) << 7;                }
+constexpr uint8_t  Lsb(Bitboard x)              { return (uint8_t)__builtin_ctzll(x);           }
+constexpr uint8_t  Msb(Bitboard x)              { return 63 - (uint8_t)__builtin_clzll(x);      }
+constexpr uint8_t  PopCount(Bitboard x)         { return (uint8_t)__builtin_popcountll(x);      }
+constexpr Bitboard ShiftNorth(Bitboard b)       { return b << 8;                                }
+constexpr Bitboard ShiftNortheast(Bitboard b)   { return (b & MASK_EAST_1) << 9;                }
+constexpr Bitboard ShiftEast(Bitboard b)        { return (b & MASK_EAST_1) << 1;                }
+constexpr Bitboard ShiftSoutheast(Bitboard b)   { return (b & MASK_EAST_1) >> 7;                }
+constexpr Bitboard ShiftSouth(Bitboard b)       { return b >> 8;                                }
+constexpr Bitboard ShiftSouthwest(Bitboard b)   { return (b & MASK_WEST_1) >> 9;                }
+constexpr Bitboard ShiftWest(Bitboard b)        { return (b & MASK_WEST_1) >> 1;                }
+constexpr Bitboard ShiftNorthwest(Bitboard b)   { return (b & MASK_WEST_1) << 7;                }
 constexpr Bitboard BITBOARD(uint8_t location)   { return 1ull << location;                      }
 constexpr Bitboard BITBOARD(int x, int y)       { return 1ull << (x + 8 * y);                   }
-constexpr Bitboard BITBOARD(const char* s)      { return (BITBOARD(s[0] - 'a', s[1] - '1'));    }
+constexpr Bitboard BITBOARD(const char* s)      { return BITBOARD(s[0] - 'a', s[1] - '1');      }
 
-constexpr uint8_t FindAndClearLsb(Bitboard *x)
+constexpr uint8_t FindAndClearLsb(Bitboard &x)
 {
-    const Bitboard y = *x;
-    const uint8_t z = LSB(y);
-    *x =  y ^ BITBOARD(z);
-    return z;
+    const uint8_t lsb = (uint8_t)__builtin_ctzll(x);
+    x &= (x - 1);
+    return lsb;
 }
 
 constexpr Bitboard KnightFill(Bitboard b)
 {
-    const Bitboard west1     = SHIFT_WEST(b);
-    const Bitboard west2     = SHIFT_WEST(west1);
-    const Bitboard east1     = SHIFT_EAST(b);
-    const Bitboard east2     = SHIFT_EAST(east1);
+    const Bitboard west1     = ShiftWest(b);
+    const Bitboard west2     = ShiftWest(west1);
+    const Bitboard east1     = ShiftEast(b);
+    const Bitboard east2     = ShiftEast(east1);
     const Bitboard eastwest1 = west1 | east1;
     const Bitboard eastwest2 = west2 | east2;
     return (eastwest1 << 16) | (eastwest1 >> 16) | (eastwest2 << 8) | (eastwest2 >> 8);
@@ -99,14 +98,14 @@ constexpr Bitboard KnightFill(Bitboard b)
 constexpr Bitboard KingFill(Bitboard b)
 {
     return
-        SHIFT_NORTH(b)      |
-        SHIFT_NORTHEAST(b)  |
-        SHIFT_EAST(b)       |
-        SHIFT_SOUTHEAST(b)  |
-        SHIFT_SOUTH(b)      |
-        SHIFT_SOUTHWEST(b)  |
-        SHIFT_WEST(b)       |
-        SHIFT_NORTHWEST(b);
+        ShiftNorth(b)      |
+        ShiftNortheast(b)  |
+        ShiftEast(b)       |
+        ShiftSoutheast(b)  |
+        ShiftSouth(b)      |
+        ShiftSouthwest(b)  |
+        ShiftWest(b)       |
+        ShiftNorthwest(b);
 }
 
 constexpr Bitboard FillNorth(Bitboard b)

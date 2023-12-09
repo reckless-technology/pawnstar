@@ -57,9 +57,9 @@ GeneratePseudoLegalMoves(const Position* position,
     if (color == WHITE)
     {
         friendly_pawns = position->pawns & position->white_pieces;
-        pawn_promotions_capture_west = SHIFT_NORTHWEST(friendly_pawns) & enemy_pieces & RANK_8;
-        pawn_promotions_capture_east = SHIFT_NORTHEAST(friendly_pawns) & enemy_pieces & RANK_8;
-        pawn_promotions = SHIFT_NORTH(friendly_pawns) & vacant_squares & RANK_8;
+        pawn_promotions_capture_west = ShiftNorthwest(friendly_pawns) & enemy_pieces & RANK_8;
+        pawn_promotions_capture_east = ShiftNortheast(friendly_pawns) & enemy_pieces & RANK_8;
+        pawn_promotions = ShiftNorth(friendly_pawns) & vacant_squares & RANK_8;
         pawn_push_delta = 8;
         pawn_capture_west_delta = 7;
         pawn_capture_east_delta = 9;
@@ -67,9 +67,9 @@ GeneratePseudoLegalMoves(const Position* position,
     else
     {
         friendly_pawns = position->pawns & position->black_pieces;
-        pawn_promotions_capture_west = SHIFT_SOUTHWEST(friendly_pawns) & enemy_pieces & RANK_1;
-        pawn_promotions_capture_east = SHIFT_SOUTHEAST(friendly_pawns) & enemy_pieces & RANK_1;
-        pawn_promotions = SHIFT_SOUTH(friendly_pawns) & vacant_squares & RANK_1;
+        pawn_promotions_capture_west = ShiftSouthwest(friendly_pawns) & enemy_pieces & RANK_1;
+        pawn_promotions_capture_east = ShiftSoutheast(friendly_pawns) & enemy_pieces & RANK_1;
+        pawn_promotions = ShiftSouth(friendly_pawns) & vacant_squares & RANK_1;
         pawn_push_delta = -8;
         pawn_capture_west_delta = -9;
         pawn_capture_east_delta = -7;
@@ -174,13 +174,13 @@ GeneratePseudoLegalMoves(const Position* position,
     Bitboard pawn_double_pushes;
     if (color == WHITE)
     {
-        pawn_single_pushes = SHIFT_NORTH(friendly_pawns) & vacant_squares & ~RANK_8;
-        pawn_double_pushes = SHIFT_NORTH(pawn_single_pushes) & vacant_squares & RANK_4;
+        pawn_single_pushes = ShiftNorth(friendly_pawns) & vacant_squares & ~RANK_8;
+        pawn_double_pushes = ShiftNorth(pawn_single_pushes) & vacant_squares & RANK_4;
     }
     else
     {
-        pawn_single_pushes = SHIFT_SOUTH(friendly_pawns) & vacant_squares & ~RANK_1;
-        pawn_double_pushes = SHIFT_SOUTH(pawn_single_pushes) & vacant_squares & RANK_5;
+        pawn_single_pushes = ShiftSouth(friendly_pawns) & vacant_squares & ~RANK_1;
+        pawn_double_pushes = ShiftSouth(pawn_single_pushes) & vacant_squares & RANK_5;
     }
     pawn_push_delta <<= 1;
     while (pawn_double_pushes)

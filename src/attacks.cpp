@@ -20,10 +20,10 @@ Bitboard BishopAttacks(Bitboard occupied_squares, int location)
 {
     const Sets* sets= &SETS[location];
     Bitboard attacks = sets->bishop_attacks;
-    attacks ^= SETS[LSB((sets->northeast & occupied_squares) | H8BB)].northeast;
-    attacks ^= SETS[LSB((sets->northwest & occupied_squares) | H8BB)].northwest;
-    attacks ^= SETS[MSB((sets->southeast & occupied_squares) | A1BB)].southeast;
-    attacks ^= SETS[MSB((sets->southwest & occupied_squares) | A1BB)].southwest;
+    attacks ^= SETS[Lsb((sets->northeast & occupied_squares) | H8BB)].northeast;
+    attacks ^= SETS[Lsb((sets->northwest & occupied_squares) | H8BB)].northwest;
+    attacks ^= SETS[Msb((sets->southeast & occupied_squares) | A1BB)].southeast;
+    attacks ^= SETS[Msb((sets->southwest & occupied_squares) | A1BB)].southwest;
     return attacks;
 }
 
@@ -31,10 +31,10 @@ Bitboard RookAttacks(Bitboard occupied_squares, int location)
 {
     const Sets* sets= &SETS[location];
     Bitboard attacks = sets->rook_attacks;
-    attacks ^= SETS[LSB((sets->north & occupied_squares) | H8BB)].north;
-    attacks ^= SETS[LSB((sets->east  & occupied_squares) | H8BB)].east;
-    attacks ^= SETS[MSB((sets->south & occupied_squares) | A1BB)].south;
-    attacks ^= SETS[MSB((sets->west  & occupied_squares) | A1BB)].west;
+    attacks ^= SETS[Lsb((sets->north & occupied_squares) | H8BB)].north;
+    attacks ^= SETS[Lsb((sets->east  & occupied_squares) | H8BB)].east;
+    attacks ^= SETS[Msb((sets->south & occupied_squares) | A1BB)].south;
+    attacks ^= SETS[Msb((sets->west  & occupied_squares) | A1BB)].west;
     return attacks;
 }
 
@@ -81,7 +81,7 @@ bool IsAttacked(const Position* position, int location, int color)
     Bitboard sliding_attackers = (position->rooks | position->queens) & sets->rook_attacks & attacking_pieces;
     while (sliding_attackers)
     {
-        if (!(intervening_squares[FindAndClearLsb(&sliding_attackers)] & occupied_squares))
+        if (!(intervening_squares[FindAndClearLsb(sliding_attackers)] & occupied_squares))
         {
             return true;
         }
@@ -92,7 +92,7 @@ bool IsAttacked(const Position* position, int location, int color)
     sliding_attackers = (position->bishops | position->queens) & sets->bishop_attacks & attacking_pieces;
     while (sliding_attackers)
     {
-        if (!(intervening_squares[FindAndClearLsb(&sliding_attackers)] & occupied_squares))
+        if (!(intervening_squares[FindAndClearLsb(sliding_attackers)] & occupied_squares))
         {
             return true;
         }
@@ -128,7 +128,7 @@ Bitboard AttacksTo(const Position* position, int location, int color)
     Bitboard sliding_attackers = (position->rooks | position->queens) & sets->rook_attacks & attacking_pieces;
     while (sliding_attackers)
     {
-        const int locn = FindAndClearLsb(&sliding_attackers);
+        const int locn = FindAndClearLsb(sliding_attackers);
         if (!(intervening_squares[locn] & occupied_squares))
         {
             result |= BITBOARD(locn);
@@ -140,7 +140,7 @@ Bitboard AttacksTo(const Position* position, int location, int color)
     sliding_attackers = (position->bishops | position->queens) & sets->bishop_attacks & attacking_pieces;
     while (sliding_attackers)
     {
-        const int locn = FindAndClearLsb(&sliding_attackers);
+        const int locn = FindAndClearLsb(sliding_attackers);
         if (!(intervening_squares[locn] & occupied_squares))
         {
             result |= BITBOARD(locn);

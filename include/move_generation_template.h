@@ -50,10 +50,10 @@ void GenerateMoves(const Position *position,
     if constexpr (color == WHITE)
     {
         pawns = position->pawns & position->white_pieces;
-        single_pushes = SHIFT_NORTH(pawns) & vacant_squares;
-        double_pushes = SHIFT_NORTH(single_pushes) & vacant_squares & RANK_4;
-        captures_west = SHIFT_NORTHWEST(pawns) & position->black_pieces;
-        captures_east = SHIFT_NORTHEAST(pawns) & position->black_pieces;
+        single_pushes = ShiftNorth(pawns) & vacant_squares;
+        double_pushes = ShiftNorth(single_pushes) & vacant_squares & RANK_4;
+        captures_west = ShiftNorthwest(pawns) & position->black_pieces;
+        captures_east = ShiftNortheast(pawns) & position->black_pieces;
         en_passant_sources = position->en_passant_index ? SETS[position->en_passant_index].pawn_attacks_black & pawns : NO_SQUARES;
         promotions = single_pushes & RANK_8;
         promotions_west = captures_west & RANK_8;
@@ -68,10 +68,10 @@ void GenerateMoves(const Position *position,
     else
     {
         pawns = position->pawns & position->black_pieces;
-        single_pushes = SHIFT_SOUTH(pawns) & vacant_squares;
-        double_pushes = SHIFT_SOUTH(single_pushes) & vacant_squares & RANK_5;
-        captures_west = SHIFT_SOUTHWEST(pawns) & position->white_pieces;
-        captures_east = SHIFT_SOUTHEAST(pawns) & position->white_pieces;
+        single_pushes = ShiftSouth(pawns) & vacant_squares;
+        double_pushes = ShiftSouth(single_pushes) & vacant_squares & RANK_5;
+        captures_west = ShiftSouthwest(pawns) & position->white_pieces;
+        captures_east = ShiftSoutheast(pawns) & position->white_pieces;
         en_passant_sources = position->en_passant_index ? SETS[position->en_passant_index].pawn_attacks_white & pawns : NO_SQUARES;
         promotions = single_pushes & RANK_1;
         promotions_west = captures_west & RANK_1;
@@ -85,40 +85,40 @@ void GenerateMoves(const Position *position,
     }
     while (promotions_west)
     {
-        const int to = FindAndClearLsb(&promotions_west);
+        const int to = FindAndClearLsb(promotions_west);
         const int from = to - west_delta;
         *moves = CONSTRUCT_PROMOTION_MOVE(from, to, PieceAt(position, to), QUEEN);
         GenerateUnderpromotions(&moves);
     }
     while (promotions_east)
     {
-        const int to = FindAndClearLsb(&promotions_east);
+        const int to = FindAndClearLsb(promotions_east);
         const int from = to - east_delta;
         *moves = CONSTRUCT_PROMOTION_MOVE(from, to, PieceAt(position, to), QUEEN);
         GenerateUnderpromotions(&moves);
     }
     while (promotions)
     {
-        const int to = FindAndClearLsb(&promotions);
+        const int to = FindAndClearLsb(promotions);
         const int from = to - push_delta;
         *moves = CONSTRUCT_PROMOTION_MOVE(from, to, NO_PIECE, QUEEN);
         GenerateUnderpromotions(&moves);
     }
     while (captures_west)
     {
-        const int to = FindAndClearLsb(&captures_west);
+        const int to = FindAndClearLsb(captures_west);
         const int from = to - west_delta;
         *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, PAWN, PieceAt(position, to));
     }
     while (captures_east)
     {
-        const int to = FindAndClearLsb(&captures_east);
+        const int to = FindAndClearLsb(captures_east);
         const int from = to - east_delta;
         *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, PAWN, PieceAt(position, to));
     }
     while (en_passant_sources)
     {
-        const int from = FindAndClearLsb(&en_passant_sources);
+        const int from = FindAndClearLsb(en_passant_sources);
         *moves++ = CONSTRUCT_EP_CAPTURE_MOVE(from, position->en_passant_index);
     }
     if constexpr (do_all_moves)
@@ -126,14 +126,14 @@ void GenerateMoves(const Position *position,
         push_delta <<= 1;
         while (double_pushes)
         {
-            const int to = FindAndClearLsb(&double_pushes);
+            const int to = FindAndClearLsb(double_pushes);
             const int from = to - push_delta;
             *moves++ = CONSTRUCT_PAWN_DOUBLE_PUSH_MOVE(from, to);
         }
         push_delta >>= 1;
         while (single_pushes)
         {
-            const int to = FindAndClearLsb(&single_pushes);
+            const int to = FindAndClearLsb(single_pushes);
             const int from = to - push_delta;
             *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, PAWN);
         }
@@ -144,12 +144,12 @@ void GenerateMoves(const Position *position,
     Bitboard knights = position->knights & friendly_pieces;
     while (knights)
     {
-        const int from = FindAndClearLsb(&knights);
+        const int from = FindAndClearLsb(knights);
         Bitboard targets = SETS[from].knight_attacks;
         Bitboard capture_targets = targets & enemy_pieces;
         while (capture_targets)
         {
-            const int to = FindAndClearLsb(&capture_targets);
+            const int to = FindAndClearLsb(capture_targets);
             *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, KNIGHT, PieceAt(position, to));
         }
         if constexpr (do_all_moves)
@@ -157,7 +157,7 @@ void GenerateMoves(const Position *position,
             Bitboard non_capture_targets = targets & vacant_squares;
             while (non_capture_targets)
             {
-                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), KNIGHT);
+                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(non_capture_targets), KNIGHT);
             }
         }
     }
@@ -167,12 +167,12 @@ void GenerateMoves(const Position *position,
     Bitboard bishops = position->bishops & friendly_pieces;
     while (bishops)
     {
-        const int from = FindAndClearLsb(&bishops);
+        const int from = FindAndClearLsb(bishops);
         Bitboard targets = BishopAttacks(occupied_squares, from);
         Bitboard capture_targets = targets & enemy_pieces;
         while (capture_targets)
         {
-            const int to = FindAndClearLsb(&capture_targets);
+            const int to = FindAndClearLsb(capture_targets);
             *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
         }
         if constexpr (do_all_moves)
@@ -180,7 +180,7 @@ void GenerateMoves(const Position *position,
             Bitboard non_capture_targets = targets & vacant_squares;
             while (non_capture_targets)
             {
-                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), BISHOP);
+                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(non_capture_targets), BISHOP);
             }
         }
     }
@@ -190,12 +190,12 @@ void GenerateMoves(const Position *position,
     Bitboard rooks = position->rooks & friendly_pieces;
     while (rooks)
     {
-        const int from = FindAndClearLsb(&rooks);
+        const int from = FindAndClearLsb(rooks);
         Bitboard targets = RookAttacks(occupied_squares, from);
         Bitboard capture_targets = targets & enemy_pieces;
         while (capture_targets)
         {
-            const int to = FindAndClearLsb(&capture_targets);
+            const int to = FindAndClearLsb(capture_targets);
             *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
         }
         if constexpr (do_all_moves)
@@ -203,7 +203,7 @@ void GenerateMoves(const Position *position,
             Bitboard non_capture_targets = targets & vacant_squares;
             while (non_capture_targets)
             {
-                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), ROOK);
+                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(non_capture_targets), ROOK);
             }
         }
     }
@@ -213,12 +213,12 @@ void GenerateMoves(const Position *position,
     Bitboard queens = position->queens & friendly_pieces;
     while (queens)
     {
-        const int from = FindAndClearLsb(&queens);
+        const int from = FindAndClearLsb(queens);
         Bitboard targets = QueenAttacks(occupied_squares, from);
         Bitboard capture_targets = targets & enemy_pieces;
         while (capture_targets)
         {
-            const int to = FindAndClearLsb(&capture_targets);
+            const int to = FindAndClearLsb(capture_targets);
             *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
         }
         if constexpr (do_all_moves)
@@ -226,7 +226,7 @@ void GenerateMoves(const Position *position,
             Bitboard non_capture_targets = targets & vacant_squares;
             while (non_capture_targets)
             {
-                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), QUEEN);
+                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(non_capture_targets), QUEEN);
             }
         }
     }
@@ -238,7 +238,7 @@ void GenerateMoves(const Position *position,
     Bitboard capture_targets = targets & enemy_pieces;
     while (capture_targets)
     {
-        const int to = FindAndClearLsb(&capture_targets);
+        const int to = FindAndClearLsb(capture_targets);
         *moves++ = CONSTRUCT_CAPTURE_MOVE(king_location, to, KING, PieceAt(position, to));
     }
     *moves = 0;
@@ -247,7 +247,7 @@ void GenerateMoves(const Position *position,
         Bitboard non_capture_targets = targets & vacant_squares;
         while (non_capture_targets)
         {
-            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(king_location, FindAndClearLsb(&non_capture_targets), KING);
+            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(king_location, FindAndClearLsb(non_capture_targets), KING);
         }
         if (!(position->state_flags & IS_CHECK))
         {

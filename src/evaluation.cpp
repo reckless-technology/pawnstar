@@ -146,11 +146,11 @@ EvaluatePosition(const Position* position,
         const Bitboard rooks            = position->rooks   & friendly_pieces;
         const Bitboard queens           = position->queens  & friendly_pieces;
         scores[color] = 
-            POPCOUNT(pawns)    * 100 +
-            POPCOUNT(knights)  * 325 +
-            POPCOUNT(bishops)  * 325 +
-            POPCOUNT(rooks)    * 525 +
-            POPCOUNT(queens)   * 1000;
+            PopCount(pawns)    * 100 +
+            PopCount(knights)  * 325 +
+            PopCount(bishops)  * 325 +
+            PopCount(rooks)    * 525 +
+            PopCount(queens)   * 1000;
         if ((bishops & WHITE_SQUARES) && (bishops & BLACK_SQUARES))
         {
             scores[color] += 50;
@@ -186,11 +186,11 @@ EvaluatePosition(const Position* position,
             Bitboard p = position->piece[piece - 1] & friendly_pieces;
             while (p)
             {
-                const int locn = FindAndClearLsb(&p);
+                const int locn = FindAndClearLsb(p);
                 scores[color] += pst[locn ^ rank_flip];
             }
         }        
-        if (position->queens == NO_SQUARES || POPCOUNT(position->white_pieces | position->black_pieces) < 8)
+        if (position->queens == NO_SQUARES || PopCount(position->white_pieces | position->black_pieces) < 8)
         {
             scores[color] += KING_SQUARE_ENDGAME[king_location ^ rank_flip];
             const Bitboard friendly_pawns = position->pawns & friendly_pieces;
@@ -198,7 +198,7 @@ EvaluatePosition(const Position* position,
             Bitboard p = friendly_pawns;
             while (p)
             {
-                const int pawn_locn = FindAndClearLsb(&p);
+                const int pawn_locn = FindAndClearLsb(p);
                 const PawnSets* sets = &PAWN_SETS[color][pawn_locn];
                 if ((sets->passed_pawn_mask & enemy_pawns) == NO_SQUARES)
                 {
@@ -225,8 +225,8 @@ EvaluatePosition(const Position* position,
             {
                 const Bitboard friendly_pawns = position->pawns & friendly_pieces;
                 scores[color] +=  
-                    10 * POPCOUNT(SETS[king_location].king_attacks & friendly_pieces) + 
-                    10 * POPCOUNT(SETS[king_location].king_attacks & friendly_pawns);
+                    10 * PopCount(SETS[king_location].king_attacks & friendly_pieces) + 
+                    10 * PopCount(SETS[king_location].king_attacks & friendly_pawns);
                 if ((FILES_BB[FILE_OF(king_location)] & friendly_pawns) == NO_SQUARES)
                 {
                     scores[color] -= 50;
@@ -235,8 +235,8 @@ EvaluatePosition(const Position* position,
             Bitboard b = SETS[king_location].king_attacks;
             while (b)
             {
-                const int locn = FindAndClearLsb(&b);
-                scores[color] -= 5 * POPCOUNT(AttacksTo(position, locn, ENEMY(color)));
+                const int locn = FindAndClearLsb(b);
+                scores[color] -= 5 * PopCount(AttacksTo(position, locn, ENEMY(color)));
             }
         }
     }
