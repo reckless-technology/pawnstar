@@ -10,19 +10,15 @@ void StopThinking()
     is_cancel_pending = true;
 }
 
-#define max(a,b)             \
-({                           \
-    __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a > _b ? _a : _b;       \
-})
+static constexpr int max(int a, int b)
+{
+    return a > b ? a : b;
+}
 
-#define min(a,b)             \
-({                           \
-    __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a < _b ? _a : _b;       \
-})
+static constexpr int min(int a, int b)
+{
+    return a < b ? a : b;
+}
 
 /**
  * @brief Search the root node and find the best move

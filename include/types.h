@@ -240,21 +240,38 @@ typedef struct Variation
 */
 typedef struct Game
 {
-    Position*       position;               /**< stack pointer - current position               */
-    Position        stack[MAX_GAME_LENGTH]; /**< position stack                                 */
-    TimeControl     time_control;           /**< Clock controls for the current game            */
-    int             node_count;             /**< Number of nodes (positions) during search      */
-    int             engine_color;           /**< The color which pawnstar is playing            */
-    bool            do_show_thinking;       /**< Whether to show scores and PV during search    */
+    Position*   position;               /**< stack pointer - current position               */
+    Position    stack[MAX_GAME_LENGTH]; /**< position stack                                 */
+    TimeControl time_control;           /**< Clock controls for the current game            */
+    int         node_count;             /**< Number of nodes (positions) during search      */
+    int         engine_color;           /**< The color which pawnstar is playing            */
+    bool        do_show_thinking;       /**< Whether to show scores and PV during search    */
 } Game;
 
+/**
+ * @brief An entry in the magic bitboard move generator array.
+ * Each entry contains information to generate sliding moves
+ * for either a bishop or a rook, for one square.
+ * Uses an extra indirection via indices, since indices are 1 byte
+ * each and attacks are 8 bytes each. This saves a lot of space
+ * in the (already very large) rook magic bitboard tables, since for
+ * exmaple for rooks there are 12 bits in the occupancy mask (4096 indices)
+ * but typically only around 100 actual move sets.
+ * 
+ * To get sliding move targets without branches or loops we use:
+ * 
+ * m->attacks[m->indices[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift]]
+ * 
+ * The magic bitboard sets are generated at compile time by 
+ * compiling and then running "generate_constants.cpp"
+ */
 typedef struct MagicMoveEntry
 {
-    uint64_t        magic;
-    Bitboard        occupancy_mask;
-    int             shift;
-    const uint64_t* attacks;
-    const uint8_t*  indices;
+    uint64_t        magic;          /**< Magic multiplier.                              */
+    Bitboard        occupancy_mask; /**< Occupancy mask (excludes final target square). */
+    int             shift;          /**< Number of bits to right shift to get indices.  */
+    const uint64_t* attacks;        /**< Discrete attack vectors (move sets).           */
+    const uint8_t*  indices;        /**< Indices into the discrete attack vector array. */
 } MagicMoveEntry;
 
 /**

@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "pawnstar.h"
 
 #define MOVE_MASK 0x7FFF /* piece, from, to only */
@@ -68,12 +70,10 @@ ScoreAndSortMoves(const Position* position,
     (void)depth;
 }
 
-#define min(a,b)             \
-({                           \
-    __typeof__ (a) _a = (a); \
-    __typeof__ (b) _b = (b); \
-    _a < _b ? _a : _b;       \
-})
+static constexpr int min(int a, int b)
+{
+    return a < b ? a : b;
+}
 
 /**
  * @brief Sort moves best first.
@@ -86,6 +86,10 @@ void
 SortMoves(int   num_elements, 
           Move  values[])
 {
+#if 0
+    std::stable_sort(values, values + num_elements, [](Move a, Move b){ return MoveScore(a) > MoveScore(b); } );
+#else
+    /* This seems to be about 15% faster than std::stable_sort */
     Move work[MAX_MOVES_PER_POSITION];
     Move* merge_src = values;
     Move* merge_dst = work;
@@ -119,4 +123,5 @@ SortMoves(int   num_elements,
     {
         memcpy(values, work, num_elements * sizeof(Move));
     }
+#endif
 }

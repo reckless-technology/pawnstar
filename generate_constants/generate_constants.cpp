@@ -18,10 +18,10 @@
 /* Function like macros */
 #define FileOf(locn)       ((locn) & 7)                /**< Convert square index to file. */
 #define RankOf(locn)       ((locn) >> 3)               /**< Convert square index to rank. */
-#define FileChar(locn)     (char)('a' + FileOf(locn)) /**< Convert square index to file character. */
-#define RankChar(locn)     (char)('1' + RankOf(locn)) /**< Convert square index to rank character. */
-#define BITBOARD(locn)      (1ull << (locn))            /**< Convert square index to Bitboard. */
-#define BITBOARD_XY(x,y)    (1ull << ((x) + 8 * (y)))   /**< Convert square (file,rank) co-ords to Bitboard. */
+#define FileChar(locn)     (char)('a' + FileOf(locn))  /**< Convert square index to file character. */
+#define RankChar(locn)     (char)('1' + RankOf(locn))  /**< Convert square index to rank character. */
+#define BITBOARD(locn)     (1ull << (locn))            /**< Convert square index to Bitboard. */
+#define BITBOARD_XY(x,y)   (1ull << ((x) + 8 * (y)))   /**< Convert square (file,rank) co-ords to Bitboard. */
 #define ShiftNorth(b)      ((b) << 8)                  /**< Shift a Bitboard one square to the north. */
 #define ShiftNortheast(b)  (((b) & MASK_EAST_1) << 9)  /**< Shift a Bitboard one square to the northeast. */
 #define ShiftEast(b)       (((b) & MASK_EAST_1) << 1)  /**< Shift a Bitboard one square to the east. */
@@ -72,7 +72,7 @@ typedef struct DirectionVector
 /**
  * @brief Each of the directions on the compass.
  */
-static const DirectionVector direction_vectors[] =
+static const DirectionVector direction_vectors[8] =
 {
     [DIR_NORTH]     = { .dx =  0, .dy =  1 },
     [DIR_NORTHEAST] = { .dx =  1, .dy =  1 },
@@ -658,7 +658,8 @@ typedef struct Magic
 /**
  * @brief Trial and error search for a magic Bitboard entry.
  * @param location Square index.
- * @param magic Where to store the found magic values.
+ * @param magic Where to store the found magic values. 
+ *              Has functions populated on entry.
  */
 static void
 FindMagic(int    location,

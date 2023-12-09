@@ -21,7 +21,7 @@ bool RunMergeSortTests(void)
             {
                 return false;
             }
-            if (score_left == score_right && sequence_left > sequence_right)
+            if (score_left == score_right && sequence_left >= sequence_right)
             {
                 return false;
             }
