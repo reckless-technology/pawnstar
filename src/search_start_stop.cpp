@@ -8,7 +8,6 @@ Thread entry function for computer thinking
 */
 static void SearchThreadEntry(Game* game)
 {
-
     int move = SearchRootNode(game->position);
     if (move)
     {
@@ -20,8 +19,9 @@ static void SearchThreadEntry(Game* game)
     }  
 }
 
-extern "C" void StopWorker(void)
+void StopWorker(void)
 {
+    StopThinking();
     if (worker_thread.joinable())
     {
         worker_thread.join();
@@ -30,7 +30,7 @@ extern "C" void StopWorker(void)
 /*
 Start thinking on a background worker thread
 */
-extern "C" void StartThinking(Game* game)
+void StartThinking(Game* game)
 {
     StopWorker();
     worker_thread = std::thread(SearchThreadEntry, game);

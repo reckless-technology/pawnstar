@@ -12,7 +12,7 @@ void DeterminePins(const Position* position, Pins* pins)
     const int color                 = COLOR_TO_MOVE(position);
     const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
     const Bitboard friendly_pieces  = position->pieces_of_color[color];
-    const int king_location         = Lsb(position->kings & friendly_pieces);
+    const int king_location         = position->king_location[color];
     const Bitboard* intervening     = &INTERVENING_SQUARES[king_location][0];
     Bitboard enemy_sliding_pieces = 
         ((SETS[king_location].bishop_attacks & (position->bishops | position->queens)) | 
@@ -23,14 +23,14 @@ void DeterminePins(const Position* position, Pins* pins)
         const Bitboard intervening_squares          = intervening[slider_location];
         const Bitboard intervening_pieces           = intervening_squares & occupied_squares;
         const Bitboard intervening_friendly_piece   = intervening_pieces & friendly_pieces;
-        if (intervening_friendly_piece && PopCount(intervening_pieces) == 1)
+        if (intervening_friendly_piece && POPCOUNT(intervening_pieces) == 1)
         {
             pins->pinned_pieces |= intervening_friendly_piece;
-            pins->allowed_squares[Lsb(intervening_friendly_piece)] = intervening_squares | BITBOARD(slider_location);
+            pins->allowed_squares[LSB(intervening_friendly_piece)] = intervening_squares | BITBOARD(slider_location);
         }
     }
 #if 0
-    if (PopCount(pins->pinned_pieces) == 3)
+    if (POPCOUNT(pins->pinned_pieces) == 3)
     {
         char pos_string[256];
         PositionToString(position, pos_string);

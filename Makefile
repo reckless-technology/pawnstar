@@ -1,59 +1,53 @@
 PROGRAM     = pawnstar
-CC          = gcc
 CXX         = g++
-COMMONFLAGS = -I include -Wall -Wextra
-CFLAGS      = $(COMMONFLAGS) -std=c99
-CXXFLAGS    = $(COMMONFLAGS) -std=c++11
+CXXFLAGS    = -I include -Wall -Wextra -std=c++17
 
 HDRS = \
-	bitboard_constants.h \
+	bitboard.h \
 	function_prototypes.h \
-	inline_functions.h \
-	macros.h \
 	move.h \
 	move_generation_template.h \
 	options.h \
 	pawnstar.h \
 	types.h
 	
-GENERATED_DATA      = generated_data.c
-GENERATED_DATA_SRC  = generate_constants/generate_constants.c
+GENERATED_DATA      = generated_data.cpp
+GENERATED_DATA_SRC  = generate_constants/generate_constants.cpp
 GENERATED_DATA_EXE  = generate_constants/gen_constants
 
-CSRCS = \
-	attacks.c \
-	debug_hashtable.c \
-	evaluation.c \
-	forsyth_edwards.c \
-	game_over_detection.c \
-	input_handling.c \
-	main.c \
-	make_moves.c \
-	move_generation.c \
-	move_to_string.c \
-	opening_book.c \
-	opening_book_moves.c \
-	pins.c \
-	random.c \
-	search_alphabeta.c \
-	search_quiescent.c \
-	search_root_node.c \
-	search_single_move.c \
-	sort_moves.c \
-	static_exchange_evaluation.c \
-	tests_bratko_kopec.c \
-	tests_merge_sort.c \
-	tests_move_generation.c \
-	tests_static_exchange.c \
-	transposition_table.c \
-	zobrist.c \
+CPPSRCS = \
+	attacks.cpp \
+	debug_hashtable.cpp \
+	evaluation.cpp \
+	forsyth_edwards.cpp \
+	game_over_detection.cpp \
+	input_handling.cpp \
+	main.cpp \
+	make_moves.cpp \
+	move_generation.cpp \
+	move_to_string.cpp \
+	opening_book.cpp \
+	opening_book_moves.cpp \
+	pins.cpp \
+	random.cpp \
+	search_alphabeta.cpp \
+	search_quiescent.cpp \
+	search_root_node.cpp \
+	search_single_move.cpp \
+	search_start_stop.cpp \
+	sort_moves.cpp \
+	static_exchange_evaluation.cpp \
+	tests_bratko_kopec.cpp \
+	tests_merge_sort.cpp \
+	tests_move_generation.cpp \
+	tests_static_exchange.cpp \
+	timer.cpp \
+	transposition_table.cpp \
+	zobrist.cpp \
 	$(GENERATED_DATA)
 
-CPPSRCS = \
-	search_start_stop.cpp \
-	timer.cpp
 
-OBJS = $(CSRCS:.c=.o) $(CPPSRCS:.cpp=.o)
+OBJS = $(CPPSRCS:.cpp=.o)
 
 DBGDIR    = debug
 DBGEXE    = $(DBGDIR)/$(PROGRAM)
@@ -74,9 +68,6 @@ debug: $(DBGEXE)
 $(DBGEXE): $(DBGOBJS)
 	$(CXX) $(CXXFLAGS) $(DBGFLAGS) -o $(DBGEXE) $^
 
-$(DBGDIR)/%.o: src/%.c $(addprefix include/, $(HDRS))
-	$(CC) -c $(CFLAGS) $(DBGFLAGS) -o $@ $<
-	
 $(DBGDIR)/%.o: src/%.cpp $(addprefix include/, $(HDRS))
 	$(CXX) -c $(CXXFLAGS) $(DBGFLAGS) -o $@ $<
 
@@ -85,14 +76,11 @@ release: $(RELEXE)
 $(RELEXE): $(RELOBJS)
 	$(CXX) $(CXXFLAGS) $(RELFLAGS) -o $(RELEXE) $^
 
-$(RELDIR)/%.o: src/%.c $(addprefix include/, $(HDRS))
-	$(CC) -c $(CFLAGS) $(RELFLAGS) -o $@ $<
-	
 $(RELDIR)/%.o: src/%.cpp $(addprefix include/, $(HDRS))
 	$(CXX) -c $(CXXFLAGS) $(RELFLAGS) -o $@ $<
 
 src/$(GENERATED_DATA) : $(GENERATED_DATA_SRC)
-	$(CC) $< -o $(GENERATED_DATA_EXE) $(CFLAGS)
+	$(CXX) $< -o $(GENERATED_DATA_EXE) $(CXXFLAGS)
 	$(GENERATED_DATA_EXE) > $@
 	
 prep:
@@ -102,4 +90,3 @@ remake: clean all
 
 clean:
 	rm -f $(RELEXE) $(RELOBJS) $(DBGEXE) $(DBGOBJS) src/$(GENERATED_DATA) $(GENERATED_DATA_EXE)
-	rm -r $(DBGDIR) $(RELDIR)

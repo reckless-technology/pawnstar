@@ -17,6 +17,9 @@
  * 
  * A value of 0 terminates a move list.
 */
+#include <stdint.h>
+typedef int64_t Move;
+
 #define CONSTRUCT_PROMOTION_MOVE(from, to, captured, promoted)  ((to) | ((from) << 6) | (PAWN    << 12) | ((captured) << 15) | ((promoted) << 18))
 #define CONSTRUCT_CASTLING_MOVE(from, to)                       ((to) | ((from) << 6) | (KING    << 12) |                      (1 << 21))
 #define CONSTRUCT_EP_CAPTURE_MOVE(from, to)                     ((to) | ((from) << 6) | (PAWN    << 12) | (PAWN       << 15) | (1 << 22))
@@ -32,6 +35,6 @@
 #define MOVE_IS_CASTLING(m)         ( (m)        & (1 << 21))
 #define MOVE_IS_EP_CAPTURE(m)       ( (m)        & (1 << 22))
 #define MOVE_IS_PAWN_DOUBLE_PUSH(m) ( (m)        & (1 << 23))
+#define SCORED_MOVE(m,s)            (((m) & 0xFFFFFFFF) | ((int64_t)(s) << 32))
 #define MOVE_SCORE(m)               ((int)((m) >> 32))
 #define MOVE_BITS(m)                ( (m) & 0xFFFFFFFF)
-#define SCORED_MOVE(m,s)            (((m) & 0xFFFFFFFF) | ((int64_t)(s) << 32))

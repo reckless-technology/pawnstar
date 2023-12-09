@@ -3,8 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef uint64_t Bitboard;
-typedef int64_t  Move;
+#include "bitboard.h"
+#include "move.h"
 
 /**
  * @brief Chess pieces.
@@ -166,6 +166,7 @@ struct Position
     uint64_t        hash;                   /**< Zobrist hash of this position, maintained incrementally    */
     const Position* previous;               /**< position immediately prior to this in the line of play     */
     uint16_t        state_flags;            /**< game state-machine flags                                   */
+    uint8_t         king_location[2];       /**< square index of white and black kings                      */
     uint8_t         en_passant_index;       /**< en passant capture availability square (0 if none)         */
     uint8_t         reversible_move_count;  /**< number of consecutive reversible half-moves (plies)        */
     uint8_t         full_move_count;        /**< number of full moves (zero indexed)                        */

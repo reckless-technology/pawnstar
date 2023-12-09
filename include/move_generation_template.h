@@ -1,16 +1,34 @@
+#pragma once
+#include "pawnstar.h"
+
 /**
- * @file Used by move_generation.c to generate moves.
- * This file is a form of "template" and gets incluced twice, to generate 2 functions,
- * generating all moves and moves only (for quiescent search).
-*/
+ * @brief Generate underpromotions to knight, bishop and rook.
+ * @param pmoves Pointer to move list.
+ */
+constexpr void GenerateUnderpromotions(Move **pmoves)
 {
-    const int color                 = COLOR_TO_MOVE(position);
+    Move *const moves = *pmoves;
+    const Move move = *moves;
+    moves[1] = move ^ ((ROOK   ^ QUEEN) << 18);
+    moves[2] = move ^ ((BISHOP ^ QUEEN) << 18);
+    moves[3] = move ^ ((KNIGHT ^ QUEEN) << 18);
+    *pmoves += 4;
+}
+
+/**
+ * @brief Generate pseudo legal moves for the side to move.
+ * @tparam do_all_moves true for all moves, false for captures and promotions only.
+ * @param position Position to generate moves for.
+ * @param moves Where to store the zero terminated list of moves.
+ */
+template <bool do_all_moves, int color>
+void GenerateMoves(const Position *position,
+                   Move            moves[])
+{
     const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
-    const Bitboard vacant_squares   = ~occupied_squares;
-    const Bitboard friendly_pieces  = position->pieces_of_color[color];
-    const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
-    Pins pins;
-    DeterminePins(position, &pins);
+    const Bitboard vacant_squares = ~occupied_squares;
+    const Bitboard friendly_pieces = position->pieces_of_color[color];
+    const Bitboard enemy_pieces = occupied_squares ^ friendly_pieces;
     /*
     Pawn move variables
     */
@@ -20,9 +38,7 @@
     Bitboard promotions;
     Bitboard captures_west;
     Bitboard captures_east;
-#if GENERATE_NON_CAPTURES
     Bitboard double_pushes;
-#endif
     Bitboard single_pushes;
     Bitboard en_passant_sources;
     int push_delta;
@@ -31,13 +47,11 @@
     /*
     Generate pawn moves
     */
-    if (color == WHITE)
+    if constexpr (color == WHITE)
     {
         pawns = position->pawns & position->white_pieces;
         single_pushes = SHIFT_NORTH(pawns) & vacant_squares;
-#if GENERATE_NON_CAPTURES
         double_pushes = SHIFT_NORTH(single_pushes) & vacant_squares & RANK_4;
-#endif
         captures_west = SHIFT_NORTHWEST(pawns) & position->black_pieces;
         captures_east = SHIFT_NORTHEAST(pawns) & position->black_pieces;
         en_passant_sources = position->en_passant_index ? SETS[position->en_passant_index].pawn_attacks_black & pawns : NO_SQUARES;
@@ -55,9 +69,7 @@
     {
         pawns = position->pawns & position->black_pieces;
         single_pushes = SHIFT_SOUTH(pawns) & vacant_squares;
-#if GENERATE_NON_CAPTURES
         double_pushes = SHIFT_SOUTH(single_pushes) & vacant_squares & RANK_5;
-#endif
         captures_west = SHIFT_SOUTHWEST(pawns) & position->white_pieces;
         captures_east = SHIFT_SOUTHEAST(pawns) & position->white_pieces;
         en_passant_sources = position->en_passant_index ? SETS[position->en_passant_index].pawn_attacks_white & pawns : NO_SQUARES;
@@ -75,13 +87,6 @@
     {
         const int to = FindAndClearLsb(&promotions_west);
         const int from = to - west_delta;
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            if (!(pins.allowed_squares[from] & BITBOARD(to)))
-            {
-                continue;
-            }
-        }
         *moves = CONSTRUCT_PROMOTION_MOVE(from, to, PieceAt(position, to), QUEEN);
         GenerateUnderpromotions(&moves);
     }
@@ -89,13 +94,6 @@
     {
         const int to = FindAndClearLsb(&promotions_east);
         const int from = to - east_delta;
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            if (!(pins.allowed_squares[from] & BITBOARD(to)))
-            {
-                continue;
-            }
-        }
         *moves = CONSTRUCT_PROMOTION_MOVE(from, to, PieceAt(position, to), QUEEN);
         GenerateUnderpromotions(&moves);
     }
@@ -103,13 +101,6 @@
     {
         const int to = FindAndClearLsb(&promotions);
         const int from = to - push_delta;
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            if (!(pins.allowed_squares[from] & BITBOARD(to)))
-            {
-                continue;
-            }
-        }
         *moves = CONSTRUCT_PROMOTION_MOVE(from, to, NO_PIECE, QUEEN);
         GenerateUnderpromotions(&moves);
     }
@@ -117,70 +108,36 @@
     {
         const int to = FindAndClearLsb(&captures_west);
         const int from = to - west_delta;
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            if (!(pins.allowed_squares[from] & BITBOARD(to)))
-            {
-                continue;
-            }
-        }
         *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, PAWN, PieceAt(position, to));
     }
     while (captures_east)
     {
         const int to = FindAndClearLsb(&captures_east);
         const int from = to - east_delta;
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            if (!(pins.allowed_squares[from] & BITBOARD(to)))
-            {
-                continue;
-            }
-        }
         *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, PAWN, PieceAt(position, to));
     }
     while (en_passant_sources)
     {
         const int from = FindAndClearLsb(&en_passant_sources);
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            if (!(pins.allowed_squares[from] & BITBOARD(position->en_passant_index)))
-            {
-                continue;
-            }
-        }
         *moves++ = CONSTRUCT_EP_CAPTURE_MOVE(from, position->en_passant_index);
     }
-#if GENERATE_NON_CAPTURES
-    push_delta <<= 1;
-    while (double_pushes)
+    if constexpr (do_all_moves)
     {
-        const int to = FindAndClearLsb(&double_pushes);
-        const int from = to - push_delta;
-        if (pins.pinned_pieces & BITBOARD(from))
+        push_delta <<= 1;
+        while (double_pushes)
         {
-            if (!(pins.allowed_squares[from] & BITBOARD(to)))
-            {
-                continue;
-            }
+            const int to = FindAndClearLsb(&double_pushes);
+            const int from = to - push_delta;
+            *moves++ = CONSTRUCT_PAWN_DOUBLE_PUSH_MOVE(from, to);
         }
-        *moves++ = CONSTRUCT_PAWN_DOUBLE_PUSH_MOVE(from, to);
-    }
-    push_delta >>= 1;
-    while (single_pushes)
-    {
-        const int to = FindAndClearLsb(&single_pushes);
-        const int from = to - push_delta;
-        if (pins.pinned_pieces & BITBOARD(from))
+        push_delta >>= 1;
+        while (single_pushes)
         {
-            if (!(pins.allowed_squares[from] & BITBOARD(to)))
-            {
-                continue;
-            }
+            const int to = FindAndClearLsb(&single_pushes);
+            const int from = to - push_delta;
+            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, PAWN);
         }
-        *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, to, PAWN);
     }
-#endif
     /*
     Generate knight moves
     */
@@ -189,23 +146,20 @@
     {
         const int from = FindAndClearLsb(&knights);
         Bitboard targets = SETS[from].knight_attacks;
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            targets &= pins.allowed_squares[from];
-        }
         Bitboard capture_targets = targets & enemy_pieces;
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
             *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, KNIGHT, PieceAt(position, to));
         }
-#if GENERATE_NON_CAPTURES
-        Bitboard non_capture_targets = targets & vacant_squares;
-        while (non_capture_targets)
+        if constexpr (do_all_moves)
         {
-            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), KNIGHT);
+            Bitboard non_capture_targets = targets & vacant_squares;
+            while (non_capture_targets)
+            {
+                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), KNIGHT);
+            }
         }
-#endif
     }
     /*
     Generate bishop sliding moves
@@ -215,23 +169,20 @@
     {
         const int from = FindAndClearLsb(&bishops);
         Bitboard targets = BishopAttacks(occupied_squares, from);
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            targets &= pins.allowed_squares[from];
-        }
         Bitboard capture_targets = targets & enemy_pieces;
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
             *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, BISHOP, PieceAt(position, to));
         }
-#if GENERATE_NON_CAPTURES
-        Bitboard non_capture_targets = targets & vacant_squares;
-        while (non_capture_targets)
+        if constexpr (do_all_moves)
         {
-            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), BISHOP);
+            Bitboard non_capture_targets = targets & vacant_squares;
+            while (non_capture_targets)
+            {
+                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), BISHOP);
+            }
         }
-#endif
     }
     /*
     Generate rook sliding moves
@@ -241,23 +192,20 @@
     {
         const int from = FindAndClearLsb(&rooks);
         Bitboard targets = RookAttacks(occupied_squares, from);
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            targets &= pins.allowed_squares[from];
-        }
         Bitboard capture_targets = targets & enemy_pieces;
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
             *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, ROOK, PieceAt(position, to));
         }
-#if GENERATE_NON_CAPTURES
-        Bitboard non_capture_targets = targets & vacant_squares;
-        while (non_capture_targets)
+        if constexpr (do_all_moves)
         {
-            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), ROOK);
+            Bitboard non_capture_targets = targets & vacant_squares;
+            while (non_capture_targets)
+            {
+                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), ROOK);
+            }
         }
-#endif
     }
     /*
     Generate Queen sliding moves
@@ -267,28 +215,25 @@
     {
         const int from = FindAndClearLsb(&queens);
         Bitboard targets = QueenAttacks(occupied_squares, from);
-        if (pins.pinned_pieces & BITBOARD(from))
-        {
-            targets &= pins.allowed_squares[from];
-        }
         Bitboard capture_targets = targets & enemy_pieces;
         while (capture_targets)
         {
             const int to = FindAndClearLsb(&capture_targets);
             *moves++ = CONSTRUCT_CAPTURE_MOVE(from, to, QUEEN, PieceAt(position, to));
         }
-#if GENERATE_NON_CAPTURES
-        Bitboard non_capture_targets = targets & vacant_squares;
-        while (non_capture_targets)
+        if constexpr (do_all_moves)
         {
-            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), QUEEN);
+            Bitboard non_capture_targets = targets & vacant_squares;
+            while (non_capture_targets)
+            {
+                *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(from, FindAndClearLsb(&non_capture_targets), QUEEN);
+            }
         }
-#endif
     }
     /*
     Generate King Moves
     */
-    const int king_location = Lsb(position->kings & friendly_pieces);
+    const int king_location = position->king_location[color];
     Bitboard targets = SETS[king_location].king_attacks;
     Bitboard capture_targets = targets & enemy_pieces;
     while (capture_targets)
@@ -297,52 +242,60 @@
         *moves++ = CONSTRUCT_CAPTURE_MOVE(king_location, to, KING, PieceAt(position, to));
     }
     *moves = 0;
-#if GENERATE_NON_CAPTURES
-    Bitboard non_capture_targets = targets & vacant_squares;
-    while (non_capture_targets)
+    if constexpr (do_all_moves)
     {
-        *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(king_location, FindAndClearLsb(&non_capture_targets), KING);
-    }
-    if (!(position->state_flags & IS_CHECK))
-    {
-        /*
-        Generate castling moves
-        */
-        if (color == WHITE)
+        Bitboard non_capture_targets = targets & vacant_squares;
+        while (non_capture_targets)
         {
-            if ((position->state_flags & MAY_WHITE_CASTLE_KINGSIDE) &&  /* if white retains the right to castle kingside and */
-                !(occupied_squares & (F1BB | G1BB)) &&                  /* f1 and g1 are both vacant and                     */
-                !IsAttacked(position, F1, BLACK) &&                     /* f1 is not attacked by black and                   */
-                !IsAttacked(position, G1, BLACK))                       /* the king's destination is not attacked by black   */
-            {
-                *moves++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
+            *moves++ = CONSTRUCT_NON_CAPTURE_MOVE(king_location, FindAndClearLsb(&non_capture_targets), KING);
+        }
+        if (!(position->state_flags & IS_CHECK))
+        {
+            /*
+            Generate castling moves
+            */
+            if constexpr (color == WHITE)
+            {  
+                /* 
+                Castling to g1 is possible if:
+                - white retains the right to castle kingside AND 
+                - f1 and g1 are both vacant AND
+                - f1 is not attacked by black AND
+                - the king's destination is not attacked by black
+                */
+                if ((position->state_flags & MAY_WHITE_CASTLE_KINGSIDE) && 
+                    !(occupied_squares & (BITBOARD("f1") | BITBOARD("g1"))) &&
+                    !IsAttacked(position, F1, BLACK) &&
+                    !IsAttacked(position, G1, BLACK))
+                {
+                    *moves++ = CONSTRUCT_CASTLING_MOVE(E1, G1);
+                }
+                if ((position->state_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
+                    !(occupied_squares & (BITBOARD("b1") | BITBOARD("c1") | BITBOARD("d1"))) &&
+                    !IsAttacked(position, D1, BLACK) &&
+                    !IsAttacked(position, C1, BLACK))
+                {
+                    *moves++ = CONSTRUCT_CASTLING_MOVE(E1, C1);
+                }
             }
-            if ((position->state_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
-                !(occupied_squares & (B1BB | C1BB | D1BB)) &&
-                !IsAttacked(position, D1, BLACK) &&
-                !IsAttacked(position, C1, BLACK))
+            else
             {
-                *moves++ = CONSTRUCT_CASTLING_MOVE(E1, C1);
+                if ((position->state_flags & MAY_BLACK_CASTLE_KINGSIDE) &&
+                    !(occupied_squares & (BITBOARD("f8") | BITBOARD("g8"))) &&
+                    !IsAttacked(position, F8, WHITE) &&
+                    !IsAttacked(position, G8, WHITE))
+                {
+                    *moves++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
+                }
+                if ((position->state_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
+                    !(occupied_squares & (BITBOARD("b8") | BITBOARD("c8") | BITBOARD("d8"))) &&
+                    !IsAttacked(position, D8, WHITE) &&
+                    !IsAttacked(position, C8, WHITE))
+                {
+                    *moves++ = CONSTRUCT_CASTLING_MOVE(E8, C8);
+                }
             }
         }
-        else
-        {
-            if ((position->state_flags & MAY_BLACK_CASTLE_KINGSIDE) &&
-                !(occupied_squares & (F8BB | G8BB)) &&
-                !IsAttacked(position, F8, WHITE) &&
-                !IsAttacked(position, G8, WHITE))
-            {
-                *moves++ = CONSTRUCT_CASTLING_MOVE(E8, G8);
-            }
-            if ((position->state_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
-                !(occupied_squares & (B8BB | C8BB | D8BB)) &&
-                !IsAttacked(position, D8, WHITE) &&
-                !IsAttacked(position, C8, WHITE))
-            {
-                *moves++ = CONSTRUCT_CASTLING_MOVE(E8, C8);
-            }
-        }
+        *moves = 0;
     }
-    *moves = 0;
-#endif
 }
