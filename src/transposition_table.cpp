@@ -69,12 +69,12 @@ RecordTransposition(uint64_t hash,
                     Move     move, 
                     int      node_type)
 {   
-    Transposition* const t  = &transposition_table[hash % table_num_entries];
-    t->hash                 = hash;
-    t->move                 = move;
-    t->score                = (int16_t)score;
-    t->depth                = (int8_t)depth;
-    t->node_type            = (uint8_t)node_type;
+    Transposition* const t = &transposition_table[hash % table_num_entries];
+    t->hash      = hash;
+    t->move      = move;
+    t->score     = score;
+    t->depth     = (int16_t)depth;
+    t->node_type = (uint16_t)node_type;
 }
 
 /*

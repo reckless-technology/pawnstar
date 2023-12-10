@@ -221,9 +221,9 @@ typedef struct Transposition
 {
     uint64_t    hash;       /**< Zobrist hash of this position                          */
     Move        move;       /**< Best move from this position, if any                   */
-    int16_t     score;      /**< The score computed from this position                  */
-    int8_t      depth;      /**< The depth to which this position was searched          */
-    uint8_t     node_type;  /**< The alpha-beta tree search node type (cut, all, pv)    */
+    int         score;      /**< The score computed from this position                  */
+    int16_t     depth;      /**< The depth to which this position was searched          */
+    uint16_t    node_type;  /**< The alpha-beta tree search node type (cut, all, pv)    */
 } Transposition;
 
 /**
