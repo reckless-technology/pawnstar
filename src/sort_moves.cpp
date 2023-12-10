@@ -51,7 +51,7 @@ void InitializeGoodMoveCounts(void)
  * @param ply distance from root node
 */
 void 
-ScoreAndSortMoves(const Position* position,
+ScoreAndSortMoves(const Position& position,
                   Move            moves[], 
                   int             ply,
                   int             depth)
@@ -68,11 +68,6 @@ ScoreAndSortMoves(const Position* position,
     }
     SortMoves((int)(move - moves), moves);
     (void)depth;
-}
-
-static constexpr int min(int a, int b)
-{
-    return a < b ? a : b;
 }
 
 /**

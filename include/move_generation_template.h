@@ -22,12 +22,12 @@ constexpr void GenerateUnderpromotions(Move **pmoves)
  * @param moves Where to store the zero terminated list of moves.
  */
 template <bool do_all_moves, int color>
-void GenerateMoves(const Position *position,
+void GenerateMoves(const Position& position,
                    Move            moves[])
 {
-    const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
+    const Bitboard occupied_squares = position.white_pieces | position.black_pieces;
     const Bitboard vacant_squares = ~occupied_squares;
-    const Bitboard friendly_pieces = position->pieces_of_color[color];
+    const Bitboard friendly_pieces = position.pieces_of_color[color];
     const Bitboard enemy_pieces = occupied_squares ^ friendly_pieces;
     /*
     Pawn move variables
@@ -49,12 +49,12 @@ void GenerateMoves(const Position *position,
     */
     if constexpr (color == WHITE)
     {
-        pawns = position->pawns & position->white_pieces;
+        pawns = position.pawns & position.white_pieces;
         single_pushes = ShiftNorth(pawns) & vacant_squares;
         double_pushes = ShiftNorth(single_pushes) & vacant_squares & RANK_4;
-        captures_west = ShiftNorthwest(pawns) & position->black_pieces;
-        captures_east = ShiftNortheast(pawns) & position->black_pieces;
-        en_passant_sources = position->en_passant_index ? SETS[position->en_passant_index].pawn_attacks_black & pawns : NO_SQUARES;
+        captures_west = ShiftNorthwest(pawns) & position.black_pieces;
+        captures_east = ShiftNortheast(pawns) & position.black_pieces;
+        en_passant_sources = position.en_passant_index ? SETS[position.en_passant_index].pawn_attacks_black & pawns : NO_SQUARES;
         promotions = single_pushes & RANK_8;
         promotions_west = captures_west & RANK_8;
         promotions_east = captures_east & RANK_8;
@@ -67,12 +67,12 @@ void GenerateMoves(const Position *position,
     }
     else
     {
-        pawns = position->pawns & position->black_pieces;
+        pawns = position.pawns & position.black_pieces;
         single_pushes = ShiftSouth(pawns) & vacant_squares;
         double_pushes = ShiftSouth(single_pushes) & vacant_squares & RANK_5;
-        captures_west = ShiftSouthwest(pawns) & position->white_pieces;
-        captures_east = ShiftSoutheast(pawns) & position->white_pieces;
-        en_passant_sources = position->en_passant_index ? SETS[position->en_passant_index].pawn_attacks_white & pawns : NO_SQUARES;
+        captures_west = ShiftSouthwest(pawns) & position.white_pieces;
+        captures_east = ShiftSoutheast(pawns) & position.white_pieces;
+        en_passant_sources = position.en_passant_index ? SETS[position.en_passant_index].pawn_attacks_white & pawns : NO_SQUARES;
         promotions = single_pushes & RANK_1;
         promotions_west = captures_west & RANK_1;
         promotions_east = captures_east & RANK_1;
@@ -119,7 +119,7 @@ void GenerateMoves(const Position *position,
     while (en_passant_sources)
     {
         const int from = FindAndClearLsb(en_passant_sources);
-        *moves++ = EpCaptureMove(from, position->en_passant_index);
+        *moves++ = EpCaptureMove(from, position.en_passant_index);
     }
     if constexpr (do_all_moves)
     {
@@ -141,7 +141,7 @@ void GenerateMoves(const Position *position,
     /*
     Generate knight moves
     */
-    Bitboard knights = position->knights & friendly_pieces;
+    Bitboard knights = position.knights & friendly_pieces;
     while (knights)
     {
         const int from = FindAndClearLsb(knights);
@@ -164,7 +164,7 @@ void GenerateMoves(const Position *position,
     /*
     Generate bishop sliding moves
     */
-    Bitboard bishops = position->bishops & friendly_pieces;
+    Bitboard bishops = position.bishops & friendly_pieces;
     while (bishops)
     {
         const int from = FindAndClearLsb(bishops);
@@ -187,7 +187,7 @@ void GenerateMoves(const Position *position,
     /*
     Generate rook sliding moves
     */
-    Bitboard rooks = position->rooks & friendly_pieces;
+    Bitboard rooks = position.rooks & friendly_pieces;
     while (rooks)
     {
         const int from = FindAndClearLsb(rooks);
@@ -210,7 +210,7 @@ void GenerateMoves(const Position *position,
     /*
     Generate Queen sliding moves
     */
-    Bitboard queens = position->queens & friendly_pieces;
+    Bitboard queens = position.queens & friendly_pieces;
     while (queens)
     {
         const int from = FindAndClearLsb(queens);
@@ -233,7 +233,7 @@ void GenerateMoves(const Position *position,
     /*
     Generate King Moves
     */
-    const int king_location = position->king_location[color];
+    const int king_location = position.king_location[color];
     Bitboard targets = SETS[king_location].king_attacks;
     Bitboard capture_targets = targets & enemy_pieces;
     while (capture_targets)
@@ -249,7 +249,7 @@ void GenerateMoves(const Position *position,
         {
             *moves++ = NonCaptureMove(king_location, FindAndClearLsb(non_capture_targets), KING);
         }
-        if (!(position->flags & IS_CHECK))
+        if (!(position.flags & IS_CHECK))
         {
             /*
             Generate castling moves
@@ -263,14 +263,14 @@ void GenerateMoves(const Position *position,
                 - f1 is not attacked by black AND
                 - the king's destination is not attacked by black
                 */
-                if ((position->flags & MAY_WHITE_CASTLE_KINGSIDE) && 
+                if ((position.flags & MAY_WHITE_CASTLE_KINGSIDE) && 
                     !(occupied_squares & (BITBOARD("f1") | BITBOARD("g1"))) &&
                     !IsAttacked(position, F1, BLACK) &&
                     !IsAttacked(position, G1, BLACK))
                 {
                     *moves++ = CastlingMove(E1, G1);
                 }
-                if ((position->flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
+                if ((position.flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
                     !(occupied_squares & (BITBOARD("b1") | BITBOARD("c1") | BITBOARD("d1"))) &&
                     !IsAttacked(position, D1, BLACK) &&
                     !IsAttacked(position, C1, BLACK))
@@ -280,14 +280,14 @@ void GenerateMoves(const Position *position,
             }
             else
             {
-                if ((position->flags & MAY_BLACK_CASTLE_KINGSIDE) &&
+                if ((position.flags & MAY_BLACK_CASTLE_KINGSIDE) &&
                     !(occupied_squares & (BITBOARD("f8") | BITBOARD("g8"))) &&
                     !IsAttacked(position, F8, WHITE) &&
                     !IsAttacked(position, G8, WHITE))
                 {
                     *moves++ = CastlingMove(E8, G8);
                 }
-                if ((position->flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
+                if ((position.flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
                     !(occupied_squares & (BITBOARD("b8") | BITBOARD("c8") | BITBOARD("d8"))) &&
                     !IsAttacked(position, D8, WHITE) &&
                     !IsAttacked(position, C8, WHITE))

@@ -11,12 +11,12 @@
  * @return beta on success, alpha on failure
  */
 static int 
-AttemptNullMove(const Position*  position, 
+AttemptNullMove(const Position&  position, 
                 int              depth, 
                 int              ply, 
                 int              alpha, 
                 int              beta, 
-                volatile bool*   cancel)
+                volatile bool&   cancel)
 {
     /*
     Try null move pruning if ALL of the following are true:
@@ -29,17 +29,19 @@ AttemptNullMove(const Position*  position,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    if (!(position->flags & IS_NULL_MOVE)
-        && !(position->flags & IS_CHECK)
+    if (!(position.flags & IS_NULL_MOVE)
+        && !(position.flags & IS_CHECK)
         && beta == alpha + 1
-        && (position->knights | position->bishops | position->rooks | position->queens)
+        && (position.knights | position.bishops | position.rooks | position.queens)
         && EvaluatePosition(position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
         Position child_position;
-        MakeNullMove(&child_position, position);
-        int score = -Search(&child_position, depth - 3, ply + 1, -beta, -alpha, cancel, NULL);
-        if (*cancel)
+        MakeNullMove(child_position, position);
+        Variation dummy;
+        dummy.moves[0] = 0;
+        int score = -Search(child_position, depth - 3, ply + 1, -beta, -alpha, cancel, dummy);
+        if (cancel)
         {
             return SEARCH_CANCELLED_SCORE;
         }
@@ -65,15 +67,15 @@ AttemptNullMove(const Position*  position,
  * @return score for this node
 */
 int 
-Search(const Position*  position, 
+Search(const Position&  position, 
        int              depth, 
        int              ply, 
        int              alpha, 
        int              beta, 
-       volatile bool*   cancel, 
-       Variation*       parent_pv)
+       volatile bool&   cancel, 
+       Variation&       parent_pv)
 {    
-    if (*cancel)
+    if (cancel)
     {
         return SEARCH_CANCELLED_SCORE;
     }
@@ -82,7 +84,7 @@ Search(const Position*  position,
         the_game.time_control.hard_stop_search_ms &&
         GetMilliseconds() >= the_game.time_control.hard_stop_search_ms)
     {
-        *cancel = true;
+        cancel = true;
         return SEARCH_CANCELLED_SCORE;
     }
     INCREMENT("alpha beta calls");
@@ -97,7 +99,7 @@ Search(const Position*  position,
         INCREMENT("max ply reached");
         return EvaluatePosition(position, alpha, beta);
     }
-    if (position->flags & IS_CHECK)
+    if (position.flags & IS_CHECK)
     {
         INCREMENT("extensions check");
         ++depth;
@@ -111,7 +113,7 @@ Search(const Position*  position,
     for this position.
     */
     Transposition transposition;
-    const bool is_transposition = FindTransposition(position->hash, &transposition);
+    const bool is_transposition = FindTransposition(position.hash, &transposition);
     if (is_transposition && transposition.depth >= depth)
     {
         INCREMENT("table hit");
@@ -157,7 +159,7 @@ Search(const Position*  position,
  
 #if DO_NULL_MOVE_PRUNING
     int null_move_score = AttemptNullMove(position, depth, ply, alpha, beta, cancel);
-    if (*cancel)
+    if (cancel)
     {
         return SEARCH_CANCELLED_SCORE;
     }
@@ -182,15 +184,15 @@ Search(const Position*  position,
     {
         INCREMENT("table move");
         ++num_legal_moves;
-        int score = SearchSingleMove(position, depth, ply, alpha, beta, cancel, transposition.move, &pv, 0);
-        if (*cancel)
+        int score = SearchSingleMove(position, depth, ply, alpha, beta, cancel, transposition.move, pv, 0);
+        if (cancel)
         {
             return SEARCH_CANCELLED_SCORE;
         }
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            RecordTransposition(position->hash, depth, beta, transposition.move, NODE_CUT);
+            RecordTransposition(position.hash, depth, beta, transposition.move, NODE_CUT);
             RecordGoodMove(ply, transposition.move);
             return beta;
         }
@@ -204,7 +206,7 @@ Search(const Position*  position,
             Provisionally store this move as a CUT node - it 
             may later turn out to be a PV but we don't know that yet.
             */
-            RecordTransposition(position->hash, depth, alpha, transposition.move, NODE_CUT);
+            RecordTransposition(position.hash, depth, alpha, transposition.move, NODE_CUT);
             RecordGoodMove(ply, transposition.move);
         }
     } 
@@ -228,7 +230,7 @@ Search(const Position*  position,
         # We are not in a PV node AND
         # The static exchange evaluation for this move is negative
         */
-        if (!(position->flags & IS_CHECK) && 
+        if (!(position.flags & IS_CHECK) && 
               num_legal_moves > 2               &&
               beta == alpha + 1                 &&
               MoveScore(*move) < 0)
@@ -241,14 +243,14 @@ Search(const Position*  position,
             else
             {
                 INCREMENT("negative SEE reduction attempts");
-                score = SearchSingleMove(position, depth - 1, ply, alpha, beta, cancel, *move, &pv, num_legal_moves);
+                score = SearchSingleMove(position, depth - 1, ply, alpha, beta, cancel, *move, pv, num_legal_moves);
             }
         }
         else
         {
-            score = SearchSingleMove(position, depth, ply, alpha, beta, cancel, *move, &pv, num_legal_moves);
+            score = SearchSingleMove(position, depth, ply, alpha, beta, cancel, *move, pv, num_legal_moves);
         }
-        if (*cancel)
+        if (cancel)
         {
             return SEARCH_CANCELLED_SCORE;
         }
@@ -261,7 +263,7 @@ Search(const Position*  position,
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            RecordTransposition(position->hash, depth, beta, *move, NODE_CUT);
+            RecordTransposition(position.hash, depth, beta, *move, NODE_CUT);
             RecordGoodMove(ply, *move);
             return beta;
         }
@@ -275,7 +277,7 @@ Search(const Position*  position,
             may later turn out to be a PV but we don't know that 
             for sure yet until we have searched every move.
             */
-            RecordTransposition(position->hash, depth, score, *move, NODE_CUT);
+            RecordTransposition(position.hash, depth, score, *move, NODE_CUT);
             RecordGoodMove(ply, *move);
             best_move = *move;
         }
@@ -294,7 +296,7 @@ Search(const Position*  position,
         the losing score, so that the search algorithm chooses the shortest  
         path to checkmate when multiple possible checkmates exist in the tree.
         */
-        if (position->flags & IS_CHECK)
+        if (position.flags & IS_CHECK)
         {
             INCREMENT("checkmates");
             return CHECKMATED_SCORE + ply;
@@ -310,9 +312,9 @@ Search(const Position*  position,
         tree to our parent node.
         */
         INCREMENT("pv nodes");
-        RecordTransposition(position->hash, depth, alpha, best_move, NODE_PV);
+        RecordTransposition(position.hash, depth, alpha, best_move, NODE_PV);
         RecordGoodMove(ply, best_move);
-        CopyVariation(parent_pv, &pv, best_move);
+        CopyVariation(parent_pv, pv, best_move);
     }
     else
     {
@@ -320,7 +322,7 @@ Search(const Position*  position,
         We tried every move but did not raise alpha; this was an all node
         */
         INCREMENT("all nodes");
-        RecordTransposition(position->hash, depth, alpha, best_move, NODE_ALL);
+        RecordTransposition(position.hash, depth, alpha, best_move, NODE_ALL);
     }
     return alpha;
 }

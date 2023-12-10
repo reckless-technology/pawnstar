@@ -413,7 +413,7 @@ static uint64_t IsolatedPawnMaskBlack(int location)
  */
 static uint64_t SupportedPawnMaskWhite(int location)
 {
-    uint64_t result       = NO_SQUARES;
+    uint64_t result     = NO_SQUARES;
     const int locn_x    = FileOf(location);
     const int locn_y    = RankOf(location);;
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
@@ -422,7 +422,7 @@ static uint64_t SupportedPawnMaskWhite(int location)
         {
             continue; /* off board */
         }
-        for (int y = locn_y - 1; y >= 0; --y)
+        for (int y = locn_y; y >= 0; --y)
         {
             result |= BITBOARD_XY(x, y);
         }
@@ -437,7 +437,7 @@ static uint64_t SupportedPawnMaskWhite(int location)
  */
 static uint64_t SupportedPawnMaskBlack(int location)
 {
-    uint64_t result    = NO_SQUARES;
+    uint64_t result  = NO_SQUARES;
     const int locn_x = FileOf(location);
     const int locn_y = RankOf(location);
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
@@ -446,7 +446,7 @@ static uint64_t SupportedPawnMaskBlack(int location)
         {
             continue; /* off board */
         }
-        for (int y = locn_y + 1; y < 8; ++y)
+        for (int y = locn_y; y < 8; ++y)
         {
             result |= BITBOARD_XY(x, y);
         }

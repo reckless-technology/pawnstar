@@ -20,14 +20,14 @@ void RunStaticExchangeTests(void)
     for (const SeeTest* test = tests; test->fen_string; ++test)
     {
         Position position;
-        if (!PositionFromString(test->fen_string, &position))
+        if (!PositionFromString(test->fen_string, position))
         {
             printf("ERROR: unable to produce position from string\n");
             continue;
         }
         char move_string[16];
-        MoveToString(&position, test->move, move_string);
-        int score = EvaluateStaticExchange(&position, test->move);
+        MoveToString(position, test->move, move_string);
+        int score = EvaluateStaticExchange(position, test->move);
         printf("\n%s\nSEE for %s = %d\n", test->fen_string, move_string, score);
         is_pass &= (score == test->see_score);
 

@@ -54,7 +54,7 @@ static void handle_xboard(int argc, char* argv[])
 
 static void handle_bookmoves(int argc, char* argv[])
 {
-    DisplayAvailableBookMoves(the_game.position);
+    DisplayAvailableBookMoves(*the_game.position);
     (void)argc;
     (void)argv;
 }
@@ -91,7 +91,7 @@ static void handle_new(int argc, char* argv[])
 {
     StopThinking();
     StopWorker();
-    InitializeGame(&the_game);
+    InitializeGame(the_game);
     (void)argc;
     (void)argv;
 }
@@ -105,10 +105,10 @@ static void handle_force(int argc, char* argv[])
 
 static void handle_go(int argc, char* argv[])
 {
-    the_game.engine_color = ColorToMove(the_game.position);
+    the_game.engine_color = ColorToMove(*the_game.position);
     if (!(the_game.position->flags & IS_GAME_OVER))
     {
-        StartThinking(&the_game);
+        StartThinking(the_game);
     }
     (void)argc;
     (void)argv;
@@ -116,7 +116,7 @@ static void handle_go(int argc, char* argv[])
 
 static void handle_playother(int argc, char* argv[])
 {
-    the_game.engine_color = EnemyOf(ColorToMove(the_game.position));
+    the_game.engine_color = EnemyOf(ColorToMove(*the_game.position));
     (void)argc;
     (void)argv;
 }
@@ -128,20 +128,20 @@ static void handle_usermove(int argc, char* argv[])
         printf("ERROR: move not specified\n");
         return;
     }
-    int move = PlayMoveString(&the_game, argv[1]);
+    int move = PlayMoveString(the_game, argv[1]);
     if (!move)
     {
         printf("Illegal move: %s\n", argv[1]);
     }
     else
     {
-        if (!(the_game.position->flags & IS_GAME_OVER) && the_game.engine_color == (int)ColorToMove(the_game.position))
+        if (!(the_game.position->flags & IS_GAME_OVER) && the_game.engine_color == (int)ColorToMove(*the_game.position))
         {
-            StartThinking(&the_game);
+            StartThinking(the_game);
         }
         else
         {
-            DisplayResultIfGameOver(the_game.position);
+            DisplayResultIfGameOver(*the_game.position);
         }
     }
 }
@@ -156,16 +156,16 @@ static void handle_setboard(int argc, char* argv[])
     }
     *p = 0;
     the_game.position = the_game.stack;
-    if (!PositionFromString(fen_string, the_game.position))
+    if (!PositionFromString(fen_string, *the_game.position))
     {
-        InitializeGame(&the_game);
+        InitializeGame(the_game);
     }
 }
 
 static void handle_getboard(int argc, char* argv[])
 {
     char fen_string[256];
-    PositionToString(the_game.position, fen_string);
+    PositionToString(*the_game.position, fen_string);
     printf("%s\n", fen_string);
     (void)argc;
     (void)argv;
@@ -309,7 +309,7 @@ static void handle_showtime(int argc, char* argv[])
 
 static void handle_eval(int argc, char* argv[])
 {
-    printf("evaluation %5d\n", EvaluatePosition(the_game.position, ALPHA, BETA));
+    printf("evaluation %5d\n", EvaluatePosition(*the_game.position, ALPHA, BETA));
     (void)argc;
     (void)argv;
 }

@@ -33,44 +33,44 @@ static const uint16_t CASTLING_RIGHTS_MASKS[64] =
  * @param src_position source position
 */
 void 
-MakeNullMove(Position*       position, 
-             const Position* src_position)
+MakeNullMove(Position&       position, 
+             const Position& src_position)
 {
-    *position = *src_position;
-    position->previous = src_position;
-    position->flags |= IS_NULL_MOVE;
-    position->flags ^= IS_BLACK_TO_MOVE;
-    position->hash ^= EN_PASSANT_HASHES[position->en_passant_index];
-    position->hash ^= BLACK_MOVE_HASH;
-    position->en_passant_index = 0;
+    position = src_position;
+    position.previous = &src_position;
+    position.flags |= IS_NULL_MOVE;
+    position.flags ^= IS_BLACK_TO_MOVE;
+    position.hash ^= EN_PASSANT_HASHES[position.en_passant_index];
+    position.hash ^= BLACK_MOVE_HASH;
+    position.en_passant_index = 0;
 }
 
 void
-AddPiece(Position* position, 
+AddPiece(Position& position, 
          int       color, 
          int       piece, 
          int       to)
 {
     const Bitboard to_bb = BITBOARD(to);
-    position->piece[piece - 1] ^= to_bb;
-    position->pieces_of_color[color] ^= to_bb;
-    position->hash ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
+    position.piece[piece - 1] ^= to_bb;
+    position.pieces_of_color[color] ^= to_bb;
+    position.hash ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
 }
 
 static void
-RemovePiece(Position* position, 
+RemovePiece(Position& position, 
             int       color, 
             int       piece, 
             int       from)
 {
     const Bitboard from_bb = BITBOARD(from);
-    position->piece[piece - 1] ^= from_bb;
-    position->pieces_of_color[color] ^= from_bb;
-    position->hash ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
+    position.piece[piece - 1] ^= from_bb;
+    position.pieces_of_color[color] ^= from_bb;
+    position.hash ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
 }
 
 static void
-MovePiece(Position* position, 
+MovePiece(Position& position, 
           int       color, 
           int       piece, 
           int       from, 
@@ -78,9 +78,9 @@ MovePiece(Position* position,
 {
     const Bitboard from_to_bb = BITBOARD(from) | BITBOARD(to);
     const uint64_t* const hash = &PIECE_SQUARE_HASHES[color][piece -1][0];
-    position->piece[piece - 1] ^= from_to_bb;
-    position->pieces_of_color[color] ^= from_to_bb;
-    position->hash ^= hash[to] ^ hash[from];
+    position.piece[piece - 1] ^= from_to_bb;
+    position.pieces_of_color[color] ^= from_to_bb;
+    position.hash ^= hash[to] ^ hash[from];
 }
 
 /**
@@ -90,8 +90,8 @@ MovePiece(Position* position,
  * @param move move being made
 */
 void 
-MakeMove(Position*       position, 
-         const Position* src_position, 
+MakeMove(Position&       position, 
+         const Position& src_position, 
          Move            move)
 {                          
     const int color    = ColorToMove(src_position);
@@ -100,19 +100,19 @@ MakeMove(Position*       position,
     const int piece    = MovePiece(move);
     const int captured = MoveCaptured(move);
      
-    *position = *src_position;
-    position->previous = src_position;
-    position->flags &= ~IS_NULL_MOVE;
-    position->flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
-    position->hash ^= CASTLING_RIGHTS_HASHES[position->flags & CASTLING_RIGHTS_MASK] 
-                    ^ CASTLING_RIGHTS_HASHES[src_position->flags & CASTLING_RIGHTS_MASK];
-    position->hash ^= EN_PASSANT_HASHES[position->en_passant_index];
-    position->en_passant_index = 0;
-    ++position->reversible_move_count;
+    position = src_position;
+    position.previous = &src_position;
+    position.flags &= ~IS_NULL_MOVE;
+    position.flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
+    position.hash ^= CASTLING_RIGHTS_HASHES[position.flags & CASTLING_RIGHTS_MASK] 
+                    ^ CASTLING_RIGHTS_HASHES[src_position.flags & CASTLING_RIGHTS_MASK];
+    position.hash ^= EN_PASSANT_HASHES[position.en_passant_index];
+    position.en_passant_index = 0;
+    ++position.reversible_move_count;
     switch (piece)
     {
     case PAWN:
-        position->reversible_move_count = 0;
+        position.reversible_move_count = 0;
         if (captured)
         {
             if (IsEpCaptureMove(move))
@@ -138,8 +138,8 @@ MakeMove(Position*       position,
             if (IsPawnDoublePushMove(move))
             {
                 /* Pawn double push: affects en passant. */
-                position->en_passant_index = (uint8_t)((from + to) >> 1);
-                position->hash ^= EN_PASSANT_HASHES[position->en_passant_index];
+                position.en_passant_index = (uint8_t)((from + to) >> 1);
+                position.hash ^= EN_PASSANT_HASHES[position.en_passant_index];
             } 
         }
         break;
@@ -152,7 +152,7 @@ MakeMove(Position*       position,
         if (captured)
         {
             RemovePiece(position, EnemyOf(color), captured, to);
-            position->reversible_move_count = 0;
+            position.reversible_move_count = 0;
         }
         MovePiece(position, color, piece, from, to);
         break;
@@ -163,7 +163,7 @@ MakeMove(Position*       position,
             if (captured)
             {
                 RemovePiece(position, EnemyOf(color), captured, to);
-                position->reversible_move_count = 0;
+                position.reversible_move_count = 0;
             }
             MovePiece(position, color, KING, from, to);
             break;
@@ -192,58 +192,58 @@ MakeMove(Position*       position,
         }
         break;
     };  
-    position->flags ^= IS_BLACK_TO_MOVE;
-    position->hash ^= BLACK_MOVE_HASH;
-    position->full_move_count += color;
-    position->king_location[WHITE] = Lsb(position->kings & position->white_pieces);
-    position->king_location[BLACK] = Lsb(position->kings & position->black_pieces);
-    if (IsAttacked(position, position->king_location[color], EnemyOf(color)))
+    position.flags ^= IS_BLACK_TO_MOVE;
+    position.hash ^= BLACK_MOVE_HASH;
+    position.full_move_count += color;
+    position.king_location[WHITE] = Lsb(position.kings & position.white_pieces);
+    position.king_location[BLACK] = Lsb(position.kings & position.black_pieces);
+    if (IsAttacked(position, position.king_location[color], EnemyOf(color)))
     {
-        position->flags |= IS_MOVED_INTO_CHECK;
+        position.flags |= IS_MOVED_INTO_CHECK;
     }
     else
     {
-        if (IsAttacked(position, position->king_location[EnemyOf(color)], color))
+        if (IsAttacked(position, position.king_location[EnemyOf(color)], color))
         {
-            position->flags |= IS_CHECK;
+            position.flags |= IS_CHECK;
         }
         else
         {
-            position->flags &= ~IS_CHECK;
+            position.flags &= ~IS_CHECK;
         }
     }
 }
 /*
 Make a move and update the game end status flags
 */
-void PlayMove(Game* game, Move move)
+void PlayMove(Game& game, Move move)
 {
-    if (game->position->flags & IS_GAME_OVER)
+    if (game.position->flags & IS_GAME_OVER)
     {
         printf("ERROR: attempt to play move after game is over\n");
         return;
     }
-    MakeMove(game->position + 1, game->position, move);
-    ++game->position;
-    if (IsCheckmate(game->position))
+    MakeMove(*(game.position + 1), *game.position, move);
+    ++game.position;
+    if (IsCheckmate(*game.position))
     {
-        game->position->flags |= IS_CHECKMATE;
+        game.position->flags |= IS_CHECKMATE;
     }
-    else if (IsStalemate(game->position))
+    else if (IsStalemate(*game.position))
     {
-        game->position->flags |= IS_STALEMATE;
+        game.position->flags |= IS_STALEMATE;
     }
-    else if (IsDrawByRepetition(game->position, false))
+    else if (IsDrawByRepetition(*game.position, false))
     {
-        game->position->flags |= IS_DRAW_REPETITION;
+        game.position->flags |= IS_DRAW_REPETITION;
     }
-    else if (IsDrawByMaterial(game->position))
+    else if (IsDrawByMaterial(*game.position))
     {
-        game->position->flags |= IS_DRAW_MATERIAL;
+        game.position->flags |= IS_DRAW_MATERIAL;
     }
-    else if (IsDrawByFiftyMoves(game->position))
+    else if (IsDrawByFiftyMoves(*game.position))
     {
-        game->position->flags |= IS_DRAW_50_MOVES;
+        game.position->flags |= IS_DRAW_50_MOVES;
     }
 }
 /*
@@ -253,18 +253,18 @@ format, and update game state_flags accordingly
 returns the move if a legal move was played
 returns zero if the move was illegal or the game is over
 */
-Move PlayMoveString(Game* game, char* move_str)
+Move PlayMoveString(Game& game, char* move_str)
 {
-    if (game->position->flags & IS_GAME_OVER)
+    if (game.position->flags & IS_GAME_OVER)
     {
         return 0;
     }  
     Move moves[MAX_MOVES_PER_POSITION];
-    GenerateLegalMoves(game->position, moves);
+    GenerateLegalMoves(*game.position, moves);
     for (const Move* move = moves; *move; ++move)
     {
         char buffer[16];
-        MoveToString(game->position, *move,  buffer);
+        MoveToString(*game.position, *move,  buffer);
         if (AreMoveStringsEquivalent(buffer, move_str))
         {
             PlayMove(game, *move);
@@ -280,13 +280,13 @@ Move PlayMoveString(Game* game, char* move_str)
  * @param src_position source position
  * @param moves zero terminated list of moves
 */
-void MakeMoveSequence(Position* dst_position, const Position* src_position, const Move* moves)
+void MakeMoveSequence(Position& dst_position, const Position& src_position, const Move* moves)
 {
-    Position tmp = *src_position;
-    while (*moves)
+    Position tmp = src_position;
+    for ( ; *moves; ++moves)
     {
-        MakeMove(dst_position, &tmp, *moves++);
-        tmp = *dst_position;
+        MakeMove(dst_position, tmp, *moves);
+        tmp = dst_position;
     }
-    dst_position->previous = dst_position; // Can't assume stack here.
+    dst_position.previous = &dst_position; // Can't assume stack here.
 }

@@ -45,14 +45,14 @@ void RunPositionTests(int depth)
     first_start = GetMilliseconds();
     for (tests = POSITION_TESTS; *tests; ++tests)
     {
-        if (!PositionFromString(*tests, &position))
+        if (!PositionFromString(*tests, position))
         {
             printf("ERROR: unable to parse FEN string:\n%s\n", *tests);
             return;
         }
         printf("\n%s\n", *tests);
         DEBUG_STATEMENT(DebugXClear());
-        SearchRootNode(&position);
+        SearchRootNode(position);
         DEBUG_STATEMENT(DebugXWrite(stdout));
     }
     printf("total elapsed milliseconds                        %10d\n", GetMilliseconds() - first_start);

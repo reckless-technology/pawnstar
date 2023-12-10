@@ -61,7 +61,7 @@ DebugPrintBitboard(Bitboard b, char* buffer)
 }
 
 static void
-DebugPrintPosition(const Position* position, Move move, char* buffer)
+DebugPrintPosition(const Position& position, Move move, char* buffer)
 {
     static const char* const names[] = {
         "pawns",
@@ -76,7 +76,7 @@ DebugPrintPosition(const Position* position, Move move, char* buffer)
     for (int i = 0; i != 8; ++i)
     {
         buffer += sprintf(buffer, "\n%s\n", names[i]);
-        buffer = DebugPrintBitboard(position->piece[i], buffer);
+        buffer = DebugPrintBitboard(position.piece[i], buffer);
     }
     if (move)
     {
@@ -107,14 +107,14 @@ Categorize a null-terminated set of pseudo-legal moves into strictly-legal
 moves of various types, storing the result in counts
 */
 static void 
-CategorizeMoves(const Position* src_position, 
+CategorizeMoves(const Position& src_position, 
                 const Move      moves[], 
                 PerftCounts*    counts)
 {
     Position position;
     for (const Move* move = moves; *move; ++move)
     {
-        MakeMove(&position, src_position, *move);
+        MakeMove(position, src_position, *move);
         if (position.flags & IS_MOVED_INTO_CHECK)
         {
             continue;
@@ -149,7 +149,7 @@ http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
 */
 static void 
-Perft(const Position* src_position, 
+Perft(const Position& src_position, 
       int             depth, 
       int             color, 
       PerftCounts*    counts)
@@ -166,7 +166,7 @@ Perft(const Position* src_position,
         for (const Move* move = moves; *move; ++move)
         {
             Position position;
-            MakeMove(&position, src_position, *move);
+            MakeMove(position, src_position, *move);
 #if DO_TEST_HASH_DURING_PERFT
             if (position.hash != ComputeHash(&position))
             {
@@ -177,7 +177,7 @@ Perft(const Position* src_position,
             {
                 continue;
             }
-            Perft(&position, depth - 1, EnemyOf(color), counts);
+            Perft(position, depth - 1, EnemyOf(color), counts);
         }           
         return;
     }
@@ -198,18 +198,18 @@ RunPerftTests(void)
     first_start = GetMilliseconds();
     for (test = perft_tests; test->position; ++test)
     {
-        if (!PositionFromString(test->position, &position))
+        if (!PositionFromString(test->position, position))
         {
             printf("ERROR: cannot create position from FEN string\n");
             continue;
         }
         char pos_string[256];
-        PositionToString(&position, pos_string);
+        PositionToString(position, pos_string);
         printf("\n%s\n", pos_string);
         memset(&counts, 0, sizeof(counts));
         total_nodes += test->counts.legal_moves;
         start = GetMilliseconds();
-        Perft(&position, test->depth, ColorToMove(&position), &counts);
+        Perft(position, test->depth, ColorToMove(position), &counts);
         stop = GetMilliseconds();
         if (stop == start)
         {

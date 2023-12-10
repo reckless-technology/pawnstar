@@ -4,6 +4,7 @@ CXXFLAGS    = -I include -Wall -Wextra -std=c++17
 
 HDRS = \
 	bitboard.h \
+	evaluation_template.h \
 	function_prototypes.h \
 	move.h \
 	move_generation_template.h \

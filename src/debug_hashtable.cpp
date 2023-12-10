@@ -10,17 +10,12 @@
 */
 
 #include "pawnstar.h"
+
 #if DEBUGX
 
 #define STRING_LEN 0x80
 
-typedef struct
-{
-    const char* key;
-    int        count;
-} DebugEntry;
-
-static DebugEntry debug_dict[DEBUG_DICT_SIZE];
+DebugEntry debug_dict[DEBUG_DICT_SIZE];
 
 /**
 * @brief Initialize or reset the dictionary
@@ -31,37 +26,8 @@ void DebugXClear()
 }
 
 /**
-* @brief Increment the count associated with the string literal in key
-*/
-void DebugXIncrement(const char* key)
-{
-    /*
-    String literals are typically aligned on 4 byte boundaries, so throw away
-    the bottom 2 bits of the address before finding the index into the table
-    */
-    DebugEntry* const entry = &debug_dict[((uint64_t)key >> 2) % DEBUG_DICT_SIZE];
-    if (entry->key == NULL)
-    {
-        entry->key = key;
-    }
-    else if (entry->key != key)
-    {
-        printf("ERROR: debug hash collision '%s'\n", key);
-    }
-    ++entry->count;
-}
-
-/**
-* @brief Conditionally increment the count associated with the string literal in key
-*/
-void DebugXIncrementIf(bool condition, const char* key)
-{
-    if (condition)
-    {
-        DebugXIncrement(key);
-    }
-}
-
+ * @brief Sort predicate for debug table
+ */
 int CompareEntries(const DebugEntry** left, const DebugEntry** right)
 {
     return strcmp((*left)->key, (*right)->key);

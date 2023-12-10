@@ -108,6 +108,15 @@ typedef struct Sets
 
 /**
  * @brief Bitsets used to efficiently determine pawn structure.
+ * A passed pawn has no enemy pawns in front of it either on its file or on adjacent files.
+ * 
+ * An isolated pawn has no friendly pawns on either adjacent file.
+ * 
+ * A supported pawn has at least one friendly pawn on an adjacent file, either level
+ * with it, or behind it. A pawn which is not supported may be a backwards pawn, if the
+ * square in front of it is attacked by an enemy pawn.
+ * 
+ * A doubled pawn has a friendly pawn in front of it on the same file.
 */
 typedef struct PawnSets
 {
@@ -210,8 +219,6 @@ typedef struct TimeControl
     };
 } TimeControl;
 
-
-
 /**
  * @brief A transposition table entry.
  * A transposition is the result of a previous search containing pertinent
@@ -282,3 +289,33 @@ typedef struct Pins
     Bitboard pinned_pieces;         /**< Set of squares which are pinned. */
     Bitboard allowed_squares[64];   /**< Contains the set of allowed squares a pinned piece may safely move to. */
 } Pins;
+
+/**
+ * @brief Pawn structure for one color.
+ * A passed pawn has no enemy pawns in front of it either on its file or on adjacent files.
+ * 
+ * An isolated pawn has no friendly pawns on either adjacent file.
+ * 
+ * A backward pawn has no pawns to support it and its forward square is 
+ * attacked by an enemy pawn.
+ * 
+ * A doubled pawn has a friendly pawn in front of it on the same file.
+ */
+typedef struct PawnStructure
+{
+    Bitboard passed_pawns;
+    Bitboard isolated_pawns;
+    Bitboard backward_pawns;
+    Bitboard doubled_pawns;
+} PawnStructure;
+
+#if DEBUGX
+/**
+ * @brief Simple debug hash table dictionary fo diagnostic counts.
+ */
+typedef struct
+{
+    const char* key;
+    int        count;
+} DebugEntry;
+#endif

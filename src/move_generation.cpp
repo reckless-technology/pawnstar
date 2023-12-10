@@ -4,7 +4,7 @@
 
 #if 1
 
-void GeneratePseudoLegalMoves(const Position* position,
+void GeneratePseudoLegalMoves(const Position& position,
                               Move            moves[])
 {
     if (ColorToMove(position) == WHITE)
@@ -17,7 +17,7 @@ void GeneratePseudoLegalMoves(const Position* position,
     }
 }
 
-void GeneratePseudoLegalCaptures(const Position* position,
+void GeneratePseudoLegalCaptures(const Position& position,
                                  Move            moves[])
 {
     if (ColorToMove(position) == WHITE)
@@ -35,16 +35,16 @@ void GeneratePseudoLegalCaptures(const Position* position,
 static const int FINAL_RANK[2] = { 7, 0 };
 
 void
-GeneratePseudoLegalMoves(const Position* position, 
+GeneratePseudoLegalMoves(const Position& position, 
                          Move            captures[], 
                          Move            non_captures[])
 {   
     Bitboard has_attacks_to = NO_SQUARES;
     Bitboard attacks_to[64];
     const int color = ColorToMove(position);
-    const Bitboard friendly_pieces = position->pieces_of_color[color];
-    const Bitboard enemy_pieces = position->pieces_of_color[EnemyOf(color)];
-    const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
+    const Bitboard friendly_pieces = position.pieces_of_color[color];
+    const Bitboard enemy_pieces = position.pieces_of_color[EnemyOf(color)];
+    const Bitboard occupied_squares = position.white_pieces | position.black_pieces;
     const Bitboard vacant_squares = ~occupied_squares;
     /* Generate pawn promotions. */
     Bitboard friendly_pawns;
@@ -56,7 +56,7 @@ GeneratePseudoLegalMoves(const Position* position,
     int pawn_capture_east_delta;
     if (color == WHITE)
     {
-        friendly_pawns = position->pawns & position->white_pieces;
+        friendly_pawns = position.pawns & position.white_pieces;
         pawn_promotions_capture_west = ShiftNorthwest(friendly_pawns) & enemy_pieces & RANK_8;
         pawn_promotions_capture_east = ShiftNortheast(friendly_pawns) & enemy_pieces & RANK_8;
         pawn_promotions = ShiftNorth(friendly_pawns) & vacant_squares & RANK_8;
@@ -66,7 +66,7 @@ GeneratePseudoLegalMoves(const Position* position,
     }
     else
     {
-        friendly_pawns = position->pawns & position->black_pieces;
+        friendly_pawns = position.pawns & position.black_pieces;
         pawn_promotions_capture_west = ShiftSouthwest(friendly_pawns) & enemy_pieces & RANK_1;
         pawn_promotions_capture_east = ShiftSoutheast(friendly_pawns) & enemy_pieces & RANK_1;
         pawn_promotions = ShiftSouth(friendly_pawns) & vacant_squares & RANK_1;
@@ -95,12 +95,12 @@ GeneratePseudoLegalMoves(const Position* position,
     /*
     Generate en passant capture moves (unlikely but typically valuable)
     */
-    if (position->en_passant_index)
+    if (position.en_passant_index)
     {
-        Bitboard en_passant_sources = SETS[position->en_passant_index].pawn_attacks[EnemyOf(color)] & friendly_pawns;
+        Bitboard en_passant_sources = SETS[position.en_passant_index].pawn_attacks[EnemyOf(color)] & friendly_pawns;
         while (en_passant_sources)
         {
-            *captures++ = EpCaptureMove(FindAndClearLsb(&en_passant_sources), position->en_passant_index);
+            *captures++ = EpCaptureMove(FindAndClearLsb(&en_passant_sources), position.en_passant_index);
         }
     }
     /*
@@ -108,7 +108,7 @@ GeneratePseudoLegalMoves(const Position* position,
     */
     for (int victim = QUEEN; victim >= PAWN; --victim)
     {
-        Bitboard v = position->piece[victim - 1] & enemy_pieces;
+        Bitboard v = position.piece[victim - 1] & enemy_pieces;
         while (v)
         {
             const int victim_locn = FindAndClearLsb(&v);
@@ -125,7 +125,7 @@ GeneratePseudoLegalMoves(const Position* position,
                     /* Pawn promotion captures: already handled. */
                     continue;
                 }
-                Bitboard a = position->piece[attacker - 1] & friendly_pieces & attacks_to[victim_locn];
+                Bitboard a = position.piece[attacker - 1] & friendly_pieces & attacks_to[victim_locn];
                 while (a)
                 {
                     const int attacker_locn = FindAndClearLsb(&a);
@@ -137,7 +137,7 @@ GeneratePseudoLegalMoves(const Position* position,
     /* Generate captures MVV / LVA possible losing captures (where attacker > victim ) */
     for (int victim = QUEEN; victim >= PAWN; --victim)
     {
-        Bitboard v = position->piece[victim - 1] & enemy_pieces;
+        Bitboard v = position.piece[victim - 1] & enemy_pieces;
         while (v)
         {
             const int victim_locn = FindAndClearLsb(&v);
@@ -154,7 +154,7 @@ GeneratePseudoLegalMoves(const Position* position,
                     /* Pawn promotion captures: already handled. */
                     continue;
                 }
-                Bitboard a = position->piece[attacker - 1] & friendly_pieces & attacks_to[victim_locn];
+                Bitboard a = position.piece[attacker - 1] & friendly_pieces & attacks_to[victim_locn];
                 while (a)
                 {
                     const int attacker_locn = FindAndClearLsb(&a);
@@ -195,7 +195,7 @@ GeneratePseudoLegalMoves(const Position* position,
         *non_captures++ = NonCaptureMove(to - pawn_push_delta, to, PAWN);
     }
     /* Knight non captures */
-    Bitboard knights = position->knights & friendly_pieces;
+    Bitboard knights = position.knights & friendly_pieces;
     while (knights)
     {
         const int from = FindAndClearLsb(&knights);
@@ -206,7 +206,7 @@ GeneratePseudoLegalMoves(const Position* position,
         }
     }
     /* Bishop non captures */
-    Bitboard bishops = position->bishops & friendly_pieces;
+    Bitboard bishops = position.bishops & friendly_pieces;
     while (bishops)
     {
         const int from = FindAndClearLsb(&bishops);
@@ -218,7 +218,7 @@ GeneratePseudoLegalMoves(const Position* position,
 
     }
     /* Rook non captures */
-    Bitboard rooks = position->rooks & friendly_pieces;
+    Bitboard rooks = position.rooks & friendly_pieces;
     while (rooks)
     {
         const int from = FindAndClearLsb(&rooks);
@@ -230,7 +230,7 @@ GeneratePseudoLegalMoves(const Position* position,
 
     }
     /* Queen non captures */
-    Bitboard queens = position->queens & friendly_pieces;
+    Bitboard queens = position.queens & friendly_pieces;
     while (queens)
     {
         const int from = FindAndClearLsb(&queens);
@@ -241,7 +241,7 @@ GeneratePseudoLegalMoves(const Position* position,
         }
     }
     /* King non captures */
-    const int king_locn = position->king_location[color];
+    const int king_locn = position.king_location[color];
     Bitboard targets = SETS[king_locn].king_attacks & vacant_squares;
     while (targets)
     {
@@ -253,21 +253,21 @@ GeneratePseudoLegalMoves(const Position* position,
 
     }
     /* Castling moves */
-    if (!(position->state_flags & IS_CHECK))
+    if (!(position.state_flags & IS_CHECK))
     {
         /*
         Generate castling moves
         */
         if (color == WHITE)
         {
-            if ((position->state_flags & MAY_WHITE_CASTLE_KINGSIDE) && /* if white retains the right to castle kingside and */
+            if ((position.state_flags & MAY_WHITE_CASTLE_KINGSIDE) && /* if white retains the right to castle kingside and */
                 !(occupied_squares & (F1BB | G1BB)) &&                 /* f1 and g1 are both vacant and                     */
                 !IsAttacked(position, F1, BLACK) &&                    /* f1 is not attacked by black and                   */
                 !IsAttacked(position, G1, BLACK))                      /* the king's destination is not attacked by black   */
             {
                 *non_captures++ = CastlingMove(E1, G1);
             }
-            if ((position->state_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
+            if ((position.state_flags & MAY_WHITE_CASTLE_QUEENSIDE) &&
                 !(occupied_squares & (B1BB | C1BB | D1BB)) &&
                 !IsAttacked(position, D1, BLACK) &&
                 !IsAttacked(position, C1, BLACK))
@@ -277,14 +277,14 @@ GeneratePseudoLegalMoves(const Position* position,
         }
         else
         {
-            if ((position->state_flags & MAY_BLACK_CASTLE_KINGSIDE) &&
+            if ((position.state_flags & MAY_BLACK_CASTLE_KINGSIDE) &&
                 !(occupied_squares & (F8BB | G8BB)) &&
                 !IsAttacked(position, F8, WHITE) &&
                 !IsAttacked(position, G8, WHITE))
             {
                 *non_captures++ = CastlingMove(E8, G8);
             }
-            if ((position->state_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
+            if ((position.state_flags & MAY_BLACK_CASTLE_QUEENSIDE) &&
                 !(occupied_squares & (B8BB | C8BB | D8BB)) &&
                 !IsAttacked(position, D8, WHITE) &&
                 !IsAttacked(position, C8, WHITE))
@@ -304,7 +304,7 @@ This is relatively slow and is not used at each node of the search, since each
 move has to be tested to see if it leaves the king in check
 Returns the number of moves generated
 */
-int GenerateLegalMoves(const Position *position, Move moves[])
+int GenerateLegalMoves(const Position& position, Move moves[])
 {
     const Move *const initial_ptr = moves;
     Move pseudo_legal_moves[MAX_MOVES_PER_POSITION];
@@ -312,7 +312,7 @@ int GenerateLegalMoves(const Position *position, Move moves[])
     for (const Move* move = pseudo_legal_moves; *move; ++move)
     {
         Position dst_position;
-        MakeMove(&dst_position, position, *move);
+        MakeMove(dst_position, position, *move);
         if (!(dst_position.flags & IS_MOVED_INTO_CHECK))
         {
             *moves++ = *move;

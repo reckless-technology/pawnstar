@@ -80,14 +80,14 @@ void FreeOpeningBook()
  * @brief Print available book moves for a position
  * @param position Position to consider for book moves
 */
-void DisplayAvailableBookMoves(const Position* position)
+void DisplayAvailableBookMoves(const Position& position)
 {
-    if (!book.count(position->hash))
+    if (!book.count(position.hash))
     {
         return;
     }
     unordered_map<Move, int> move_counts;
-    for (const auto& move : book[position->hash])
+    for (const auto& move : book[position.hash])
     {
         ++move_counts[move];
     }
@@ -111,7 +111,7 @@ void DisplayAvailableBookMoves(const Position* position)
 static bool ParseLineOfPlay(const string& line)
 {
     Game game;
-    InitializeGame(&game);
+    InitializeGame(game);
     stringstream ss { line };
     while (ss)
     {
@@ -128,7 +128,7 @@ static bool ParseLineOfPlay(const string& line)
         char move_string_mutable[16];
         strncpy(move_string_mutable, token.c_str(), sizeof(move_string_mutable) - 1);
         const uint64_t hash = game.position->hash;
-        const Move move = PlayMoveString(&game, move_string_mutable);
+        const Move move = PlayMoveString(game, move_string_mutable);
         if (move == 0)
         {
             printf("ERROR found in book line '%s' move '%s'\n", line.c_str(), token.c_str());

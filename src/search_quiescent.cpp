@@ -9,12 +9,12 @@
  * @param beta parent ceiling value
  * @return score
 */
-int SearchQuiescent(const Position* position, 
+int SearchQuiescent(const Position& position, 
                     int             depth,
                     int             ply, 
                     int             alpha, 
                     int             beta,
-                    volatile bool*  cancel)
+                    volatile bool&  cancel)
 {    
     INCREMENT("quiescent calls");
     if (ply == MAX_PLY)
@@ -22,10 +22,12 @@ int SearchQuiescent(const Position* position,
         INCREMENT("quiescent max ply");
         return EvaluatePosition(position, alpha, beta);
     }
-    if (position->flags & IS_CHECK)
+    if (position.flags & IS_CHECK)
     {
         INCREMENT("quiescent checks");
-        return Search(position, depth, ply, alpha, beta, cancel, NULL);
+        Variation dummy;
+        dummy.moves[0] = 0;
+        return Search(position, depth, ply, alpha, beta, cancel, dummy);
     }
     int score = EvaluatePosition(position, alpha, beta);
     if (score >= beta)
@@ -49,13 +51,13 @@ int SearchQuiescent(const Position* position,
             continue;
         }
         Position child_position;
-        MakeMove(&child_position, position, *move);
+        MakeMove(child_position, position, *move);
         if (child_position.flags & IS_MOVED_INTO_CHECK)
         {
             INCREMENT("quiescent moved into check");
             continue;
         }
-        score = -SearchQuiescent(&child_position, depth - 1, ply + 1, -beta, -alpha, cancel);
+        score = -SearchQuiescent(child_position, depth - 1, ply + 1, -beta, -alpha, cancel);
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");

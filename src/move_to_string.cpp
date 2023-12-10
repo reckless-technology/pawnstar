@@ -7,7 +7,7 @@
  * @param move_string Where to store the move string.
  * @return Number of characters written to output.
  */
-int MoveToString(const Position* position, Move move, char move_string[])
+int MoveToString(const Position& position, Move move, char move_string[])
 {
     const char* initial_ptr = move_string;
     Move legal_moves[MAX_MOVES_PER_POSITION];
@@ -123,8 +123,8 @@ int MoveToString(const Position* position, Move move, char move_string[])
     /*
     Determine if this move results in check or checkmate
     */
-    MakeMove(&dst_position, position, move);
-    if (IsCheckmate(&dst_position))
+    MakeMove(dst_position, position, move);
+    if (IsCheckmate(dst_position))
     {
         move_string += sprintf(move_string, "#");
     }
@@ -142,15 +142,14 @@ int MoveToString(const Position* position, Move move, char move_string[])
  * @param move_string Pointer to store the formatted string.
  * @return Number of characters written to output.
  */
-int MoveSequenceToSanString(const Position* position, const Move* moves, char* move_string)
+int MoveSequenceToSanString(const Position& position, const Move* moves, char* move_string)
 {
     const char* const initial_ptr = move_string;
     bool is_first_move = true;
-    Position src_position[1];
-    Position dst_position[1];
-    const Move* move;
-    *src_position = *position;
-    for (move = moves; *move; ++move)
+    Position src_position;
+    Position dst_position;
+    src_position = position;
+    for (const Move* move = moves; *move; ++move)
     {
         if (!is_first_move)
         {
@@ -158,7 +157,7 @@ int MoveSequenceToSanString(const Position* position, const Move* moves, char* m
         }
         move_string += MoveToString(src_position, *move, move_string);
         MakeMove(dst_position, src_position, *move);
-        *src_position = *dst_position;
+        src_position = dst_position;
         is_first_move = false;
     }
     return (int)(move_string - initial_ptr);

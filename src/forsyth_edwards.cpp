@@ -11,7 +11,7 @@
 */
 bool 
 PositionFromString(const char* fen_string, 
-                   Position*   position)
+                   Position&   position)
 {
     static const char* const white_pieces = "PNBRQK";
     static const char* const black_pieces = "pnbrqk";
@@ -23,8 +23,8 @@ PositionFromString(const char* fen_string,
     {
         BAD_FEN_STRING;
     }    
-    memset(position, 0, sizeof(Position));
-    position->previous = position;
+    memset(&position, 0, sizeof(Position));
+    position.previous = &position;
     strcpy(buffer, fen_string);
     if (buffer[len - 1] == '\n')
     {
@@ -93,14 +93,14 @@ PositionFromString(const char* fen_string,
     }
     if (!strcmp(color_to_move, "b"))
     {
-        position->flags |= IS_BLACK_TO_MOVE;
+        position.flags |= IS_BLACK_TO_MOVE;
     }
     else if (!!strcmp(color_to_move, "w"))
     {
         BAD_FEN_STRING;
     }
-    position->king_location[WHITE] = Lsb(position->kings & position->white_pieces);
-    position->king_location[BLACK] = Lsb(position->kings & position->black_pieces);
+    position.king_location[WHITE] = Lsb(position.kings & position.white_pieces);
+    position.king_location[BLACK] = Lsb(position.kings & position.black_pieces);
     /* Castling rights */
     const char* castling_rights = strtok_r(NULL, " ", &save_ptr);
     if (!castling_rights)
@@ -109,7 +109,7 @@ PositionFromString(const char* fen_string,
     }
     if (!strcmp("-", castling_rights))
     {
-        position->flags &= ~CASTLING_RIGHTS_MASK;
+        position.flags &= ~CASTLING_RIGHTS_MASK;
     }
     else
     {
@@ -118,16 +118,16 @@ PositionFromString(const char* fen_string,
             switch (*c)
             {
             case 'K':
-                position->flags |= MAY_WHITE_CASTLE_KINGSIDE;
+                position.flags |= MAY_WHITE_CASTLE_KINGSIDE;
                 break;
             case 'Q':
-                position->flags |= MAY_WHITE_CASTLE_QUEENSIDE;
+                position.flags |= MAY_WHITE_CASTLE_QUEENSIDE;
                 break;
             case 'k':
-                position->flags |= MAY_BLACK_CASTLE_KINGSIDE;
+                position.flags |= MAY_BLACK_CASTLE_KINGSIDE;
                 break;
             case 'q':
-                position->flags |= MAY_BLACK_CASTLE_QUEENSIDE;
+                position.flags |= MAY_BLACK_CASTLE_QUEENSIDE;
                 break;
             default:
                 BAD_FEN_STRING;
@@ -142,7 +142,7 @@ PositionFromString(const char* fen_string,
     }
     if (!strcmp(ep_square, "-"))
     {
-        position->en_passant_index = 0;
+        position.en_passant_index = 0;
     }
     else
     {
@@ -150,7 +150,7 @@ PositionFromString(const char* fen_string,
         {
             BAD_FEN_STRING;
         }
-        position->en_passant_index = (ep_square[0] - 'a') + 8 * (ep_square[1] - '1');
+        position.en_passant_index = (ep_square[0] - 'a') + 8 * (ep_square[1] - '1');
     }
     /* Half move clock - optional */
     const char* hmc = strtok_r(NULL, " ", &save_ptr);
@@ -161,7 +161,7 @@ PositionFromString(const char* fen_string,
         {
             BAD_FEN_STRING;
         }
-        position->reversible_move_count = (uint8_t)half_move_clock;
+        position.reversible_move_count = (uint8_t)half_move_clock;
     }
     /* Full move number - optional */
     const char* full_move_num = strtok_r(NULL, " ", &save_ptr);
@@ -172,9 +172,9 @@ PositionFromString(const char* fen_string,
         {
             BAD_FEN_STRING;
         }
-        position->full_move_count = (uint8_t)fmc - 1;
+        position.full_move_count = (uint8_t)fmc - 1;
     }
-    position->hash = ComputeHash(position);
+    position.hash = ComputeHash(position);
     /* Legality of position */
     if (!IsPositionLegal(position))
     {
@@ -182,9 +182,9 @@ PositionFromString(const char* fen_string,
     }
     /* Is the position in check? */
     const int color = ColorToMove(position);
-    if (IsAttacked(position, position->king_location[color], EnemyOf(color)))
+    if (IsAttacked(position, position.king_location[color], EnemyOf(color)))
     {
-        position->flags |= IS_CHECK;
+        position.flags |= IS_CHECK;
     }
     /*
     Check to see if this position represents checkmate, stalemate or 
@@ -193,17 +193,17 @@ PositionFromString(const char* fen_string,
     if (IsCheckmate(position))
     {
         printf("NOTE: FEN string specifies a checkmate position\n");
-        position->flags |= IS_CHECKMATE;
+        position.flags |= IS_CHECKMATE;
     }
     else if (IsStalemate(position))
     {
         printf("NOTE: FEN string specifies a stalemate position\n");
-        position->flags |= IS_STALEMATE;
+        position.flags |= IS_STALEMATE;
     }
     else if (IsDrawByMaterial(position))
     {
         printf("NOTE: FEN string specifies a draw by insufficient material position\n");
-        position->flags |= IS_DRAW_MATERIAL;
+        position.flags |= IS_DRAW_MATERIAL;
     }
     return true;
 }
@@ -214,10 +214,10 @@ PositionFromString(const char* fen_string,
  * @param position the position
  * @param fen_string pointer to the string to be created
 */
-void PositionToString(const Position* position, char* fen_string)
+void PositionToString(const Position& position, char* fen_string)
 {
     /* Pieces on the board */
-    const Bitboard occupied_squares = position->white_pieces | position->black_pieces;
+    const Bitboard occupied_squares = position.white_pieces | position.black_pieces;
     for (int y = 7; y >= 0; --y)
     {
         int num_empty_squares = 0;
@@ -234,7 +234,7 @@ void PositionToString(const Position* position, char* fen_string)
                     *fen_string++ = (char)('0' + num_empty_squares);
                     num_empty_squares = 0;
                 }
-                const char piece = (position->white_pieces & BITBOARD(x, y)) ?
+                const char piece = (position.white_pieces & BITBOARD(x, y)) ?
                                    " PNBRQK"[PieceAt(position, x + 8 * y)] : " pnbrqk"[PieceAt(position, x + 8 * y)];
                 *fen_string++ = piece;
             }
@@ -251,44 +251,44 @@ void PositionToString(const Position* position, char* fen_string)
     }
     /* Side to move */
     *fen_string++ = ' ';
-    *fen_string++ = position->flags & IS_BLACK_TO_MOVE ? 'b' : 'w';
+    *fen_string++ = position.flags & IS_BLACK_TO_MOVE ? 'b' : 'w';
     *fen_string++ = ' ';;
     /* Castling rights */
-    if (!(position->flags & CASTLING_RIGHTS_MASK))
+    if (!(position.flags & CASTLING_RIGHTS_MASK))
     {
         *fen_string++ = '-';
     }
     else
     {
-        if (position->flags & MAY_WHITE_CASTLE_KINGSIDE)
+        if (position.flags & MAY_WHITE_CASTLE_KINGSIDE)
         {
             *fen_string++ = 'K';
         }
-        if (position->flags & MAY_WHITE_CASTLE_QUEENSIDE)
+        if (position.flags & MAY_WHITE_CASTLE_QUEENSIDE)
         {
             *fen_string++ = 'Q';
         }
-        if (position->flags & MAY_BLACK_CASTLE_KINGSIDE)
+        if (position.flags & MAY_BLACK_CASTLE_KINGSIDE)
         {
             *fen_string++ = 'k';
         }
-        if (position->flags & MAY_BLACK_CASTLE_QUEENSIDE)
+        if (position.flags & MAY_BLACK_CASTLE_QUEENSIDE)
         {
             *fen_string++ = 'q';
         }
     }
     *fen_string++ = ' ';
     /* En passant capture availability */
-    if (!position->en_passant_index)
+    if (!position.en_passant_index)
     {
         *fen_string++ = '-';
     }
     else
     {
-        *fen_string++ = FileChar(position->en_passant_index);
-        *fen_string++ = RankChar(position->en_passant_index);
+        *fen_string++ = FileChar(position.en_passant_index);
+        *fen_string++ = RankChar(position.en_passant_index);
     }
     *fen_string++ = ' ';
     /* Half move clock and full move number */
-    fen_string += sprintf(fen_string, "%hu %hu", position->reversible_move_count, position->full_move_count + 1);
+    fen_string += sprintf(fen_string, "%hu %hu", position.reversible_move_count, position.full_move_count + 1);
 }

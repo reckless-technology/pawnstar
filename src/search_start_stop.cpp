@@ -3,22 +3,27 @@
 #include "pawnstar.h"
 
 static std::thread worker_thread;
-/*
-Thread entry function for computer thinking
-*/
-static void SearchThreadEntry(Game* game)
+
+/**
+ * @brief Entry point for the search thread.
+ * @param game Game to search on.
+ */
+static void SearchThreadEntry(Game& game)
 {
-    int move = SearchRootNode(game->position);
+    int move = SearchRootNode(*game.position);
     if (move)
     {
         char move_string[16];
-        MoveToString(game->position, move, move_string);
+        MoveToString(*game.position, move, move_string);
         PlayMove(game, move);
         printf("move %s\n", move_string);
-        DisplayResultIfGameOver(game->position);
+        DisplayResultIfGameOver(*game.position);
     }  
 }
 
+/**
+ * @brief Cancel the worker thread.
+ */
 void StopWorker(void)
 {
     StopThinking();
@@ -27,11 +32,13 @@ void StopWorker(void)
         worker_thread.join();
     }
 }
-/*
-Start thinking on a background worker thread
-*/
-void StartThinking(Game* game)
+
+/**
+ * @brief Start thinking on a worker thread.
+ * @param game Game to search on.
+ */
+void StartThinking(Game& game)
 {
     StopWorker();
-    worker_thread = std::thread(SearchThreadEntry, game);
+    worker_thread = std::thread(SearchThreadEntry, std::ref(game));
 }
