@@ -10,6 +10,7 @@
  * @param cancel Cancel flag
  * @return beta on success, alpha on failure
  */
+#if DO_NULL_MOVE_PRUNING
 static int 
 AttemptNullMove(const Position&  position, 
                 int              depth, 
@@ -54,6 +55,7 @@ AttemptNullMove(const Position&  position,
     }
     return alpha;
 }
+#endif
 
 /**
  * @brief Fail hard alpha beta main search algorithm.
@@ -152,7 +154,7 @@ Search(const Position&  position,
             searching these few principal variation nodes is trivial.
             */
             INCREMENT("table hit pv node");
-            depth += 2;
+            ++depth;
             break;
         }
     }
@@ -223,6 +225,7 @@ Search(const Position&  position,
     for (const Move* move = moves; *move; ++move)
     {
         int score;
+#if DO_LATE_MOVE_REDUCTION
         /* 
         Consider candidate move reductions in the following circumstances:
         # We are not in check AND
@@ -247,6 +250,7 @@ Search(const Position&  position,
             }
         }
         else
+#endif
         {
             score = SearchSingleMove(position, depth, ply, alpha, beta, cancel, *move, pv, num_legal_moves);
         }

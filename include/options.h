@@ -12,6 +12,10 @@
 #define DO_NULL_MOVE_PRUNING 1
 #endif
 
+#ifndef DO_LATE_MOVE_REDUCTION
+#define DO_LATE_MOVE_REDUCTION 0
+#endif
+
 const int HASHTABLE_MEGABYTES           =      1024; ///< default transposition table size in MB
 const int MAX_MOVES_PER_POSITION        =       256; ///< maximum possible number of pseudo-legal moves for a chess position
 const int BETA                          =     11000; ///< greater than any possible evaluation score including checkmate

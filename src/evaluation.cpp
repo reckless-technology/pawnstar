@@ -7,7 +7,7 @@ typedef struct EvalHash
     int         score;
 } EvalHash;
 
-#define EVAL_HASH_SIZE 100003 /* Prime number */
+constexpr int EVAL_HASH_SIZE = 100003; /* Prime number */
 
 static EvalHash eval_hash_table[EVAL_HASH_SIZE];
 

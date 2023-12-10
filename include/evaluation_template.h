@@ -2,7 +2,7 @@
 
 #include "pawnstar.h"
 
-static const int PAWN_SQUARE[64] =
+const int PAWN_SQUARE[64] =
 {
      0,  0,  0,  0,  0,  0,  0,  0,
      5, 10, 15, 20, 20, 15, 10,  5,
@@ -10,23 +10,23 @@ static const int PAWN_SQUARE[64] =
      3,  6,  9, 12, 12,  9,  6,  3,
      2,  4,  6,  8,  8,  6,  4,  2,
      1,  2,  3,-10,-10,  3,  2,  1,
-     0,  0,  0,-30,-30,  0,  0,  0,
+     0,  0,  0,-40,-40,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0
 };
 
-static const int KNIGHT_SQUARE[64] =
+const int KNIGHT_SQUARE[64] =
 {
-   -50,-40,-30,-30,-30,-30,-40,-50,
-   -40,-20,  0,  0,  0,  0,-20,-40,
-   -30,  0, 10, 15, 15, 10,  0,-30,
-   -30,  5, 15, 20, 20, 15,  5,-30,
-   -30,  0, 15, 20, 20, 15,  0,-30,
-   -30,  5, 10, 15, 15, 10,  5,-30,
-   -40,-20,  0,  5,  5,  0,-20,-40,
-   -50,-40,-30,-30,-30,-30,-40,-50,
+  -10,-10,-10,-10,-10,-10,-10, -10,
+  -10,  0,  0,  0,  0,  0,  0, -10,
+  -10,  0,  5,  5,  5,  5,  0, -10,
+  -10,  0,  5, 10, 10,  5,  0, -10,
+  -10,  0,  5, 10, 10,  5,  0, -10,
+  -10,  0,  5,  5,  5,  5,  0, -10,
+  -10,  0,  0,  0,  0,  0,  0, -10,
+  -10,-30,-10,-10,-10,-10,-30, -10
 };
 
-static const int BISHOP_SQUARE[64] = 
+const int BISHOP_SQUARE[64] = 
 {
    -20,-10,-10,-10,-10,-10,-10,-20,
    -10,  0,  0,  0,  0,  0,  0,-10,
@@ -38,7 +38,7 @@ static const int BISHOP_SQUARE[64] =
    -20,-10,-10,-10,-10,-10,-10,-20,
 };
 
-static const int ROOK_SQUARE[64] = 
+const int ROOK_SQUARE[64] = 
 {
      0,  0,  0,  0,  0,  0,  0,  0,
      5, 10, 10, 10, 10, 10, 10,  5,
@@ -50,7 +50,7 @@ static const int ROOK_SQUARE[64] =
     -5,  0,  0,  5,  5,  0,  0, -5,
 };
 
-static const int QUEEN_SQUARE[64] = 
+const int QUEEN_SQUARE[64] = 
 {
    -20,-10,-10, -5, -5,-10,-10,-20,
    -10,  0,  0,  0,  0,  0,  0,-10,
@@ -62,7 +62,7 @@ static const int QUEEN_SQUARE[64] =
    -20,-10,-10, -5, -5,-10,-10,-20
 };
 
-static const int KING_SQUARE_MIDGAME[64] =
+const int KING_SQUARE_MIDGAME[64] =
 {
    -40,-40,-40,-40,-40,-40,-40,-40,
    -40,-40,-40,-40,-40,-40,-40,-40,
@@ -74,7 +74,7 @@ static const int KING_SQUARE_MIDGAME[64] =
      0, 20, 40,-20,  0,-20, 40, 20
 };
 
-static const int KING_SQUARE_ENDGAME[64] =
+const int KING_SQUARE_ENDGAME[64] =
 {
      0, 10, 20, 30, 30, 20, 10,  0,
     10, 20, 30, 40, 40, 30, 20, 10,
@@ -86,7 +86,7 @@ static const int KING_SQUARE_ENDGAME[64] =
      0, 10, 20, 30, 30, 20, 10,  0
 };
 
-static const int PASSED_PAWN_SQUARE[64] = 
+const int PASSED_PAWN_SQUARE[64] = 
 {
      0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50, 
@@ -98,7 +98,7 @@ static const int PASSED_PAWN_SQUARE[64] =
      0,  0,  0,  0,  0,  0,  0,  0,
 };
 
-static const Bitboard FILES_BB[8] = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
+const Bitboard FILE_BITBOARDS[8] = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
 
 template<int color> void
 DeterminePawnStructure(const Position& position, PawnStructure& s)
@@ -181,7 +181,7 @@ EvaluateMaterial(const Position& position)
 
 /**
  * @brief Evaluate piece square scores excluding the king.
- * @tparam color color to evaluate for
+ * @tparam color Color to evaluate for
  * @param position Position
  * @return 
  */
@@ -258,94 +258,63 @@ EvaluateKing(const Position& position)
         3 * PopCount((position.knights | position.bishops) & enemy_pieces) +
         5 * PopCount( position.rooks                       & enemy_pieces) +
         9 * PopCount( position.queens                      & enemy_pieces);
-    int score;
+    int piece_square_score;
     /* First do piece square table */
     if (enemy_material >= 16)
     {
-        score = KING_SQUARE_MIDGAME[position.king_location[color] ^ rank_flip];
+        piece_square_score = KING_SQUARE_MIDGAME[position.king_location[color] ^ rank_flip];
     }
     else if (enemy_material <= 11)
     {
-        score = KING_SQUARE_ENDGAME[position.king_location[color] ^ rank_flip];
+        piece_square_score = KING_SQUARE_ENDGAME[position.king_location[color] ^ rank_flip];
     }
     else
     {
         const int early_score = KING_SQUARE_MIDGAME[position.king_location[color] ^ rank_flip];
         const int late_score  = KING_SQUARE_ENDGAME[position.king_location[color] ^ rank_flip];
-        score = early_score * (enemy_material - 11) + late_score * (16 - enemy_material);
-        score /= 5;
+        piece_square_score = early_score * (enemy_material - 11) + late_score * (16 - enemy_material);
+        piece_square_score /= 5;
     }
+    
     /* Consider pawns in front of the king and approaching enemy pawns */
+    Bitboard pawn_shelter_1;
+    Bitboard pawn_shelter_2;
+    Bitboard pawn_shelter_3;
+    const Bitboard king_bb = BITBOARD(position.king_location[color]);
     if constexpr (color == WHITE)
     {
-        const Bitboard king_bb = BITBOARD(position.king_location[color]);
-        
-        /* Bonus for pawns which are directly in front of the king */
-        Bitboard pawn_shelter_squares = 
-            ShiftNorthwest(king_bb) | ShiftNorth(king_bb) | ShiftNortheast(king_bb);
-        score += 25 * PopCount(friendly_pawns & pawn_shelter_squares);
-        
-        /* Smaller bonus for pawns which have moved forward one square */
-        pawn_shelter_squares = ShiftNorth(pawn_shelter_squares);
-        score += 10 * PopCount(friendly_pawns & pawn_shelter_squares) 
-               - 20 * PopCount(enemy_pawns & pawn_shelter_squares);
-        
-        /* Penalty for enemy pawns close to our king */
-        pawn_shelter_squares = ShiftNorth(pawn_shelter_squares);
-        score -= 10 * PopCount(enemy_pawns & pawn_shelter_squares);
-       
-        /* Penalty for open files near our king */
-        Bitboard king_file = FILES_BB[FileOf(position.king_location[color])];
-        if ((king_file & friendly_pawns) == NO_SQUARES)
-        {
-            score -= 30;
-        }
-        Bitboard adjacent_file = ShiftWest(king_file);
-        if (adjacent_file && ((adjacent_file & friendly_pawns) == NO_SQUARES))
-        {
-            score -= 20;
-        }
-        adjacent_file = ShiftEast(king_file);
-        if (adjacent_file && ((adjacent_file & friendly_pawns) == NO_SQUARES))
-        {
-            score -= 20;
-        }
-        
+        pawn_shelter_1 = ShiftNorthwest(king_bb) | ShiftNorth(king_bb) | ShiftNortheast(king_bb);
+        pawn_shelter_2 = ShiftNorth(pawn_shelter_1);
+        pawn_shelter_3 = ShiftNorth(pawn_shelter_2);
     }
     else
     {
-        const Bitboard king_bb = BITBOARD(position.king_location[color]);
-        
-        /* Bonus for pawns which are directly in front of the king */
-        Bitboard pawn_shelter_squares = 
-            ShiftSouthwest(king_bb) | ShiftSouth(king_bb) | ShiftSoutheast(king_bb);
-        score += 25 * PopCount(friendly_pawns & pawn_shelter_squares);
-        
-        /* Smaller bonus for pawns which have moved forward one square */
-        pawn_shelter_squares = ShiftSouth(pawn_shelter_squares);
-        score += 10 * PopCount(friendly_pawns & pawn_shelter_squares) 
-               - 20 * PopCount(enemy_pawns & pawn_shelter_squares);
-        
-        /* Penalty for enemy pawns close to our king */
-        pawn_shelter_squares = ShiftSouth(pawn_shelter_squares);
-        score -= 10 * PopCount(enemy_pawns & pawn_shelter_squares);
-       
-        /* Penalty for open files near our king */
-        Bitboard king_file = FILES_BB[FileOf(position.king_location[color])];
-        if ((king_file & friendly_pawns) == NO_SQUARES)
-        {
-            score -= 30;
-        }
-        Bitboard adjacent_file = ShiftWest(king_file);
-        if (adjacent_file && ((adjacent_file & friendly_pawns) == NO_SQUARES))
-        {
-            score -= 20;
-        }
-        adjacent_file = ShiftEast(king_file);
-        if (adjacent_file && ((adjacent_file & friendly_pawns) == NO_SQUARES))
-        {
-            score -= 20;
-        }
+        pawn_shelter_1 = ShiftSouthwest(king_bb) | ShiftSouth(king_bb) | ShiftSoutheast(king_bb);
+        pawn_shelter_2 = ShiftSouth(pawn_shelter_1);
+        pawn_shelter_3 = ShiftSouth(pawn_shelter_2);
     }
-    return score;
+    int safety_score = 25 * PopCount(friendly_pawns & pawn_shelter_1)
+                     + 10 * PopCount(friendly_pawns & pawn_shelter_2) 
+                     - 20 * PopCount(enemy_pawns    & pawn_shelter_2)
+                     - 10 * PopCount(enemy_pawns    & pawn_shelter_3);
+    
+    /* Penalty for open files near our king */
+    const Bitboard king_file = FILE_BITBOARDS[FileOf(position.king_location[color])];
+    if ((king_file & friendly_pawns) == NO_SQUARES)
+    {
+        safety_score -= 30;
+    }
+    Bitboard adjacent_file = ShiftWest(king_file);
+    if (adjacent_file && ((adjacent_file & friendly_pawns) == NO_SQUARES))
+    {
+        safety_score -= 20;
+    }
+    adjacent_file = ShiftEast(king_file);
+    if (adjacent_file && ((adjacent_file & friendly_pawns) == NO_SQUARES))
+    {
+        safety_score -= 20;
+    }
+    /* Scale the king safety score according to the enemy's material. */
+    safety_score = (safety_score * enemy_material) / 31;
+    return piece_square_score + safety_score;
 }
