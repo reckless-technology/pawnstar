@@ -1,70 +1,31 @@
-PROGRAM     = pawnstar
-CXX         = g++
-CXXFLAGS    = -I include -Wall -Wextra -std=c++17
+PROGRAM             = pawnstar
+CXX                 = g++
+CXXFLAGS            = -I include -Wall -Wextra -std=c++17
 
-HDRS = \
-	bitboard.h \
-	evaluation_template.h \
-	function_prototypes.h \
-	move.h \
-	move_generation_template.h \
-	options.h \
-	pawnstar.h \
-	types.h
-	
 GENERATED_DATA      = generated_data.cpp
 GENERATED_DATA_SRC  = generate_constants/generate_constants.cpp
 GENERATED_DATA_EXE  = generate_constants/gen_constants
 
-CPPSRCS = \
-	attacks.cpp \
-	debug_hashtable.cpp \
-	evaluation.cpp \
-	forsyth_edwards.cpp \
-	game_over_detection.cpp \
-	input_handling.cpp \
-	main.cpp \
-	make_moves.cpp \
-	move_generation.cpp \
-	move_to_string.cpp \
-	opening_book.cpp \
-	opening_book_moves.cpp \
-	pins.cpp \
-	random.cpp \
-	search_alphabeta.cpp \
-	search_quiescent.cpp \
-	search_root_node.cpp \
-	search_single_move.cpp \
-	search_start_stop.cpp \
-	sort_moves.cpp \
-	static_exchange_evaluation.cpp \
-	tests_bratko_kopec.cpp \
-	tests_merge_sort.cpp \
-	tests_move_generation.cpp \
-	tests_static_exchange.cpp \
-	timer.cpp \
-	transposition_table.cpp \
-	zobrist.cpp \
-	$(GENERATED_DATA)
+HDRS                = $(notdir $(wildcard include/*.h))
+SRCS                = $(notdir $(wildcard src/*.cpp)) $(GENERATED_DATA)
 
+OBJS                = $(SRCS:.cpp=.o)
 
-OBJS = $(CPPSRCS:.cpp=.o)
+DBGDIR              = debug
+DBGEXE              = $(DBGDIR)/$(PROGRAM)
+DBGOBJS             = $(addprefix $(DBGDIR)/,$(OBJS))
+DBGFLAGS            = -g -O0 -DDEBUG
 
-DBGDIR    = debug
-DBGEXE    = $(DBGDIR)/$(PROGRAM)
-DBGOBJS   = $(addprefix $(DBGDIR)/,$(OBJS))
-DBGFLAGS  = -g -O0 -DDEBUG
-
-RELDIR    = release
-RELEXE    = $(RELDIR)/$(PROGRAM)
-RELOBJS   = $(addprefix $(RELDIR)/, $(OBJS))
-RELFLAGS  = -O3 -DNDEBUG
+RELDIR              = release
+RELEXE              = $(RELDIR)/$(PROGRAM)
+RELOBJS             = $(addprefix $(RELDIR)/, $(OBJS))
+RELFLAGS            = -O3 -DNDEBUG
 
 .PHONY: all clean debug prep release remake
 
-all: prep debug release
+all: debug release
 
-debug: $(DBGEXE)
+debug: prep $(DBGEXE)
 
 $(DBGEXE): $(DBGOBJS)
 	$(CXX) $(CXXFLAGS) $(DBGFLAGS) -o $(DBGEXE) $^
@@ -72,7 +33,7 @@ $(DBGEXE): $(DBGOBJS)
 $(DBGDIR)/%.o: src/%.cpp $(addprefix include/, $(HDRS))
 	$(CXX) -c $(CXXFLAGS) $(DBGFLAGS) -o $@ $<
 
-release: $(RELEXE)
+release: prep $(RELEXE)
 
 $(RELEXE): $(RELOBJS)
 	$(CXX) $(CXXFLAGS) $(RELFLAGS) -o $(RELEXE) $^

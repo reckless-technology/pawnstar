@@ -1,5 +1,9 @@
 #include "pawnstar.h"
 
+#include <string>
+
+using std::string;
+
 /**
  * @brief Handling for input commands (xboard support)
 */
@@ -164,9 +168,8 @@ static void handle_setboard(int argc, char* argv[])
 
 static void handle_getboard(int argc, char* argv[])
 {
-    char fen_string[256];
-    PositionToString(*the_game.position, fen_string);
-    printf("%s\n", fen_string);
+    std::string fen_string = PositionToString(*the_game.position);
+    printf("%s\n", fen_string.c_str());
     (void)argc;
     (void)argv;
 }

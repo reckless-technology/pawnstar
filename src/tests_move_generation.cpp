@@ -1,3 +1,7 @@
+#include <string>
+
+using std::string;
+
 #include "pawnstar.h"
 /*
 Structure to hold the counts of different move types
@@ -203,9 +207,8 @@ RunPerftTests(void)
             printf("ERROR: cannot create position from FEN string\n");
             continue;
         }
-        char pos_string[256];
-        PositionToString(position, pos_string);
-        printf("\n%s\n", pos_string);
+        string pos_string = PositionToString(position);
+        printf("\n%s\n", pos_string.c_str());
         memset(&counts, 0, sizeof(counts));
         total_nodes += test->counts.legal_moves;
         start = GetMilliseconds();
