@@ -87,7 +87,7 @@ void        DisplayAvailableBookMoves(const Position* position);
 void        FreeOpeningBook(void);
 Move        GetBookMove(uint64_t hash);
 bool        InitializeOpeningBookFromFile(const char* filename);
-bool        InitializeOpeningBookFromString(const char* book_string);
+bool        InitializeDefaultOpeningBook();
 /*
 Transposition table
 */

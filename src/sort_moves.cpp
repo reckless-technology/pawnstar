@@ -89,7 +89,7 @@ SortMoves(int   num_elements,
 #if 0
     std::stable_sort(values, values + num_elements, [](Move a, Move b){ return MoveScore(a) > MoveScore(b); } );
 #else
-    /* This seems to be about 15% faster than std::stable_sort */
+    /* This seems to be about 15% faster on average than std::stable_sort */
     Move work[MAX_MOVES_PER_POSITION];
     Move* merge_src = values;
     Move* merge_dst = work;
