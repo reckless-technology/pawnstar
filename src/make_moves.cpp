@@ -5,7 +5,7 @@ Make a move and update the game end status flags
 */
 void PlayMove(Game& game, Move move)
 {
-    if (game.position->flags & IS_GAME_OVER)
+    if (game.position->flags_ & IS_GAME_OVER)
     {
         printf("ERROR: attempt to play move after game is over\n");
         return;
@@ -14,23 +14,23 @@ void PlayMove(Game& game, Move move)
     ++game.position;
     if (IsCheckmate(*game.position))
     {
-        game.position->flags |= IS_CHECKMATE;
+        game.position->flags_ |= IS_CHECKMATE;
     }
     else if (IsStalemate(*game.position))
     {
-        game.position->flags |= IS_STALEMATE;
+        game.position->flags_ |= IS_STALEMATE;
     }
     else if (IsDrawByRepetition(*game.position, false))
     {
-        game.position->flags |= IS_DRAW_REPETITION;
+        game.position->flags_ |= IS_DRAW_REPETITION;
     }
     else if (IsDrawByMaterial(*game.position))
     {
-        game.position->flags |= IS_DRAW_MATERIAL;
+        game.position->flags_ |= IS_DRAW_MATERIAL;
     }
     else if (IsDrawByFiftyMoves(*game.position))
     {
-        game.position->flags |= IS_DRAW_50_MOVES;
+        game.position->flags_ |= IS_DRAW_50_MOVES;
     }
 }
 /*
@@ -42,7 +42,7 @@ returns zero if the move was illegal or the game is over
 */
 Move PlayMoveString(Game& game, char* move_str)
 {
-    if (game.position->flags & IS_GAME_OVER)
+    if (game.position->flags_ & IS_GAME_OVER)
     {
         return 0;
     }  
@@ -75,5 +75,5 @@ void MakeMoveSequence(Position& dst_position, const Position& src_position, cons
         dst_position = Position(tmp, *moves);
         tmp = dst_position;
     }
-    dst_position.previous = &dst_position; // Can't assume stack here.
+    dst_position.previous_ = &dst_position; // Can't assume stack here.
 }

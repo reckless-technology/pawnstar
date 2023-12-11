@@ -110,7 +110,7 @@ static void handle_force(int argc, char* argv[])
 static void handle_go(int argc, char* argv[])
 {
     the_game.engine_color = ColorToMove(*the_game.position);
-    if (!(the_game.position->flags & IS_GAME_OVER))
+    if (!(the_game.position->flags_ & IS_GAME_OVER))
     {
         StartThinking(the_game);
     }
@@ -139,7 +139,7 @@ static void handle_usermove(int argc, char* argv[])
     }
     else
     {
-        if (!(the_game.position->flags & IS_GAME_OVER) && the_game.engine_color == (int)ColorToMove(*the_game.position))
+        if (!(the_game.position->flags_ & IS_GAME_OVER) && the_game.engine_color == (int)ColorToMove(*the_game.position))
         {
             StartThinking(the_game);
         }

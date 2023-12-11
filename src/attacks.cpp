@@ -62,23 +62,23 @@ bool IsAttacked(const Position& position, int location, int color)
 {
     const Sets& sets = SETS[location];
     const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard attacking_pieces = position.pieces_of_color[color];
-    const Bitboard occupied_squares = position.white_pieces | position.black_pieces;
+    const Bitboard attacking_pieces = position.pieces_of_color_[color];
+    const Bitboard occupied_squares = position.white_pieces_ | position.black_pieces_;
     /*
     Pawn, knight and king attacks can be done by direct lookup since blockers 
     do not affect their attack set.
     */
     if (attacking_pieces & 
-        ((sets.pawn_attacks[EnemyOf(color)] & position.pawns) |
-        (             sets.knight_attacks & position.knights) |
-        (               sets.king_attacks & position.kings)))
+        ((sets.pawn_attacks[EnemyOf(color)] & position.pawns_) |
+        (             sets.knight_attacks & position.knights_) |
+        (               sets.king_attacks & position.kings_)))
     {
         return true;
     }
     /*
     Rook and queen horizontal and vertical sliding attacks
     */
-    Bitboard sliding_attackers = (position.rooks | position.queens) & sets.rook_attacks & attacking_pieces;
+    Bitboard sliding_attackers = (position.rooks_ | position.queens_) & sets.rook_attacks & attacking_pieces;
     while (sliding_attackers)
     {
         if (!(intervening_squares[FindAndClearLsb(sliding_attackers)] & occupied_squares))
@@ -89,7 +89,7 @@ bool IsAttacked(const Position& position, int location, int color)
     /*
     Bishop and queen diagonal and antidiagonal sliding attacks
     */
-    sliding_attackers = (position.bishops | position.queens) & sets.bishop_attacks & attacking_pieces;
+    sliding_attackers = (position.bishops_ | position.queens_) & sets.bishop_attacks & attacking_pieces;
     while (sliding_attackers)
     {
         if (!(intervening_squares[FindAndClearLsb(sliding_attackers)] & occupied_squares))
@@ -111,21 +111,21 @@ Bitboard AttacksTo(const Position& position, int location, int color)
 {
     const Sets& sets = SETS[location];
     const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard attacking_pieces = position.pieces_of_color[color];
-    const Bitboard occupied_squares = position.white_pieces | position.black_pieces;
+    const Bitboard attacking_pieces = position.pieces_of_color_[color];
+    const Bitboard occupied_squares = position.white_pieces_ | position.black_pieces_;
     /*
     Pawn, knight and king attacks can be done by direct lookup since blockers 
     do not affect their attack set.
     */
     Bitboard result = 
         (attacking_pieces & 
-        ((sets.pawn_attacks[EnemyOf(color)] & position.pawns) |
-        (             sets.knight_attacks & position.knights) |
-        (               sets.king_attacks & position.kings)));
+        ((sets.pawn_attacks[EnemyOf(color)] & position.pawns_) |
+        (             sets.knight_attacks & position.knights_) |
+        (               sets.king_attacks & position.kings_)));
     /*
     Rook and queen horizontal and vertical sliding attacks
     */
-    Bitboard sliding_attackers = (position.rooks | position.queens) & sets.rook_attacks & attacking_pieces;
+    Bitboard sliding_attackers = (position.rooks_ | position.queens_) & sets.rook_attacks & attacking_pieces;
     while (sliding_attackers)
     {
         const int locn = FindAndClearLsb(sliding_attackers);
@@ -137,7 +137,7 @@ Bitboard AttacksTo(const Position& position, int location, int color)
     /*
     Bishop and queen diagonal and antidiagonal sliding attacks
     */
-    sliding_attackers = (position.bishops | position.queens) & sets.bishop_attacks & attacking_pieces;
+    sliding_attackers = (position.bishops_ | position.queens_) & sets.bishop_attacks & attacking_pieces;
     while (sliding_attackers)
     {
         const int locn = FindAndClearLsb(sliding_attackers);

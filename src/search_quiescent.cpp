@@ -22,7 +22,7 @@ int SearchQuiescent(const Position& position,
         INCREMENT("quiescent max ply");
         return EvaluatePosition(position, alpha, beta);
     }
-    if (position.flags & IS_CHECK)
+    if (position.flags_ & IS_CHECK)
     {
         INCREMENT("quiescent checks");
         Variation dummy;
@@ -51,7 +51,7 @@ int SearchQuiescent(const Position& position,
             continue;
         }
         Position child_position { position, *move };
-        if (child_position.flags & IS_MOVED_INTO_CHECK)
+        if (child_position.flags_ & IS_MOVED_INTO_CHECK)
         {
             INCREMENT("quiescent moved into check");
             continue;

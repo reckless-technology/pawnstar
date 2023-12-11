@@ -127,7 +127,7 @@ int MoveToString(const Position& position, Move move, char move_string[])
     {
         move_string += sprintf(move_string, "#");
     }
-    else if (dst_position.flags & IS_CHECK)
+    else if (dst_position.flags_ & IS_CHECK)
     {
         move_string += sprintf(move_string, "+");
     }

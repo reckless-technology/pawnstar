@@ -118,12 +118,12 @@ CategorizeMoves(const Position& src_position,
     for (const Move* move = moves; *move; ++move)
     {
         Position position { src_position, *move };
-        if (position.flags & IS_MOVED_INTO_CHECK)
+        if (position.flags_ & IS_MOVED_INTO_CHECK)
         {
             continue;
         }
         ++counts->legal_moves;
-        if (position.flags & IS_CHECK)
+        if (position.flags_ & IS_CHECK)
         {
             ++counts->checks;
         }
@@ -175,7 +175,7 @@ Perft(const Position& src_position,
                 printf("\nERROR in hash during perft\n");
             }
 #endif
-            if (position.flags & IS_MOVED_INTO_CHECK)
+            if (position.flags_ & IS_MOVED_INTO_CHECK)
             {
                 continue;
             }

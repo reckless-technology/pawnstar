@@ -13,7 +13,7 @@ Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
 int EvaluateStaticExchange(const Position& src_position, Move move)
 {
     Position position { src_position, move };
-    if (position.flags & IS_MOVED_INTO_CHECK)
+    if (position.flags_ & IS_MOVED_INTO_CHECK)
     {
         return ALPHA;
     }
@@ -36,7 +36,7 @@ static int EvaluateSwapOff(Position& position, int location, int color, int piec
     const Sets* const sets                    = &SETS[location];
     const Bitboard square                     = BITBOARD(location);
     const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
-    Bitboard occupied_squares                 = position.white_pieces | position.black_pieces;
+    Bitboard occupied_squares                 = position.white_pieces_ | position.black_pieces_;
     int scores[32];
     int ply;
     /* First pass: perform all the captures onto the square least valuable piece first */
@@ -45,22 +45,22 @@ static int EvaluateSwapOff(Position& position, int location, int color, int piec
         /* Find the least valuable piece of color which directly attacks location */
         int capturing_piece;
         Bitboard sliders; 
-        const Bitboard attacking_pieces = position.pieces_of_color[color];
-        Bitboard attacker = sets->pawn_attacks[EnemyOf(color)] & attacking_pieces & position.pawns;
+        const Bitboard attacking_pieces = position.pieces_of_color_[color];
+        Bitboard attacker = sets->pawn_attacks[EnemyOf(color)] & attacking_pieces & position.pawns_;
         if (attacker)
         {
             attacker &= -attacker; /* isolate Lsb in case there is more than 1 pawn attacker */
             capturing_piece = PAWN;
             goto FoundAttacker;
         }
-        attacker = sets->knight_attacks & attacking_pieces & position.knights;
+        attacker = sets->knight_attacks & attacking_pieces & position.knights_;
         if (attacker)
         {
             attacker &= -attacker; /* isolate Lsb in case there is more than 1 knight attacker */
             capturing_piece = KNIGHT;
             goto FoundAttacker;
         }
-        sliders = sets->bishop_attacks & attacking_pieces & position.bishops;
+        sliders = sets->bishop_attacks & attacking_pieces & position.bishops_;
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(sliders);
@@ -71,7 +71,7 @@ static int EvaluateSwapOff(Position& position, int location, int color, int piec
                 goto FoundAttacker;
             }
         }
-        sliders = sets->rook_attacks & attacking_pieces & position.rooks;
+        sliders = sets->rook_attacks & attacking_pieces & position.rooks_;
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(sliders);
@@ -82,7 +82,7 @@ static int EvaluateSwapOff(Position& position, int location, int color, int piec
                 goto FoundAttacker;
             }
         }
-        sliders = sets->queen_attacks & attacking_pieces & position.queens;
+        sliders = sets->queen_attacks & attacking_pieces & position.queens_;
         while (sliders)
         {
             const int slider_locn = FindAndClearLsb(sliders);
@@ -93,7 +93,7 @@ static int EvaluateSwapOff(Position& position, int location, int color, int piec
                 goto FoundAttacker;
             }
         }
-        attacker = sets->king_attacks & attacking_pieces & position.kings;
+        attacker = sets->king_attacks & attacking_pieces & position.kings_;
         if (attacker)
         {
             capturing_piece = KING;
@@ -105,14 +105,14 @@ static int EvaluateSwapOff(Position& position, int location, int color, int piec
         break;
 
 FoundAttacker:
-        position.piece[piece_on_square - 1]    ^= square;
-        position.pieces_of_color[EnemyOf(color)] ^= square;
-        position.piece[capturing_piece - 1]    ^= attacker | square;
-        position.pieces_of_color[color]        ^= attacker | square;
-        occupied_squares                        ^= attacker;        
-        scores[ply]                             = piece_values[piece_on_square];
-        piece_on_square                         = capturing_piece;
-        color                                   = EnemyOf(color);
+        position.pieces_[piece_on_square - 1]       ^= square;
+        position.pieces_of_color_[EnemyOf(color)]   ^= square;
+        position.pieces_[capturing_piece - 1]       ^= attacker | square;
+        position.pieces_of_color_[color]            ^= attacker | square;
+        occupied_squares                            ^= attacker;        
+        scores[ply]                                 = piece_values[piece_on_square];
+        piece_on_square                             = capturing_piece;
+        color                                       = EnemyOf(color);
     }
     /* Second pass: unwind the capture stack and propagate values 
        back to the top for material winning sequences */

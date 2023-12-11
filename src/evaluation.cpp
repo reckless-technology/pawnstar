@@ -25,15 +25,15 @@ EvaluatePosition(const Position& position,
                  int beta)
 {    
     INCREMENT("eval calls");
-    EvalHash& eval_hash = eval_hash_table[position.hash % EVAL_HASH_SIZE];
-    if (eval_hash.hash == position.hash)
+    EvalHash& eval_hash = eval_hash_table[position.hash_ % EVAL_HASH_SIZE];
+    if (eval_hash.hash == position.hash_)
     {
         INCREMENT("eval hash table hits");
         return eval_hash.score;
     }
     if (IsDrawByMaterial(position))
     {
-        eval_hash.hash = position.hash;
+        eval_hash.hash = position.hash_;
         eval_hash.score = DRAW_SCORE;
         return DRAW_SCORE;
     }
@@ -46,7 +46,7 @@ EvaluatePosition(const Position& position,
     This saves time doing more expensive evaluation when clearly it's
     not a PV node so evaluation accuracy is not as important. 
     */
-    int score = (position.flags & IS_BLACK_TO_MOVE) ?
+    int score = (position.flags_ & IS_BLACK_TO_MOVE) ?
         scores[BLACK] - scores[WHITE] :
         scores[WHITE] - scores[BLACK];
     if (score >= beta + 150)
@@ -71,10 +71,10 @@ EvaluatePosition(const Position& position,
     /* Kings */
     scores[WHITE] += EvaluateKing<WHITE>(position);
     scores[BLACK] += EvaluateKing<BLACK>(position);
-    score = (position.flags & IS_BLACK_TO_MOVE) ?
+    score = (position.flags_ & IS_BLACK_TO_MOVE) ?
         scores[BLACK] - scores[WHITE] :
         scores[WHITE] - scores[BLACK];
-    eval_hash.hash = position.hash;
+    eval_hash.hash = position.hash_;
     eval_hash.score = score;
     return score;
 }

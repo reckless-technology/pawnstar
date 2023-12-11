@@ -45,50 +45,47 @@ MakeNullMove(Position&       position,
              const Position& src_position)
 {
     position = src_position;
-    position.previous = &src_position;
-    position.flags |= IS_NULL_MOVE;
-    position.flags ^= IS_BLACK_TO_MOVE;
-    position.hash ^= EN_PASSANT_HASHES[position.en_passant_index];
-    position.hash ^= BLACK_MOVE_HASH;
-    position.en_passant_index = 0;
+    position.previous_ = &src_position;
+    position.flags_ |= IS_NULL_MOVE;
+    position.flags_ ^= IS_BLACK_TO_MOVE;
+    position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_index_];
+    position.hash_ ^= BLACK_MOVE_HASH;
+    position.en_passant_index_ = 0;
+}
+
+void 
+Position::AddPiece(int color, 
+                   int piece, 
+                   int to)
+{
+    const Bitboard to_bb = BITBOARD(to);
+    pieces_[piece - 1] ^= to_bb;
+    pieces_of_color_[color] ^= to_bb;
+    hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
 }
 
 void
-AddPiece(Position& position, 
-         int       color, 
-         int       piece, 
-         int       to)
-{
-    const Bitboard to_bb = BITBOARD(to);
-    position.piece[piece - 1] ^= to_bb;
-    position.pieces_of_color[color] ^= to_bb;
-    position.hash ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
-}
-
-static void
-RemovePiece(Position& position, 
-            int       color, 
-            int       piece, 
-            int       from)
+Position::RemovePiece(int color, 
+                      int piece, 
+                      int from)
 {
     const Bitboard from_bb = BITBOARD(from);
-    position.piece[piece - 1] ^= from_bb;
-    position.pieces_of_color[color] ^= from_bb;
-    position.hash ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
+    pieces_[piece - 1] ^= from_bb;
+    pieces_of_color_[color] ^= from_bb;
+    hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
 }
 
-static void
-MovePiece(Position& position, 
-          int       color, 
-          int       piece, 
-          int       from, 
-          int       to)
+void
+Position::MovePiece(int color, 
+                    int piece, 
+                    int from, 
+                    int to)
 {
     const Bitboard from_to_bb = BITBOARD(from) | BITBOARD(to);
     const uint64_t* const hash = &PIECE_SQUARE_HASHES[color][piece -1][0];
-    position.piece[piece - 1] ^= from_to_bb;
-    position.pieces_of_color[color] ^= from_to_bb;
-    position.hash ^= hash[to] ^ hash[from];
+    pieces_[piece - 1] ^= from_to_bb;
+    pieces_of_color_[color] ^= from_to_bb;
+    hash_ ^= hash[to] ^ hash[from];
 }
 
 #define BAD_FEN_STRING printf("ERROR: bad FEN string %s\n", fen_string); return
@@ -98,49 +95,49 @@ Position::Position(const Position& that, Move move) noexcept
     const int color    = ColorToMove(that);
     const int from     = MoveFrom(move);
     const int to       = MoveTo(move);
-    const int piece    = MovePiece(move);
+    const int piece    = ::MovePiece(move);
     const int captured = MoveCaptured(move);
      
     *this = that;
-    previous = &that;
-    flags &= ~IS_NULL_MOVE;
-    flags &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
-    hash ^= CASTLING_RIGHTS_HASHES[flags & CASTLING_RIGHTS_MASK] 
-          ^ CASTLING_RIGHTS_HASHES[that.flags & CASTLING_RIGHTS_MASK];
-    hash ^= EN_PASSANT_HASHES[en_passant_index];
-    en_passant_index = 0;
-    ++reversible_move_count;
+    previous_ = &that;
+    flags_ &= ~IS_NULL_MOVE;
+    flags_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
+    hash_ ^= CASTLING_RIGHTS_HASHES[flags_ & CASTLING_RIGHTS_MASK] 
+          ^ CASTLING_RIGHTS_HASHES[that.flags_ & CASTLING_RIGHTS_MASK];
+    hash_ ^= EN_PASSANT_HASHES[en_passant_index_];
+    en_passant_index_ = 0;
+    ++reversible_move_count_;
     switch (piece)
     {
     case PAWN:
-        reversible_move_count = 0;
+        reversible_move_count_ = 0;
         if (captured)
         {
             if (IsEpCaptureMove(move))
             {
                 /* En passant capture: capture location is source rank, destination file. */
                 const int captured_pawn_locn = (from & 0x38) | (to & 0x07);
-                RemovePiece(*this, EnemyOf(color), PAWN, captured_pawn_locn);
+                RemovePiece(EnemyOf(color), PAWN, captured_pawn_locn);
             }
             else
             {
-                RemovePiece(*this, EnemyOf(color), captured, to);
+                RemovePiece(EnemyOf(color), captured, to);
             }
         }                
         if (MovePromoted(move))
         {
             /* Replace the pawn with the promoted piece. */
-            RemovePiece(*this, color, PAWN, from);
-            AddPiece(*this, color, MovePromoted(move), to);
+            RemovePiece(color, PAWN, from);
+            AddPiece(color, MovePromoted(move), to);
         }
         else
         {
-            MovePiece(*this, color, PAWN, from, to);
+            MovePiece(color, PAWN, from, to);
             if (IsPawnDoublePushMove(move))
             {
                 /* Pawn double push: affects en passant. */
-                en_passant_index = (uint8_t)((from + to) >> 1);
-                hash ^= EN_PASSANT_HASHES[en_passant_index];
+                en_passant_index_ = (uint8_t)((from + to) >> 1);
+                hash_ ^= EN_PASSANT_HASHES[en_passant_index_];
             } 
         }
         break;
@@ -152,10 +149,10 @@ Position::Position(const Position& that, Move move) noexcept
     default:
         if (captured)
         {
-            RemovePiece(*this, EnemyOf(color), captured, to);
-            reversible_move_count = 0;
+            RemovePiece(EnemyOf(color), captured, to);
+            reversible_move_count_ = 0;
         }
-        MovePiece(*this, color, piece, from, to);
+        MovePiece(color, piece, from, to);
         break;
 
     case KING:
@@ -163,54 +160,54 @@ Position::Position(const Position& that, Move move) noexcept
         {
             if (captured)
             {
-                RemovePiece(*this, EnemyOf(color), captured, to);
-                reversible_move_count = 0;
+                RemovePiece(EnemyOf(color), captured, to);
+                reversible_move_count_ = 0;
             }
-            MovePiece(*this, color, KING, from, to);
+            MovePiece(color, KING, from, to);
             break;
         }
         /* Castling move. */
         switch (to)
         {
         case G1:
-            MovePiece(*this, WHITE, KING, E1, G1);
-            MovePiece(*this, WHITE, ROOK, H1, F1);
+            MovePiece(WHITE, KING, E1, G1);
+            MovePiece(WHITE, ROOK, H1, F1);
             break;
         case C1:
-            MovePiece(*this, WHITE, KING, E1, C1);
-            MovePiece(*this, WHITE, ROOK, A1, D1);
+            MovePiece(WHITE, KING, E1, C1);
+            MovePiece(WHITE, ROOK, A1, D1);
             break;
         case G8:
-            MovePiece(*this, BLACK, KING, E8, G8);
-            MovePiece(*this, BLACK, ROOK, H8, F8);
+            MovePiece(BLACK, KING, E8, G8);
+            MovePiece(BLACK, ROOK, H8, F8);
             break;
         case C8:
-            MovePiece(*this, BLACK, KING, E8, C8);
-            MovePiece(*this, BLACK, ROOK, A8, D8);
+            MovePiece(BLACK, KING, E8, C8);
+            MovePiece(BLACK, ROOK, A8, D8);
             break;
         default:
             break;
         }
         break;
     };  
-    flags ^= IS_BLACK_TO_MOVE;
-    hash ^= BLACK_MOVE_HASH;
-    full_move_count += color;
-    king_location[WHITE] = Lsb(kings & white_pieces);
-    king_location[BLACK] = Lsb(kings & black_pieces);
-    if (IsAttacked(*this, king_location[color], EnemyOf(color)))
+    flags_ ^= IS_BLACK_TO_MOVE;
+    hash_ ^= BLACK_MOVE_HASH;
+    full_move_count_ += color;
+    king_location_[WHITE] = Lsb(kings_ & white_pieces_);
+    king_location_[BLACK] = Lsb(kings_ & black_pieces_);
+    if (IsAttacked(*this, king_location_[color], EnemyOf(color)))
     {
-        flags |= IS_MOVED_INTO_CHECK;
+        flags_ |= IS_MOVED_INTO_CHECK;
     }
     else
     {
-        if (IsAttacked(*this, king_location[EnemyOf(color)], color))
+        if (IsAttacked(*this, king_location_[EnemyOf(color)], color))
         {
-            flags |= IS_CHECK;
+            flags_ |= IS_CHECK;
         }
         else
         {
-            flags &= ~IS_CHECK;
+            flags_ &= ~IS_CHECK;
         }
     }
 }
@@ -226,7 +223,7 @@ Position::Position(const char* fen_string) noexcept
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
     memset(this, 0, sizeof(Position));
 #pragma GCC diagnostic pop
-    previous = this;
+    previous_ = this;
     /* Pieces on the board */
     string pieces;
     ss >> pieces;
@@ -263,7 +260,7 @@ Position::Position(const char* fen_string) noexcept
         if (a != string::npos)
         {
             const int piece = a + 1;
-            AddPiece(*this, WHITE, piece, x + 8 * y);
+            AddPiece(WHITE, piece, x + 8 * y);
             ++x;
             continue;
         }
@@ -271,7 +268,7 @@ Position::Position(const char* fen_string) noexcept
         if (a != string::npos)
         {
             const int piece = a + 1;
-            AddPiece(*this, BLACK, piece, x + 8 * y);
+            AddPiece(BLACK, piece, x + 8 * y);
             ++x;
             continue;
         }
@@ -290,14 +287,14 @@ Position::Position(const char* fen_string) noexcept
     }
     if (color_to_move == "b")
     {
-        flags |= IS_BLACK_TO_MOVE;
+        flags_ |= IS_BLACK_TO_MOVE;
     }
     else if (color_to_move != "w")
     {
         BAD_FEN_STRING;
     }
-    king_location[WHITE] = Lsb(kings & white_pieces);
-    king_location[BLACK] = Lsb(kings & black_pieces);
+    king_location_[WHITE] = Lsb(kings_ & white_pieces_);
+    king_location_[BLACK] = Lsb(kings_ & black_pieces_);
     /* Castling rights */
     string castling_rights;
     ss >> castling_rights;
@@ -307,7 +304,7 @@ Position::Position(const char* fen_string) noexcept
     }
     if (castling_rights == "-")
     {
-        flags &= ~CASTLING_RIGHTS_MASK;
+        flags_ &= ~CASTLING_RIGHTS_MASK;
     }
     else
     {
@@ -316,16 +313,16 @@ Position::Position(const char* fen_string) noexcept
             switch (c)
             {
             case 'K':
-                flags |= MAY_WHITE_CASTLE_KINGSIDE;
+                flags_ |= MAY_WHITE_CASTLE_KINGSIDE;
                 break;
             case 'Q':
-                flags |= MAY_WHITE_CASTLE_QUEENSIDE;
+                flags_ |= MAY_WHITE_CASTLE_QUEENSIDE;
                 break;
             case 'k':
-                flags |= MAY_BLACK_CASTLE_KINGSIDE;
+                flags_ |= MAY_BLACK_CASTLE_KINGSIDE;
                 break;
             case 'q':
-                flags |= MAY_BLACK_CASTLE_QUEENSIDE;
+                flags_ |= MAY_BLACK_CASTLE_QUEENSIDE;
                 break;
             default:
                 BAD_FEN_STRING;
@@ -341,7 +338,7 @@ Position::Position(const char* fen_string) noexcept
     }
     if (ep_square == "-")
     {
-        en_passant_index = 0;
+        en_passant_index_ = 0;
     }
     else
     {
@@ -351,23 +348,23 @@ Position::Position(const char* fen_string) noexcept
         {
             BAD_FEN_STRING;
         }
-        en_passant_index = (ep_square[0] - 'a') + 8 * (ep_square[1] - '1');
+        en_passant_index_ = (ep_square[0] - 'a') + 8 * (ep_square[1] - '1');
     }
     if (ss)
     {
         /* Half move clock - optional */
         int hmc = 0;
         ss >> hmc;
-        reversible_move_count = (uint8_t)hmc;
+        reversible_move_count_ = (uint8_t)hmc;
     }
     if (ss)
     {
         /* Full move number - optional */
         int fmn = 1;
         ss >> fmn;
-        full_move_count = (uint8_t)fmn - 1;
+        full_move_count_ = (uint8_t)fmn - 1;
     }
-    hash = ComputeHash(*this);
+    hash_ = ComputeHash(*this);
     /* Legality of position */
     if (!IsPositionLegal(*this))
     {
@@ -375,9 +372,9 @@ Position::Position(const char* fen_string) noexcept
     }
     /* Is the position in check? */
     const int color = ColorToMove(*this);
-    if (IsAttacked(*this, king_location[color], EnemyOf(color)))
+    if (IsAttacked(*this, king_location_[color], EnemyOf(color)))
     {
-        flags |= IS_CHECK;
+        flags_ |= IS_CHECK;
     }
     /*
     Check to see if this position represents checkmate, stalemate or 
@@ -386,17 +383,17 @@ Position::Position(const char* fen_string) noexcept
     if (IsCheckmate(*this))
     {
         printf("NOTE: FEN string specifies a checkmate position\n");
-        flags |= IS_CHECKMATE;
+        flags_ |= IS_CHECKMATE;
     }
     else if (IsStalemate(*this))
     {
         printf("NOTE: FEN string specifies a stalemate position\n");
-        flags |= IS_STALEMATE;
+        flags_ |= IS_STALEMATE;
     }
     else if (IsDrawByMaterial(*this))
     {
         printf("NOTE: FEN string specifies a draw by insufficient material position\n");
-        flags |= IS_DRAW_MATERIAL;
+        flags_ |= IS_DRAW_MATERIAL;
     }
 }
 
@@ -404,7 +401,7 @@ Position::operator std::string() const
 {
     stringstream ss;
     /* Pieces on the board */
-    const Bitboard occupied_squares = white_pieces | black_pieces;
+    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
     for (int y = 7; y >= 0; --y)
     {
         int num_empty_squares = 0;
@@ -421,7 +418,7 @@ Position::operator std::string() const
                     ss << (char)('0' + num_empty_squares);
                     num_empty_squares = 0;
                 }
-                const char piece = (white_pieces & BITBOARD(x, y)) ?
+                const char piece = (white_pieces_ & BITBOARD(x, y)) ?
                     " PNBRQK"[PieceAt(*this, x + 8 * y)] : 
                     " pnbrqk"[PieceAt(*this, x + 8 * y)];
                 ss << piece;
@@ -438,44 +435,44 @@ Position::operator std::string() const
         }
     }
     /* Side to move */
-    ss << ' ' << (flags & IS_BLACK_TO_MOVE ? 'b' : 'w') << ' ';
+    ss << ' ' << (flags_ & IS_BLACK_TO_MOVE ? 'b' : 'w') << ' ';
     /* Castling rights */
-    if (!(flags & CASTLING_RIGHTS_MASK))
+    if (!(flags_ & CASTLING_RIGHTS_MASK))
     {
         ss << '-';
     }
     else
     {
-        if (flags & MAY_WHITE_CASTLE_KINGSIDE)
+        if (flags_ & MAY_WHITE_CASTLE_KINGSIDE)
         {
             ss << 'K';
         }
-        if (flags & MAY_WHITE_CASTLE_QUEENSIDE)
+        if (flags_ & MAY_WHITE_CASTLE_QUEENSIDE)
         {
             ss << 'Q';
         }
-        if (flags & MAY_BLACK_CASTLE_KINGSIDE)
+        if (flags_ & MAY_BLACK_CASTLE_KINGSIDE)
         {
             ss << 'k';
         }
-        if (flags & MAY_BLACK_CASTLE_QUEENSIDE)
+        if (flags_ & MAY_BLACK_CASTLE_QUEENSIDE)
         {
             ss << 'q';
         }
     }
     ss << ' ';
     /* En passant capture availability */
-    if (en_passant_index == 0)
+    if (en_passant_index_ == 0)
     {
         ss << '-';
     }
     else
     {
-        ss << FileChar(en_passant_index) << RankChar(en_passant_index);
+        ss << FileChar(en_passant_index_) << RankChar(en_passant_index_);
     }
     ss <<  ' ';
     /* Half move clock and full move number */
-    ss << (int)reversible_move_count << ' ' << (int)(full_move_count + 1);
+    ss << (int)reversible_move_count_ << ' ' << (int)(full_move_count_ + 1);
     return ss.str();
 
 }

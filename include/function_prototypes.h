@@ -12,7 +12,7 @@ constexpr char      RankChar(int locn)                      { return '1' + RankO
 constexpr uint8_t   EnemyOf(int color)                      { return !color;                }
 constexpr int       min(int a, int b)                       { return a < b ? a : b;         }
 constexpr int       max(int a, int b)                       { return a > b ? a : b;         }
-constexpr uint8_t   ColorToMove(const Position& position)   { return position.flags & IS_BLACK_TO_MOVE ? BLACK : WHITE; }
+constexpr uint8_t   ColorToMove(const Position& position)   { return position.flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE; }
 
 constexpr void 
 CopyVariation(Variation&       dst_variation, 
@@ -35,12 +35,12 @@ PieceAt(const Position& position,
 {
     const Bitboard square = BITBOARD(location);
     return 
-        (square & position.pawns)   ? PAWN   :
-        (square & position.knights) ? KNIGHT :
-        (square & position.bishops) ? BISHOP :
-        (square & position.rooks)   ? ROOK   :
-        (square & position.queens)  ? QUEEN  :
-        (square & position.kings)   ? KING   : NO_PIECE;
+        (square & position.pawns_)   ? PAWN   :
+        (square & position.knights_) ? KNIGHT :
+        (square & position.bishops_) ? BISHOP :
+        (square & position.rooks_)   ? ROOK   :
+        (square & position.queens_)  ? QUEEN  :
+        (square & position.kings_)   ? KING   : NO_PIECE;
 }
 
 /*
@@ -118,7 +118,6 @@ bool        IsStalemate(const Position& position);
 /*
 Making moves
 */
-void        AddPiece(Position& position, int color, int piece, int to);
 void        MakeMoveSequence(Position& dst_position, const Position& src_position, const Move* moves);
 void        MakeNullMove(Position& dst_position, const Position& src_position);
 void        PlayMove(Game& game, Move move);

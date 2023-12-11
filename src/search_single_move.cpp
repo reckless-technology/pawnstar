@@ -20,7 +20,7 @@ SearchSingleMove(const Position&    position,
         return SEARCH_CANCELLED_SCORE;
     }
     Position child_position { position, move };
-    if (child_position.flags & IS_MOVED_INTO_CHECK)
+    if (child_position.flags_ & IS_MOVED_INTO_CHECK)
     {
         return MOVED_INTO_CHECK_SCORE;
     }

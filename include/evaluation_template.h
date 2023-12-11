@@ -103,8 +103,8 @@ const Bitboard FILE_BITBOARDS[8] = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FIL
 template<int color> void
 DeterminePawnStructure(const Position& position, PawnStructure& s)
 {
-    const Bitboard friendly_pawns = position.pawns & position.pieces_of_color[color];
-    const Bitboard enemy_pawns    = position.pawns ^ friendly_pawns;
+    const Bitboard friendly_pawns = position.pawns_ & position.pieces_of_color_[color];
+    const Bitboard enemy_pawns    = position.pawns_ ^ friendly_pawns;
     memset(&s, 0, sizeof(s));
     Bitboard p = friendly_pawns;
     while (p)
@@ -152,12 +152,12 @@ DeterminePawnStructure(const Position& position, PawnStructure& s)
 template<int color> int
 EvaluateMaterial(const Position& position)
 {
-    const Bitboard friendly_pieces = position.pieces_of_color[color];
-    const Bitboard pawns   = position.pawns   & friendly_pieces;
-    const Bitboard knights = position.knights & friendly_pieces;
-    const Bitboard bishops = position.bishops & friendly_pieces;
-    const Bitboard rooks   = position.rooks   & friendly_pieces;
-    const Bitboard queens  = position.queens  & friendly_pieces;
+    const Bitboard friendly_pieces = position.pieces_of_color_[color];
+    const Bitboard pawns   = position.pawns_   & friendly_pieces;
+    const Bitboard knights = position.knights_ & friendly_pieces;
+    const Bitboard bishops = position.bishops_ & friendly_pieces;
+    const Bitboard rooks   = position.rooks_   & friendly_pieces;
+    const Bitboard queens  = position.queens_  & friendly_pieces;
     int score = 
         PopCount(pawns)   * 100 +
         PopCount(knights) * 300 +
@@ -189,29 +189,29 @@ template<int color> int
 EvaluatePieceSquare(const Position& position)
 {
     constexpr int rank_flip = (color == WHITE ? RANK_FLIP : 0);
-    const Bitboard friendly_pieces = position.pieces_of_color[color];
+    const Bitboard friendly_pieces = position.pieces_of_color_[color];
     int score = 0;
-    Bitboard b = position.pawns & friendly_pieces;
+    Bitboard b = position.pawns_ & friendly_pieces;
     while (b)
     {
         score += PAWN_SQUARE[FindAndClearLsb(b) ^ rank_flip];
     }
-    b = position.knights & friendly_pieces;
+    b = position.knights_ & friendly_pieces;
     while (b)
     {
         score += KNIGHT_SQUARE[FindAndClearLsb(b) ^ rank_flip];
     }
-    b = position.bishops & friendly_pieces;
+    b = position.bishops_ & friendly_pieces;
     while (b)
     {
         score += BISHOP_SQUARE[FindAndClearLsb(b) ^ rank_flip];
     }
-    b = position.rooks & friendly_pieces;
+    b = position.rooks_ & friendly_pieces;
     while (b)
     {
         score += ROOK_SQUARE[FindAndClearLsb(b) ^ rank_flip];
     }
-    b = position.queens & friendly_pieces;
+    b = position.queens_ & friendly_pieces;
     while (b)
     {
         score += QUEEN_SQUARE[FindAndClearLsb(b) ^ rank_flip];
@@ -245,33 +245,33 @@ template<int color> int
 EvaluateKing(const Position& position)
 {
     constexpr int rank_flip         = (color == WHITE ? RANK_FLIP : 0);
-    const Bitboard friendly_pieces  = position.pieces_of_color[color];
-    const Bitboard enemy_pieces     = position.pieces_of_color[EnemyOf(color)];
-    const Bitboard friendly_pawns   = friendly_pieces & position.pawns;
-    const Bitboard enemy_pawns      = enemy_pieces    & position.pawns;
+    const Bitboard friendly_pieces  = position.pieces_of_color_[color];
+    const Bitboard enemy_pieces     = position.pieces_of_color_[EnemyOf(color)];
+    const Bitboard friendly_pawns   = friendly_pieces & position.pawns_;
+    const Bitboard enemy_pawns      = enemy_pieces    & position.pawns_;
     /* 
     Determine enemy non pawn material value. 
     This starts out at the beginning of the game as 31
     (2 x N + 2 x B + 2 x R + 1 x Q)
     */
     const int enemy_material =
-        3 * PopCount((position.knights | position.bishops) & enemy_pieces) +
-        5 * PopCount( position.rooks                       & enemy_pieces) +
-        9 * PopCount( position.queens                      & enemy_pieces);
+        3 * PopCount((position.knights_ | position.bishops_) & enemy_pieces) +
+        5 * PopCount( position.rooks_                       & enemy_pieces) +
+        9 * PopCount( position.queens_                      & enemy_pieces);
     int piece_square_score;
     /* First do piece square table */
     if (enemy_material >= 16)
     {
-        piece_square_score = KING_SQUARE_MIDGAME[position.king_location[color] ^ rank_flip];
+        piece_square_score = KING_SQUARE_MIDGAME[position.king_location_[color] ^ rank_flip];
     }
     else if (enemy_material <= 11)
     {
-        piece_square_score = KING_SQUARE_ENDGAME[position.king_location[color] ^ rank_flip];
+        piece_square_score = KING_SQUARE_ENDGAME[position.king_location_[color] ^ rank_flip];
     }
     else
     {
-        const int early_score = KING_SQUARE_MIDGAME[position.king_location[color] ^ rank_flip];
-        const int late_score  = KING_SQUARE_ENDGAME[position.king_location[color] ^ rank_flip];
+        const int early_score = KING_SQUARE_MIDGAME[position.king_location_[color] ^ rank_flip];
+        const int late_score  = KING_SQUARE_ENDGAME[position.king_location_[color] ^ rank_flip];
         piece_square_score = early_score * (enemy_material - 11) + late_score * (16 - enemy_material);
         piece_square_score /= 5;
     }
@@ -280,7 +280,7 @@ EvaluateKing(const Position& position)
     Bitboard pawn_shelter_1;
     Bitboard pawn_shelter_2;
     Bitboard pawn_shelter_3;
-    const Bitboard king_bb = BITBOARD(position.king_location[color]);
+    const Bitboard king_bb = BITBOARD(position.king_location_[color]);
     if constexpr (color == WHITE)
     {
         pawn_shelter_1 = ShiftNorthwest(king_bb) | ShiftNorth(king_bb) | ShiftNortheast(king_bb);
@@ -299,7 +299,7 @@ EvaluateKing(const Position& position)
                      - 10 * PopCount(enemy_pawns    & pawn_shelter_3);
     
     /* Penalty for open files near our king */
-    const Bitboard king_file = FILE_BITBOARDS[FileOf(position.king_location[color])];
+    const Bitboard king_file = FILE_BITBOARDS[FileOf(position.king_location_[color])];
     if ((king_file & friendly_pawns) == NO_SQUARES)
     {
         safety_score -= 30;

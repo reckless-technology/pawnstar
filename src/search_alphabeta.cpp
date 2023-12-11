@@ -30,10 +30,10 @@ AttemptNullMove(const Position&  position,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    if (!(position.flags & IS_NULL_MOVE)
-        && !(position.flags & IS_CHECK)
+    if (!(position.flags_ & IS_NULL_MOVE)
+        && !(position.flags_ & IS_CHECK)
         && beta == alpha + 1
-        && (position.knights | position.bishops | position.rooks | position.queens)
+        && (position.knights_ | position.bishops_ | position.rooks_ | position.queens_)
         && EvaluatePosition(position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
@@ -101,7 +101,7 @@ Search(const Position&  position,
         INCREMENT("max ply reached");
         return EvaluatePosition(position, alpha, beta);
     }
-    if (position.flags & IS_CHECK)
+    if (position.flags_ & IS_CHECK)
     {
         INCREMENT("extensions check");
         ++depth;
@@ -115,7 +115,7 @@ Search(const Position&  position,
     for this position.
     */
     Transposition transposition;
-    const bool is_transposition = FindTransposition(position.hash, &transposition);
+    const bool is_transposition = FindTransposition(position.hash_, &transposition);
     if (is_transposition && transposition.depth >= depth)
     {
         INCREMENT("table hit");
@@ -194,7 +194,7 @@ Search(const Position&  position,
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            RecordTransposition(position.hash, depth, beta, transposition.move, NODE_CUT);
+            RecordTransposition(position.hash_, depth, beta, transposition.move, NODE_CUT);
             RecordGoodMove(ply, transposition.move);
             return beta;
         }
@@ -208,7 +208,7 @@ Search(const Position&  position,
             Provisionally store this move as a CUT node - it 
             may later turn out to be a PV but we don't know that yet.
             */
-            RecordTransposition(position.hash, depth, alpha, transposition.move, NODE_CUT);
+            RecordTransposition(position.hash_, depth, alpha, transposition.move, NODE_CUT);
             RecordGoodMove(ply, transposition.move);
         }
     } 
@@ -267,7 +267,7 @@ Search(const Position&  position,
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            RecordTransposition(position.hash, depth, beta, *move, NODE_CUT);
+            RecordTransposition(position.hash_, depth, beta, *move, NODE_CUT);
             RecordGoodMove(ply, *move);
             return beta;
         }
@@ -281,7 +281,7 @@ Search(const Position&  position,
             may later turn out to be a PV but we don't know that 
             for sure yet until we have searched every move.
             */
-            RecordTransposition(position.hash, depth, score, *move, NODE_CUT);
+            RecordTransposition(position.hash_, depth, score, *move, NODE_CUT);
             RecordGoodMove(ply, *move);
             best_move = *move;
         }
@@ -300,7 +300,7 @@ Search(const Position&  position,
         the losing score, so that the search algorithm chooses the shortest  
         path to checkmate when multiple possible checkmates exist in the tree.
         */
-        if (position.flags & IS_CHECK)
+        if (position.flags_ & IS_CHECK)
         {
             INCREMENT("checkmates");
             return CHECKMATED_SCORE + ply;
@@ -316,7 +316,7 @@ Search(const Position&  position,
         tree to our parent node.
         */
         INCREMENT("pv nodes");
-        RecordTransposition(position.hash, depth, alpha, best_move, NODE_PV);
+        RecordTransposition(position.hash_, depth, alpha, best_move, NODE_PV);
         RecordGoodMove(ply, best_move);
         CopyVariation(parent_pv, pv, best_move);
     }
@@ -326,7 +326,7 @@ Search(const Position&  position,
         We tried every move but did not raise alpha; this was an all node
         */
         INCREMENT("all nodes");
-        RecordTransposition(position.hash, depth, alpha, best_move, NODE_ALL);
+        RecordTransposition(position.hash_, depth, alpha, best_move, NODE_ALL);
     }
     return alpha;
 }

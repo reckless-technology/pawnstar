@@ -17,12 +17,12 @@ void StopThinking()
 */
 Move SearchRootNode(const Position& position)
 {
-    if (position.flags & IS_GAME_OVER)
+    if (position.flags_ & IS_GAME_OVER)
     {
         return 0;
     }
     /* If there is a book move for this position, do not bother with search. */
-    Move book_move = GetBookMove(position.hash);
+    Move book_move = GetBookMove(position.hash_);
     if (book_move)
     {
         return book_move;
@@ -42,7 +42,7 @@ Move SearchRootNode(const Position& position)
     {
     case CLOCK_STANDARD:
     default:
-        moves_to_go     = the_game.time_control.standard.moves_per_period - (position.full_move_count % the_game.time_control.standard.moves_per_period);
+        moves_to_go     = the_game.time_control.standard.moves_per_period - (position.full_move_count_ % the_game.time_control.standard.moves_per_period);
         ms_allocated    = the_game.time_control.standard.milliseconds_remaining / moves_to_go;
         timeout_ms      = max(100, min(ms_allocated * 2, the_game.time_control.standard.milliseconds_remaining - 3000));
         the_game.time_control.hard_stop_search_ms = GetMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
@@ -126,7 +126,7 @@ Move SearchRootNode(const Position& position)
                 alpha             = score;
                 best_move         = moves[i];
                 best_moves[depth] = moves[i];
-                RecordTransposition(position.hash, depth, alpha, best_move, NODE_PV);
+                RecordTransposition(position.hash_, depth, alpha, best_move, NODE_PV);
                 CopyVariation(principal_variation, child_pv, best_move);
                 if (the_game.do_show_thinking)
                 {

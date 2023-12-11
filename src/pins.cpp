@@ -10,13 +10,13 @@ void DeterminePins(const Position& position, Pins& pins)
 {
     pins.pinned_pieces             = NO_SQUARES;
     const int color                 = ColorToMove(position);
-    const Bitboard occupied_squares = position.white_pieces | position.black_pieces;
-    const Bitboard friendly_pieces  = position.pieces_of_color[color];
-    const int king_location         = position.king_location[color];
+    const Bitboard occupied_squares = position.white_pieces_ | position.black_pieces_;
+    const Bitboard friendly_pieces  = position.pieces_of_color_[color];
+    const int king_location         = position.king_location_[color];
     const Bitboard* intervening     = &INTERVENING_SQUARES[king_location][0];
     Bitboard enemy_sliding_pieces = 
-        ((SETS[king_location].bishop_attacks & (position.bishops | position.queens)) | 
-        ( SETS[king_location].rook_attacks   & (position.rooks   | position.queens))) & ~friendly_pieces;
+        ((SETS[king_location].bishop_attacks & (position.bishops_ | position.queens_)) | 
+        ( SETS[king_location].rook_attacks   & (position.rooks_   | position.queens_))) & ~friendly_pieces;
     while (enemy_sliding_pieces)
     {
         const int slider_location                   = FindAndClearLsb(enemy_sliding_pieces);

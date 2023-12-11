@@ -82,12 +82,12 @@ void FreeOpeningBook()
 */
 void DisplayAvailableBookMoves(const Position& position)
 {
-    if (!book.count(position.hash))
+    if (!book.count(position.hash_))
     {
         return;
     }
     unordered_map<Move, int> move_counts;
-    for (const auto& move : book[position.hash])
+    for (const auto& move : book[position.hash_])
     {
         ++move_counts[move];
     }
@@ -127,7 +127,7 @@ static bool ParseLineOfPlay(const string& line)
         }
         char move_string_mutable[16];
         strncpy(move_string_mutable, token.c_str(), sizeof(move_string_mutable) - 1);
-        const uint64_t hash = game.position->hash;
+        const uint64_t hash = game.position->hash_;
         const Move move = PlayMoveString(game, move_string_mutable);
         if (move == 0)
         {
