@@ -119,7 +119,6 @@ bool        IsStalemate(const Position& position);
 Making moves
 */
 void        AddPiece(Position& position, int color, int piece, int to);
-void        MakeMove(Position& dst_position, const Position& src_position, Move move);
 void        MakeMoveSequence(Position& dst_position, const Position& src_position, const Move* moves);
 void        MakeNullMove(Position& dst_position, const Position& src_position);
 void        PlayMove(Game& game, Move move);

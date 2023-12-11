@@ -311,8 +311,7 @@ int GenerateLegalMoves(const Position& position, Move moves[])
     GeneratePseudoLegalMoves(position, pseudo_legal_moves);
     for (const Move* move = pseudo_legal_moves; *move; ++move)
     {
-        Position dst_position;
-        MakeMove(dst_position, position, *move);
+        Position dst_position { position, *move };
         if (!(dst_position.flags & IS_MOVED_INTO_CHECK))
         {
             *moves++ = *move;

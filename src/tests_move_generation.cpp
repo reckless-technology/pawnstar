@@ -115,10 +115,9 @@ CategorizeMoves(const Position& src_position,
                 const Move      moves[], 
                 PerftCounts*    counts)
 {
-    Position position;
     for (const Move* move = moves; *move; ++move)
     {
-        MakeMove(position, src_position, *move);
+        Position position { src_position, *move };
         if (position.flags & IS_MOVED_INTO_CHECK)
         {
             continue;
@@ -169,8 +168,7 @@ Perft(const Position& src_position,
     {
         for (const Move* move = moves; *move; ++move)
         {
-            Position position;
-            MakeMove(position, src_position, *move);
+            Position position { src_position, *move };
 #if DO_TEST_HASH_DURING_PERFT
             if (position.hash != ComputeHash(&position))
             {

@@ -50,8 +50,7 @@ int SearchQuiescent(const Position& position,
             INCREMENT("negative SEE quiescent skips");
             continue;
         }
-        Position child_position;
-        MakeMove(child_position, position, *move);
+        Position child_position { position, *move };
         if (child_position.flags & IS_MOVED_INTO_CHECK)
         {
             INCREMENT("quiescent moved into check");

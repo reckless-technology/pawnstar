@@ -12,8 +12,7 @@ Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
 */
 int EvaluateStaticExchange(const Position& src_position, Move move)
 {
-    Position position;
-    MakeMove(position, src_position, move);
+    Position position { src_position, move };
     if (position.flags & IS_MOVED_INTO_CHECK)
     {
         return ALPHA;

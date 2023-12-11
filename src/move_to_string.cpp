@@ -11,7 +11,6 @@ int MoveToString(const Position& position, Move move, char move_string[])
 {
     const char* initial_ptr = move_string;
     Move legal_moves[MAX_MOVES_PER_POSITION];
-    Position dst_position;
     char disambiguation[3]   = { 0 };
     char from_square[3]      = { FileChar(MoveFrom(move)), RankChar(MoveFrom(move)), 0 };
     char to_square[3]        = { FileChar(MoveTo  (move)), RankChar(MoveTo  (move)), 0 };
@@ -123,7 +122,7 @@ int MoveToString(const Position& position, Move move, char move_string[])
     /*
     Determine if this move results in check or checkmate
     */
-    MakeMove(dst_position, position, move);
+    Position dst_position { position, move };
     if (IsCheckmate(dst_position))
     {
         move_string += sprintf(move_string, "#");
@@ -146,9 +145,7 @@ int MoveSequenceToSanString(const Position& position, const Move* moves, char* m
 {
     const char* const initial_ptr = move_string;
     bool is_first_move = true;
-    Position src_position;
-    Position dst_position;
-    src_position = position;
+    Position src_position { position };
     for (const Move* move = moves; *move; ++move)
     {
         if (!is_first_move)
@@ -156,7 +153,7 @@ int MoveSequenceToSanString(const Position& position, const Move* moves, char* m
             *move_string++ = ' ';
         }
         move_string += MoveToString(src_position, *move, move_string);
-        MakeMove(dst_position, src_position, *move);
+        Position dst_position { src_position, *move };
         src_position = dst_position;
         is_first_move = false;
     }
