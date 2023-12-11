@@ -7,7 +7,7 @@
 using std::string;
 using std::stringstream;
 
-#define BAD_FEN_STRING printf("ERROR: bad FEN string %s\n", fen_string.c_str()); return false
+#define BAD_FEN_STRING printf("ERROR: bad FEN string %s\n", fen_string); return false
 
 /**
  * @brief Construct a position from a Forsyth-Edwards (FEN) string.
@@ -16,8 +16,8 @@ using std::stringstream;
  * @return true on success, false if an illegal position string was provided
 */
 bool 
-PositionFromString(const string& fen_string, 
-                   Position&     position)
+PositionFromString(const char* fen_string, 
+                   Position&   position)
 {
     const string white_pieces   { "PNBRQK"   };
     const string black_pieces   { "pnbrqk"   };

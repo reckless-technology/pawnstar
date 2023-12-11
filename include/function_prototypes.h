@@ -67,7 +67,7 @@ uint64_t    ComputeHash(const Position& position);
 void        InitializeGame(Game& game);
 bool        IsPositionLegal(const Position& position);
 Move        PlayMoveString(Game& game, char* move_string);
-bool        PositionFromString(const std::string& fen_string, Position& position);
+bool        PositionFromString(const char* fen_string, Position& position);
 std::string PositionToString(const Position& position);
 int         MoveSequenceToSanString(const Position& position, const Move* moves, char* move_string);
 int         MoveToString(const Position& position, Move move, char* move_string);

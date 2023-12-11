@@ -79,7 +79,7 @@ enum NodeType
 /**
  * @brief Bitboard bit sets for a specific square.
 */
-typedef struct Sets
+struct Sets
 {
     Bitboard north;
     Bitboard northeast;
@@ -104,7 +104,7 @@ typedef struct Sets
     Bitboard queen_attacks;     /**< squares attacked by a queen on an empty board  */
     Bitboard king_attacks;      /**< squares attacked by a king on this square      */
     Bitboard king_attacks2;     /**< squares within 2 king moves from this square   */
-} Sets;
+};
 
 /**
  * @brief Bitsets used to efficiently determine pawn structure.
@@ -118,13 +118,13 @@ typedef struct Sets
  * 
  * A doubled pawn has a friendly pawn in front of it on the same file.
 */
-typedef struct PawnSets
+struct PawnSets
 {
     Bitboard passed_pawn_mask;      /**< Squares which if not containing an enemy pawn, make the pawn passed.       */
     Bitboard isolated_pawn_mask;    /**< Squares which if not containing a friendly pawn, make the pawn isolated.   */
     Bitboard supported_pawn_mask;   /**< Squares which if containing a friendly pawn, make the pawn supported.      */
     Bitboard doubled_pawn_mask;     /**< Squares which if containing a friendly pawn, make the pawn doubled.        */
-} PawnSets;
+};
 
 
 /**
@@ -133,7 +133,6 @@ typedef struct PawnSets
  * move, castling rights for each side, whether en passant capture is possible,
  * and the number of consecutive reversible half-moves.
 */
-typedef struct Position Position;
 struct Position
 {    
     union
@@ -170,43 +169,43 @@ struct Position
 /**
  * @brief Clock for a standard time control game.
 */
-typedef struct StandardTimeControl
+struct StandardTimeControl
 {
     int     milliseconds_remaining;  /**< how many milliseconds does the computer have left on its clock             */
     int     milliseconds_per_period; /**< how many milliseconds in each period for a standard chess clock            */
     int     moves_per_period;        /**< how many moves in each period for a standard chess clock                   */
-} StandardTimeControl;
+};
 
 /**
  * @brief Clock for an incremental time control game.
 */
-typedef struct IncrementalTimeControl
+struct IncrementalTimeControl
 {
     int     milliseconds_remaining;  /**< how many milliseconds does the computer have left on its clock             */
     int     base_milliseconds;       /**< how many milliseconds for the game for an incremental chess clock          */
     int     increment_milliseconds;  /**< how many additional milliseconds per move for an incremental chess clock   */
-} IncrementalTimeControl;
+};
 
 /**
  * @brief Clock for a fixed depth of search game.
 */
-typedef struct FixedDepthTimeControl
+struct FixedDepthTimeControl
 {
     int     depth;                  /**< search depth to search to when using fixed depth                           */
-} FixedDepthTimeControl;
+};
 
 /**
  * @brief Clock for a fixed time per move game.
 */
-typedef struct FixedTimeTimeControl
+struct FixedTimeTimeControl
 {
     int     milliseconds;           /**< how many milliseconds to spend on each move when using fixed time          */
-} FixedTimeTimeControl;
+};
 
 /**
  * @brief Clock and time controls.
 */
-typedef struct TimeControl
+struct TimeControl
 {
     int             hard_stop_search_ms;    /**< Wall clock time to hard stop searching and move    */
     enum ClockType  clock_type;             /**< standard chess clock, incremental clock, fixed time or fixed depth         */
@@ -217,35 +216,35 @@ typedef struct TimeControl
         FixedDepthTimeControl   fixed_depth;
         FixedTimeTimeControl    fixed_time;
     };
-} TimeControl;
+};
 
 /**
  * @brief A transposition table entry.
  * A transposition is the result of a previous search containing pertinent
  * information about what was found when this position was searched earlier.
 */
-typedef struct Transposition
+struct Transposition
 {
     uint64_t    hash;       /**< Zobrist hash of this position                          */
     Move        move;       /**< Best move from this position, if any                   */
     int         score;      /**< The score computed from this position                  */
     int16_t     depth;      /**< The depth to which this position was searched          */
     uint16_t    node_type;  /**< The alpha-beta tree search node type (cut, all, pv)    */
-} Transposition;
+};
 
 /**
  * @brief A variation, or line of play.
  * Typically used to record the principal variation during search.
 */
-typedef struct Variation
+struct Variation
 {
     Move moves[MAX_PLY + 1]; /**< the moves comprising the line  */
-} Variation;
+};
 
 /**
  * @brief A chess game.
 */
-typedef struct Game
+struct Game
 {
     Position*   position;               /**< stack pointer - current position               */
     Position    stack[MAX_GAME_LENGTH]; /**< position stack                                 */
@@ -253,7 +252,7 @@ typedef struct Game
     int         node_count;             /**< Number of nodes (positions) during search      */
     int         engine_color;           /**< The color which pawnstar is playing            */
     bool        do_show_thinking;       /**< Whether to show scores and PV during search    */
-} Game;
+};
 
 /**
  * @brief An entry in the magic bitboard move generator array.
@@ -272,23 +271,23 @@ typedef struct Game
  * The magic bitboard sets are generated at compile time by 
  * compiling and then running "generate_constants.cpp"
  */
-typedef struct MagicMoveEntry
+struct MagicMoveEntry
 {
     uint64_t        magic;          /**< Magic multiplier.                              */
     Bitboard        occupancy_mask; /**< Occupancy mask (excludes final target square). */
     int             shift;          /**< Number of bits to right shift to get indices.  */
     const uint64_t* attacks;        /**< Discrete attack vectors (move sets).           */
     const uint8_t*  indices;        /**< Indices into the discrete attack vector array. */
-} MagicMoveEntry;
+};
 
 /**
  * @brief Holds information about pinned pieces.
  */
-typedef struct Pins
+struct Pins
 {
     Bitboard pinned_pieces;         /**< Set of squares which are pinned. */
     Bitboard allowed_squares[64];   /**< Contains the set of allowed squares a pinned piece may safely move to. */
-} Pins;
+};
 
 /**
  * @brief Pawn structure for one color.
@@ -301,21 +300,21 @@ typedef struct Pins
  * 
  * A doubled pawn has a friendly pawn in front of it on the same file.
  */
-typedef struct PawnStructure
+struct PawnStructure
 {
     Bitboard passed_pawns;
     Bitboard isolated_pawns;
     Bitboard backward_pawns;
     Bitboard doubled_pawns;
-} PawnStructure;
+};
 
 #if DEBUGX
 /**
  * @brief Simple debug hash table dictionary fo diagnostic counts.
  */
-typedef struct
+struct DebugEntry
 {
     const char* key;
     int        count;
-} DebugEntry;
+};
 #endif
