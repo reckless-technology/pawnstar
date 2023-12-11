@@ -194,7 +194,6 @@ void
 RunPerftTests(void)
 {
     PerftCounts counts;
-    Position position;
     int start, first_start, stop = 0;
     bool is_good = true;
     uint64_t total_nodes = 0;
@@ -202,12 +201,8 @@ RunPerftTests(void)
     first_start = GetMilliseconds();
     for (test = perft_tests; test->position; ++test)
     {
-        if (!PositionFromString(test->position, position))
-        {
-            printf("ERROR: cannot create position from FEN string\n");
-            continue;
-        }
-        string pos_string = PositionToString(position);
+        Position position { test->position };
+        string pos_string = position.operator std::string();
         printf("\n%s\n", pos_string.c_str());
         memset(&counts, 0, sizeof(counts));
         total_nodes += test->counts.legal_moves;

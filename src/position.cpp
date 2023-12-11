@@ -1,31 +1,27 @@
-#include <ctype.h>
-#include <string>
 #include <sstream>
+#include <string>
+#include <memory.h>
 
+using std::stringstream;
+using std::string;
+
+#include "position.h"
 #include "pawnstar.h"
 
-using std::string;
-using std::stringstream;
+#define BAD_FEN_STRING printf("ERROR: bad FEN string %s\n", fen_string); return
 
-#define BAD_FEN_STRING printf("ERROR: bad FEN string %s\n", fen_string); return false
-
-/**
- * @brief Construct a position from a Forsyth-Edwards (FEN) string.
- * @param fen_string string format of position
- * @param position position object to initialize
- * @return true on success, false if an illegal position string was provided
-*/
-bool 
-PositionFromString(const char* fen_string, 
-                   Position&   position)
+Position::Position(const char* fen_string) noexcept
 {
-    const string white_pieces   { "PNBRQK"   };
-    const string black_pieces   { "pnbrqk"   };
-    const string ep_files       { "abcdefgh" };
-    const string ep_ranks       { "36"       };
-    stringstream ss { fen_string };   
-    memset(&position, 0, sizeof(Position));
-    position.previous = &position;
+    const string white_piece_names { "PNBRQK"   };
+    const string black_piece_names { "pnbrqk"   };
+    const string ep_files { "abcdefgh" };
+    const string ep_ranks { "36"       };
+    stringstream ss { fen_string };
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
+    memset(this, 0, sizeof(Position));
+#pragma GCC diagnostic pop
+    previous = this;
     /* Pieces on the board */
     string pieces;
     ss >> pieces;
@@ -58,19 +54,19 @@ PositionFromString(const char* fen_string,
         {
             BAD_FEN_STRING;
         }
-        auto a = white_pieces.find(c);
+        auto a = white_piece_names.find(c);
         if (a != string::npos)
         {
             const int piece = a + 1;
-            AddPiece(position, WHITE, piece, x + 8 * y);
+            AddPiece(*this, WHITE, piece, x + 8 * y);
             ++x;
             continue;
         }
-        a = black_pieces.find(c);
+        a = black_piece_names.find(c);
         if (a != string::npos)
         {
             const int piece = a + 1;
-            AddPiece(position, BLACK, piece, x + 8 * y);
+            AddPiece(*this, BLACK, piece, x + 8 * y);
             ++x;
             continue;
         }
@@ -89,14 +85,14 @@ PositionFromString(const char* fen_string,
     }
     if (color_to_move == "b")
     {
-        position.flags |= IS_BLACK_TO_MOVE;
+        flags |= IS_BLACK_TO_MOVE;
     }
     else if (color_to_move != "w")
     {
         BAD_FEN_STRING;
     }
-    position.king_location[WHITE] = Lsb(position.kings & position.white_pieces);
-    position.king_location[BLACK] = Lsb(position.kings & position.black_pieces);
+    king_location[WHITE] = Lsb(kings & white_pieces);
+    king_location[BLACK] = Lsb(kings & black_pieces);
     /* Castling rights */
     string castling_rights;
     ss >> castling_rights;
@@ -106,7 +102,7 @@ PositionFromString(const char* fen_string,
     }
     if (castling_rights == "-")
     {
-        position.flags &= ~CASTLING_RIGHTS_MASK;
+        flags &= ~CASTLING_RIGHTS_MASK;
     }
     else
     {
@@ -115,16 +111,16 @@ PositionFromString(const char* fen_string,
             switch (c)
             {
             case 'K':
-                position.flags |= MAY_WHITE_CASTLE_KINGSIDE;
+                flags |= MAY_WHITE_CASTLE_KINGSIDE;
                 break;
             case 'Q':
-                position.flags |= MAY_WHITE_CASTLE_QUEENSIDE;
+                flags |= MAY_WHITE_CASTLE_QUEENSIDE;
                 break;
             case 'k':
-                position.flags |= MAY_BLACK_CASTLE_KINGSIDE;
+                flags |= MAY_BLACK_CASTLE_KINGSIDE;
                 break;
             case 'q':
-                position.flags |= MAY_BLACK_CASTLE_QUEENSIDE;
+                flags |= MAY_BLACK_CASTLE_QUEENSIDE;
                 break;
             default:
                 BAD_FEN_STRING;
@@ -140,7 +136,7 @@ PositionFromString(const char* fen_string,
     }
     if (ep_square == "-")
     {
-        position.en_passant_index = 0;
+        en_passant_index = 0;
     }
     else
     {
@@ -150,66 +146,60 @@ PositionFromString(const char* fen_string,
         {
             BAD_FEN_STRING;
         }
-        position.en_passant_index = (ep_square[0] - 'a') + 8 * (ep_square[1] - '1');
+        en_passant_index = (ep_square[0] - 'a') + 8 * (ep_square[1] - '1');
     }
     if (ss)
     {
         /* Half move clock - optional */
         int hmc = 0;
         ss >> hmc;
-        position.reversible_move_count = (uint8_t)hmc;
+        reversible_move_count = (uint8_t)hmc;
     }
     if (ss)
     {
         /* Full move number - optional */
         int fmn = 1;
         ss >> fmn;
-        position.full_move_count = (uint8_t)fmn - 1;
+        full_move_count = (uint8_t)fmn - 1;
     }
-    position.hash = ComputeHash(position);
+    hash = ComputeHash(*this);
     /* Legality of position */
-    if (!IsPositionLegal(position))
+    if (!IsPositionLegal(*this))
     {
         BAD_FEN_STRING;
     }
     /* Is the position in check? */
-    const int color = ColorToMove(position);
-    if (IsAttacked(position, position.king_location[color], EnemyOf(color)))
+    const int color = ColorToMove(*this);
+    if (IsAttacked(*this, king_location[color], EnemyOf(color)))
     {
-        position.flags |= IS_CHECK;
+        flags |= IS_CHECK;
     }
     /*
     Check to see if this position represents checkmate, stalemate or 
     draw by insufficient material and set flags accordingly.
     */
-    if (IsCheckmate(position))
+    if (IsCheckmate(*this))
     {
         printf("NOTE: FEN string specifies a checkmate position\n");
-        position.flags |= IS_CHECKMATE;
+        flags |= IS_CHECKMATE;
     }
-    else if (IsStalemate(position))
+    else if (IsStalemate(*this))
     {
         printf("NOTE: FEN string specifies a stalemate position\n");
-        position.flags |= IS_STALEMATE;
+        flags |= IS_STALEMATE;
     }
-    else if (IsDrawByMaterial(position))
+    else if (IsDrawByMaterial(*this))
     {
         printf("NOTE: FEN string specifies a draw by insufficient material position\n");
-        position.flags |= IS_DRAW_MATERIAL;
+        flags |= IS_DRAW_MATERIAL;
     }
-    return true;
 }
 
-
-/**
- * @brief Construct a Forsyth-Edwards (FEN) string from the specified position.
- * @param position the position
-*/
-string PositionToString(const Position& position)
+Position::operator std::string() const
 {
     stringstream ss;
     /* Pieces on the board */
-    const Bitboard occupied_squares = position.white_pieces | position.black_pieces;
+    const Bitboard occupied_squares = white_pieces | black_pieces;
     for (int y = 7; y >= 0; --y)
     {
         int num_empty_squares = 0;
@@ -226,9 +216,9 @@ string PositionToString(const Position& position)
                     ss << (char)('0' + num_empty_squares);
                     num_empty_squares = 0;
                 }
-                const char piece = (position.white_pieces & BITBOARD(x, y)) ?
-                    " PNBRQK"[PieceAt(position, x + 8 * y)] : 
-                    " pnbrqk"[PieceAt(position, x + 8 * y)];
+                const char piece = (white_pieces & BITBOARD(x, y)) ?
+                    " PNBRQK"[PieceAt(*this, x + 8 * y)] : 
+                    " pnbrqk"[PieceAt(*this, x + 8 * y)];
                 ss << piece;
             }
         }
@@ -243,43 +233,44 @@ string PositionToString(const Position& position)
         }
     }
     /* Side to move */
-    ss << ' ' << (position.flags & IS_BLACK_TO_MOVE ? 'b' : 'w') << ' ';
+    ss << ' ' << (flags & IS_BLACK_TO_MOVE ? 'b' : 'w') << ' ';
     /* Castling rights */
-    if (!(position.flags & CASTLING_RIGHTS_MASK))
+    if (!(flags & CASTLING_RIGHTS_MASK))
     {
         ss << '-';
     }
     else
     {
-        if (position.flags & MAY_WHITE_CASTLE_KINGSIDE)
+        if (flags & MAY_WHITE_CASTLE_KINGSIDE)
         {
             ss << 'K';
         }
-        if (position.flags & MAY_WHITE_CASTLE_QUEENSIDE)
+        if (flags & MAY_WHITE_CASTLE_QUEENSIDE)
         {
             ss << 'Q';
         }
-        if (position.flags & MAY_BLACK_CASTLE_KINGSIDE)
+        if (flags & MAY_BLACK_CASTLE_KINGSIDE)
         {
             ss << 'k';
         }
-        if (position.flags & MAY_BLACK_CASTLE_QUEENSIDE)
+        if (flags & MAY_BLACK_CASTLE_QUEENSIDE)
         {
             ss << 'q';
         }
     }
     ss << ' ';
     /* En passant capture availability */
-    if (position.en_passant_index == 0)
+    if (en_passant_index == 0)
     {
         ss << '-';
     }
     else
     {
-        ss << FileChar(position.en_passant_index) << RankChar(position.en_passant_index);
+        ss << FileChar(en_passant_index) << RankChar(en_passant_index);
     }
     ss <<  ' ';
     /* Half move clock and full move number */
-    ss << (int)position.reversible_move_count << ' ' << (int)(position.full_move_count + 1);
+    ss << (int)reversible_move_count << ' ' << (int)(full_move_count + 1);
     return ss.str();
+
 }

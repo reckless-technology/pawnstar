@@ -35,21 +35,16 @@ Run the standard Bratko-Kopec test suite at fixed search depth
 */
 void RunPositionTests(int depth)
 {
-    Position position;
     int first_start;
     const char* const * tests;
     const TimeControl prev_time_control     = the_game.time_control;
     the_game.time_control.clock_type        = CLOCK_FIXED_DEPTH;
     the_game.time_control.fixed_depth.depth = depth;
     the_game.do_show_thinking               = true;
-    first_start = GetMilliseconds();
+    first_start                             = GetMilliseconds();
     for (tests = POSITION_TESTS; *tests; ++tests)
     {
-        if (!PositionFromString(*tests, position))
-        {
-            printf("ERROR: unable to parse FEN string:\n%s\n", *tests);
-            return;
-        }
+        Position position { *tests };
         printf("\n%s\n", *tests);
         DEBUG_STATEMENT(DebugXClear());
         SearchRootNode(position);

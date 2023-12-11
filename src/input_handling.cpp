@@ -160,15 +160,12 @@ static void handle_setboard(int argc, char* argv[])
     }
     *p = 0;
     the_game.position = the_game.stack;
-    if (!PositionFromString(fen_string, *the_game.position))
-    {
-        InitializeGame(the_game);
-    }
+    *the_game.position = Position { fen_string };
 }
 
 static void handle_getboard(int argc, char* argv[])
 {
-    std::string fen_string = PositionToString(*the_game.position);
+    std::string fen_string = the_game.position->operator std::string();
     printf("%s\n", fen_string.c_str());
     (void)argc;
     (void)argv;

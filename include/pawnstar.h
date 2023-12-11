@@ -12,6 +12,7 @@ Global header file - included by each source file
 #include "move.h"
 #include "types.h"
 #include "function_prototypes.h"
+#include "position.h"
 
 extern const char* const    OPENING_BOOK_MOVES;
 extern const Sets           SETS[64];
