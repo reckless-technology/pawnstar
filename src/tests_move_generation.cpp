@@ -226,7 +226,7 @@ RunPerftTests(void)
         printf(  "promotions                              %10u\n",   counts.promotions);
         printf(  "checks                                  %10u\n",   counts.checks);
         printf(  "elapsed milliseconds                    %10u\n",   stop - start);
-        printf(  "positions per second                    %10llu\n", (uint64_t)counts.legal_moves * 1000 / (stop - start));
+        printf(  "positions per second                    %10" PRIu64 "\n", (uint64_t)counts.legal_moves * 1000 / (stop - start));
         if (!!memcmp(&counts, &test->counts, sizeof(PerftCounts)))
         {
             printf("************* ERROR on this position *************\n");
@@ -234,7 +234,7 @@ RunPerftTests(void)
         }
     }
     printf("total elapsed milliseconds              %10u\n",   stop - first_start);
-    printf("mean positions per second               %10llu\n", total_nodes * 1000 / (stop - first_start));
+    printf("mean positions per second               %10" PRIu64 "\n", total_nodes * 1000 / (stop - first_start));
     if (is_good)
     {
         printf("******************* PERFT PASS *******************\n");

@@ -2,6 +2,7 @@
 /*
 Global header file - included by each source file
 */
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
