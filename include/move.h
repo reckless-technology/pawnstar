@@ -36,6 +36,16 @@ enum Piece
     KING,
 };
 
+/**
+ * @brief Chess piece colors.
+*/
+enum Color
+{
+    WHITE,
+    BLACK,
+    NEITHER_COLOR,
+};
+
 constexpr Move PromotionMove    (int from, int to, int captured, int promoted)  { return (to|(from<<6)|(PAWN <<12)|(captured<<15)|(promoted<<18)); }
 constexpr Move CastlingMove     (int from, int to)                              { return (to|(from<<6)|(KING <<12)|               (1<<21));        }
 constexpr Move EpCaptureMove    (int from, int to)                              { return (to|(from<<6)|(PAWN <<12)|(PAWN    <<15)|(1<<22));        }

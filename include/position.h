@@ -6,6 +6,30 @@
 #include "move.h"
 
 /**
+ * @brief Bitset of position state flags.
+*/
+enum StateFlags
+{
+    MAY_WHITE_CASTLE_KINGSIDE   = 1 <<  0,  /**< white has the right to castle king side                    */
+    MAY_WHITE_CASTLE_QUEENSIDE  = 1 <<  1,  /**< white has the right to castle queen side                   */
+    MAY_BLACK_CASTLE_KINGSIDE   = 1 <<  2,  /**< black has the right to castle king side                    */
+    MAY_BLACK_CASTLE_QUEENSIDE  = 1 <<  3,  /**< black has the right to castle queen side                   */
+    IS_BLACK_TO_MOVE            = 1 <<  4,  /**< it is black's turn to move                                 */
+    IS_CHECK                    = 1 <<  5,  /**< is the side to move in check                               */
+    IS_MOVED_INTO_CHECK         = 1 <<  6,  /**< is the side not to move in check (illegal position)        */
+    IS_CHECKMATE                = 1 <<  7,  /**< position represents checkmate                              */
+    IS_STALEMATE                = 1 <<  8,  /**< position represents stalemate                              */
+    IS_DRAW_REPETITION          = 1 <<  9,  /**< position represents draw by repetition 3 times             */
+    IS_DRAW_MATERIAL            = 1 << 10,  /**< position represents draw by insufficient material to mate  */
+    IS_DRAW_50_MOVES            = 1 << 11,  /**< position represents draw by the 50 move rule               */
+    IS_NULL_MOVE                = 1 << 12,  /**< position was the result of a null move                     */
+    IS_GAME_DRAWN               = (IS_STALEMATE | IS_DRAW_REPETITION | IS_DRAW_MATERIAL | IS_DRAW_50_MOVES),
+    IS_GAME_OVER                = (IS_GAME_DRAWN | IS_CHECKMATE),
+    CASTLING_RIGHTS_MASK        = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | 
+                                   MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE),
+};
+
+/**
  * @brief A chess position.
  * The position comprises the pieces on the board, whose turn it is to
  * move, castling rights for each side, whether en passant capture is possible,
@@ -47,8 +71,20 @@ struct Position
     Position(const Position& that, Move move) noexcept;
     Position() noexcept {};
 
-    operator std::string() const;
-    void AddPiece   (int color, int piece, int to);
-    void RemovePiece(int color, int piece, int from);
-    void MovePiece  (int color, int piece, int from, int to);
+    operator    std::string() const;
+
+    void        MakeNullMove(Position& dst_position) const;
+    uint8_t     ColorToMove() const  { return flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE; }
+    void        AddPiece   (int color, int piece, int to);
+    void        RemovePiece(int color, int piece, int from);
+    void        MovePiece  (int color, int piece, int from, int to);
+    Bitboard    AttacksTo  (uint8_t location, int color) const;
+    bool        IsAttacked (uint8_t location, int color) const;
+    bool        IsLegal() const;
+    bool        IsCheckmate() const;
+    bool        IsDrawByFiftyMoves() const;
+    bool        IsDrawByMaterial() const;
+    bool        IsDrawByRepetition(bool is_search) const;
+    bool        IsStalemate() const;
+    uint64_t    ComputeHash() const;
 };

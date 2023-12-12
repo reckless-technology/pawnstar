@@ -4,15 +4,35 @@
 
 #include "bitboard.h"
 #include "types.h"
+#include "generated_data.h"
 
-constexpr uint8_t   FileOf(int locn)                        { return locn & 7;              }
-constexpr uint8_t   RankOf(int locn)                        { return locn >> 3;             }
-constexpr char      FileChar(int locn)                      { return 'a' + FileOf(locn);    }
-constexpr char      RankChar(int locn)                      { return '1' + RankOf(locn);    }
-constexpr uint8_t   EnemyOf(int color)                      { return !color;                }
-constexpr int       min(int a, int b)                       { return a < b ? a : b;         }
-constexpr int       max(int a, int b)                       { return a > b ? a : b;         }
-constexpr uint8_t   ColorToMove(const Position& position)   { return position.flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE; }
+constexpr uint8_t   FileOf(int locn)    { return locn & 7;              }
+constexpr uint8_t   RankOf(int locn)    { return locn >> 3;             }
+constexpr char      FileChar(int locn)  { return 'a' + FileOf(locn);    }
+constexpr char      RankChar(int locn)  { return '1' + RankOf(locn);    }
+constexpr uint8_t   EnemyOf(int color)  { return !color;                }
+constexpr int       min(int a, int b)   { return a < b ? a : b;         }
+constexpr int       max(int a, int b)   { return a > b ? a : b;         }
+
+constexpr Bitboard 
+BishopAttacks(Bitboard occupied_squares, uint8_t location)
+{
+    const MagicMoveEntry& m = BISHOP_MAGICS[location];
+    return m.attacks[m.indices[((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
+}
+
+constexpr Bitboard 
+RookAttacks(Bitboard occupied_squares, uint8_t location)
+{
+    const MagicMoveEntry& m = ROOK_MAGICS[location];
+    return m.attacks[m.indices[((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
+}
+
+constexpr Bitboard 
+QueenAttacks(Bitboard occupied_squares, uint8_t location)
+{
+    return BishopAttacks(occupied_squares, location) | RookAttacks(occupied_squares, location);
+}
 
 constexpr void 
 CopyVariation(Variation&       dst_variation, 
@@ -43,56 +63,32 @@ PieceAt(const Position& position,
         (square & position.kings_)   ? KING   : NO_PIECE;
 }
 
-/*
-Search
-*/
 int         Search          (const Position& position, int depth, int ply, int alpha, int beta, volatile bool& cancel, Variation& parent_pv);
 int         SearchQuiescent (const Position& position, int depth, int ply, int alpha, int beta, volatile bool& cancel);
-Move        SearchRootNode  (const Position& position);
 int         SearchSingleMove(const Position& position, int depth, int ply, int alpha, int beta, volatile bool& cancel, Move move, Variation& pv, int move_index);
-/*
-Thinking and time control
-*/
+Move        SearchRootNode  (const Position& position);
+
 int         GetMilliseconds(void);
 void        StartThinking(Game& game);
 void        StopThinking(void);
 void        StopWorker(void);
-/*
-Support for FEN and SAN strings
-*/
-bool        AreMoveStringsEquivalent(char* str1, char* str2);
-uint64_t    ComputeHash(const Position& position);
+
 void        InitializeGame(Game& game);
-bool        IsPositionLegal(const Position& position);
 Move        PlayMoveString(Game& game, char* move_string);
 int         MoveSequenceToSanString(const Position& position, const Move* moves, char* move_string);
 int         MoveToString(const Position& position, Move move, char* move_string);
-/*
-Attacks
-*/
-Bitboard    AttacksTo    (const Position& position, int location, int color);
-bool        IsAttacked   (const Position& position, int location, int color);
-Bitboard    BishopAttacks(Bitboard occupied_squares, int location);
-Bitboard    QueenAttacks (Bitboard occupied_squares, int location);
-Bitboard    RookAttacks  (Bitboard occupied_squares, int location);
-/*
-Opening book
-*/
+
 void        DisplayAvailableBookMoves(const Position& position);
 void        FreeOpeningBook(void);
 Move        GetBookMove(uint64_t hash);
 bool        InitializeOpeningBookFromFile(const char* filename);
 bool        InitializeDefaultOpeningBook();
-/*
-Transposition table
-*/
+
 bool        FindTransposition(uint64_t hash, Transposition* transposition);
 void        FreeTranspositionTable(void);
 bool        InitializeTranspositionTable(int megabytes);
 void        RecordTransposition(uint64_t hash, int depth, int score, Move move, int node_type);
-/*
-Generation and ordering of moves
-*/
+
 void        DeterminePins(const Position& position, Pins& pins);
 int         EvaluateStaticExchange(const Position& src_position, Move move);
 void        InitializeGoodMoveCounts(void);
@@ -102,44 +98,17 @@ void        GeneratePseudoLegalCaptures(const Position& position, Move moves[]);
 void        GeneratePseudoLegalMoves(const Position& position, Move moves[]);
 void        ScoreAndSortMoves(const Position& position, Move moves[], int ply, int depth);
 void        SortMoves(int num_elements, Move values[]);
-/*
-Positional evaluation
-*/
 int         EvaluatePosition(const Position& position, int alpha, int beta);
-/*
-Game over (terminal node) detection
-*/
 void        DisplayResultIfGameOver(const Position& position);
-bool        IsCheckmate(const Position& position);
-bool        IsDrawByFiftyMoves(const Position& position);
-bool        IsDrawByMaterial(const Position& position);
-bool        IsDrawByRepetition(const Position& position, bool is_search);
-bool        IsStalemate(const Position& position);
-/*
-Making moves
-*/
-void        MakeMoveSequence(Position& dst_position, const Position& src_position, const Move* moves);
-void        MakeNullMove(Position& dst_position, const Position& src_position);
 void        PlayMove(Game& game, Move move);
-/*
-Tests
-*/
 bool        RunMergeSortTests(void);
 void        RunPerftTests(void);
 void        RunPositionTests(int depth);
 void        RunStaticExchangeTests(void);
-/*
-Simple PRNG
-*/
 int         NextRandom(void);
-/*
-Process Input Commands
-*/
 void        ProcessInput(char* line);
 
-/*
-Debugging counts dictionary - DEBUG and RELEASEX configurations only
-*/
+
 #if DEBUGX
 extern DebugEntry debug_dict[DEBUG_DICT_SIZE];
 /**

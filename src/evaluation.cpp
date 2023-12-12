@@ -31,7 +31,7 @@ EvaluatePosition(const Position& position,
         INCREMENT("eval hash table hits");
         return eval_hash.score;
     }
-    if (IsDrawByMaterial(position))
+    if (position.IsDrawByMaterial())
     {
         eval_hash.hash = position.hash_;
         eval_hash.score = DRAW_SCORE;

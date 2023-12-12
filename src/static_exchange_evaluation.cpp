@@ -1,6 +1,6 @@
 #include "pawnstar.h"
 
-static int EvaluateSwapOff(Position& position, int location, int color, int piece_on_square);
+static int EvaluateSwapOff(Position& position, uint8_t location, int color, int piece_on_square);
 
 /*
 Use nominal 1-3-3-5-9 material values for SEE
@@ -20,10 +20,10 @@ int EvaluateStaticExchange(const Position& src_position, Move move)
     if (MovePromoted(move))
     {
         return piece_values[MoveCaptured(move)] + piece_values[MovePromoted(move)] - piece_values[PAWN] - 
-            EvaluateSwapOff(position, MoveTo(move), ColorToMove(position), MovePromoted(move));
+            EvaluateSwapOff(position, MoveTo(move), position.ColorToMove(), MovePromoted(move));
     }
     return piece_values[MoveCaptured(move)] - 
-        EvaluateSwapOff(position, MoveTo(move), ColorToMove(position), MovePiece(move));
+        EvaluateSwapOff(position, MoveTo(move), position.ColorToMove(), MovePiece(move));
 }
 /*
 Determine the swap off value of a capture move onto a fixed square. This 
@@ -31,7 +31,7 @@ function destroys its position during execution, and does not update flags etc
 for speed, since it is called for every move at every node in the tree it must
 be super fast.
 */
-static int EvaluateSwapOff(Position& position, int location, int color, int piece_on_square)
+static int EvaluateSwapOff(Position& position, uint8_t location, int color, int piece_on_square)
 {
     const Sets* const sets                    = &SETS[location];
     const Bitboard square                     = BITBOARD(location);

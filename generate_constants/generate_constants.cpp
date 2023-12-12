@@ -156,7 +156,7 @@ static uint64_t PseudoRandom64(void)
  * @param direction Compass direction.
  * @return Vector from location in direction specified, excluding source square.
  */
-static uint64_t VectorFrom(int location, int direction)
+static uint64_t VectorFrom(uint8_t location, int direction)
 {
     uint64_t result = NO_SQUARES;
     const DirectionVector* dv = &direction_vectors[direction];
@@ -169,42 +169,42 @@ static uint64_t VectorFrom(int location, int direction)
     return result;
 }
 
-static uint64_t NorthOf(int location)
+static uint64_t NorthOf(uint8_t location)
 {
     return VectorFrom(location, DIR_NORTH);
 }
 
-static uint64_t NortheastOf(int location)
+static uint64_t NortheastOf(uint8_t location)
 {
     return VectorFrom(location, DIR_NORTHEAST);
 }
 
-static uint64_t EastOf(int location)
+static uint64_t EastOf(uint8_t location)
 {
     return VectorFrom(location, DIR_EAST);
 }
 
-static uint64_t SoutheastOf(int location)
+static uint64_t SoutheastOf(uint8_t location)
 {
     return VectorFrom(location, DIR_SOUTHEAST);
 }
 
-static uint64_t SouthOf(int location)
+static uint64_t SouthOf(uint8_t location)
 {
     return VectorFrom(location, DIR_SOUTH);
 }
 
-static uint64_t SouthwestOf(int location)
+static uint64_t SouthwestOf(uint8_t location)
 {
     return VectorFrom(location, DIR_SOUTHWEST);
 }
 
-static uint64_t WestOf(int location)
+static uint64_t WestOf(uint8_t location)
 {
     return VectorFrom(location, DIR_WEST);
 }
 
-static uint64_t NorthwestOf(int location)
+static uint64_t NorthwestOf(uint8_t location)
 {
     return VectorFrom(location, DIR_NORTHWEST);
 }
@@ -214,7 +214,7 @@ static uint64_t NorthwestOf(int location)
  * @param location Square index.
  * @return Bitboard of squares attacked by a white pawn on location.
  */
-static uint64_t PawnAttacksWhite(int location)
+static uint64_t PawnAttacksWhite(uint8_t location)
 {
     return ShiftNorthwest(BITBOARD(location)) | ShiftNortheast(BITBOARD(location));
 }
@@ -224,7 +224,7 @@ static uint64_t PawnAttacksWhite(int location)
  * @param location Square index.
  * @return Bitboard of squares attacked by a black pawn on location.
  */
-static uint64_t PawnAttacksBlack(int location)
+static uint64_t PawnAttacksBlack(uint8_t location)
 {
     return ShiftSouthwest(BITBOARD(location)) | ShiftSoutheast(BITBOARD(location));
 }
@@ -250,7 +250,7 @@ static uint64_t KnightFill(uint64_t b)
  * @param location Square index.
  * @return Squares attacked by a knight standing on location.
  */
-static uint64_t KnightAttacks(int location)
+static uint64_t KnightAttacks(uint8_t location)
 {
     return KnightFill(BITBOARD(location));
 }
@@ -260,7 +260,7 @@ static uint64_t KnightAttacks(int location)
  * @param location Square index.
  * @return Bishop attacks on an otherwise empty board.
  */
-static uint64_t BishopAttacks(int location)
+static uint64_t BishopAttacks(uint8_t location)
 {
     return NortheastOf(location) | 
            NorthwestOf(location) | 
@@ -273,7 +273,7 @@ static uint64_t BishopAttacks(int location)
  * @param location Square index.
  * @return Rook attacks on an otherwise empty board.
  */
-static uint64_t RookAttacks(int location)
+static uint64_t RookAttacks(uint8_t location)
 {
     return NorthOf(location) | 
            SouthOf(location) | 
@@ -286,7 +286,7 @@ static uint64_t RookAttacks(int location)
  * @param location Square index.
  * @return Queen attacks on an otherwise empty board.
  */
-static uint64_t QueenAttacks(int location)
+static uint64_t QueenAttacks(uint8_t location)
 {
     return BishopAttacks(location) | RookAttacks(location);
 }
@@ -313,12 +313,12 @@ static uint64_t KingFill(uint64_t b)
  * @param location Square index.
  * @return King attacks by a king standing on location.
  */
-static uint64_t KingAttacks(int location)
+static uint64_t KingAttacks(uint8_t location)
 {
     return KingFill(BITBOARD(location));
 }
 
-static uint64_t KingAttacks2(int location)
+static uint64_t KingAttacks2(uint8_t location)
 {
     return KingFill(KingFill(BITBOARD(location)));
 }
@@ -330,7 +330,7 @@ static uint64_t KingAttacks2(int location)
  * @param location Square index.
  * @return Squares which must be free of black pawns for a white pawn on location to be passed.
  */
-static uint64_t PassedPawnMaskWhite(int location)
+static uint64_t PassedPawnMaskWhite(uint8_t location)
 {
     uint64_t result     = NO_SQUARES;
     const int locn_x    = FileOf(location);
@@ -354,7 +354,7 @@ static uint64_t PassedPawnMaskWhite(int location)
  * @param location Square index.
  * @return Squares which must be free of white pawns for a black pawn on location to be passed.
  */
-static uint64_t PassedPawnMaskBlack(int location)
+static uint64_t PassedPawnMaskBlack(uint8_t location)
 {
     uint64_t result     = NO_SQUARES;
     const int locn_x    = FileOf(location);
@@ -378,7 +378,7 @@ static uint64_t PassedPawnMaskBlack(int location)
  * @param location Square index.
  * @return Squares which must contain at least one white pawn else the pawn on location is isolated.
  */
-static uint64_t IsolatedPawnMaskWhite(int location)
+static uint64_t IsolatedPawnMaskWhite(uint8_t location)
 {
     uint64_t result     = NO_SQUARES;
     const int locn_x    = FileOf(location);
@@ -401,7 +401,7 @@ static uint64_t IsolatedPawnMaskWhite(int location)
  * @param location Square index.
  * @return Squares which must contain at least one black pawn else the pawn on location is isolated.
  */
-static uint64_t IsolatedPawnMaskBlack(int location)
+static uint64_t IsolatedPawnMaskBlack(uint8_t location)
 {
     return IsolatedPawnMaskWhite(location); /* files are symmetrical */
 }
@@ -411,7 +411,7 @@ static uint64_t IsolatedPawnMaskBlack(int location)
  * @param location Square index.
  * @return Squares which if containing a friendly pawn can potentially defend the pawn on location.
  */
-static uint64_t SupportedPawnMaskWhite(int location)
+static uint64_t SupportedPawnMaskWhite(uint8_t location)
 {
     uint64_t result     = NO_SQUARES;
     const int locn_x    = FileOf(location);
@@ -435,7 +435,7 @@ static uint64_t SupportedPawnMaskWhite(int location)
  * @param location Square index.
  * @return Squares which if containing a friendly pawn can potentially defend the pawn on location.
  */
-static uint64_t SupportedPawnMaskBlack(int location)
+static uint64_t SupportedPawnMaskBlack(uint8_t location)
 {
     uint64_t result  = NO_SQUARES;
     const int locn_x = FileOf(location);
@@ -459,7 +459,7 @@ static uint64_t SupportedPawnMaskBlack(int location)
  * @param location Square index.
  * @return Squares which if containing a friendly pawn, make the pawn on location doubled.
  */
-static uint64_t DoubledPawnMaskWhite(int location)
+static uint64_t DoubledPawnMaskWhite(uint8_t location)
 {
     return NorthOf(location);
 }
@@ -469,7 +469,7 @@ static uint64_t DoubledPawnMaskWhite(int location)
  * @param location Square index.
  * @return Squares which if containing a friendly pawn, make the pawn on location doubled.
  */
-static uint64_t DoubledPawnMaskBlack(int location)
+static uint64_t DoubledPawnMaskBlack(uint8_t location)
 {
     return SouthOf(location);
 }
@@ -503,7 +503,7 @@ static uint64_t InterveningSquares(int from, int to)
  * @param direction Compass direction.
  * @return Occupancy mask for that location and direction.
  */
-static uint64_t OccupancyMaskVector(int location, int direction)
+static uint64_t OccupancyMaskVector(uint8_t location, int direction)
 {
     uint64_t result = NO_SQUARES;
     const DirectionVector* dv = &direction_vectors[direction];
@@ -522,7 +522,7 @@ static uint64_t OccupancyMaskVector(int location, int direction)
  * @return Bishop sliding move occupancy mask for source square location.
  */
 static uint64_t
-BishopOccupancyMask(int location)
+BishopOccupancyMask(uint8_t location)
 {
     return OccupancyMaskVector(location, DIR_NORTHEAST) |
            OccupancyMaskVector(location, DIR_NORTHWEST) |
@@ -536,7 +536,7 @@ BishopOccupancyMask(int location)
  * @return Rook sliding move occupancy mask for source square location.
  */
 static uint64_t
-RookOccupancyMask(int location)
+RookOccupancyMask(uint8_t location)
 {
     return OccupancyMaskVector(location, DIR_NORTH) |
            OccupancyMaskVector(location, DIR_SOUTH) |
@@ -579,7 +579,7 @@ VectorMoveTargets(uint64_t occupied_squares,
  */
 static uint64_t
 BishopMoveTargets(uint64_t occupied_squares, 
-                    int    location)
+                  uint8_t  location)
 {
     return VectorMoveTargets(occupied_squares, location, DIR_NORTHEAST) |
            VectorMoveTargets(occupied_squares, location, DIR_SOUTHEAST) |
@@ -595,7 +595,7 @@ BishopMoveTargets(uint64_t occupied_squares,
  */
 static uint64_t
 RookMoveTargets(uint64_t occupied_squares, 
-                  int    location)
+                uint8_t  location)
 {
     return VectorMoveTargets(occupied_squares, location, DIR_NORTH) |
            VectorMoveTargets(occupied_squares, location, DIR_SOUTH) |
@@ -636,8 +636,8 @@ EnumerateMaskCombinations(uint64_t mask,
     return num_combinations;
 }
 
-typedef uint64_t(*OccupancyFn)   (int location);
-typedef uint64_t(*MoveTargetFn)  (uint64_t occupied_squares, int location);
+typedef uint64_t(*OccupancyFn)   (uint8_t location);
+typedef uint64_t(*MoveTargetFn)  (uint64_t occupied_squares, uint8_t location);
 #define MAX_ATTACK_SET_SIZE 4096 /* Rooks have a 12 bit occupancy mask. */
 
 /**
@@ -828,7 +828,7 @@ GenerateMagics(void)
  * i.e. a function which converts a square location into a Bitboard
  * based on some property.
 */
-typedef uint64_t(*BitboardFn)(int location);
+typedef uint64_t(*BitboardFn)(uint8_t location);
 
 /**
  * @brief Bitboard generator.
@@ -924,7 +924,7 @@ int main()
     printf("/* This file was generated on " __DATE__ " at " __TIME__ " */\n");
     printf("#include \"types.h\"\n");
     printf("extern const Sets SETS[64] = \n{");
-    for (int location = 0; location != 64; ++location)
+    for (uint8_t location = 0; location != 64; ++location)
     {
         printf("\n    { /* square %c%c */", FileChar(location), RankChar(location));
         for (const BitboardGen* generator = ray_generators; generator->name; ++generator)
@@ -945,7 +945,7 @@ int main()
     for (int color = 0; color != 2; ++color)
     {
         printf("\n    {");
-        for (int location = 0; location != 64; ++location)
+        for (uint8_t location = 0; location != 64; ++location)
         {
             printf("\n        { /* %s square %c%c */", color_names[color], FileChar(location), RankChar(location));
             for (const BitboardGen* generator = pawn_generators[color];

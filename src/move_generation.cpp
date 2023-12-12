@@ -7,7 +7,7 @@
 void GeneratePseudoLegalMoves(const Position& position,
                               Move            moves[])
 {
-    if (ColorToMove(position) == WHITE)
+    if (position.ColorToMove() == WHITE)
     {
         GenerateMoves<true, WHITE>(position, moves);
     }
@@ -20,7 +20,7 @@ void GeneratePseudoLegalMoves(const Position& position,
 void GeneratePseudoLegalCaptures(const Position& position,
                                  Move            moves[])
 {
-    if (ColorToMove(position) == WHITE)
+    if (position.ColorToMove() == WHITE)
     {
         GenerateMoves<false, WHITE>(position, moves);
     }

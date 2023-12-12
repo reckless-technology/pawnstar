@@ -265,15 +265,15 @@ void GenerateMoves(const Position& position,
                 */
                 if ((position.flags_ & MAY_WHITE_CASTLE_KINGSIDE) && 
                     !(occupied_squares & (BITBOARD("f1") | BITBOARD("g1"))) &&
-                    !IsAttacked(position, F1, BLACK) &&
-                    !IsAttacked(position, G1, BLACK))
+                    !position.IsAttacked(F1, BLACK) &&
+                    !position.IsAttacked(G1, BLACK))
                 {
                     *moves++ = CastlingMove(E1, G1);
                 }
                 if ((position.flags_ & MAY_WHITE_CASTLE_QUEENSIDE) &&
                     !(occupied_squares & (BITBOARD("b1") | BITBOARD("c1") | BITBOARD("d1"))) &&
-                    !IsAttacked(position, D1, BLACK) &&
-                    !IsAttacked(position, C1, BLACK))
+                    !position.IsAttacked(D1, BLACK) &&
+                    !position.IsAttacked(C1, BLACK))
                 {
                     *moves++ = CastlingMove(E1, C1);
                 }
@@ -282,15 +282,15 @@ void GenerateMoves(const Position& position,
             {
                 if ((position.flags_ & MAY_BLACK_CASTLE_KINGSIDE) &&
                     !(occupied_squares & (BITBOARD("f8") | BITBOARD("g8"))) &&
-                    !IsAttacked(position, F8, WHITE) &&
-                    !IsAttacked(position, G8, WHITE))
+                    !position.IsAttacked(F8, WHITE) &&
+                    !position.IsAttacked(G8, WHITE))
                 {
                     *moves++ = CastlingMove(E8, G8);
                 }
                 if ((position.flags_ & MAY_BLACK_CASTLE_QUEENSIDE) &&
                     !(occupied_squares & (BITBOARD("b8") | BITBOARD("c8") | BITBOARD("d8"))) &&
-                    !IsAttacked(position, D8, WHITE) &&
-                    !IsAttacked(position, C8, WHITE))
+                    !position.IsAttacked(D8, WHITE) &&
+                    !position.IsAttacked(C8, WHITE))
                 {
                     *moves++ = CastlingMove(E8, C8);
                 }

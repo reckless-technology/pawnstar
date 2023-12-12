@@ -123,7 +123,7 @@ int MoveToString(const Position& position, Move move, char move_string[])
     Determine if this move results in check or checkmate
     */
     Position dst_position { position, move };
-    if (IsCheckmate(dst_position))
+    if (dst_position.IsCheckmate())
     {
         move_string += sprintf(move_string, "#");
     }

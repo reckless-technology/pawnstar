@@ -170,7 +170,7 @@ Perft(const Position& src_position,
         {
             Position position { src_position, *move };
 #if DO_TEST_HASH_DURING_PERFT
-            if (position.hash != ComputeHash(&position))
+            if (position.hash != position.ComputeHash())
             {
                 printf("\nERROR in hash during perft\n");
             }
@@ -205,7 +205,7 @@ RunPerftTests(void)
         memset(&counts, 0, sizeof(counts));
         total_nodes += test->counts.legal_moves;
         start = GetMilliseconds();
-        Perft(position, test->depth, ColorToMove(position), &counts);
+        Perft(position, test->depth, position.ColorToMove(), &counts);
         stop = GetMilliseconds();
         if (stop == start)
         {

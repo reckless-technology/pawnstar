@@ -38,7 +38,7 @@ AttemptNullMove(const Position&  position,
     {
         INCREMENT("null move attempts");
         Position child_position;
-        MakeNullMove(child_position, position);
+        position.MakeNullMove(child_position);
         Variation dummy;
         dummy.moves[0] = 0;
         int score = -Search(child_position, depth - 3, ply + 1, -beta, -alpha, cancel, dummy);
@@ -90,9 +90,9 @@ Search(const Position&  position,
         return SEARCH_CANCELLED_SCORE;
     }
     INCREMENT("alpha beta calls");
-    if (IsDrawByMaterial  (position) ||
-        IsDrawByFiftyMoves(position) ||
-        IsDrawByRepetition(position, true))
+    if (position.IsDrawByMaterial  () ||
+        position.IsDrawByFiftyMoves() ||
+        position.IsDrawByRepetition(true))
     {
         return DRAW_SCORE;
     }    
