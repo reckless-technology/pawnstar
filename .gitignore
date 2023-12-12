@@ -30,3 +30,4 @@ bin/
 x64/
 build/
 src/generated_data.cpp
+generate_constants/gen_constants*

@@ -3,7 +3,7 @@
 */
 #include <stdio.h>
 #include <stdbool.h>
-#include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 
 #ifndef DO_EXTRA_PAWN_EVAL
@@ -801,7 +801,7 @@ GenerateMagics(void)
                 {
                     printf("\n    ");
                 }
-                printf("0x%016llXull, ", magics[i].attacks[j]);
+                printf("0x%016" PRIX64 "ull, ", magics[i].attacks[j]);
             }
             printf("\n};\n");
            
@@ -812,8 +812,8 @@ GenerateMagics(void)
         {
             char square_name[3] = { (char)('A' + FileOf(i)), RankChar(i), 0 };
             printf("    {\n");
-            printf("        .magic          = 0x%016llXull,\n", magics[i].magic);
-            printf("        .occupancy_mask = 0x%016llXull,\n", magics[i].mask);
+            printf("        .magic          = 0x%016" PRIX64 "ull,\n", magics[i].magic);
+            printf("        .occupancy_mask = 0x%016" PRIX64 "ull,\n", magics[i].mask);
             printf("        .shift          = %d,\n", magics[i].shift);
             printf("        .attacks        = %s_MAGIC_ATTACKS_%s,\n", v->name, square_name);
             printf("        .indices        = %s_MAGIC_INDICES_%s,\n", v->name, square_name);
@@ -930,7 +930,7 @@ int main()
         for (const BitboardGen* generator = ray_generators; generator->name; ++generator)
         {
             const uint64_t b = generator->function(location);
-            printf("\n        .%-20s = 0x%016llXull, /* popcnt %2d */",
+            printf("\n        .%-20s = 0x%016" PRIX64 "ull, /* popcnt %2d */",
                 generator->name,
                 b,
                 PopCount(b));
@@ -953,7 +953,7 @@ int main()
                 ++generator)
             {
                 const uint64_t b = generator->function(location);
-                printf("\n            .%-28s = 0x%016llXull, /* popcnt %2d */",
+                printf("\n            .%-28s = 0x%016" PRIX64 "ull, /* popcnt %2d */",
                     generator->name,
                     b,
                     PopCount(b));
@@ -976,7 +976,7 @@ int main()
             {
                 printf("\n        ");
             }
-            printf("0x%016llXull,", InterveningSquares(i, j));
+            printf("0x%016" PRIX64 "ull,", InterveningSquares(i, j));
         }
         printf("\n    },");
     }
@@ -994,7 +994,7 @@ int main()
                 {
                     printf("\n            ");
                 }
-                printf("0x%016llXull,", piece >= PAWN && piece <= KING ? PseudoRandom64() : 0ull);
+                printf("0x%016" PRIX64 "ull,", piece >= PAWN && piece <= KING ? PseudoRandom64() : 0);
             }
             printf("\n        },");
         }
@@ -1008,7 +1008,7 @@ int main()
         {
             printf("\n    ");
         }
-        printf("0x%016llXull,", PseudoRandom64());
+        printf("0x%016" PRIX64 "ull,", PseudoRandom64());
     }
     printf("\n};\n");
     printf("extern const uint64_t EN_PASSANT_HASHES[64] = \n{");
@@ -1019,7 +1019,7 @@ int main()
             printf("\n    ");
         }
         const int rank = RankOf(i);
-        printf("0x%016llXull,", rank == 2 || rank == 5 ? PseudoRandom64() : 0ull);
+        printf("0x%016" PRIX64 "ull,", rank == 2 || rank == 5 ? PseudoRandom64() : 0);
     }
     printf("\n};\n");
     GenerateMagics();

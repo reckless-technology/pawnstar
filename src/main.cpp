@@ -54,7 +54,9 @@ int main()
     for ( ; ; )
     {
         char line_buffer[256];
-        gets_s(line_buffer, sizeof(line_buffer));
-        ProcessInput(line_buffer);
+        if (fgets(line_buffer, sizeof(line_buffer), stdin))
+        {
+            ProcessInput(line_buffer);
+        }
     }
 }
