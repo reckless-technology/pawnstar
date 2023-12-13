@@ -6,7 +6,11 @@ using std::stringstream;
 using std::string;
 
 #include "position.h"
-#include "pawnstar.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+#include "move_generation.h"
 
 #define A1M (uint16_t)(~MAY_WHITE_CASTLE_QUEENSIDE)
 #define E1M (uint16_t)(~(MAY_WHITE_CASTLE_QUEENSIDE | MAY_WHITE_CASTLE_KINGSIDE))

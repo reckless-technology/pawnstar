@@ -1,4 +1,5 @@
-#include "pawnstar.h"
+#include <stdint.h>
+#include <time.h>
 
 /**
  * @brief Xorshift simple PRNG

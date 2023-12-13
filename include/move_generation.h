@@ -1,5 +1,11 @@
 #pragma once
-#include "pawnstar.h"
+#include "bitboard.h"
+#include "move.h"
+#include "position.h"
+
+int     GenerateLegalMoves(const Position& position, Move moves[]);
+void    GeneratePseudoLegalCaptures(const Position& position, Move moves[]);
+void    GeneratePseudoLegalMoves(const Position& position, Move moves[]);
 
 /**
  * @brief Generate underpromotions to knight, bishop and rook.

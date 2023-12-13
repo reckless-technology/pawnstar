@@ -1,4 +1,9 @@
-#include "pawnstar.h"
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+#include "move_generation.h"
 
 /**
  * @brief Convert a move to standard algebraic notation string.

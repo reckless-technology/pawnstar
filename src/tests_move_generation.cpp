@@ -1,8 +1,17 @@
 #include <string>
 
+#include <memory.h>
+#include <inttypes.h>
+
 using std::string;
 
-#include "pawnstar.h"
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+#include "move_generation.h"
+
 /*
 Structure to hold the counts of different move types
 */

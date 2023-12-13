@@ -4,7 +4,14 @@
 #include <sstream>
 #include <fstream>
 
-#include "pawnstar.h"
+#include <string.h>
+
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+#include "game.h"
 
 using std::string;
 using std::vector;

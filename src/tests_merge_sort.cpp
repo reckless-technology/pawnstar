@@ -1,4 +1,9 @@
-#include "pawnstar.h"
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+
 bool RunMergeSortTests(void)
 {
     Move values[MAX_MOVES_PER_POSITION];

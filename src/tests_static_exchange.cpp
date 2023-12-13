@@ -1,11 +1,15 @@
-#include "pawnstar.h"
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
 
-typedef struct SeeTest
+struct SeeTest
 {
     const char* fen_string;
     int         move;
     int         see_score;
-} SeeTest;
+};
 
 static const SeeTest tests[] = 
 {   

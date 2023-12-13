@@ -1,4 +1,8 @@
-#include "pawnstar.h"
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
 
 static bool IsPrime(int x);
 

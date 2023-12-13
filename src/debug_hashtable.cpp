@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "debug_hashtable.h"
 #include "options.h"
 #include "function_prototypes.h"
 

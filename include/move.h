@@ -1,5 +1,7 @@
 #pragma once
 #include <stdint.h>
+
+#include "options.h"
 /**
  * @file Functions for constructing and using chess moves.
  *
@@ -64,3 +66,12 @@ constexpr bool      IsPawnDoublePushMove(Move m)    { return  m        & (1 << 2
 constexpr int       MoveScore(Move m)               { return  (int)(m >> 32);       }
 constexpr uint32_t  MoveBits(Move m)                { return  m & 0xFFFFFFFF;       }
 constexpr Move      ScoredMove(Move m, int score)   { return (m & 0xFFFFFFFF) | ((int64_t)score << 32); }
+
+/**
+ * @brief A variation, or line of play.
+ * Typically used to record the principal variation during search.
+*/
+struct Variation
+{
+    Move moves[MAX_PLY + 1]; /**< the moves comprising the line  */
+};

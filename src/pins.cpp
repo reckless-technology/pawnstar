@@ -1,4 +1,9 @@
-#include "pawnstar.h"
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+#include "pins.h"
 /**
  * @brief Determine any pinned pieces and their corresponding allowed target squares
  * Note: The contents of pins.allowed_squares[x] for non-pinned pieces is garbage

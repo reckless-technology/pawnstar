@@ -1,8 +1,6 @@
 #include <chrono>
 
-#include "pawnstar.h"
-
-int GetMilliseconds(void)
+extern int GetMilliseconds(void)
 {
     static long long start_ms = 0;
     if (start_ms == 0)

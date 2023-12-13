@@ -1,6 +1,10 @@
 
-#include "pawnstar.h"
-#include "move_generation_template.h"
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+#include "move_generation.h"
 
 #if 1
 

@@ -1,6 +1,10 @@
 #include <algorithm>
 
-#include "pawnstar.h"
+#include <memory.h>
+
+#include "move.h"
+#include "debug_hashtable.h"
+#include "function_prototypes.h"
 
 #define MOVE_MASK 0x7FFF /* piece, from, to only */
 

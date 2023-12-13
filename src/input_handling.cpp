@@ -1,8 +1,16 @@
-#include "pawnstar.h"
-
+#include <string.h>
 #include <string>
 
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+#include "game.h"
+
 using std::string;
+
+extern Game the_game;
 
 /**
  * @brief Handling for input commands (xboard support)
@@ -145,7 +153,7 @@ static void handle_usermove(int argc, char* argv[])
         }
         else
         {
-            DisplayResultIfGameOver(*the_game.position);
+            DisplayResultIfGameOver(the_game);
         }
     }
 }

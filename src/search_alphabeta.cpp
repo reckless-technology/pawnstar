@@ -1,4 +1,12 @@
-#include "pawnstar.h"
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+#include "game.h"
+#include "move_generation.h"
+
+extern Game the_game;
 
 /**
  * @brief Try null move pruning.

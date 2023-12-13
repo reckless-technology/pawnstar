@@ -69,12 +69,7 @@ int         SearchSingleMove(const Position& position, int depth, int ply, int a
 Move        SearchRootNode  (const Position& position);
 
 int         GetMilliseconds(void);
-void        StartThinking(Game& game);
-void        StopThinking(void);
-void        StopWorker(void);
 
-void        InitializeGame(Game& game);
-Move        PlayMoveString(Game& game, char* move_string);
 int         MoveSequenceToSanString(const Position& position, const Move* moves, char* move_string);
 int         MoveToString(const Position& position, Move move, char* move_string);
 
@@ -84,67 +79,16 @@ Move        GetBookMove(uint64_t hash);
 bool        InitializeOpeningBookFromFile(const char* filename);
 bool        InitializeDefaultOpeningBook();
 
-bool        FindTransposition(uint64_t hash, Transposition* transposition);
-void        FreeTranspositionTable(void);
-bool        InitializeTranspositionTable(int megabytes);
-void        RecordTransposition(uint64_t hash, int depth, int score, Move move, int node_type);
-
-void        DeterminePins(const Position& position, Pins& pins);
 int         EvaluateStaticExchange(const Position& src_position, Move move);
 void        InitializeGoodMoveCounts(void);
 void        RecordGoodMove(int ply, Move move);
-int         GenerateLegalMoves(const Position& position, Move moves[]);
-void        GeneratePseudoLegalCaptures(const Position& position, Move moves[]);
-void        GeneratePseudoLegalMoves(const Position& position, Move moves[]);
 void        ScoreAndSortMoves(const Position& position, Move moves[], int ply, int depth);
 void        SortMoves(int num_elements, Move values[]);
 int         EvaluatePosition(const Position& position, int alpha, int beta);
 void        DisplayResultIfGameOver(const Position& position);
-void        PlayMove(Game& game, Move move);
 bool        RunMergeSortTests(void);
 void        RunPerftTests(void);
 void        RunPositionTests(int depth);
 void        RunStaticExchangeTests(void);
 int         NextRandom(void);
 void        ProcessInput(char* line);
-
-#if DEBUGX
-/**
- * @brief Simple debug hash table dictionary fo diagnostic counts.
- */
-struct DebugEntry
-{
-    const char* key;
-    int        count;
-};
-
-extern DebugEntry debug_dict[DEBUG_DICT_SIZE];
-
-/**
-* @brief Increment the count associated with the string literal in key
-*/
-constexpr void DebugXIncrement(const char* key)
-{
-    /*
-    String literals are typically aligned on 4 byte boundaries, so throw away
-    the bottom 2 bits of the address before finding the index into the table
-    */
-    DebugEntry* const entry = &debug_dict[((uint64_t)key >> 2) % DEBUG_DICT_SIZE];
-    entry->key = key;
-    ++entry->count;
-}
-
-/**
-* @brief Conditionally increment the count associated with the string literal in key
-*/
-constexpr void DebugXIncrementIf(bool condition, const char* key)
-{
-    if (condition)
-    {
-        DebugXIncrement(key);
-    }
-}
-
-void DebugXClear(void);
-void DebugXWrite(FILE* file);
-#endif /* DEBUGX */

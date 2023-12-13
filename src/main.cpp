@@ -1,20 +1,9 @@
-#include "pawnstar.h"
-
-Game the_game;
-
-void InitializeGame(Game& game)
-{
-    game.time_control.hard_stop_search_ms              = 0;
-    game.time_control.clock_type                       = CLOCK_STANDARD;
-    game.time_control.standard.milliseconds_per_period = 5 * 60 * 1000; // 5 minutes
-    game.time_control.standard.moves_per_period        = 40;            // 40 moves in 5 mins
-    game.time_control.standard.milliseconds_remaining  = 5 * 60 * 1000;
-    game.node_count                                    = 0;
-    game.engine_color                                  = NEITHER_COLOR;
-    game.do_show_thinking                              = true;
-    game.position                                      = &game.stack[0];
-    *game.position                                     = Position {"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"};
-}
+#include "position.h"
+#include "debug_hashtable.h"
+#include "transposition_table.h"
+#include "types.h"
+#include "function_prototypes.h"
+#include "game.h"
 
 int main()
 {    
