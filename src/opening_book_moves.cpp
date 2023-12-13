@@ -1,8 +1,7 @@
-#include "pawnstar.h"
 /*
 Built in opening book used in the event that pawnstar.book cannot be found.
 */
-const char* const OPENING_BOOK_MOVES = 
+extern const char* const OPENING_BOOK_MOVES = 
 "1. Nf3 d5 2. c4 dxc4 3. e3 c5 4. Bxc4 e6 5. O-O Nf6 6. b3 Nc6 7. Bb2 a6 8. a4 Be7                                      \n" // reti - accepted                              
 "1. Nf3 d5 2. c4 e6 3. g3 Nf6 4. Bg2 Be7 5. O-O O-O 6. b3 c5 7. cxd5 Nxd5 8. Bb2 Nc6 9. d4 b6 10. Nc3 Nxc3              \n" // reti - neo catalan                           
 "1. Nf3 d5 2. g3 Nf6 3. Bg2 g6 4. O-O Bg7 5. d3 O-O 6. Nbd2 Nc6 7. e4 e5 8. c3 a5 9. Re1 dxe4 10. dxe4 Nd7              \n" // reti - barcza                                

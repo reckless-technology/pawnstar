@@ -323,6 +323,18 @@ static uint64_t KingAttacks2(uint8_t location)
     return KingFill(KingFill(BITBOARD(location)));
 }
 
+static uint64_t KingPawnShelterWhite(uint8_t location)
+{
+    const uint64_t b = BITBOARD(location);
+    return ShiftNorthwest(b) | ShiftNorth(b) | ShiftNortheast(b);
+}
+
+static uint64_t KingPawnShelterBlack(uint8_t location)
+{
+    const uint64_t b = BITBOARD(location);
+    return ShiftSouthwest(b) | ShiftSouth(b) | ShiftSoutheast(b);
+}
+
 #if DO_EXTRA_PAWN_EVAL
 
 /**
@@ -844,23 +856,25 @@ typedef struct BitboardGen
  */
 static const BitboardGen ray_generators[] = 
 {
-    { "north",              NorthOf             },
-    { "northeast",          NortheastOf         },
-    { "east",               EastOf              },
-    { "southeast",          SoutheastOf         },
-    { "south",              SouthOf             },
-    { "southwest",          SouthwestOf         },
-    { "west",               WestOf              },
-    { "northwest",          NorthwestOf         },
-    { "pawn_attacks_white", PawnAttacksWhite    },
-    { "pawn_attacks_black", PawnAttacksBlack    },
-    { "knight_attacks",     KnightAttacks       },
-    { "bishop_attacks",     BishopAttacks       },
-    { "rook_attacks",       RookAttacks         },
-    { "queen_attacks",      QueenAttacks        },
-    { "king_attacks",       KingAttacks         },
-    { "king_attacks2",      KingAttacks2        },
-    { NULL,                 NULL                },
+    { "north",                      NorthOf                 },
+    { "northeast",                  NortheastOf             },
+    { "east",                       EastOf                  },
+    { "southeast",                  SoutheastOf             },
+    { "south",                      SouthOf                 },
+    { "southwest",                  SouthwestOf             },
+    { "west",                       WestOf                  },
+    { "northwest",                  NorthwestOf             },
+    { "pawn_attacks_white",         PawnAttacksWhite        },
+    { "pawn_attacks_black",         PawnAttacksBlack        },
+    { "knight_attacks",             KnightAttacks           },
+    { "bishop_attacks",             BishopAttacks           },
+    { "rook_attacks",               RookAttacks             },
+    { "queen_attacks",              QueenAttacks            },
+    { "king_attacks",               KingAttacks             },
+    { "king_attacks2",              KingAttacks2            },
+    { "king_pawn_shelter_white",    KingPawnShelterWhite    },
+    { "king_pawn_shelter_black",    KingPawnShelterBlack    },
+    { NULL,                         NULL                    },
 };
 
 #if DO_EXTRA_PAWN_EVAL
@@ -922,7 +936,7 @@ static const char* const color_names[2] =
 int main()
 {
     printf("/* This file was generated on " __DATE__ " at " __TIME__ " */\n");
-    printf("#include \"types.h\"\n");
+    printf("#include \"generated_data.h\"\n");
     printf("extern const Sets SETS[64] = \n{");
     for (uint8_t location = 0; location != 64; ++location)
     {
@@ -930,7 +944,7 @@ int main()
         for (const BitboardGen* generator = ray_generators; generator->name; ++generator)
         {
             const uint64_t b = generator->function(location);
-            printf("\n        .%-20s = 0x%016" PRIX64 "ull, /* popcnt %2d */",
+            printf("\n        .%-25s = 0x%016" PRIX64 "ull, /* popcnt %2d */",
                 generator->name,
                 b,
                 PopCount(b));

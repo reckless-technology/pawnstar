@@ -108,9 +108,18 @@ void        RunStaticExchangeTests(void);
 int         NextRandom(void);
 void        ProcessInput(char* line);
 
-
 #if DEBUGX
+/**
+ * @brief Simple debug hash table dictionary fo diagnostic counts.
+ */
+struct DebugEntry
+{
+    const char* key;
+    int        count;
+};
+
 extern DebugEntry debug_dict[DEBUG_DICT_SIZE];
+
 /**
 * @brief Increment the count associated with the string literal in key
 */
@@ -136,6 +145,6 @@ constexpr void DebugXIncrementIf(bool condition, const char* key)
     }
 }
 
-void    DebugXClear(void);
-void    DebugXWrite(FILE* file);
-#endif
+void DebugXClear(void);
+void DebugXWrite(FILE* file);
+#endif /* DEBUGX */

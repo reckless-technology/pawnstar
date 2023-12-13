@@ -98,20 +98,3 @@ Move PlayMoveString(Game& game, char* move_str)
     }
     return 0;
 }
-
-/**
- * @brief Make a sequence of moves.
- * @param dst_position destination position after the sequence
- * @param src_position source position
- * @param moves zero terminated list of moves
-*/
-void MakeMoveSequence(Position& dst_position, const Position& src_position, const Move* moves)
-{
-    Position tmp = src_position;
-    for ( ; *moves; ++moves)
-    {
-        dst_position = Position(tmp, *moves);
-        tmp = dst_position;
-    }
-    dst_position.previous_ = &dst_position; // Can't assume stack here.
-}

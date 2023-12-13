@@ -8,12 +8,14 @@
 *
 * Only included when CPP flag DEBUGX is nonzero.
 */
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
-#include "pawnstar.h"
+#include "options.h"
+#include "function_prototypes.h"
 
 #if DEBUGX
-
-#define STRING_LEN 0x80
 
 DebugEntry debug_dict[DEBUG_DICT_SIZE];
 
@@ -25,10 +27,7 @@ void DebugXClear()
     memset(debug_dict, 0, sizeof(debug_dict));
 }
 
-/**
- * @brief Sort predicate for debug table
- */
-int CompareEntries(const DebugEntry** left, const DebugEntry** right)
+static int CompareEntries(const DebugEntry** left, const DebugEntry** right)
 {
     return strcmp((*left)->key, (*right)->key);
 }

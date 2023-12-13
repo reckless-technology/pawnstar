@@ -71,7 +71,7 @@ const int KING_SQUARE_MIDGAME[64] =
    -40,-40,-40,-40,-40,-40,-40,-40,
    -40,-40,-40,-40,-40,-40,-40,-40,
    -20,-20,-20,-20,-20,-20,-20,-20,
-     0, 20, 40,-20,  0,-20, 40, 20
+     0, 40, 20,-20,  0,-20, 40, 20
 };
 
 const int KING_SQUARE_ENDGAME[64] =
@@ -277,19 +277,16 @@ EvaluateKing(const Position& position)
     }
     
     /* Consider pawns in front of the king and approaching enemy pawns */
-    Bitboard pawn_shelter_1;
+    const Bitboard pawn_shelter_1 = SETS[position.king_location_[color]].king_pawn_shelter[color];
     Bitboard pawn_shelter_2;
     Bitboard pawn_shelter_3;
-    const Bitboard king_bb = BITBOARD(position.king_location_[color]);
     if constexpr (color == WHITE)
     {
-        pawn_shelter_1 = ShiftNorthwest(king_bb) | ShiftNorth(king_bb) | ShiftNortheast(king_bb);
         pawn_shelter_2 = ShiftNorth(pawn_shelter_1);
         pawn_shelter_3 = ShiftNorth(pawn_shelter_2);
     }
     else
     {
-        pawn_shelter_1 = ShiftSouthwest(king_bb) | ShiftSouth(king_bb) | ShiftSoutheast(king_bb);
         pawn_shelter_2 = ShiftSouth(pawn_shelter_1);
         pawn_shelter_3 = ShiftSouth(pawn_shelter_2);
     }

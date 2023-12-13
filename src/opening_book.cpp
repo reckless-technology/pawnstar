@@ -49,6 +49,7 @@ bool InitializeOpeningBookFromFile(const char* filename)
  */
 bool InitializeDefaultOpeningBook()
 {
+    extern const char* OPENING_BOOK_MOVES;
     stringstream ss { OPENING_BOOK_MOVES };
     return InitializeOpeningBookFromStringStream(ss);
 }

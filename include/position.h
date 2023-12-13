@@ -8,7 +8,7 @@
 /**
  * @brief Bitset of position state flags.
 */
-enum StateFlags
+enum StateFlags : uint16_t
 {
     MAY_WHITE_CASTLE_KINGSIDE   = 1 <<  0,  /**< white has the right to castle king side                    */
     MAY_WHITE_CASTLE_QUEENSIDE  = 1 <<  1,  /**< white has the right to castle queen side                   */
