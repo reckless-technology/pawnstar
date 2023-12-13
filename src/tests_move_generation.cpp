@@ -8,9 +8,8 @@ using std::string;
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
-#include "types.h"
 #include "function_prototypes.h"
-#include "move_generation.h"
+#include "position_move_generation.h"
 
 /*
 Structure to hold the counts of different move types
@@ -121,36 +120,36 @@ moves of various types, storing the result in counts
 */
 static void 
 CategorizeMoves(const Position& src_position, 
-                const Move      moves[], 
-                PerftCounts*    counts)
+                const MoveList& move_list, 
+                PerftCounts&    counts)
 {
-    for (const Move* move = moves; *move; ++move)
+    for (auto move : move_list)
     {
-        Position position { src_position, *move };
+        Position position { src_position, move };
         if (position.flags_ & IS_MOVED_INTO_CHECK)
         {
             continue;
         }
-        ++counts->legal_moves;
+        ++counts.legal_moves;
         if (position.flags_ & IS_CHECK)
         {
-            ++counts->checks;
+            ++counts.checks;
         }
-        if (MoveCaptured(*move))
+        if (MoveCaptured(move))
         {
-            ++counts->captures;
+            ++counts.captures;
         }
-        if (MovePromoted(*move))
+        if (MovePromoted(move))
         {
-            ++counts->promotions;
+            ++counts.promotions;
         }
-        if (IsEpCaptureMove(*move))
+        if (IsEpCaptureMove(move))
         {
-            ++counts->ep_captures;
+            ++counts.ep_captures;
         }
-        if (IsCastlingMove(*move))
+        if (IsCastlingMove(move))
         {
-            ++counts->castles;
+            ++counts.castles;
         }
     }
 }
@@ -164,18 +163,18 @@ static void
 Perft(const Position& src_position, 
       int             depth, 
       int             color, 
-      PerftCounts*    counts)
+      PerftCounts&    counts)
 {
     static int call_count = 0;
-    Move moves[MAX_MOVES_PER_POSITION];
-    GeneratePseudoLegalMoves(src_position, moves);
+    MoveList move_list;
+    src_position.GeneratePseudoLegalMoves(move_list);
     if (!(++call_count & 0x3FFFF))
     {
-        printf("\rpositions processed %10u", counts->legal_moves);
+        printf("\rpositions processed %10u", counts.legal_moves);
     }
     if (depth > 1)
     {
-        for (const Move* move = moves; *move; ++move)
+        for (const Move* move = move_list.moves; *move; ++move)
         {
             Position position { src_position, *move };
 #if DO_TEST_HASH_DURING_PERFT
@@ -192,7 +191,7 @@ Perft(const Position& src_position,
         }           
         return;
     }
-    CategorizeMoves(src_position, moves, counts);
+    CategorizeMoves(src_position, move_list, counts);
 }
 /*
 Run perft test on the standard test positions
@@ -214,7 +213,7 @@ RunPerftTests(void)
         memset(&counts, 0, sizeof(counts));
         total_nodes += test->counts.legal_moves;
         start = GetMilliseconds();
-        Perft(position, test->depth, position.ColorToMove(), &counts);
+        Perft(position, test->depth, position.ColorToMove(), counts);
         stop = GetMilliseconds();
         if (stop == start)
         {

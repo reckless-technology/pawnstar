@@ -1,9 +1,8 @@
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
-#include "types.h"
 #include "function_prototypes.h"
-#include "move_generation.h"
+#include "position_move_generation.h"
 
 /**
  * @brief Convert a move to standard algebraic notation string.
@@ -15,7 +14,7 @@
 int MoveToString(const Position& position, Move move, char move_string[])
 {
     const char* initial_ptr = move_string;
-    Move legal_moves[MAX_MOVES_PER_POSITION];
+    
     char disambiguation[3]   = { 0 };
     char from_square[3]      = { FileChar(MoveFrom(move)), RankChar(MoveFrom(move)), 0 };
     char to_square[3]        = { FileChar(MoveTo  (move)), RankChar(MoveTo  (move)), 0 };
@@ -27,8 +26,9 @@ int MoveToString(const Position& position, Move move, char move_string[])
     Determine if there is more than one piece of the same type which is capable 
     of moving to the target square, and will require further disambiguation
     */
-    GenerateLegalMoves(position, legal_moves);
-    for (const Move* m = legal_moves; *m; ++m)
+    MoveList legal_moves;
+    position.GenerateLegalMoves(legal_moves);
+    for (const Move* m = legal_moves.moves; *m; ++m)
     {
         if (MovePiece(*m) == MovePiece(move) && 
             MoveTo   (*m) == MoveTo   (move) &&

@@ -4,9 +4,8 @@
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
-#include "types.h"
 #include "function_prototypes.h"
-#include "move_generation.h"
+#include "position_move_generation.h"
 #include "game.h"
 
 Game the_game;
@@ -33,33 +32,8 @@ Make a move and update the game end status flags
 */
 void PlayMove(Game& game, Move move)
 {
-    if (game.position->flags_ & IS_GAME_OVER)
-    {
-        printf("ERROR: attempt to play move after game is over\n");
-        return;
-    }
     game.position[1] = Position(game.position[0], move);
     ++game.position;
-    if (game.position->IsCheckmate())
-    {
-        game.position->flags_ |= IS_CHECKMATE;
-    }
-    else if (game.position->IsStalemate())
-    {
-        game.position->flags_ |= IS_STALEMATE;
-    }
-    else if (game.position->IsDrawByRepetition(false))
-    {
-        game.position->flags_ |= IS_DRAW_REPETITION;
-    }
-    else if (game.position->IsDrawByMaterial())
-    {
-        game.position->flags_ |= IS_DRAW_MATERIAL;
-    }
-    else if (game.position->IsDrawByFiftyMoves())
-    {
-        game.position->flags_ |= IS_DRAW_50_MOVES;
-    }
 }
 
 /*
@@ -71,13 +45,9 @@ returns zero if the move was illegal or the game is over
 */
 Move PlayMoveString(Game& game, char* move_str)
 {
-    if (game.position->flags_ & IS_GAME_OVER)
-    {
-        return 0;
-    }  
-    Move moves[MAX_MOVES_PER_POSITION];
-    GenerateLegalMoves(*game.position, moves);
-    for (const Move* move = moves; *move; ++move)
+    MoveList move_list;
+    game.position->GenerateLegalMoves(move_list);
+    for (const Move* move = move_list.moves; *move; ++move)
     {
         char buffer[16];
         MoveToString(*game.position, *move,  buffer);
@@ -127,32 +97,40 @@ static bool AreMoveStringsEquivalent(char* str1, char* str2)
     return !strcmp(str1, str2);
 }
 
-/*
-If the game is over, display the xboard style result string
-*/
-void DisplayResultIfGameOver(const Game& game)
+/**
+ * @brief Check to see if the game is over. Display the result and return true if so.
+ * @param game The game
+ * @return true in the case of checkmate, stalemate or a draw for insufficient material, 50 moves or repetition.
+ */
+bool IsGameOver(const Game& game)
 {
     const Position& position = *game.position;
-    switch (position.flags_ & IS_GAME_OVER)
+    if (position.IsCheckmate())
     {
-    default:
-        break;
-    case IS_CHECKMATE:
-        printf((position.flags_ & IS_BLACK_TO_MOVE) ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
-        break;
-    case IS_STALEMATE:
-        printf("1/2-1/2 {stalemate}\n");
-        break;
-    case IS_DRAW_REPETITION:
-        printf("1/2-1/2 {draw by repetition}\n");
-        break;
-    case IS_DRAW_MATERIAL:
-        printf("1/2-1/2 {draw by insufficient material}\n");
-        break;
-    case IS_DRAW_50_MOVES:
-        printf("1/2-1/2 {draw by 50 reversible moves}\n");
-        break;
+        printf(position.ColorToMove() == BLACK ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
+        return true;
     }
+    if (position.IsStalemate())
+    {
+        printf("1/2-1/2 {stalemate}\n");
+        return true;
+    }
+    if (position.IsDrawByRepetition(false))
+    {
+        printf("1/2-1/2 {draw by repetition}\n");
+        return true;
+    }
+    if (position.IsDrawByMaterial())
+    {
+        printf("1/2-1/2 {draw by insufficient material}\n");
+        return true;
+    }
+    if (position.IsDrawByFiftyMoves())
+    {
+        printf("1/2-1/2 {draw by 50 reversible moves}\n");
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -168,7 +146,7 @@ static void SearchThreadEntry(Game& game)
         MoveToString(*game.position, move, move_string);
         PlayMove(game, move);
         printf("move %s\n", move_string);
-        DisplayResultIfGameOver(game);
+        IsGameOver(game);
     }  
 }
 

@@ -1,10 +1,9 @@
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
-#include "types.h"
 #include "function_prototypes.h"
 #include "game.h"
-#include "move_generation.h"
+#include "position_move_generation.h"
 
 extern Game the_game;
 
@@ -224,13 +223,13 @@ Search(const Position&  position,
     We didn't get a cutoff from the transposition table so proceed
     with generating and searching moves.
     */
-    Move moves[MAX_MOVES_PER_POSITION];
-    GeneratePseudoLegalMoves(position, moves);
-    ScoreAndSortMoves(position, moves, ply, depth);
+    MoveList move_list;
+    position.GeneratePseudoLegalMoves(move_list);
+    ScoreAndSortMoves(position, move_list.moves, ply, depth);
     /* 
     Start of the main loop. 
     */
-    for (const Move* move = moves; *move; ++move)
+    for (auto move : move_list)
     {
         int score;
 #if DO_LATE_MOVE_REDUCTION
@@ -244,7 +243,7 @@ Search(const Position&  position,
         if (!(position.flags & IS_CHECK) && 
               num_legal_moves > 2               &&
               beta == alpha + 1                 &&
-              MoveScore(*move) < 0)
+              MoveScore(move) < 0)
         {
             if (depth <= 1)
             {
@@ -254,13 +253,13 @@ Search(const Position&  position,
             else
             {
                 INCREMENT("negative SEE reduction attempts");
-                score = SearchSingleMove(position, depth - 1, ply, alpha, beta, cancel, *move, pv, num_legal_moves);
+                score = SearchSingleMove(position, depth - 1, ply, alpha, beta, cancel, move, pv, num_legal_moves);
             }
         }
         else
 #endif
         {
-            score = SearchSingleMove(position, depth, ply, alpha, beta, cancel, *move, pv, num_legal_moves);
+            score = SearchSingleMove(position, depth, ply, alpha, beta, cancel, move, pv, num_legal_moves);
         }
         if (cancel)
         {
@@ -275,8 +274,8 @@ Search(const Position&  position,
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            RecordTransposition(position.hash_, depth, beta, *move, NODE_CUT);
-            RecordGoodMove(ply, *move);
+            RecordTransposition(position.hash_, depth, beta, move, NODE_CUT);
+            RecordGoodMove(ply, move);
             return beta;
         }
         if (score > alpha)
@@ -289,9 +288,9 @@ Search(const Position&  position,
             may later turn out to be a PV but we don't know that 
             for sure yet until we have searched every move.
             */
-            RecordTransposition(position.hash_, depth, score, *move, NODE_CUT);
-            RecordGoodMove(ply, *move);
-            best_move = *move;
+            RecordTransposition(position.hash_, depth, score, move, NODE_CUT);
+            RecordGoodMove(ply, move);
+            best_move = move;
         }
     }
     /*

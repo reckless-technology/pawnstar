@@ -1,30 +1,31 @@
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <memory.h>
 
 using std::stringstream;
 using std::string;
+using std::string_view;
 
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
-#include "types.h"
 #include "function_prototypes.h"
-#include "move_generation.h"
+#include "position_move_generation.h"
 
-#define A1M (uint16_t)(~MAY_WHITE_CASTLE_QUEENSIDE)
-#define E1M (uint16_t)(~(MAY_WHITE_CASTLE_QUEENSIDE | MAY_WHITE_CASTLE_KINGSIDE))
-#define H1M (uint16_t)(~MAY_WHITE_CASTLE_KINGSIDE)
-#define A8M (uint16_t)(~MAY_BLACK_CASTLE_QUEENSIDE)
-#define E8M (uint16_t)(~(MAY_BLACK_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE))
-#define H8M (uint16_t)(~MAY_BLACK_CASTLE_KINGSIDE)
-#define OK  0xFFFF
+#define A1M (uint8_t)( ~MAY_WHITE_CASTLE_QUEENSIDE)
+#define E1M (uint8_t)(~(MAY_WHITE_CASTLE_QUEENSIDE | MAY_WHITE_CASTLE_KINGSIDE))
+#define H1M (uint8_t)( ~MAY_WHITE_CASTLE_KINGSIDE)
+#define A8M (uint8_t)( ~MAY_BLACK_CASTLE_QUEENSIDE)
+#define E8M (uint8_t)(~(MAY_BLACK_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE))
+#define H8M (uint8_t)( ~MAY_BLACK_CASTLE_KINGSIDE)
+#define OK  0xFF
 
 /**
  * @brief Castling rights flags based on move square from and to index.
  * Moves to and from king and rook squares invalidate castling rights.
 */
-static const uint16_t CASTLING_RIGHTS_MASKS[64] =
+static const uint8_t CASTLING_RIGHTS_MASKS[64] =
 {
    A1M,  OK,  OK,  OK, E1M,  OK,  OK, H1M,
     OK,  OK,  OK,  OK,  OK,  OK,  OK,  OK,
@@ -90,8 +91,6 @@ Position::MovePiece(int color,
     pieces_of_color_[color] ^= from_to_bb;
     hash_ ^= hash[to] ^ hash[from];
 }
-
-#define BAD_FEN_STRING printf("ERROR: bad FEN string %s\n", fen_string); return
 
 Position::Position(const Position& that, Move move) noexcept
 {                          
@@ -215,12 +214,14 @@ Position::Position(const Position& that, Move move) noexcept
     }
 }
 
+#define BAD_FEN_STRING printf("ERROR: bad FEN string %s\n", fen_string); return
+
 Position::Position(const char* fen_string) noexcept
 {
-    const string white_piece_names { "PNBRQK"   };
-    const string black_piece_names { "pnbrqk"   };
-    const string ep_files { "abcdefgh" };
-    const string ep_ranks { "36"       };
+    static constexpr string_view white_piece_names { "PNBRQK"   };
+    static constexpr string_view black_piece_names { "pnbrqk"   };
+    static constexpr string_view ep_files { "abcdefgh" };
+    static constexpr string_view ep_ranks { "36"       };
     stringstream ss { fen_string };
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
@@ -379,25 +380,6 @@ Position::Position(const char* fen_string) noexcept
     {
         flags_ |= IS_CHECK;
     }
-    /*
-    Check to see if this position represents checkmate, stalemate or 
-    draw by insufficient material and set flags accordingly.
-    */
-    if (IsCheckmate())
-    {
-        printf("NOTE: FEN string specifies a checkmate position\n");
-        flags_ |= IS_CHECKMATE;
-    }
-    else if (IsStalemate())
-    {
-        printf("NOTE: FEN string specifies a stalemate position\n");
-        flags_ |= IS_STALEMATE;
-    }
-    else if (IsDrawByMaterial())
-    {
-        printf("NOTE: FEN string specifies a draw by insufficient material position\n");
-        flags_ |= IS_DRAW_MATERIAL;
-    }
 }
 
 Position::operator std::string() const
@@ -422,8 +404,8 @@ Position::operator std::string() const
                     num_empty_squares = 0;
                 }
                 const char piece = (white_pieces_ & BITBOARD(x, y)) ?
-                    " PNBRQK"[PieceAt(*this, x + 8 * y)] : 
-                    " pnbrqk"[PieceAt(*this, x + 8 * y)];
+                    " PNBRQK"[PieceAt(x + 8 * y)] : 
+                    " pnbrqk"[PieceAt(x + 8 * y)];
                 ss << piece;
             }
         }
@@ -692,20 +674,20 @@ Determine if the current position represents stalemate
 */
 bool Position::IsStalemate() const
 {
-    Move moves[MAX_MOVES_PER_POSITION];
+    MoveList move_list;
     return 
         !(flags_ & IS_CHECK) && 
-        GenerateLegalMoves(*this, moves) == 0;
+        GenerateLegalMoves(move_list) == 0;
 }
 /*
 Determine if the current position represents checkmate
 */
 bool Position::IsCheckmate() const
 {
-    Move moves[MAX_MOVES_PER_POSITION];
+    MoveList move_list;
     return 
         (flags_ & IS_CHECK) && 
-        GenerateLegalMoves(*this, moves) == 0;
+        GenerateLegalMoves(move_list) == 0;
 }
 
 /**
@@ -732,5 +714,33 @@ Position::ComputeHash() const
         }
     }
     return hash;
+}
+
+void Position::GeneratePseudoLegalMoves(MoveList& moves) const
+{
+    GenerateMoves<true>(moves);
+}
+
+void Position::GeneratePseudoLegalCaptures(MoveList& moves) const
+{
+    GenerateMoves<false>(moves);
+}
+
+int Position::GenerateLegalMoves(MoveList& m) const
+{
+    const Move *const initial_ptr = m.moves;
+    Move* moves = m.moves;
+    MoveList pseudo_legal_moves;
+    GeneratePseudoLegalMoves(pseudo_legal_moves);
+    for (const Move* move = pseudo_legal_moves.moves; *move; ++move)
+    {
+        Position position { *this, *move };
+        if (!(position.flags_ & IS_MOVED_INTO_CHECK))
+        {
+            *moves++ = *move;
+        }
+    }
+    *moves = 0;
+    return (int)(moves - initial_ptr);
 }
 

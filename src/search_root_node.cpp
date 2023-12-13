@@ -1,10 +1,9 @@
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
-#include "types.h"
 #include "function_prototypes.h"
 #include "game.h"
-#include "move_generation.h"
+#include "position_move_generation.h"
 
 static volatile bool is_cancel_pending;
 extern Game the_game;
@@ -24,22 +23,22 @@ void StopThinking()
 */
 Move SearchRootNode(const Position& position)
 {
-    if (position.flags_ & IS_GAME_OVER)
-    {
-        return 0;
-    }
     /* If there is a book move for this position, do not bother with search. */
     Move book_move = GetBookMove(position.hash_);
     if (book_move)
     {
         return book_move;
     } 
-    Move moves[MAX_MOVES_PER_POSITION];
-    int num_legal_moves = GenerateLegalMoves(position, moves);
+    MoveList move_list;
+    int num_legal_moves = position.GenerateLegalMoves(move_list);
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
+    if (num_legal_moves == 0)
+    {
+        return 0;
+    }
     if (num_legal_moves == 1)
     {
-        return moves[0];
+        return move_list.moves[0];
     }  
     /* Plan time usage for this search. */
     int timeout_ms      = 0;    /* cancel search when this time expires             */
@@ -87,11 +86,11 @@ Move SearchRootNode(const Position& position)
     Move best_moves[MAX_PLY]; /* Best move found at each ply of search. */
     for (int i = 0; i != num_legal_moves; ++i)
     {
-        const int score = SearchSingleMove(position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, is_cancel_pending, moves[i], principal_variation, i);
-        moves[i] = ScoredMove(moves[i], score);
+        const int score = SearchSingleMove(position, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, is_cancel_pending, move_list.moves[i], principal_variation, i);
+        move_list.moves[i] = ScoredMove(move_list.moves[i], score);
     }   
-    SortMoves(num_legal_moves, moves);
-    Move best_move = moves[0];
+    SortMoves(num_legal_moves, move_list.moves);
+    Move best_move = move_list.moves[0];
     best_moves[STARTING_SEARCH_DEPTH] = best_move;
     
     for (int depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
@@ -101,7 +100,7 @@ Move SearchRootNode(const Position& position)
             break;
         }
         the_game.node_count = 0;
-        SortMoves(num_legal_moves, moves); /* Sort moves from previous iteration depth. */
+        SortMoves(num_legal_moves, move_list.moves); /* Sort moves from previous iteration depth. */
         Variation child_pv = { 0 };
         int alpha = ALPHA;
         for (int i = 0; i != num_legal_moves; ++i)
@@ -109,19 +108,19 @@ Move SearchRootNode(const Position& position)
             int score;    
             if (i == 0)
             {
-                score = SearchSingleMove(position, depth, 0, alpha, BETA, is_cancel_pending, moves[i], child_pv, i);
-                moves[i] = ScoredMove(moves[i], score);
+                score = SearchSingleMove(position, depth, 0, alpha, BETA, is_cancel_pending, move_list.moves[i], child_pv, i);
+                move_list.moves[i] = ScoredMove(move_list.moves[i], score);
             }
             else
             {
                 INCREMENT("pvs root node attempts");
-                score = SearchSingleMove(position, depth, 0, alpha, alpha + 1, is_cancel_pending, moves[i], child_pv, i);
-                moves[i] = ScoredMove(moves[i], score);
+                score = SearchSingleMove(position, depth, 0, alpha, alpha + 1, is_cancel_pending, move_list.moves[i], child_pv, i);
+                move_list.moves[i] = ScoredMove(move_list.moves[i], score);
                 if (score > alpha)
                 {
                     INCREMENT("pvs root node fails");
-                    score = SearchSingleMove(position, depth, 0, alpha, BETA, is_cancel_pending, moves[i], child_pv, i);
-                    moves[i] = ScoredMove(moves[i], score);
+                    score = SearchSingleMove(position, depth, 0, alpha, BETA, is_cancel_pending, move_list.moves[i], child_pv, i);
+                    move_list.moves[i] = ScoredMove(move_list.moves[i], score);
                 }
             }
             if (is_cancel_pending)
@@ -131,8 +130,8 @@ Move SearchRootNode(const Position& position)
             if (score > alpha)
             {
                 alpha             = score;
-                best_move         = moves[i];
-                best_moves[depth] = moves[i];
+                best_move         = move_list.moves[i];
+                best_moves[depth] = move_list.moves[i];
                 RecordTransposition(position.hash_, depth, alpha, best_move, NODE_PV);
                 CopyVariation(principal_variation, child_pv, best_move);
                 if (the_game.do_show_thinking)

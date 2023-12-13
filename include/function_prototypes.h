@@ -3,8 +3,10 @@
 #include <string>
 
 #include "bitboard.h"
-#include "types.h"
+#include "move.h"
 #include "generated_data.h"
+
+struct Position;
 
 constexpr uint8_t   FileOf(int locn)    { return locn & 7;              }
 constexpr uint8_t   RankOf(int locn)    { return locn >> 3;             }
@@ -49,20 +51,6 @@ CopyVariation(Variation&       dst_variation,
     *dst = 0;
 }
 
-constexpr uint8_t
-PieceAt(const Position& position, 
-        int             location)
-{
-    const Bitboard square = BITBOARD(location);
-    return 
-        (square & position.pawns_)   ? PAWN   :
-        (square & position.knights_) ? KNIGHT :
-        (square & position.bishops_) ? BISHOP :
-        (square & position.rooks_)   ? ROOK   :
-        (square & position.queens_)  ? QUEEN  :
-        (square & position.kings_)   ? KING   : NO_PIECE;
-}
-
 int         Search          (const Position& position, int depth, int ply, int alpha, int beta, volatile bool& cancel, Variation& parent_pv);
 int         SearchQuiescent (const Position& position, int depth, int ply, int alpha, int beta, volatile bool& cancel);
 int         SearchSingleMove(const Position& position, int depth, int ply, int alpha, int beta, volatile bool& cancel, Move move, Variation& pv, int move_index);
@@ -85,7 +73,6 @@ void        RecordGoodMove(int ply, Move move);
 void        ScoreAndSortMoves(const Position& position, Move moves[], int ply, int depth);
 void        SortMoves(int num_elements, Move values[]);
 int         EvaluatePosition(const Position& position, int alpha, int beta);
-void        DisplayResultIfGameOver(const Position& position);
 bool        RunMergeSortTests(void);
 void        RunPerftTests(void);
 void        RunPositionTests(int depth);

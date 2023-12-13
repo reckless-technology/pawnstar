@@ -4,7 +4,6 @@
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
-#include "types.h"
 #include "function_prototypes.h"
 #include "game.h"
 
@@ -118,10 +117,7 @@ static void handle_force(int argc, char* argv[])
 static void handle_go(int argc, char* argv[])
 {
     the_game.engine_color = the_game.position->ColorToMove();
-    if (!(the_game.position->flags_ & IS_GAME_OVER))
-    {
-        StartThinking(the_game);
-    }
+    StartThinking(the_game);
     (void)argc;
     (void)argv;
 }
@@ -145,15 +141,11 @@ static void handle_usermove(int argc, char* argv[])
     {
         printf("Illegal move: %s\n", argv[1]);
     }
-    else
+    if (!IsGameOver(the_game))
     {
-        if (!(the_game.position->flags_ & IS_GAME_OVER) && the_game.engine_color == (int)the_game.position->ColorToMove())
+        if (the_game.engine_color == (int)the_game.position->ColorToMove())
         {
             StartThinking(the_game);
-        }
-        else
-        {
-            DisplayResultIfGameOver(the_game);
         }
     }
 }

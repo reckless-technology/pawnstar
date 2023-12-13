@@ -25,4 +25,4 @@ void    StartThinking(Game& game);
 void    StopThinking(void);
 void    StopWorker(void);
 void    PlayMove(Game& game, Move move);
-void    DisplayResultIfGameOver(const Game& game);
+bool    IsGameOver(const Game& game);

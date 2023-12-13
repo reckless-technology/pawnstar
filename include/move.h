@@ -48,12 +48,12 @@ enum Color
     NEITHER_COLOR,
 };
 
-constexpr Move PromotionMove    (int from, int to, int captured, int promoted)  { return (to|(from<<6)|(PAWN <<12)|(captured<<15)|(promoted<<18)); }
-constexpr Move CastlingMove     (int from, int to)                              { return (to|(from<<6)|(KING <<12)|               (1<<21));        }
-constexpr Move EpCaptureMove    (int from, int to)                              { return (to|(from<<6)|(PAWN <<12)|(PAWN    <<15)|(1<<22));        }
-constexpr Move DoublePushMove   (int from, int to)                              { return (to|(from<<6)|(PAWN <<12)|               (1<<23));        }
-constexpr Move CaptureMove      (int from, int to, int piece, int captured)     { return (to|(from<<6)|(piece<<12)|(captured<<15));                }
-constexpr Move NonCaptureMove   (int from, int to, int piece)                   { return (to|(from<<6)|(piece<<12));                               }
+constexpr Move PromotionMove (uint8_t from, uint8_t to, uint8_t captured, uint8_t promoted) { return to|(from<<6)|(PAWN <<12)|(captured<<15)|(promoted<<18); }
+constexpr Move CastlingMove  (uint8_t from, uint8_t to)                                     { return to|(from<<6)|(KING <<12)|               (1<<21);        }
+constexpr Move EpCaptureMove (uint8_t from, uint8_t to)                                     { return to|(from<<6)|(PAWN <<12)|(PAWN    <<15)|(1<<22);        }
+constexpr Move DoublePushMove(uint8_t from, uint8_t to)                                     { return to|(from<<6)|(PAWN <<12)|               (1<<23);        }
+constexpr Move CaptureMove   (uint8_t from, uint8_t to, uint8_t piece, uint8_t captured)    { return to|(from<<6)|(piece<<12)|(captured<<15);                }
+constexpr Move NonCaptureMove(uint8_t from, uint8_t to, uint8_t piece)                      { return to|(from<<6)|(piece<<12);                               }
 
 constexpr uint8_t   MoveTo(Move m)                  { return  m        & 0x3F;      }
 constexpr uint8_t   MoveFrom(Move m)                { return (m >>  6) & 0x3F;      }
@@ -74,4 +74,28 @@ constexpr Move      ScoredMove(Move m, int score)   { return (m & 0xFFFFFFFF) | 
 struct Variation
 {
     Move moves[MAX_PLY + 1]; /**< the moves comprising the line  */
+};
+
+/**
+ * @brief A list of moves for a specific position.
+ */
+struct MoveList
+{
+    Move moves[MAX_MOVES_PER_POSITION]; /**< The moves (zero terminarted) */
+    struct Sentinel {};
+    /**
+     * @brief C++20 style iterator to allow "for (move : move_list)" semantics
+     * to check for null terminated move list by using dummy sentinel.
+     */
+    struct Iterator
+    {
+        Iterator(const Move* m) : move_(m)      {}
+        const Move& operator*() const           { return *move_; }
+        bool operator==(const Sentinel&) const  { return *move_ == 0; }
+        Iterator& operator++()                  { ++move_; return *this; }
+    private:
+        const Move* move_;
+    };
+    Iterator begin() const  { return Iterator(moves); }
+    Sentinel end() const    { return Sentinel {}; }
 };

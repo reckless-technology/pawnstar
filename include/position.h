@@ -8,7 +8,7 @@
 /**
  * @brief Chess board square indices.
 */
-enum Squares
+enum Square : uint8_t
 {
     A1, B1, C1, D1, E1, F1, G1, H1,
     A2, B2, C2, D2, E2, F2, G2, H2,
@@ -23,23 +23,16 @@ enum Squares
 /**
  * @brief Bitset of position state flags.
 */
-enum StateFlags : uint16_t
+enum StateFlags : uint8_t
 {
-    MAY_WHITE_CASTLE_KINGSIDE   = 1 <<  0,  /**< white has the right to castle king side                    */
-    MAY_WHITE_CASTLE_QUEENSIDE  = 1 <<  1,  /**< white has the right to castle queen side                   */
-    MAY_BLACK_CASTLE_KINGSIDE   = 1 <<  2,  /**< black has the right to castle king side                    */
-    MAY_BLACK_CASTLE_QUEENSIDE  = 1 <<  3,  /**< black has the right to castle queen side                   */
-    IS_BLACK_TO_MOVE            = 1 <<  4,  /**< it is black's turn to move                                 */
-    IS_CHECK                    = 1 <<  5,  /**< is the side to move in check                               */
-    IS_MOVED_INTO_CHECK         = 1 <<  6,  /**< is the side not to move in check (illegal position)        */
-    IS_CHECKMATE                = 1 <<  7,  /**< position represents checkmate                              */
-    IS_STALEMATE                = 1 <<  8,  /**< position represents stalemate                              */
-    IS_DRAW_REPETITION          = 1 <<  9,  /**< position represents draw by repetition 3 times             */
-    IS_DRAW_MATERIAL            = 1 << 10,  /**< position represents draw by insufficient material to mate  */
-    IS_DRAW_50_MOVES            = 1 << 11,  /**< position represents draw by the 50 move rule               */
-    IS_NULL_MOVE                = 1 << 12,  /**< position was the result of a null move                     */
-    IS_GAME_DRAWN               = (IS_STALEMATE | IS_DRAW_REPETITION | IS_DRAW_MATERIAL | IS_DRAW_50_MOVES),
-    IS_GAME_OVER                = (IS_GAME_DRAWN | IS_CHECKMATE),
+    MAY_WHITE_CASTLE_KINGSIDE   = 1 << 0,  /**< white has the right to castle king side                    */
+    MAY_WHITE_CASTLE_QUEENSIDE  = 1 << 1,  /**< white has the right to castle queen side                   */
+    MAY_BLACK_CASTLE_KINGSIDE   = 1 << 2,  /**< black has the right to castle king side                    */
+    MAY_BLACK_CASTLE_QUEENSIDE  = 1 << 3,  /**< black has the right to castle queen side                   */
+    IS_BLACK_TO_MOVE            = 1 << 4,  /**< it is black's turn to move                                 */
+    IS_CHECK                    = 1 << 5,  /**< is the side to move in check                               */
+    IS_MOVED_INTO_CHECK         = 1 << 6,  /**< is the side not to move in check (illegal position)        */
+    IS_NULL_MOVE                = 1 << 7,  /**< position was the result of a null move                     */
     CASTLING_RIGHTS_MASK        = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | 
                                    MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE),
 };
@@ -76,7 +69,7 @@ struct Position
     };    
     uint64_t        hash_;                  /**< Zobrist hash of this position, maintained incrementally    */
     const Position* previous_;              /**< position immediately prior to this in the line of play     */
-    uint16_t        flags_;                 /**< game state-machine flags                                   */
+    uint8_t         flags_;                 /**< game state-machine flags                                   */
     uint8_t         king_location_[2];      /**< square index of white and black kings                      */
     uint8_t         en_passant_index_;      /**< en passant capture availability square (0 if none)         */
     uint8_t         reversible_move_count_; /**< number of consecutive reversible half-moves (plies)        */
@@ -102,4 +95,24 @@ struct Position
     bool        IsDrawByRepetition(bool is_search) const;
     bool        IsStalemate() const;
     uint64_t    ComputeHash() const;
+    int         GenerateLegalMoves(MoveList& moves) const;
+    void        GeneratePseudoLegalCaptures(MoveList& moves) const;
+    void        GeneratePseudoLegalMoves(MoveList& moves) const;
+    
+    constexpr uint8_t PieceAt(uint8_t location) const 
+    {
+        const Bitboard square = BITBOARD(location);
+        return 
+            (square & pawns_)   ? PAWN   :
+            (square & knights_) ? KNIGHT :
+            (square & bishops_) ? BISHOP :
+            (square & rooks_)   ? ROOK   :
+            (square & queens_)  ? QUEEN  :
+            (square & kings_)   ? KING   : NO_PIECE;
+    }
+
+private:
+    template <bool do_all_moves> void GenerateMoves(MoveList& moves) const;
 };
+
+#include "position_move_generation.h"

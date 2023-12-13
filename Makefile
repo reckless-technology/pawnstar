@@ -1,6 +1,6 @@
 PROGRAM             = pawnstar
 CXX                 = g++
-CXXFLAGS            = -I include -Wall -Wextra -std=c++17
+CXXFLAGS            = -I include -Wall -Wextra -std=c++20
 
 GENERATED_DATA      = generated_data.cpp
 GENERATED_DATA_SRC  = generate_constants/generate_constants.cpp

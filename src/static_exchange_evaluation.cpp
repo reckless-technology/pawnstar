@@ -1,7 +1,6 @@
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
-#include "types.h"
 #include "function_prototypes.h"
 
 static int EvaluateSwapOff(Position& position, uint8_t location, int color, int piece_on_square);

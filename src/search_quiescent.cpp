@@ -1,9 +1,8 @@
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
-#include "types.h"
 #include "function_prototypes.h"
-#include "move_generation.h"
+#include "position_move_generation.h"
 
 /**
  * @brief Alpha beta quiescence (capture only) search.
@@ -45,17 +44,17 @@ int SearchQuiescent(const Position& position,
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
-    Move moves[MAX_MOVES_PER_POSITION];
-    GeneratePseudoLegalCaptures(position, moves);
-    ScoreAndSortMoves(position, moves, ply, depth);
-    for (const Move* move = moves; *move; ++move)
+    MoveList move_list;
+    position.GeneratePseudoLegalCaptures(move_list);
+    ScoreAndSortMoves(position, move_list.moves, ply, depth);
+    for (auto move : move_list)
     {
-        if (MoveScore(*move) < 0)
+        if (MoveScore(move) < 0)
         {
             INCREMENT("negative SEE quiescent skips");
             continue;
         }
-        Position child_position { position, *move };
+        Position child_position { position, move };
         if (child_position.flags_ & IS_MOVED_INTO_CHECK)
         {
             INCREMENT("quiescent moved into check");
@@ -65,14 +64,14 @@ int SearchQuiescent(const Position& position,
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            RecordGoodMove(ply, *move);
+            RecordGoodMove(ply, move);
             return beta;
         }
         if (score > alpha)
         {
             alpha = score;
             INCREMENT("quiescent pv changed");
-            RecordGoodMove(ply, *move);
+            RecordGoodMove(ply, move);
         }      
     }
     return alpha;
