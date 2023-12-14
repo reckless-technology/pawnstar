@@ -7,6 +7,7 @@
 #include "generated_data.h"
 
 struct Position;
+struct Game;
 
 constexpr uint8_t   FileOf(int locn)    { return locn & 7;              }
 constexpr uint8_t   RankOf(int locn)    { return locn >> 3;             }
@@ -45,7 +46,7 @@ void    SortMoves(int num_elements, Move values[]);
 int     EvaluatePosition(const Position& position, int alpha, int beta);
 bool    RunMergeSortTests(void);
 void    RunPerftTests(void);
-void    RunPositionTests(int depth);
+void    RunPositionTests(Game& game, int depth);
 void    RunStaticExchangeTests(void);
 int     NextRandom(void);
-void    ProcessInput(char* line);
+void    ProcessInput(Game& game, char* line);

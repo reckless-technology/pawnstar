@@ -116,8 +116,7 @@ void DisplayAvailableBookMoves(const Position& position)
  */
 static bool ParseLineOfPlay(const string& line)
 {
-    Game game;
-    InitializeGame(game);
+    Game game {};
     stringstream ss { line };
     while (ss)
     {
@@ -134,7 +133,7 @@ static bool ParseLineOfPlay(const string& line)
         char move_string_mutable[16];
         strncpy(move_string_mutable, token.c_str(), sizeof(move_string_mutable) - 1);
         const uint64_t hash = game.position->hash_;
-        const Move move = PlayMove(game, move_string_mutable);
+        const Move move = game.PlayMove(move_string_mutable);
         if (move == 0)
         {
             printf("ERROR found in book line '%s' move '%s'\n", line.c_str(), token.c_str());

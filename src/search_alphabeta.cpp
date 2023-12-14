@@ -5,8 +5,6 @@
 #include "game.h"
 #include "search.h"
 
-extern Game the_game;
-
 /**
  * @brief Try null move pruning.
  * @param position Current position
@@ -19,12 +17,11 @@ extern Game the_game;
  */
 #if DO_NULL_MOVE_PRUNING
 static int 
-AttemptNullMove(const Position&  position, 
+AttemptNullMove(Game&            game, 
                 int              depth, 
                 int              ply, 
                 int              alpha, 
-                int              beta, 
-                volatile bool&   cancel)
+                int              beta)
 {
     /*
     Try null move pruning if ALL of the following are true:
@@ -37,6 +34,7 @@ AttemptNullMove(const Position&  position,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
+    Position& position = *game.position;
     if (!(position.flags_ & IS_NULL_MOVE)
         && !(position.flags_ & IS_CHECK)
         && beta == alpha + 1
@@ -44,12 +42,11 @@ AttemptNullMove(const Position&  position,
         && EvaluatePosition(position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
-        Position child_position;
-        position.MakeNullMove(child_position);
-        Variation dummy;
-        dummy.moves[0] = 0;
-        int score = -Search(child_position, depth - 3, ply + 1, -beta, -alpha, cancel, dummy);
-        if (cancel)
+        game.MakeNullMove();
+        Variation dummy {};
+        int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
+        game.UndoMove();
+        if (game.is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;
         }
@@ -76,27 +73,27 @@ AttemptNullMove(const Position&  position,
  * @return score for this node
 */
 int 
-Search(const Position&  position, 
+Search(Game&            game, 
        int              depth, 
        int              ply, 
        int              alpha, 
        int              beta, 
-       volatile bool&   cancel, 
        Variation&       parent_pv)
 {    
-    if (cancel)
+    if (game.is_cancel_pending)
     {
         return SEARCH_CANCELLED_SCORE;
     }
     
-    if (!(++the_game.node_count & 0xFFFF)         &&
-        the_game.time_control.hard_stop_search_ms &&
-        GetMilliseconds() >= the_game.time_control.hard_stop_search_ms)
+    if (!(++game.node_count & 0xFFFF)         &&
+        game.time_control.hard_stop_search_ms &&
+        GetMilliseconds() >= game.time_control.hard_stop_search_ms)
     {
-        cancel = true;
+        game.is_cancel_pending = true;
         return SEARCH_CANCELLED_SCORE;
     }
     INCREMENT("alpha beta calls");
+    Position& position = *game.position;
     if (position.IsDrawByMaterial  () ||
         position.IsDrawByFiftyMoves() ||
         position.IsDrawByRepetition(true))
@@ -115,7 +112,7 @@ Search(const Position&  position,
     }
     else if (depth <= 0)
     {
-        return SearchQuiescent(position, depth, ply, alpha, beta, cancel);
+        return SearchQuiescent(game, depth, ply, alpha, beta);
     } 
     /*
     Determine if there is an entry in the transposition table 
@@ -167,8 +164,8 @@ Search(const Position&  position,
     }
  
 #if DO_NULL_MOVE_PRUNING
-    int null_move_score = AttemptNullMove(position, depth, ply, alpha, beta, cancel);
-    if (cancel)
+    int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
+    if (game.is_cancel_pending)
     {
         return SEARCH_CANCELLED_SCORE;
     }
@@ -183,18 +180,17 @@ Search(const Position&  position,
     This might save us the cost of move generation altogether, or provide 
     better alpha beta bounds for the main search.
     */
-    Variation   pv;
+    Variation   pv {};
     int         num_legal_moves     = 0;
     Move        best_move           = 0;
     bool        has_raised_alpha    = false;
-    pv.moves[0]                     = 0;
     
     if (is_transposition && transposition.move)
     {
         INCREMENT("table move");
         ++num_legal_moves;
-        int score = SearchSingleMove(position, depth, ply, alpha, beta, cancel, transposition.move, pv, 0);
-        if (cancel)
+        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, 0);
+        if (game.is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;
         }
@@ -240,7 +236,7 @@ Search(const Position&  position,
         # We are not in a PV node AND
         # The static exchange evaluation for this move is negative
         */
-        if (!(position.flags & IS_CHECK) && 
+        if (!(position.flags_ & IS_CHECK) && 
               num_legal_moves > 2               &&
               beta == alpha + 1                 &&
               MoveScore(move) < 0)
@@ -253,15 +249,15 @@ Search(const Position&  position,
             else
             {
                 INCREMENT("negative SEE reduction attempts");
-                score = SearchSingleMove(position, depth - 1, ply, alpha, beta, cancel, move, pv, num_legal_moves);
+                score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, num_legal_moves);
             }
         }
         else
 #endif
         {
-            score = SearchSingleMove(position, depth, ply, alpha, beta, cancel, move, pv, num_legal_moves);
+            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, num_legal_moves);
         }
-        if (cancel)
+        if (game.is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;
         }
@@ -325,7 +321,7 @@ Search(const Position&  position,
         INCREMENT("pv nodes");
         RecordTransposition(position.hash_, depth, alpha, best_move, NODE_PV);
         RecordGoodMove(ply, best_move);
-        CopyVariation(parent_pv, pv, best_move);
+        parent_pv.Copy(pv, best_move);
     }
     else
     {

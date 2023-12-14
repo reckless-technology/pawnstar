@@ -5,11 +5,13 @@
 #include "game.h"
 #include "search.h"
 
-extern Game the_game;
+#include <string_view>
+using std::string_view;
+
 /*
 Standard Bratko-Kopec test positions
 */
-static const char* const POSITION_TESTS[] = {
+static constexpr const char* POSITION_TESTS[] = {
     "1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -",
     "3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - -",
     "2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - -",
@@ -34,29 +36,28 @@ static const char* const POSITION_TESTS[] = {
     "2r2rk1/1bqnbpp1/1p1ppn1p/pP6/N1P1P3/P2B1N1P/1B2QPP1/R2R2K1 b - -",
     "r1bqk2r/pp2bppp/2p5/3pP3/P2Q1P2/2N1B3/1PP3PP/R4RK1 b kq -",
     "r2qnrnk/p2b2b1/1p1p2pp/2pPpp2/1PP1P3/PRNBB3/3QNPPP/5RK1 w - -",
-    NULL,
 };
 
 /*
 Run the standard Bratko-Kopec test suite at fixed search depth
 */
-void RunPositionTests(int depth)
+void RunPositionTests(Game &game, int depth)
 {
     int first_start;
-    const char* const * tests;
-    const TimeControl prev_time_control     = the_game.time_control;
-    the_game.time_control.clock_type        = CLOCK_FIXED_DEPTH;
-    the_game.time_control.fixed_depth.depth = depth;
-    the_game.do_show_thinking               = true;
-    first_start                             = GetMilliseconds();
-    for (tests = POSITION_TESTS; *tests; ++tests)
+    const TimeControl prev_time_control = game.time_control;
+    first_start = GetMilliseconds();
+    for (auto test : POSITION_TESTS)
     {
-        Position position { *tests };
-        printf("\n%s\n", *tests);
+        game = Game(test);
+        game.time_control.clock_type = CLOCK_FIXED_DEPTH;
+        game.time_control.fixed_depth.depth = depth;
+        game.do_show_thinking = true;
+        printf("\n%s\n", test);
         DEBUG_STATEMENT(DebugXClear());
-        SearchRootNode(position);
+        SearchRootNode(game);
         DEBUG_STATEMENT(DebugXWrite(stdout));
     }
     printf("total elapsed milliseconds                        %10d\n", GetMilliseconds() - first_start);
-    the_game.time_control = prev_time_control;
+    game = Game();
+    game.time_control = prev_time_control;
 }

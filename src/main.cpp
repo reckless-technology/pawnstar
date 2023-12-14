@@ -38,14 +38,14 @@ int main()
             printf("ERROR: unable to create default opening book\n");
         }
     }
-    InitializeGame(the_game);
+    Game game;
     DEBUG_STATEMENT(DebugXClear());
     for ( ; ; )
     {
         char line_buffer[256];
         if (fgets(line_buffer, sizeof(line_buffer), stdin))
         {
-            ProcessInput(line_buffer);
+            ProcessInput(game, line_buffer);
         }
     }
 }

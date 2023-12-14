@@ -72,7 +72,7 @@ constexpr Move      ScoredMove(Move m, int score)   { return (m & 0xFFFFFFFF) | 
  */
 struct MoveList
 {
-    Move moves[MAX_MOVES_PER_POSITION]; /**< The moves (zero terminated) */
+    
     struct Sentinel {};
     /**
      * @brief C++20 style iterator to allow "for (move : move_list)" semantics
@@ -88,23 +88,33 @@ struct MoveList
     private:
         const Move* move_;
     };
-    constexpr Iterator begin() const  { return Iterator(moves); }
-    constexpr Sentinel end() const    { return Sentinel {}; }
+    constexpr Iterator begin() const    { return Iterator(moves); }
+    constexpr Sentinel end() const      { return Sentinel {}; }
+
+    constexpr MoveList() : move_(moves) { *move_ = 0; }
+    constexpr void Add(Move move)
+    {
+        *move_++ = move;
+    }
+    constexpr void Done()
+    {
+        *move_ = 0;
+    }
+    constexpr void Copy(const MoveList& that, Move best_move)
+    {
+        move_ = moves;
+        *move_++ = best_move;
+        for (auto move : that)
+        {
+            *move_++ = move;
+        }
+        *move_ = 0;
+    }
+    
+    Move moves[MAX_MOVES_PER_POSITION]; /**< zero terminated list of moves */
+
+private:
+    Move* move_;
 };
 
 typedef MoveList Variation;
-
-constexpr void 
-CopyVariation(Variation&       dst_variation, 
-              const Variation& src_variation, 
-              Move             best_move)
-{
-    Move* dst = dst_variation.moves;
-    *dst++ = best_move;
-    for (auto m : src_variation)
-    {
-        *dst++ = m;
-    }
-    *dst = 0;
-}
-

@@ -728,7 +728,6 @@ void Position::GeneratePseudoLegalCaptures(MoveList& moves) const
 
 int Position::GenerateLegalMoves(MoveList& m) const
 {
-    Move* moves = m.moves;
     int num_legal_moves = 0;
     MoveList pseudo_legal_moves;
     GeneratePseudoLegalMoves(pseudo_legal_moves);
@@ -737,11 +736,11 @@ int Position::GenerateLegalMoves(MoveList& m) const
         Position position { *this, move };
         if (!(position.flags_ & IS_MOVED_INTO_CHECK))
         {
-            *moves++ = move;
+            m.Add(move);
             ++num_legal_moves;
         }
     }
-    *moves = 0;
+    m.Done();
     return num_legal_moves;
 }
 

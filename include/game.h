@@ -1,5 +1,7 @@
 #pragma once
 
+#include <thread>
+
 #include "options.h"
 #include "chess_clock.h"
 #include "position.h"
@@ -15,14 +17,19 @@ struct Game
     int         node_count;             /**< Number of nodes (positions) during search      */
     int         engine_color;           /**< The color which pawnstar is playing            */
     bool        do_show_thinking;       /**< Whether to show scores and PV during search    */
+    bool        is_cancel_pending;
+
+    Game();
+    Game(const char* fen_string);
+    Move    PlayMove(char* move_string);
+    void    PlayMove(Move move);
+    void    MakeNullMove();
+    void    UndoMove();
+    void    StartThinking();
+    void    StopThinking();
+    bool    IsGameOver() const;
+
+private:
+    void    SearchThreadEntry();
+    std::thread worker_thread;
 };
-
-extern Game the_game;
-
-void    InitializeGame(Game& game);
-Move    PlayMove(Game& game, char* move_string);
-void    StartThinking(Game& game);
-void    StopThinking(void);
-void    StopWorker(void);
-void    PlayMove(Game& game, Move move);
-bool    IsGameOver(const Game& game);

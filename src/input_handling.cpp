@@ -10,35 +10,33 @@
 
 using std::string;
 
-extern Game the_game;
-
 /**
  * @brief Handling for input commands (xboard support)
 */
 typedef struct
 {
-    void      (*function)(int argc, char* argv[]);  /**< function to be called  */
-    const char* name;                               /**< command name           */
-    const char* description;                        /**< command description    */
+    void (*function)(Game& game, int argc, char* argv[]);   /**< function to be called  */
+    const char* name;                                       /**< command name           */
+    const char* description;                                /**< command description    */
 } InputHandler;
 
-static void handle_quit(int argc, char* argv[])
+static void handle_quit(Game& game, int argc, char* argv[])
 {
-	StopThinking();
-	StopWorker();
+	game.StopThinking();
     exit(0);
     (void)argc;
     (void)argv;
 }
 
-static void handle_perft(int argc, char* argv[])
+static void handle_perft(Game& game, int argc, char* argv[])
 {
     RunPerftTests();
     (void)argc;
     (void)argv;
+    (void)game;
 }
 
-static void handle_postests(int argc, char* argv[])
+static void handle_postests(Game& game, int argc, char* argv[])
 {
     int depth = 9;
     if (argc > 1)
@@ -49,36 +47,40 @@ static void handle_postests(int argc, char* argv[])
             depth = d;
         }
     }    
-    RunPositionTests(depth);
+    RunPositionTests(game, depth);
+    (void)game;
 }
 
-static void handle_ping(int argc, char* argv[])
+static void handle_ping(Game& game, int argc, char* argv[])
 {
     printf("pong %s\n", argc > 1 ? argv[1] : "");
+    (void)game;
 }
 
-static void handle_xboard(int argc, char* argv[])
+static void handle_xboard(Game& game, int argc, char* argv[])
 {
     printf("\n");
     (void)argc;
     (void)argv;
+    (void)game;
 }
 
-static void handle_bookmoves(int argc, char* argv[])
+static void handle_bookmoves(Game& game, int argc, char* argv[])
 {
-    DisplayAvailableBookMoves(*the_game.position);
+    DisplayAvailableBookMoves(*game.position);
     (void)argc;
     (void)argv;
 }
 
-static void handle_freebook(int argc, char* argv[])
+static void handle_freebook(Game& game, int argc, char* argv[])
 {
     FreeOpeningBook();
     (void)argc;
     (void)argv;
+    (void)game;
 }
 
-static void handle_protover(int argc, char* argv[])
+static void handle_protover(Game& game, int argc, char* argv[])
 {
     if (argc != 2)
     {
@@ -97,61 +99,61 @@ static void handle_protover(int argc, char* argv[])
     {
         printf("ERROR: unsupported XBoard protocol version %s\n", argv[1]);
     }
+    (void)game;
 }
 
-static void handle_new(int argc, char* argv[])
+static void handle_new(Game& game, int argc, char* argv[])
 {
-    StopThinking();
-    StopWorker();
-    InitializeGame(the_game);
+    game.StopThinking();
+    game = Game();
     (void)argc;
     (void)argv;
 }
 
-static void handle_force(int argc, char* argv[])
+static void handle_force(Game &game, int argc, char* argv[])
 {
-    the_game.engine_color = NEITHER_COLOR;
+    game.engine_color = NEITHER_COLOR;
     (void)argc;
     (void)argv;
 }
 
-static void handle_go(int argc, char* argv[])
+static void handle_go(Game& game, int argc, char* argv[])
 {
-    the_game.engine_color = the_game.position->ColorToMove();
-    StartThinking(the_game);
+    game.engine_color = game.position->ColorToMove();
+    game.StartThinking();
     (void)argc;
     (void)argv;
 }
 
-static void handle_playother(int argc, char* argv[])
+static void handle_playother(Game& game, int argc, char* argv[])
 {
-    the_game.engine_color = EnemyOf(the_game.position->ColorToMove());
+    game.engine_color = EnemyOf(game.position->ColorToMove());
     (void)argc;
     (void)argv;
 }
 
-static void handle_usermove(int argc, char* argv[])
+static void handle_usermove(Game& game, int argc, char* argv[])
 {
     if (argc != 2)
     {
         printf("ERROR: move not specified\n");
         return;
     }
-    int move = PlayMove(the_game, argv[1]);
-    if (!move)
+    Move move = game.PlayMove(argv[1]);
+    if (move == 0)
     {
         printf("Illegal move: %s\n", argv[1]);
     }
-    if (!IsGameOver(the_game))
+    if (!game.IsGameOver())
     {
-        if (the_game.engine_color == (int)the_game.position->ColorToMove())
+        if (game.engine_color == game.position->ColorToMove())
         {
-            StartThinking(the_game);
+            game.StartThinking();
         }
     }
 }
 
-static void handle_setboard(int argc, char* argv[])
+static void handle_setboard(Game& game, int argc, char* argv[])
 {
     char fen_string[256];
     char* p = fen_string;
@@ -160,33 +162,33 @@ static void handle_setboard(int argc, char* argv[])
         p += sprintf(p, "%s ", argv[i]);
     }
     *p = 0;
-    the_game.position = the_game.stack;
-    *the_game.position = Position { fen_string };
+    game.position = game.stack;
+    *game.position = Position { fen_string };
 }
 
-static void handle_getboard(int argc, char* argv[])
+static void handle_getboard(Game& game, int argc, char* argv[])
 {
-    std::string fen_string = the_game.position->operator std::string();
+    std::string fen_string = game.position->operator std::string();
     printf("%s\n", fen_string.c_str());
     (void)argc;
     (void)argv;
 }
 
-static void handle_nopost(int argc, char* argv[])
+static void handle_nopost(Game& game, int argc, char* argv[])
 {
-    the_game.do_show_thinking = false;
+    game.do_show_thinking = false;
     (void)argc;
     (void)argv;
 }
 
-static void handle_post(int argc, char* argv[])
+static void handle_post(Game& game, int argc, char* argv[])
 {
-    the_game.do_show_thinking = true;
+    game.do_show_thinking = true;
     (void)argc;
     (void)argv;
 }
 
-static void handle_time(int argc, char* argv[])
+static void handle_time(Game& game, int argc, char* argv[])
 {
     if (argc != 2)
     {
@@ -196,18 +198,18 @@ static void handle_time(int argc, char* argv[])
     int time;
     if (sscanf(argv[1], "%d", &time) == 1)
     {
-        the_game.time_control.standard.milliseconds_remaining = time * 10;
+        game.time_control.standard.milliseconds_remaining = time * 10;
     }
 }
 
-static void handle_cancel(int argc, char* argv[])
+static void handle_cancel(Game& game, int argc, char* argv[])
 {
-    StopThinking();
+    game.StopThinking();
     (void)argc;
     (void)argv;
 }
 
-static void handle_level(int argc, char* argv[])
+static void handle_level(Game& game, int argc, char* argv[])
 {
     if (argc != 4)
     {
@@ -227,21 +229,21 @@ static void handle_level(int argc, char* argv[])
     sscanf(argv[3], "%d", &increment);
     if (moves)
     {
-        the_game.time_control.clock_type = CLOCK_STANDARD;
-        the_game.time_control.standard.moves_per_period = moves;
-        the_game.time_control.standard.milliseconds_per_period = minutes * 60000 + seconds * 1000;
-        the_game.time_control.standard.milliseconds_remaining = the_game.time_control.standard.milliseconds_per_period;
+        game.time_control.clock_type = CLOCK_STANDARD;
+        game.time_control.standard.moves_per_period = moves;
+        game.time_control.standard.milliseconds_per_period = minutes * 60000 + seconds * 1000;
+        game.time_control.standard.milliseconds_remaining = game.time_control.standard.milliseconds_per_period;
     }
     else
     {
-        the_game.time_control.clock_type = CLOCK_INCREMENTAL;
-        the_game.time_control.incremental.base_milliseconds = minutes * 60000 + seconds * 1000;
-        the_game.time_control.incremental.increment_milliseconds = increment * 1000;
-        the_game.time_control.incremental.milliseconds_remaining = the_game.time_control.incremental.base_milliseconds;
+        game.time_control.clock_type = CLOCK_INCREMENTAL;
+        game.time_control.incremental.base_milliseconds = minutes * 60000 + seconds * 1000;
+        game.time_control.incremental.increment_milliseconds = increment * 1000;
+        game.time_control.incremental.milliseconds_remaining = game.time_control.incremental.base_milliseconds;
     }
 }
 
-static void handle_st(int argc, char* argv[])
+static void handle_st(Game& game, int argc, char* argv[])
 {
     if (argc != 2)
     {
@@ -251,12 +253,12 @@ static void handle_st(int argc, char* argv[])
     int seconds = 0;
     if (sscanf(argv[1], "%d", &seconds) == 1) 
     {
-        the_game.time_control.clock_type = CLOCK_FIXED_TIME;
-        the_game.time_control.fixed_time.milliseconds = seconds * 1000;
+        game.time_control.clock_type = CLOCK_FIXED_TIME;
+        game.time_control.fixed_time.milliseconds = seconds * 1000;
     }
 }
 
-static void handle_sd(int argc, char* argv[])
+static void handle_sd(Game& game, int argc, char* argv[])
 {
     if (argc != 2)
     {
@@ -266,107 +268,111 @@ static void handle_sd(int argc, char* argv[])
     int depth = 0;
     if (sscanf(argv[1], "%d", &depth) == 1)
     {
-        the_game.time_control.clock_type = CLOCK_FIXED_DEPTH;
-        the_game.time_control.fixed_depth.depth = depth;
+        game.time_control.clock_type = CLOCK_FIXED_DEPTH;
+        game.time_control.fixed_depth.depth = depth;
     }
 }
 
 #define PRINT_MIN_SEC(milliseconds) printf("%02d:%02d\n", (milliseconds) / 60000, ((milliseconds) / 1000) % 60)
 
-static void handle_showtime(int argc, char* argv[])
+static void handle_showtime(Game& game, int argc, char* argv[])
 {
-    switch (the_game.time_control.clock_type)
+    switch (game.time_control.clock_type)
     {
     case CLOCK_STANDARD:
         printf("standard clock mode\n");
-        printf("moves per period              %5d\n", the_game.time_control.standard.moves_per_period);
+        printf("moves per period              %5d\n", game.time_control.standard.moves_per_period);
         printf("time period                   ");
-        PRINT_MIN_SEC(the_game.time_control.standard.milliseconds_per_period);
+        PRINT_MIN_SEC(game.time_control.standard.milliseconds_per_period);
         printf("time remaining                ");
-        PRINT_MIN_SEC(the_game.time_control.standard.milliseconds_remaining);
+        PRINT_MIN_SEC(game.time_control.standard.milliseconds_remaining);
         break;
     case CLOCK_INCREMENTAL:
         printf("incremental clock mode\n");
         printf("base time                     ");
-        PRINT_MIN_SEC(the_game.time_control.incremental.base_milliseconds);
+        PRINT_MIN_SEC(game.time_control.incremental.base_milliseconds);
         printf("increment time                ");
-        PRINT_MIN_SEC(the_game.time_control.incremental.increment_milliseconds);
+        PRINT_MIN_SEC(game.time_control.incremental.increment_milliseconds);
         printf("time remaining                ");
-        PRINT_MIN_SEC(the_game.time_control.incremental.milliseconds_remaining);
+        PRINT_MIN_SEC(game.time_control.incremental.milliseconds_remaining);
         break;
     case CLOCK_FIXED_DEPTH:
         printf("fixed depth mode\n");
-        printf("search depth                  %5d\n", the_game.time_control.fixed_depth.depth);
+        printf("search depth                  %5d\n", game.time_control.fixed_depth.depth);
         break;
     case CLOCK_FIXED_TIME:
         printf("fixed time mode\n");
         printf("search time                   ");
-        PRINT_MIN_SEC(the_game.time_control.fixed_time.milliseconds);
+        PRINT_MIN_SEC(game.time_control.fixed_time.milliseconds);
         break;
     }
     (void)argc;
     (void)argv;
 }
 
-static void handle_eval(int argc, char* argv[])
+static void handle_eval(Game& game, int argc, char* argv[])
 {
-    printf("evaluation %5d\n", EvaluatePosition(*the_game.position, ALPHA, BETA));
+    printf("evaluation %5d\n", EvaluatePosition(*game.position, ALPHA, BETA));
     (void)argc;
     (void)argv;
 }
 
 #if DEBUGX
-static void handle_dbg(int argc, char* argv[])
+static void handle_dbg(Game& game, int argc, char* argv[])
 {
     DebugXWrite(stdout);
     (void)argc;
     (void)argv;
+    (void)game;
 }
 
-static void handle_dbgclear(int argc, char* argv[])
+static void handle_dbgclear(Game& game, int argc, char* argv[])
 {
     DebugXClear();
     (void)argc;
     (void)argv;
+    (void)game;
 }
 #endif
 
-static void handle_undo(int argc, char* argv[])
+static void handle_undo(Game& game, int argc, char* argv[])
 {
-    if (the_game.position != the_game.stack)
+    if (game.position != game.stack)
     {
-        --the_game.position;
+        --game.position;
     }
     (void)argc;
     (void)argv;
 }
 
-static void handle_remove(int argc, char* argv[])
+static void handle_remove(Game& game, int argc, char* argv[])
 {
-    if (the_game.position - the_game.stack >= 2)
+    if (game.position - game.stack >= 2)
     {
-        the_game.position -= 2;
+        game.position -= 2;
     }
     (void)argc;
     (void)argv;
 }
 
-static void handle_seetests(int argc, char* argv[])
+static void handle_seetests(Game& game, int argc, char* argv[])
 {
     RunStaticExchangeTests();
     (void)argc;
     (void)argv;
+    (void)game;
 }
 
-static void handle_mergetest(int argc, char* argv[])
+static void handle_mergetest(Game& game, int argc, char* argv[])
 {
     const bool is_pass = RunMergeSortTests();
     printf("Merge sort tests: %s\n", is_pass ? "PASS" : "FAIL");
     (void)argc;
     (void)argv;
+    (void)game;
 }
 
-static void handle_help(int argc, char* argv[]);
+static void handle_help(Game& game, int argc, char* argv[]);
 
 #define COMMAND(name) handle_ ## name, #name
 
@@ -407,7 +413,7 @@ const InputHandler handlers[] = {
     { NULL, NULL,           NULL                                                        },
 };
 
-static void handle_help(int argc, char* argv[])
+static void handle_help(Game& game, int argc, char* argv[])
 {
     const InputHandler* i;
     printf("refer to 'engine_protocol.html' for details of the communication\n");
@@ -419,11 +425,12 @@ static void handle_help(int argc, char* argv[])
     }
     (void)argc;
     (void)argv;
+    (void)game;
 }
 
 #define MAX_NUM_ARGS 8
 
-void ProcessInput(char* line)
+void ProcessInput(Game& game, char* line)
 {
     int argc                    = 0;
     char* argv[MAX_NUM_ARGS]    = { 0 };
@@ -450,7 +457,7 @@ void ProcessInput(char* line)
     {
         if (!strcmp(handler->name, argv[0]))
         {
-            handler->function(argc, argv);
+            handler->function(game, argc, argv);
             break;
         }
     }

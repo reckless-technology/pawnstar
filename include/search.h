@@ -1,10 +1,9 @@
 #pragma once
 
 #include "move.h"
+#include "game.h"
 
-struct Position;
-
-int     Search          (const Position& position, int depth, int ply, int alpha, int beta, volatile bool& cancel, Variation& parent_pv);
-int     SearchQuiescent (const Position& position, int depth, int ply, int alpha, int beta, volatile bool& cancel);
-int     SearchSingleMove(const Position& position, int depth, int ply, int alpha, int beta, volatile bool& cancel, Move move, Variation& pv, int move_index);
-Move    SearchRootNode  (const Position& position);
+int     Search          (Game& game, int depth, int ply, int alpha, int beta, Variation& parent_pv);
+int     SearchQuiescent (Game& game, int depth, int ply, int alpha, int beta);
+int     SearchSingleMove(Game& game, int depth, int ply, int alpha, int beta, Move move, Variation& pv, int move_index);
+Move    SearchRootNode  (Game& game);

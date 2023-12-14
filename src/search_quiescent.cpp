@@ -2,38 +2,38 @@
 #include "debug_hashtable.h"
 #include "transposition_table.h"
 #include "function_prototypes.h"
+#include "game.h"
 #include "search.h"
 
 /**
  * @brief Alpha beta quiescence (capture only) search.
- * @param src_position position to search
+ * @param game Game we are searching
  * @param depth search depth (<= 0 for quiescence)
  * @param ply distance from root node
  * @param alpha parent floor value
  * @param beta parent ceiling value
- * @return score
+ * @return score The score for this position
 */
-int SearchQuiescent(const Position& position, 
-                    int             depth,
-                    int             ply, 
-                    int             alpha, 
-                    int             beta,
-                    volatile bool&  cancel)
+int 
+SearchQuiescent(Game& game, 
+                int   depth,
+                int   ply, 
+                int   alpha, 
+                int   beta)
 {    
     INCREMENT("quiescent calls");
     if (ply == MAX_PLY)
     {
         INCREMENT("quiescent max ply");
-        return EvaluatePosition(position, alpha, beta);
+        return EvaluatePosition(*game.position, alpha, beta);
     }
-    if (position.flags_ & IS_CHECK)
+    if (game.position->flags_ & IS_CHECK)
     {
         INCREMENT("quiescent checks");
-        Variation dummy;
-        dummy.moves[0] = 0;
-        return Search(position, depth, ply, alpha, beta, cancel, dummy);
+        Variation dummy {};
+        return Search(game, depth, ply, alpha, beta, dummy);
     }
-    int score = EvaluatePosition(position, alpha, beta);
+    int score = EvaluatePosition(*game.position, alpha, beta);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
@@ -45,8 +45,8 @@ int SearchQuiescent(const Position& position,
         alpha = score;
     }
     MoveList move_list;
-    position.GeneratePseudoLegalCaptures(move_list);
-    ScoreAndSortMoves(position, move_list.moves, ply, depth);
+    game.position->GeneratePseudoLegalCaptures(move_list);
+    ScoreAndSortMoves(*game.position, move_list.moves, ply, depth);
     for (auto move : move_list)
     {
         if (MoveScore(move) < 0)
@@ -54,13 +54,15 @@ int SearchQuiescent(const Position& position,
             INCREMENT("negative SEE quiescent skips");
             continue;
         }
-        Position child_position { position, move };
-        if (child_position.flags_ & IS_MOVED_INTO_CHECK)
+        game.PlayMove(move);
+        if (game.position->flags_ & IS_MOVED_INTO_CHECK)
         {
             INCREMENT("quiescent moved into check");
+            game.UndoMove();
             continue;
         }
-        score = -SearchQuiescent(child_position, depth - 1, ply + 1, -beta, -alpha, cancel);
+        score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
+        game.UndoMove();
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");

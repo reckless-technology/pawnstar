@@ -3,21 +3,6 @@
 #include "function_prototypes.h"
 
 /**
- * @brief Generate underpromotions to knight, bishop and rook.
- * @param pmoves Pointer to move list.
- */
-constexpr void 
-GenerateUnderpromotions(Move **pmoves)
-{
-    Move *const moves = *pmoves;
-    const Move move = *moves;
-    moves[1] = move ^ ((ROOK   ^ QUEEN) << 18);
-    moves[2] = move ^ ((BISHOP ^ QUEEN) << 18);
-    moves[3] = move ^ ((KNIGHT ^ QUEEN) << 18);
-    *pmoves += 4;
-}
-
-/**
  * @brief Generate pseudo legal moves for the side to move.
  * @tparam do_all_moves true for all moves, false for captures and promotions only.
  * @param position Position to generate moves for.
@@ -31,7 +16,6 @@ Position::GenerateMoves(MoveList& m) const
     const Bitboard vacant_squares   = ~occupied_squares;
     const Bitboard friendly_pieces  = pieces_of_color_[color];
     const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
-    Move* moves                     = m.moves;
     /*
     Pawn move variables
     */
@@ -90,39 +74,47 @@ Position::GenerateMoves(MoveList& m) const
     {
         const int to = FindAndClearLsb(promotions_west);
         const int from = to - west_delta;
-        *moves = PromotionMove(from, to, PieceAt(to), QUEEN);
-        GenerateUnderpromotions(&moves);
+        const uint8_t captured = PieceAt(to);
+        m.Add(PromotionMove(from, to, captured, QUEEN));
+        m.Add(PromotionMove(from, to, captured, ROOK));
+        m.Add(PromotionMove(from, to, captured, BISHOP));
+        m.Add(PromotionMove(from, to, captured, KNIGHT));
     }
     while (promotions_east)
     {
         const int to = FindAndClearLsb(promotions_east);
         const int from = to - east_delta;
-        *moves = PromotionMove(from, to, PieceAt(to), QUEEN);
-        GenerateUnderpromotions(&moves);
+        const uint8_t captured = PieceAt(to);
+        m.Add(PromotionMove(from, to, captured, QUEEN));
+        m.Add(PromotionMove(from, to, captured, ROOK));
+        m.Add(PromotionMove(from, to, captured, BISHOP));
+        m.Add(PromotionMove(from, to, captured, KNIGHT));
     }
     while (promotions)
     {
         const int to = FindAndClearLsb(promotions);
         const int from = to - push_delta;
-        *moves = PromotionMove(from, to, NO_PIECE, QUEEN);
-        GenerateUnderpromotions(&moves);
+        m.Add(PromotionMove(from, to, NO_PIECE, QUEEN));
+        m.Add(PromotionMove(from, to, NO_PIECE, ROOK));
+        m.Add(PromotionMove(from, to, NO_PIECE, BISHOP));
+        m.Add(PromotionMove(from, to, NO_PIECE, KNIGHT));
     }
     while (captures_west)
     {
         const int to = FindAndClearLsb(captures_west);
         const int from = to - west_delta;
-        *moves++ = CaptureMove(from, to, PAWN, PieceAt(to));
+        m.Add(CaptureMove(from, to, PAWN, PieceAt(to)));
     }
     while (captures_east)
     {
         const int to = FindAndClearLsb(captures_east);
         const int from = to - east_delta;
-        *moves++ = CaptureMove(from, to, PAWN, PieceAt(to));
+        m.Add(CaptureMove(from, to, PAWN, PieceAt(to)));;
     }
     while (en_passant_sources)
     {
         const int from = FindAndClearLsb(en_passant_sources);
-        *moves++ = EpCaptureMove(from, en_passant_index_);
+        m.Add(EpCaptureMove(from, en_passant_index_));
     }
     if constexpr (do_all_moves)
     {
@@ -131,14 +123,14 @@ Position::GenerateMoves(MoveList& m) const
         {
             const int to = FindAndClearLsb(double_pushes);
             const int from = to - push_delta;
-            *moves++ = DoublePushMove(from, to);
+            m.Add(DoublePushMove(from, to));
         }
         push_delta >>= 1;
         while (single_pushes)
         {
             const int to = FindAndClearLsb(single_pushes);
             const int from = to - push_delta;
-            *moves++ = NonCaptureMove(from, to, PAWN);
+            m.Add(NonCaptureMove(from, to, PAWN));
         }
     }
     /*
@@ -153,14 +145,14 @@ Position::GenerateMoves(MoveList& m) const
         while (capture_targets)
         {
             const int to = FindAndClearLsb(capture_targets);
-            *moves++ = CaptureMove(from, to, KNIGHT, PieceAt(to));
+            m.Add(CaptureMove(from, to, KNIGHT, PieceAt(to)));
         }
         if constexpr (do_all_moves)
         {
             Bitboard non_capture_targets = targets & vacant_squares;
             while (non_capture_targets)
             {
-                *moves++ = NonCaptureMove(from, FindAndClearLsb(non_capture_targets), KNIGHT);
+                m.Add(NonCaptureMove(from, FindAndClearLsb(non_capture_targets), KNIGHT));
             }
         }
     }
@@ -176,14 +168,14 @@ Position::GenerateMoves(MoveList& m) const
         while (capture_targets)
         {
             const int to = FindAndClearLsb(capture_targets);
-            *moves++ = CaptureMove(from, to, BISHOP, PieceAt(to));
+            m.Add(CaptureMove(from, to, BISHOP, PieceAt(to)));
         }
         if constexpr (do_all_moves)
         {
             Bitboard non_capture_targets = targets & vacant_squares;
             while (non_capture_targets)
             {
-                *moves++ = NonCaptureMove(from, FindAndClearLsb(non_capture_targets), BISHOP);
+                m.Add(NonCaptureMove(from, FindAndClearLsb(non_capture_targets), BISHOP));;
             }
         }
     }
@@ -199,14 +191,14 @@ Position::GenerateMoves(MoveList& m) const
         while (capture_targets)
         {
             const int to = FindAndClearLsb(capture_targets);
-            *moves++ = CaptureMove(from, to, ROOK, PieceAt(to));
+            m.Add(CaptureMove(from, to, ROOK, PieceAt(to)));
         }
         if constexpr (do_all_moves)
         {
             Bitboard non_capture_targets = targets & vacant_squares;
             while (non_capture_targets)
             {
-                *moves++ = NonCaptureMove(from, FindAndClearLsb(non_capture_targets), ROOK);
+               m.Add(NonCaptureMove(from, FindAndClearLsb(non_capture_targets), ROOK));
             }
         }
     }
@@ -222,14 +214,14 @@ Position::GenerateMoves(MoveList& m) const
         while (capture_targets)
         {
             const int to = FindAndClearLsb(capture_targets);
-            *moves++ = CaptureMove(from, to, QUEEN, PieceAt(to));
+            m.Add(CaptureMove(from, to, QUEEN, PieceAt(to)));
         }
         if constexpr (do_all_moves)
         {
             Bitboard non_capture_targets = targets & vacant_squares;
             while (non_capture_targets)
             {
-                *moves++ = NonCaptureMove(from, FindAndClearLsb(non_capture_targets), QUEEN);
+                m.Add(NonCaptureMove(from, FindAndClearLsb(non_capture_targets), QUEEN));
             }
         }
     }
@@ -242,15 +234,14 @@ Position::GenerateMoves(MoveList& m) const
     while (capture_targets)
     {
         const int to = FindAndClearLsb(capture_targets);
-        *moves++ = CaptureMove(king_location, to, KING, PieceAt(to));
+        m.Add(CaptureMove(king_location, to, KING, PieceAt(to)));
     }
-    *moves = 0;
     if constexpr (do_all_moves)
     {
         Bitboard non_capture_targets = targets & vacant_squares;
         while (non_capture_targets)
         {
-            *moves++ = NonCaptureMove(king_location, FindAndClearLsb(non_capture_targets), KING);
+            m.Add(NonCaptureMove(king_location, FindAndClearLsb(non_capture_targets), KING));
         }
         if (!(flags_ & IS_CHECK))
         {
@@ -271,14 +262,14 @@ Position::GenerateMoves(MoveList& m) const
                     !IsAttacked(F1, BLACK) &&
                     !IsAttacked(G1, BLACK))
                 {
-                    *moves++ = CastlingMove(E1, G1);
+                    m.Add(CastlingMove(E1, G1));
                 }
                 if ((flags_ & MAY_WHITE_CASTLE_QUEENSIDE) &&
                     !(occupied_squares & (BITBOARD("b1") | BITBOARD("c1") | BITBOARD("d1"))) &&
                     !IsAttacked(D1, BLACK) &&
                     !IsAttacked(C1, BLACK))
                 {
-                    *moves++ = CastlingMove(E1, C1);
+                    m.Add(CastlingMove(E1, C1));
                 }
             }
             else
@@ -288,17 +279,18 @@ Position::GenerateMoves(MoveList& m) const
                     !IsAttacked(F8, WHITE) &&
                     !IsAttacked(G8, WHITE))
                 {
-                    *moves++ = CastlingMove(E8, G8);
+                    m.Add(CastlingMove(E8, G8));
                 }
                 if ((flags_ & MAY_BLACK_CASTLE_QUEENSIDE) &&
                     !(occupied_squares & (BITBOARD("b8") | BITBOARD("c8") | BITBOARD("d8"))) &&
                     !IsAttacked(D8, WHITE) &&
                     !IsAttacked(C8, WHITE))
                 {
-                    *moves++ = CastlingMove(E8, C8);
+                    m.Add(CastlingMove(E8, C8));;
                 }
             }
         }
-        *moves = 0;
+       
     }
+    m.Done();
 }
