@@ -1,17 +1,22 @@
 #include <string.h>
 #include <thread>
+#include <string>
+#include <string_view>
+
+using std::string;
+using std::string_view;
 
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
 #include "function_prototypes.h"
-#include "position_move_generation.h"
 #include "game.h"
+#include "search.h"
 
 Game the_game;
 static std::thread worker_thread;
 
-static bool AreMoveStringsEquivalent(char* str1, char* str2);
+static bool AreMoveStringsEquivalent(string& str1, string& str2);
 
 void InitializeGame(Game& game)
 {
@@ -43,31 +48,31 @@ format, and update game state_flags accordingly
 returns the move if a legal move was played
 returns zero if the move was illegal or the game is over
 */
-Move PlayMoveString(Game& game, char* move_str)
+Move PlayMove(Game& game, char* move_str)
 {
     MoveList move_list;
     game.position->GenerateLegalMoves(move_list);
-    for (const Move* move = move_list.moves; *move; ++move)
+    for (auto move : move_list)
     {
-        char buffer[16];
-        MoveToString(*game.position, *move,  buffer);
-        if (AreMoveStringsEquivalent(buffer, move_str))
+        string move_string { game.position->MoveToString(move) };
+        string candidate { move_str };
+        if (AreMoveStringsEquivalent(move_string, candidate))
         {
-            PlayMove(game, *move);
-            return *move;
+            PlayMove(game, move);
+            return move;
         }
     }
     return 0;
 }
 
-static const char* const strings_to_remove[] = {
+constexpr string_view strings_to_remove[6] = 
+{
     "+",
     "#",
     "ep",
     "e.p.",
     "!",
     "?",
-    NULL,
 };
 
 /**
@@ -76,25 +81,22 @@ static const char* const strings_to_remove[] = {
  * @param str2 second move string
  * @return true if moves are equivalent
  */
-static bool AreMoveStringsEquivalent(char* str1, char* str2)
+static bool AreMoveStringsEquivalent(string& str1, string& str2)
 {
-    if (!str1 || !str2 || !strlen(str1) || !strlen(str2))
+    for (const string_view& sv : strings_to_remove)
     {
-        return false;
-    }
-    for (const char* const * x = strings_to_remove; *x; ++x)
-    {
-        char* y;
-        if ((y = strstr(str1, *x)) != NULL)
+        auto locn = str1.find(sv);
+        if (locn != string::npos)
         {
-            *y = '\0';
+            str1.erase(locn);
         }
-        if ((y = strstr(str2, *x)) != NULL)
+        locn = str2.find(sv);
+        if (locn != string::npos)
         {
-            *y = '\0';
+            str2.erase(locn);
         }
     }
-    return !strcmp(str1, str2);
+    return str1 == str2;
 }
 
 /**
@@ -142,10 +144,9 @@ static void SearchThreadEntry(Game& game)
     int move = SearchRootNode(*game.position);
     if (move)
     {
-        char move_string[16];
-        MoveToString(*game.position, move, move_string);
+        std::string move_string { game.position->MoveToString(move) };
         PlayMove(game, move);
-        printf("move %s\n", move_string);
+        printf("move %s\n", move_string.c_str());
         IsGameOver(game);
     }  
 }

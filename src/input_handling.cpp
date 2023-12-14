@@ -6,6 +6,7 @@
 #include "transposition_table.h"
 #include "function_prototypes.h"
 #include "game.h"
+#include "opening_book.h"
 
 using std::string;
 
@@ -136,7 +137,7 @@ static void handle_usermove(int argc, char* argv[])
         printf("ERROR: move not specified\n");
         return;
     }
-    int move = PlayMoveString(the_game, argv[1]);
+    int move = PlayMove(the_game, argv[1]);
     if (!move)
     {
         printf("Illegal move: %s\n", argv[1]);

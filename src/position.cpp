@@ -58,9 +58,9 @@ Position::MakeNullMove(Position& dst_position) const
 }
 
 void 
-Position::AddPiece(int color, 
-                   int piece, 
-                   int to)
+Position::AddPiece(uint8_t color, 
+                   uint8_t piece, 
+                   uint8_t to)
 {
     const Bitboard to_bb = BITBOARD(to);
     pieces_[piece - 1] ^= to_bb;
@@ -69,9 +69,9 @@ Position::AddPiece(int color,
 }
 
 void
-Position::RemovePiece(int color, 
-                      int piece, 
-                      int from)
+Position::RemovePiece(uint8_t color, 
+                      uint8_t piece, 
+                      uint8_t from)
 {
     const Bitboard from_bb = BITBOARD(from);
     pieces_[piece - 1] ^= from_bb;
@@ -80,10 +80,10 @@ Position::RemovePiece(int color,
 }
 
 void
-Position::MovePiece(int color, 
-                    int piece, 
-                    int from, 
-                    int to)
+Position::MovePiece(uint8_t color, 
+                    uint8_t piece, 
+                    uint8_t from, 
+                    uint8_t to)
 {
     const Bitboard from_to_bb = BITBOARD(from) | BITBOARD(to);
     const uint64_t* const hash = &PIECE_SQUARE_HASHES[color][piece -1][0];
@@ -468,7 +468,7 @@ Position::operator std::string() const
  * @param color attacking color
  * @return true if color attacks position, otherwise false
 */
-bool Position::IsAttacked(uint8_t location, int color) const
+bool Position::IsAttacked(uint8_t location, uint8_t color) const
 {
     const Sets& sets = SETS[location];
     const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
@@ -517,7 +517,7 @@ bool Position::IsAttacked(uint8_t location, int color) const
  * @param color Attacking color.
  * @return Set of squares of color containing a piece attacking location.
  */
-Bitboard Position::AttacksTo(uint8_t location, int color) const
+Bitboard Position::AttacksTo(uint8_t location, uint8_t color) const
 {
     const Sets& sets = SETS[location];
     const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
@@ -728,19 +728,177 @@ void Position::GeneratePseudoLegalCaptures(MoveList& moves) const
 
 int Position::GenerateLegalMoves(MoveList& m) const
 {
-    const Move *const initial_ptr = m.moves;
     Move* moves = m.moves;
+    int num_legal_moves = 0;
     MoveList pseudo_legal_moves;
     GeneratePseudoLegalMoves(pseudo_legal_moves);
-    for (const Move* move = pseudo_legal_moves.moves; *move; ++move)
+    for (auto move : pseudo_legal_moves)
     {
-        Position position { *this, *move };
+        Position position { *this, move };
         if (!(position.flags_ & IS_MOVED_INTO_CHECK))
         {
-            *moves++ = *move;
+            *moves++ = move;
+            ++num_legal_moves;
         }
     }
     *moves = 0;
-    return (int)(moves - initial_ptr);
+    return num_legal_moves;
 }
 
+/**
+ * @brief Convert a sequence of moves into a string in SAN format.
+ * @param position Starting position.
+ * @param moves Zero terminated list of moves.
+ * @param move_string Pointer to store the formatted string.
+ * @return Number of characters written to output.
+ */
+string Position::VariationToString(const Variation& variation) const
+{
+    stringstream ss;
+    bool is_first_move = true;
+    Position src_position { *this };
+    for (const auto move : variation)
+    {
+        if (!is_first_move)
+        {
+            ss << ' ';
+        }
+        ss << src_position.MoveToString(move);
+        Position dst_position { src_position, move };
+        src_position = dst_position;
+        is_first_move = false;
+    }
+    return ss.str();
+}
+
+/**
+ * @brief Convert a move to standard algebraic notation string.
+ * @param position Current position corresponding to the move.
+ * @param the_move The move input to be formatted as a string.
+ * @param move_string Where to store the move string.
+ * @return Number of characters written to output.
+ */
+string Position::MoveToString(Move move) const
+{
+    stringstream result;
+    string disambiguation;
+    string from_square { FileChar(MoveFrom(move)), RankChar(MoveFrom(move)) };
+    string to_square   { FileChar(MoveTo  (move)), RankChar(MoveTo  (move)) };
+    bool is_source_ambiguous = false;
+    bool is_file_unique      = true;
+    bool is_rank_unique      = true;   
+    const char move_piece    = " PNBRQK"[::MovePiece(move)];
+    /*
+    Determine if there is more than one piece of the same type which is capable 
+    of moving to the target square, and will require further disambiguation
+    */
+    MoveList legal_moves;
+    GenerateLegalMoves(legal_moves);
+    for (auto m : legal_moves)
+    {
+        if (::MovePiece(m) == ::MovePiece(move) && 
+              MoveTo   (m) ==   MoveTo   (move) &&
+              MoveFrom (m) !=   MoveFrom (move))
+        {
+            is_source_ambiguous = true;
+            if (FileOf(MoveFrom(m)) == FileOf(MoveFrom(move)))
+            {
+                is_file_unique = false;
+            }
+            if (RankOf(MoveFrom(m)) == RankOf(MoveFrom(move)))
+            {
+                is_rank_unique = false;
+            }   
+        }
+    }
+    /*
+    Determine how to disambiguate source square based on the uniqueness of the 
+    source rank and file
+    */
+    if (is_source_ambiguous)
+    {
+        if (is_file_unique)
+        {
+            disambiguation = from_square[0]; 
+        }
+        else if (is_rank_unique)
+        {
+            disambiguation = from_square[1];
+        }
+        else
+        {
+            disambiguation = from_square;
+        }
+    }
+    switch (::MovePiece(move))
+    {
+    RegularMove:
+    default:
+    case KNIGHT:
+    case BISHOP:
+    case ROOK:
+    case QUEEN:
+        if (MoveCaptured(move))
+        {
+            result << move_piece << disambiguation << 'x' << to_square;
+        }
+        else
+        {
+            result << move_piece << disambiguation << to_square;;
+        }
+        break;
+    
+    case KING:
+        if (IsCastlingMove(move))
+        {
+            switch (MoveTo(move))
+            {
+            case G1:
+            case G8:
+                result << "O-O";
+                break;
+            case C1:
+            case C8:
+                result <<  "O-O-O";
+                break;
+            }
+        }
+        else
+        {
+            goto RegularMove;
+        }
+        break;
+
+    case PAWN:
+        if (MoveCaptured(move))
+        {
+            result << from_square[0] << 'x' << to_square;
+            if (IsEpCaptureMove(move))
+            {
+                result << "e.p.";
+            }
+        }
+        else
+        {
+            result << to_square;
+        }
+        if (MovePromoted(move))
+        {
+            result << '=' << "  NBRQ"[MovePromoted(move)];
+        }
+        break;
+    }    
+    /*
+    Determine if this move results in check or checkmate
+    */
+    Position dst_position { *this, move };
+    if (dst_position.IsCheckmate())
+    {
+        result << '#';
+    }
+    else if (dst_position.flags_ & IS_CHECK)
+    {
+        result << "+";
+    }
+    return result.str();
+}

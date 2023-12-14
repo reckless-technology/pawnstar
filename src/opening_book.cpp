@@ -101,9 +101,8 @@ void DisplayAvailableBookMoves(const Position& position)
     printf("MOVE   COUNT\n");
     for (const auto& [move, freq] : move_counts)
     {
-        char buffer[16];
-        MoveToString(position, move, buffer);
-        printf("%-8s %3d\n", buffer, freq);
+        string move_string { position.MoveToString(move) };
+        printf("%-8s %3d\n", move_string.c_str(), freq);
     }
 }
 
@@ -135,7 +134,7 @@ static bool ParseLineOfPlay(const string& line)
         char move_string_mutable[16];
         strncpy(move_string_mutable, token.c_str(), sizeof(move_string_mutable) - 1);
         const uint64_t hash = game.position->hash_;
-        const Move move = PlayMoveString(game, move_string_mutable);
+        const Move move = PlayMove(game, move_string_mutable);
         if (move == 0)
         {
             printf("ERROR found in book line '%s' move '%s'\n", line.c_str(), token.c_str());

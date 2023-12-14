@@ -2,6 +2,7 @@
 #include "debug_hashtable.h"
 #include "transposition_table.h"
 #include "function_prototypes.h"
+#include "search.h"
 
 /*
 Search a single move and return its score, or MOVED_INTO_CHECK_SCORE if the 

@@ -83,11 +83,9 @@ struct Position
 
     void        MakeNullMove(Position& dst_position) const;
     uint8_t     ColorToMove() const  { return flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE; }
-    void        AddPiece   (int color, int piece, int to);
-    void        RemovePiece(int color, int piece, int from);
-    void        MovePiece  (int color, int piece, int from, int to);
-    Bitboard    AttacksTo  (uint8_t location, int color) const;
-    bool        IsAttacked (uint8_t location, int color) const;
+    void        AddPiece   (uint8_t color, uint8_t piece, uint8_t to);
+    Bitboard    AttacksTo  (uint8_t location, uint8_t color) const;
+    bool        IsAttacked (uint8_t location, uint8_t color) const;
     bool        IsLegal() const;
     bool        IsCheckmate() const;
     bool        IsDrawByFiftyMoves() const;
@@ -98,6 +96,8 @@ struct Position
     int         GenerateLegalMoves(MoveList& moves) const;
     void        GeneratePseudoLegalCaptures(MoveList& moves) const;
     void        GeneratePseudoLegalMoves(MoveList& moves) const;
+    std::string MoveToString(Move move) const;
+    std::string VariationToString(const Variation& variation) const;
     
     constexpr uint8_t PieceAt(uint8_t location) const 
     {
@@ -113,6 +113,8 @@ struct Position
 
 private:
     template <bool do_all_moves> void GenerateMoves(MoveList& moves) const;
+    void        RemovePiece(uint8_t color, uint8_t piece, uint8_t from);
+    void        MovePiece  (uint8_t color, uint8_t piece, uint8_t from, uint8_t to);
 };
 
 #include "position_move_generation.h"

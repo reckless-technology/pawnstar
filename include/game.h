@@ -20,7 +20,7 @@ struct Game
 extern Game the_game;
 
 void    InitializeGame(Game& game);
-Move    PlayMoveString(Game& game, char* move_string);
+Move    PlayMove(Game& game, char* move_string);
 void    StartThinking(Game& game);
 void    StopThinking(void);
 void    StopWorker(void);

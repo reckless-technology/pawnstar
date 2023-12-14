@@ -3,7 +3,11 @@
 #include "transposition_table.h"
 #include "function_prototypes.h"
 #include "game.h"
-#include "position_move_generation.h"
+#include "search.h"
+#include "opening_book.h"
+
+#include <string>
+using std::string;
 
 static volatile bool is_cancel_pending;
 extern Game the_game;
@@ -136,9 +140,9 @@ Move SearchRootNode(const Position& position)
                 CopyVariation(principal_variation, child_pv, best_move);
                 if (the_game.do_show_thinking)
                 {
-                    char move_string[256];
-                    MoveSequenceToSanString(position, principal_variation.moves, move_string);
-                    printf("%2u %5d %4u %8u %s\n", depth, (int)MoveScore(best_moves[depth]), (GetMilliseconds() - start_ms) / 10, the_game.node_count, move_string);
+                    string move_string { position.VariationToString(principal_variation) };
+                    ;
+                    printf("%2u %5d %4u %8u %s\n", depth, (int)MoveScore(best_moves[depth]), (GetMilliseconds() - start_ms) / 10, the_game.node_count, move_string.c_str());
                 }
             }
         }        

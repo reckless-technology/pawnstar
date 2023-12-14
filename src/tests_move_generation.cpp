@@ -9,19 +9,18 @@ using std::string;
 #include "debug_hashtable.h"
 #include "transposition_table.h"
 #include "function_prototypes.h"
-#include "position_move_generation.h"
 
 /*
 Structure to hold the counts of different move types
 */
 typedef struct
 {
-    int legal_moves;
-    int captures;
-    int ep_captures;
-    int castles;
-    int promotions;
-    int checks;
+    uint64_t legal_moves;
+    uint64_t captures;
+    uint64_t ep_captures;
+    uint64_t castles;
+    uint64_t promotions;
+    uint64_t checks;
 } PerftCounts;
 /*
 Structure to hold a single perft test
@@ -170,7 +169,7 @@ Perft(const Position& src_position,
     src_position.GeneratePseudoLegalMoves(move_list);
     if (!(++call_count & 0x3FFFF))
     {
-        printf("\rpositions processed %10u", counts.legal_moves);
+        printf("\rpositions processed %10" PRIu64, counts.legal_moves);
     }
     if (depth > 1)
     {
@@ -219,15 +218,15 @@ RunPerftTests(void)
         {
             stop = start + 1; // avoid divide by zero error in positions per second for short tests
         }
-        printf("\rdepth                                   %10u\n",   test->depth);
-        printf(  "positions                               %10u\n",   counts.legal_moves);
-        printf(  "captures                                %10u\n",   counts.captures);
-        printf(  "ep captures                             %10u\n",   counts.ep_captures);
-        printf(  "castles                                 %10u\n",   counts.castles);
-        printf(  "promotions                              %10u\n",   counts.promotions);
-        printf(  "checks                                  %10u\n",   counts.checks);
-        printf(  "elapsed milliseconds                    %10u\n",   stop - start);
-        printf(  "positions per second                    %10" PRIu64 "\n", (uint64_t)counts.legal_moves * 1000 / (stop - start));
+        printf("\rdepth                                   %10d\n",          test->depth);
+        printf(  "positions                               %10" PRIu64 "\n", counts.legal_moves);
+        printf(  "captures                                %10" PRIu64 "\n", counts.captures);
+        printf(  "ep captures                             %10" PRIu64 "\n", counts.ep_captures);
+        printf(  "castles                                 %10" PRIu64 "\n", counts.castles);
+        printf(  "promotions                              %10" PRIu64 "\n", counts.promotions);
+        printf(  "checks                                  %10" PRIu64 "\n", counts.checks);
+        printf(  "elapsed milliseconds                    %10d\n",          stop - start);
+        printf(  "positions per second                    %10" PRIu64 "\n", counts.legal_moves * 1000 / (stop - start));
         if (!!memcmp(&counts, &test->counts, sizeof(PerftCounts)))
         {
             printf("************* ERROR on this position *************\n");

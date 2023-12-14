@@ -3,7 +3,7 @@
 #include "transposition_table.h"
 #include "function_prototypes.h"
 #include "game.h"
-#include "position_move_generation.h"
+#include "search.h"
 
 extern Game the_game;
 

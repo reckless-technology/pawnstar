@@ -3,6 +3,9 @@
 #include "transposition_table.h"
 #include "function_prototypes.h"
 
+#include <string>
+using std::string;
+
 struct SeeTest
 {
     const char* fen_string;
@@ -14,7 +17,7 @@ static const SeeTest tests[] =
 {   
     { "1k1r4/1pp4p/p7/4p3/8/P5P1/1PP4P/2K1R3 w - -",            CaptureMove(E1, E5, ROOK,   PAWN),  100 },
     { "1k1r3q/1ppn3p/p4b2/4p3/8/P2N2P1/1PP1R1BP/2K1Q3 w - -",   CaptureMove(D3, E5, KNIGHT, PAWN), -200 },
-    { NULL,                                                                                                0,    0 },
+    { NULL,                                                     0,                                    0 },
 };
 
 void RunStaticExchangeTests(void)
@@ -23,10 +26,9 @@ void RunStaticExchangeTests(void)
     for (const SeeTest* test = tests; test->fen_string; ++test)
     {
         Position position { test->fen_string };
-        char move_string[16];
-        MoveToString(position, test->move, move_string);
+        string move_string { position.MoveToString(test->move) };
         int score = EvaluateStaticExchange(position, test->move);
-        printf("\n%s\nSEE for %s = %d\n", test->fen_string, move_string, score);
+        printf("\n%s\nSEE for %s = %d\n", test->fen_string, move_string.c_str(), score);
         is_pass &= (score == test->see_score);
 
     }

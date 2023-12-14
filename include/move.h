@@ -68,20 +68,11 @@ constexpr uint32_t  MoveBits(Move m)                { return  m & 0xFFFFFFFF;   
 constexpr Move      ScoredMove(Move m, int score)   { return (m & 0xFFFFFFFF) | ((int64_t)score << 32); }
 
 /**
- * @brief A variation, or line of play.
- * Typically used to record the principal variation during search.
-*/
-struct Variation
-{
-    Move moves[MAX_PLY + 1]; /**< the moves comprising the line  */
-};
-
-/**
  * @brief A list of moves for a specific position.
  */
 struct MoveList
 {
-    Move moves[MAX_MOVES_PER_POSITION]; /**< The moves (zero terminarted) */
+    Move moves[MAX_MOVES_PER_POSITION]; /**< The moves (zero terminated) */
     struct Sentinel {};
     /**
      * @brief C++20 style iterator to allow "for (move : move_list)" semantics
@@ -89,13 +80,31 @@ struct MoveList
      */
     struct Iterator
     {
-        Iterator(const Move* m) : move_(m)      {}
-        const Move& operator*() const           { return *move_; }
-        bool operator==(const Sentinel&) const  { return *move_ == 0; }
-        Iterator& operator++()                  { ++move_; return *this; }
+        constexpr Iterator(const Move* m) : move_(m)     {}
+        constexpr const Move& operator*() const          { return *move_; }
+        constexpr bool operator==(const Sentinel&) const { return *move_ == 0; }
+        constexpr bool operator!=(const Sentinel&) const { return *move_ != 0; }
+        Iterator& operator++()                           { ++move_; return *this; }
     private:
         const Move* move_;
     };
-    Iterator begin() const  { return Iterator(moves); }
-    Sentinel end() const    { return Sentinel {}; }
+    constexpr Iterator begin() const  { return Iterator(moves); }
+    constexpr Sentinel end() const    { return Sentinel {}; }
 };
+
+typedef MoveList Variation;
+
+constexpr void 
+CopyVariation(Variation&       dst_variation, 
+              const Variation& src_variation, 
+              Move             best_move)
+{
+    Move* dst = dst_variation.moves;
+    *dst++ = best_move;
+    for (auto m : src_variation)
+    {
+        *dst++ = m;
+    }
+    *dst = 0;
+}
+
