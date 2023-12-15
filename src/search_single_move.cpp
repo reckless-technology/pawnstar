@@ -19,12 +19,12 @@ SearchSingleMove(Game&      game,
                  Variation& pv,
                  int        move_index)
 {      
-    if (game.is_cancel_pending)
+    if (game.is_cancel_pending_)
     {
         return SEARCH_CANCELLED_SCORE;
     }
     game.PlayMove(move);
-    if (game.position->flags_ & IS_MOVED_INTO_CHECK)
+    if (game.position_->flags_ & IS_MOVED_INTO_CHECK)
     {
         game.UndoMove();
         return MOVED_INTO_CHECK_SCORE;

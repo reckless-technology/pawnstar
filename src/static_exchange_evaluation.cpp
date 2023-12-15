@@ -18,15 +18,19 @@ int EvaluateStaticExchange(const Position& src_position, Move move)
     Position position { src_position, move };
     if (position.flags_ & IS_MOVED_INTO_CHECK)
     {
-        return ALPHA;
+        return -10000;
     }
     if (MovePromoted(move))
     {
-        return piece_values[MoveCaptured(move)] + piece_values[MovePromoted(move)] - piece_values[PAWN] - 
-            EvaluateSwapOff(position, MoveTo(move), position.ColorToMove(), MovePromoted(move));
+        return 
+            piece_values[MoveCaptured(move)] 
+          + piece_values[MovePromoted(move)] 
+          - piece_values[PAWN] 
+          - EvaluateSwapOff(position, MoveTo(move), position.ColorToMove(), MovePromoted(move));
     }
-    return piece_values[MoveCaptured(move)] - 
-        EvaluateSwapOff(position, MoveTo(move), position.ColorToMove(), MovePiece(move));
+    return 
+        piece_values[MoveCaptured(move)] 
+      - EvaluateSwapOff(position, MoveTo(move), position.ColorToMove(), MovePiece(move));
 }
 /*
 Determine the swap off value of a capture move onto a fixed square. This 

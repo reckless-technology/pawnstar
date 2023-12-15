@@ -1,4 +1,4 @@
-#include <string.h>
+#include <cstring>
 #include <string>
 
 #include "position.h"
@@ -67,7 +67,7 @@ static void handle_xboard(Game& game, int argc, char* argv[])
 
 static void handle_bookmoves(Game& game, int argc, char* argv[])
 {
-    DisplayAvailableBookMoves(*game.position);
+    DisplayAvailableBookMoves(*game.position_);
     (void)argc;
     (void)argv;
 }
@@ -112,14 +112,14 @@ static void handle_new(Game& game, int argc, char* argv[])
 
 static void handle_force(Game &game, int argc, char* argv[])
 {
-    game.engine_color = NEITHER_COLOR;
+    game.engine_color_ = NEITHER_COLOR;
     (void)argc;
     (void)argv;
 }
 
 static void handle_go(Game& game, int argc, char* argv[])
 {
-    game.engine_color = game.position->ColorToMove();
+    game.engine_color_ = game.position_->ColorToMove();
     game.StartThinking();
     (void)argc;
     (void)argv;
@@ -127,7 +127,7 @@ static void handle_go(Game& game, int argc, char* argv[])
 
 static void handle_playother(Game& game, int argc, char* argv[])
 {
-    game.engine_color = EnemyOf(game.position->ColorToMove());
+    game.engine_color_ = EnemyOf(game.position_->ColorToMove());
     (void)argc;
     (void)argv;
 }
@@ -146,7 +146,7 @@ static void handle_usermove(Game& game, int argc, char* argv[])
     }
     if (!game.IsGameOver())
     {
-        if (game.engine_color == game.position->ColorToMove())
+        if (game.engine_color_ == game.position_->ColorToMove())
         {
             game.StartThinking();
         }
@@ -162,13 +162,13 @@ static void handle_setboard(Game& game, int argc, char* argv[])
         p += sprintf(p, "%s ", argv[i]);
     }
     *p = 0;
-    game.position = game.stack;
-    *game.position = Position { fen_string };
+    game.position_ = game.stack_;
+    *game.position_ = Position { fen_string };
 }
 
 static void handle_getboard(Game& game, int argc, char* argv[])
 {
-    std::string fen_string = game.position->operator std::string();
+    std::string fen_string = game.position_->operator std::string();
     printf("%s\n", fen_string.c_str());
     (void)argc;
     (void)argv;
@@ -176,14 +176,14 @@ static void handle_getboard(Game& game, int argc, char* argv[])
 
 static void handle_nopost(Game& game, int argc, char* argv[])
 {
-    game.do_show_thinking = false;
+    game.do_show_thinking_ = false;
     (void)argc;
     (void)argv;
 }
 
 static void handle_post(Game& game, int argc, char* argv[])
 {
-    game.do_show_thinking = true;
+    game.do_show_thinking_ = true;
     (void)argc;
     (void)argv;
 }
@@ -198,7 +198,7 @@ static void handle_time(Game& game, int argc, char* argv[])
     int time;
     if (sscanf(argv[1], "%d", &time) == 1)
     {
-        game.time_control.standard.milliseconds_remaining = time * 10;
+        game.time_control_.standard.milliseconds_remaining = time * 10;
     }
 }
 
@@ -229,17 +229,17 @@ static void handle_level(Game& game, int argc, char* argv[])
     sscanf(argv[3], "%d", &increment);
     if (moves)
     {
-        game.time_control.clock_type = CLOCK_STANDARD;
-        game.time_control.standard.moves_per_period = moves;
-        game.time_control.standard.milliseconds_per_period = minutes * 60000 + seconds * 1000;
-        game.time_control.standard.milliseconds_remaining = game.time_control.standard.milliseconds_per_period;
+        game.time_control_.clock_type = CLOCK_STANDARD;
+        game.time_control_.standard.moves_per_period = moves;
+        game.time_control_.standard.milliseconds_per_period = minutes * 60000 + seconds * 1000;
+        game.time_control_.standard.milliseconds_remaining = game.time_control_.standard.milliseconds_per_period;
     }
     else
     {
-        game.time_control.clock_type = CLOCK_INCREMENTAL;
-        game.time_control.incremental.base_milliseconds = minutes * 60000 + seconds * 1000;
-        game.time_control.incremental.increment_milliseconds = increment * 1000;
-        game.time_control.incremental.milliseconds_remaining = game.time_control.incremental.base_milliseconds;
+        game.time_control_.clock_type = CLOCK_INCREMENTAL;
+        game.time_control_.incremental.base_milliseconds = minutes * 60000 + seconds * 1000;
+        game.time_control_.incremental.increment_milliseconds = increment * 1000;
+        game.time_control_.incremental.milliseconds_remaining = game.time_control_.incremental.base_milliseconds;
     }
 }
 
@@ -253,8 +253,8 @@ static void handle_st(Game& game, int argc, char* argv[])
     int seconds = 0;
     if (sscanf(argv[1], "%d", &seconds) == 1) 
     {
-        game.time_control.clock_type = CLOCK_FIXED_TIME;
-        game.time_control.fixed_time.milliseconds = seconds * 1000;
+        game.time_control_.clock_type = CLOCK_FIXED_TIME;
+        game.time_control_.fixed_time.milliseconds = seconds * 1000;
     }
 }
 
@@ -268,8 +268,8 @@ static void handle_sd(Game& game, int argc, char* argv[])
     int depth = 0;
     if (sscanf(argv[1], "%d", &depth) == 1)
     {
-        game.time_control.clock_type = CLOCK_FIXED_DEPTH;
-        game.time_control.fixed_depth.depth = depth;
+        game.time_control_.clock_type = CLOCK_FIXED_DEPTH;
+        game.time_control_.fixed_depth.depth = depth;
     }
 }
 
@@ -277,33 +277,33 @@ static void handle_sd(Game& game, int argc, char* argv[])
 
 static void handle_showtime(Game& game, int argc, char* argv[])
 {
-    switch (game.time_control.clock_type)
+    switch (game.time_control_.clock_type)
     {
     case CLOCK_STANDARD:
         printf("standard clock mode\n");
-        printf("moves per period              %5d\n", game.time_control.standard.moves_per_period);
+        printf("moves per period              %5d\n", game.time_control_.standard.moves_per_period);
         printf("time period                   ");
-        PRINT_MIN_SEC(game.time_control.standard.milliseconds_per_period);
+        PRINT_MIN_SEC(game.time_control_.standard.milliseconds_per_period);
         printf("time remaining                ");
-        PRINT_MIN_SEC(game.time_control.standard.milliseconds_remaining);
+        PRINT_MIN_SEC(game.time_control_.standard.milliseconds_remaining);
         break;
     case CLOCK_INCREMENTAL:
         printf("incremental clock mode\n");
         printf("base time                     ");
-        PRINT_MIN_SEC(game.time_control.incremental.base_milliseconds);
+        PRINT_MIN_SEC(game.time_control_.incremental.base_milliseconds);
         printf("increment time                ");
-        PRINT_MIN_SEC(game.time_control.incremental.increment_milliseconds);
+        PRINT_MIN_SEC(game.time_control_.incremental.increment_milliseconds);
         printf("time remaining                ");
-        PRINT_MIN_SEC(game.time_control.incremental.milliseconds_remaining);
+        PRINT_MIN_SEC(game.time_control_.incremental.milliseconds_remaining);
         break;
     case CLOCK_FIXED_DEPTH:
         printf("fixed depth mode\n");
-        printf("search depth                  %5d\n", game.time_control.fixed_depth.depth);
+        printf("search depth                  %5d\n", game.time_control_.fixed_depth.depth);
         break;
     case CLOCK_FIXED_TIME:
         printf("fixed time mode\n");
         printf("search time                   ");
-        PRINT_MIN_SEC(game.time_control.fixed_time.milliseconds);
+        PRINT_MIN_SEC(game.time_control_.fixed_time.milliseconds);
         break;
     }
     (void)argc;
@@ -312,7 +312,7 @@ static void handle_showtime(Game& game, int argc, char* argv[])
 
 static void handle_eval(Game& game, int argc, char* argv[])
 {
-    printf("evaluation %5d\n", EvaluatePosition(*game.position, ALPHA, BETA));
+    printf("evaluation %5d\n", EvaluatePosition(*game.position_, ALPHA, BETA));
     (void)argc;
     (void)argv;
 }
@@ -320,7 +320,7 @@ static void handle_eval(Game& game, int argc, char* argv[])
 #if DEBUGX
 static void handle_dbg(Game& game, int argc, char* argv[])
 {
-    DebugXWrite(stdout);
+    DebugXWrite();
     (void)argc;
     (void)argv;
     (void)game;
@@ -337,9 +337,9 @@ static void handle_dbgclear(Game& game, int argc, char* argv[])
 
 static void handle_undo(Game& game, int argc, char* argv[])
 {
-    if (game.position != game.stack)
+    if (game.position_ != game.stack_)
     {
-        --game.position;
+        --game.position_;
     }
     (void)argc;
     (void)argv;
@@ -347,9 +347,9 @@ static void handle_undo(Game& game, int argc, char* argv[])
 
 static void handle_remove(Game& game, int argc, char* argv[])
 {
-    if (game.position - game.stack >= 2)
+    if (game.position_ - game.stack_ >= 2)
     {
-        game.position -= 2;
+        game.position_ -= 2;
     }
     (void)argc;
     (void)argv;

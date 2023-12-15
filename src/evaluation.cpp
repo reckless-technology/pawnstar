@@ -4,11 +4,11 @@
 #include "function_prototypes.h"
 #include "evaluation.h"
 
-typedef struct EvalHash
+struct EvalHash
 {
     uint64_t    hash;
     int         score;
-} EvalHash;
+};
 
 constexpr int EVAL_HASH_SIZE = 100003; /* Prime number */
 

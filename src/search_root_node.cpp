@@ -1,14 +1,13 @@
+#include "search.h"
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
 #include "function_prototypes.h"
 #include "game.h"
-#include "search.h"
 #include "opening_book.h"
 
 #include <string>
 using std::string;
-
 
 /**
  * @brief Search the root node and find the best move
@@ -18,13 +17,13 @@ using std::string;
 Move SearchRootNode(Game& game)
 {
     /* If there is a book move for this position, do not bother with search. */
-    Move book_move = GetBookMove(game.position->hash_);
+    Move book_move = GetBookMove(game.position_->hash_);
     if (book_move)
     {
         return book_move;
     } 
     MoveList move_list;
-    int num_legal_moves = game.position->GenerateLegalMoves(move_list);
+    int num_legal_moves = game.position_->GenerateLegalMoves(move_list);
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (num_legal_moves == 0)
     {
@@ -38,38 +37,38 @@ Move SearchRootNode(Game& game)
     int timeout_ms      = 0;    /* cancel search when this time expires             */
     int ms_allocated    = 0;    /* soft allocated time for the move                 */
     int moves_to_go     = 0;    /* number of remaining moves in this clock period   */
-    switch (game.time_control.clock_type)
+    switch (game.time_control_.clock_type)
     {
     case CLOCK_STANDARD:
     default:
-        moves_to_go     = game.time_control.standard.moves_per_period - (game.position->full_move_count_ % game.time_control.standard.moves_per_period);
-        ms_allocated    = game.time_control.standard.milliseconds_remaining / moves_to_go;
-        timeout_ms      = max(100, min(ms_allocated * 2, game.time_control.standard.milliseconds_remaining - 3000));
-        game.time_control.hard_stop_search_ms = GetMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
+        moves_to_go     = game.time_control_.standard.moves_per_period - (game.position_->full_move_count_ % game.time_control_.standard.moves_per_period);
+        ms_allocated    = game.time_control_.standard.milliseconds_remaining / moves_to_go;
+        timeout_ms      = max(100, min(ms_allocated * 2, game.time_control_.standard.milliseconds_remaining - 3000));
+        game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
         break; 
     
     case CLOCK_FIXED_DEPTH:
         timeout_ms     = 0;
         ms_allocated   = 0;
-		game.time_control.hard_stop_search_ms = 0;
+		game.time_control_.hard_stop_search_ms = 0;
         break;
     
     case CLOCK_FIXED_TIME:
-        timeout_ms = game.time_control.fixed_time.milliseconds;
-		game.time_control.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        timeout_ms = game.time_control_.fixed_time.milliseconds;
+		game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
         ms_allocated = 0;
         break;
     
     case CLOCK_INCREMENTAL:
-        ms_allocated   = game.time_control.incremental.increment_milliseconds + (game.time_control.incremental.milliseconds_remaining / 30);
-        timeout_ms     = max(100, min(ms_allocated * 2, game.time_control.incremental.milliseconds_remaining - 3000));
-		game.time_control.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        ms_allocated   = game.time_control_.incremental.increment_milliseconds + (game.time_control_.incremental.milliseconds_remaining / 30);
+        timeout_ms     = max(100, min(ms_allocated * 2, game.time_control_.incremental.milliseconds_remaining - 3000));
+		game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
         break;
     }
     InitializeGoodMoveCounts();
     DEBUG_STATEMENT(DebugXClear());
     int start_ms = GetMilliseconds();
-    game.is_cancel_pending = false;
+    game.is_cancel_pending_ = false;
     /*
     For first pass move ordering before we do any search, just use a shallow
     search with wide open alpha beta window. Subsequent passes will use the
@@ -89,35 +88,19 @@ Move SearchRootNode(Game& game)
     
     for (int depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
     {       
-        if (game.time_control.clock_type == CLOCK_FIXED_DEPTH && depth > game.time_control.fixed_depth.depth)
+        if (game.time_control_.clock_type == CLOCK_FIXED_DEPTH && depth > game.time_control_.fixed_depth.depth)
         {
             break;
         }
-        game.node_count = 0;
         SortMoves(num_legal_moves, move_list.moves); /* Sort moves from previous iteration depth. */
         Variation child_pv {};
         int alpha = ALPHA;
+        game.node_count_ = 0;
         for (int i = 0; i != num_legal_moves; ++i)
-        {      
-            int score;    
-            if (i == 0)
-            {
-                score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list.moves[i], child_pv, i);
-                move_list.moves[i] = ScoredMove(move_list.moves[i], score);
-            }
-            else
-            {
-                INCREMENT("pvs root node attempts");
-                score = SearchSingleMove(game, depth, 0, alpha, alpha + 1, move_list.moves[i], child_pv, i);
-                move_list.moves[i] = ScoredMove(move_list.moves[i], score);
-                if (score > alpha)
-                {
-                    INCREMENT("pvs root node fails");
-                    score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list.moves[i], child_pv, i);
-                    move_list.moves[i] = ScoredMove(move_list.moves[i], score);
-                }
-            }
-            if (game.is_cancel_pending)
+        {
+            const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list.moves[i], child_pv, i);
+            move_list.moves[i] = ScoredMove(move_list.moves[i], score);
+            if (game.is_cancel_pending_)
             {
                 return best_move;
             }
@@ -126,12 +109,12 @@ Move SearchRootNode(Game& game)
                 alpha             = score;
                 best_move         = move_list.moves[i];
                 best_moves[depth] = move_list.moves[i];
-                RecordTransposition(game.position->hash_, depth, alpha, best_move, NODE_PV);
+                RecordTransposition(game.position_->hash_, depth, alpha, best_move, NODE_PV);
                 principal_variation.Copy(child_pv, best_move);
-                if (game.do_show_thinking)
+                if (game.do_show_thinking_)
                 {
-                    string move_string { game.position->VariationToString(principal_variation) };
-                    printf("%2u %5d %4u %8u %s\n", depth, (int)MoveScore(best_moves[depth]), (GetMilliseconds() - start_ms) / 10, game.node_count, move_string.c_str());
+                    string move_string { game.position_->VariationToString(principal_variation) };
+                    printf("%2u %5d %4u %8u %s\n", depth, MoveScore(best_moves[depth]), (GetMilliseconds() - start_ms) / 10, game.node_count_, move_string.c_str());
                 }
             }
         }        
@@ -141,8 +124,8 @@ Move SearchRootNode(Game& game)
         {
             break;
         }
-        if (game.time_control.clock_type == CLOCK_STANDARD || 
-            game.time_control.clock_type == CLOCK_INCREMENTAL)
+        if (game.time_control_.clock_type == CLOCK_STANDARD || 
+            game.time_control_.clock_type == CLOCK_INCREMENTAL)
         {
             /* 
             Plan our use of the time with some care. If both the score we find
@@ -166,11 +149,11 @@ Move SearchRootNode(Game& game)
                     is_score_stable = false;
                 }
             }
-            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 6) > ms_allocated)
+            if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 4) > ms_allocated)
             {
                 break;
             }
-            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 4) > ms_allocated)
+            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 3) > ms_allocated)
             {
                 break;
             }

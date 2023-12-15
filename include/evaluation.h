@@ -1,6 +1,6 @@
 #pragma once
-#include <stdint.h>
-#include <memory.h>
+#include <cstdint>
+#include <cstring>
 
 #include "bitboard.h"
 #include "function_prototypes.h"
@@ -27,11 +27,11 @@ struct PawnStructure
 const int PAWN_SQUARE[64] =
 {
      0,  0,  0,  0,  0,  0,  0,  0,
-     5, 10, 15, 20, 20, 15, 10,  5,
-     4,  8, 12, 16, 16, 12,  8,  4,
-     3,  6,  9, 12, 12,  9,  6,  3,
-     2,  4,  6,  8,  8,  6,  4,  2,
-     1,  2,  3,-10,-10,  3,  2,  1,
+    25, 25, 25, 25, 25, 25, 25, 25,
+    15, 15, 15, 20, 20, 15, 15, 15,
+    10, 10, 10, 15, 15, 10, 10, 10,
+     5,  5,  5, 10, 10,  5,  5,  5,
+     0,  0,  0,-10,-10,  0,  0,  0,
      0,  0,  0,-40,-40,  0,  0,  0,
      0,  0,  0,  0,  0,  0,  0,  0
 };
@@ -149,7 +149,8 @@ DeterminePawnStructure(const Position& position, PawnStructure& s)
         {
             if constexpr (color == WHITE)
             {
-                const Bitboard enemy_pawn_attacks = ShiftSouthwest(enemy_pawns) | ShiftSoutheast(enemy_pawns);
+                const Bitboard enemy_pawn_attacks = 
+                    ShiftSouthwest(enemy_pawns) | ShiftSoutheast(enemy_pawns);
                 const uint8_t forward_locn = locn + 8;
                 if (enemy_pawn_attacks & BITBOARD(forward_locn))
                 {
@@ -158,7 +159,8 @@ DeterminePawnStructure(const Position& position, PawnStructure& s)
             }
             else
             {
-                const Bitboard enemy_pawn_attacks = ShiftNorthwest(enemy_pawns) | ShiftNortheast(enemy_pawns);
+                const Bitboard enemy_pawn_attacks = 
+                    ShiftNorthwest(enemy_pawns) | ShiftNortheast(enemy_pawns);
                 const uint8_t forward_locn = locn - 8;
                 if (enemy_pawn_attacks & BITBOARD(forward_locn))
                 {
@@ -278,26 +280,19 @@ EvaluateKing(const Position& position)
     */
     const int enemy_material =
         3 * PopCount((position.knights_ | position.bishops_) & enemy_pieces) +
-        5 * PopCount( position.rooks_                       & enemy_pieces) +
-        9 * PopCount( position.queens_                      & enemy_pieces);
+        5 * PopCount( position.rooks_                        & enemy_pieces) +
+        9 * PopCount( position.queens_                       & enemy_pieces);
     int piece_square_score;
     /* First do piece square table */
-    if (enemy_material >= 16)
+    if (enemy_material > 12)
     {
         piece_square_score = KING_SQUARE_MIDGAME[position.king_location_[color] ^ rank_flip];
     }
-    else if (enemy_material <= 11)
-    {
-        piece_square_score = KING_SQUARE_ENDGAME[position.king_location_[color] ^ rank_flip];
-    }
     else
     {
-        const int early_score = KING_SQUARE_MIDGAME[position.king_location_[color] ^ rank_flip];
-        const int late_score  = KING_SQUARE_ENDGAME[position.king_location_[color] ^ rank_flip];
-        piece_square_score = early_score * (enemy_material - 11) + late_score * (16 - enemy_material);
-        piece_square_score /= 5;
+        /* King moves the middle when the enemy has 12 or less in remaining material. */
+        piece_square_score = KING_SQUARE_ENDGAME[position.king_location_[color] ^ rank_flip];
     }
-    
     /* Consider pawns in front of the king and approaching enemy pawns */
     const Bitboard pawn_shelter_1 = SETS[position.king_location_[color]].king_pawn_shelter[color];
     Bitboard pawn_shelter_2;
@@ -332,6 +327,14 @@ EvaluateKing(const Position& position)
     if (adjacent_file && ((adjacent_file & friendly_pawns) == NO_SQUARES))
     {
         safety_score -= 20;
+    }
+    /* Attacks to squares adjacent to our king */
+    Bitboard king_adjacent = SETS[position.king_location_[color]].king_attacks;
+    while (king_adjacent)
+    {
+        const uint8_t sq_locn = FindAndClearLsb(king_adjacent);
+        Bitboard attacks_to = position.AttacksTo(sq_locn, EnemyOf(color));
+        safety_score -= 20 * PopCount(attacks_to);
     }
     /* Scale the king safety score according to the enemy's material. */
     safety_score = (safety_score * enemy_material) / 31;

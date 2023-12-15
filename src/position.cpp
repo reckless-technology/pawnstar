@@ -1,7 +1,7 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <memory.h>
+#include <cstring>
 
 using std::stringstream;
 using std::string;

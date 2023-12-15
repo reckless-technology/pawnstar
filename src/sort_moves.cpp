@@ -1,28 +1,13 @@
 #include <algorithm>
-
-#include <memory.h>
+#include <cstring>
 
 #include "move.h"
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 
-#define MOVE_MASK 0x7FFF /* piece, from, to only */
+#define MOVE_MASK 0xFFF /* from, to only */
 
-/*
-The good_move_counts array maintains a count, indexed for each ply of search, 
-moving piece type, source and destination square (4 dimensions), how many  
-times that move has raised alpha or caused a cutoff in all the various 
-subtrees at that ply (depth from root node). 
-
-This is based on the premise that moves which are good in one subtree might 
-well be also good in another subtree, and thus moves which have caused more 
-cutoffs should generally be preferred over moves which have caused fewer 
-cutoffs. It's sort of a generalization of the history table and killer move 
-concepts. Whilst this assumption is questionable in theory, it has been 
-experimentally confirmed that it does indeed measurably speed up the search 
-on a wide variety of positions.
-*/
-static int good_move_counts[MAX_PLY][8 * 64 * 64];
+static int good_move_counts[MAX_PLY][64 * 64];
 
 /*
 This function gets called by the search when we find an "interesting" move, 

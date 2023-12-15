@@ -1,6 +1,5 @@
 #pragma once
-#include <stdio.h>
-#include <stdint.h>
+#include <cstdint>
 
 #include "options.h"
 
@@ -58,5 +57,5 @@ constexpr void DebugXIncrementIf(bool condition, const char* key)
 }
 
 void DebugXClear(void);
-void DebugXWrite(FILE* file);
+void DebugXWrite();
 #endif /* DEBUGX */

@@ -1,6 +1,4 @@
 #pragma once
-#include <stdio.h>
-#include <string>
 
 #include "bitboard.h"
 #include "move.h"

@@ -1,5 +1,5 @@
 #pragma once
-#include <stdint.h>
+#include <cstdint>
 
 #include "options.h"
 /**
@@ -91,7 +91,10 @@ struct MoveList
     constexpr Iterator begin() const    { return Iterator(moves); }
     constexpr Sentinel end() const      { return Sentinel {}; }
 
-    constexpr MoveList() : move_(moves) { *move_ = 0; }
+    constexpr MoveList() : move_(moves) 
+    { 
+        *move_ = 0; 
+    }
     constexpr void Add(Move move)
     {
         *move_++ = move;

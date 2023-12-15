@@ -51,12 +51,12 @@ Find a transposition entry for this position if one exists
 */
 bool 
 FindTransposition(uint64_t hash, 
-                  Transposition* transposition)
+                  Transposition& transposition)
 {
-    const Transposition* const t = &transposition_table[hash % table_num_entries]; 
-    if (t->hash == hash)
+    const Transposition& t = transposition_table[hash % table_num_entries]; 
+    if (t.hash == hash)
     {
-        *transposition = *t;
+        transposition = t;
         return true;
     }
     return false;
@@ -72,12 +72,30 @@ RecordTransposition(uint64_t hash,
                     Move     move, 
                     int      node_type)
 {   
-    Transposition* const t = &transposition_table[hash % table_num_entries];
-    t->hash      = hash;
-    t->move      = move;
-    t->score     = score;
-    t->depth     = (int16_t)depth;
-    t->node_type = (uint16_t)node_type;
+    Transposition& t = transposition_table[hash % table_num_entries];
+    t.hash           = hash;
+    t.move           = move;
+    t.score          = score;
+    t.depth          = (int16_t)depth;
+    t.node_type      = (uint16_t)node_type;
+}
+
+void    
+RecordTranspositionMaybe(uint64_t hash, 
+                         int      depth, 
+                         int      score, 
+                         Move     move, 
+                         int      node_type)
+{
+    Transposition& t = transposition_table[hash % table_num_entries];
+    if (t.hash == 0 || t.depth < depth)
+    {
+        t.hash           = hash;
+        t.move           = move;
+        t.score          = score;
+        t.depth          = (int16_t)depth;
+        t.node_type      = (uint16_t)node_type;
+    }
 }
 
 /*

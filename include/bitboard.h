@@ -1,5 +1,5 @@
 #pragma once
-#include <stdint.h>
+#include <cstdint>
 /**
  * @file Functions and macros to use Bitboards.
  * 

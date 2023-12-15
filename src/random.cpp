@@ -1,5 +1,5 @@
-#include <stdint.h>
-#include <time.h>
+#include <cstdint>
+#include <ctime>
 
 /**
  * @brief Xorshift simple PRNG

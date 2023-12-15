@@ -4,8 +4,6 @@
 #include <sstream>
 #include <fstream>
 
-#include <string.h>
-
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
@@ -130,10 +128,8 @@ static bool ParseLineOfPlay(const string& line)
         {
             return true; /* Done with this line. */
         }
-        char move_string_mutable[16];
-        strncpy(move_string_mutable, token.c_str(), sizeof(move_string_mutable) - 1);
-        const uint64_t hash = game.position->hash_;
-        const Move move = game.PlayMove(move_string_mutable);
+        const uint64_t hash = game.position_->hash_;
+        const Move move = game.PlayMove(token.c_str());
         if (move == 0)
         {
             printf("ERROR found in book line '%s' move '%s'\n", line.c_str(), token.c_str());

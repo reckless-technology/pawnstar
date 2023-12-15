@@ -44,20 +44,20 @@ Run the standard Bratko-Kopec test suite at fixed search depth
 void RunPositionTests(Game &game, int depth)
 {
     int first_start;
-    const TimeControl prev_time_control = game.time_control;
+    const TimeControl prev_time_control = game.time_control_;
     first_start = GetMilliseconds();
     for (auto test : POSITION_TESTS)
     {
         game = Game(test);
-        game.time_control.clock_type = CLOCK_FIXED_DEPTH;
-        game.time_control.fixed_depth.depth = depth;
-        game.do_show_thinking = true;
+        game.time_control_.clock_type = CLOCK_FIXED_DEPTH;
+        game.time_control_.fixed_depth.depth = depth;
+        game.do_show_thinking_ = true;
         printf("\n%s\n", test);
         DEBUG_STATEMENT(DebugXClear());
         SearchRootNode(game);
-        DEBUG_STATEMENT(DebugXWrite(stdout));
+        DEBUG_STATEMENT(DebugXWrite());
     }
     printf("total elapsed milliseconds                        %10d\n", GetMilliseconds() - first_start);
     game = Game();
-    game.time_control = prev_time_control;
+    game.time_control_ = prev_time_control;
 }

@@ -5,7 +5,7 @@
 #endif 
 
 #ifndef DO_TEST_HASH_DURING_PERFT
-#define DO_TEST_HASH_DURING_PERFT 0
+#define DO_TEST_HASH_DURING_PERFT 1
 #endif
 
 #ifndef DO_NULL_MOVE_PRUNING
@@ -13,7 +13,7 @@
 #endif
 
 #ifndef DO_LATE_MOVE_REDUCTION
-#define DO_LATE_MOVE_REDUCTION 0
+#define DO_LATE_MOVE_REDUCTION 1
 #endif
 
 const int HASHTABLE_MEGABYTES           =      1024; ///< default transposition table size in MB

@@ -1,4 +1,3 @@
-#include <string.h>
 #include <string>
 #include <string_view>
 
@@ -36,16 +35,16 @@ static void RemoveMoveSuffixes(string& move_str)
 
 Game::Game(const char* fen_string)
 {
-   time_control.hard_stop_search_ms              = 0;
-   time_control.clock_type                       = CLOCK_STANDARD;
-   time_control.standard.milliseconds_per_period = 5 * 60 * 1000; // 5 minutes
-   time_control.standard.moves_per_period        = 40;            // 40 moves in 5 mins
-   time_control.standard.milliseconds_remaining  = 5 * 60 * 1000;
-   node_count                                    = 0;
-   engine_color                                  = NEITHER_COLOR;
-   do_show_thinking                              = true;
-   position                                      = &stack[0];
-   *position                                     = Position { fen_string };
+   time_control_.hard_stop_search_ms              = 0;
+   time_control_.clock_type                       = CLOCK_STANDARD;
+   time_control_.standard.milliseconds_per_period = 5 * 60 * 1000; // 5 minutes
+   time_control_.standard.moves_per_period        = 40;            // 40 moves in 5 mins
+   time_control_.standard.milliseconds_remaining  = 5 * 60 * 1000;
+   node_count_                                    = 0;
+   engine_color_                                  = NEITHER_COLOR;
+   do_show_thinking_                              = true;
+   position_                                      = &stack_[0];
+   *position_                                     = Position { fen_string };
 }
 
 Game::Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {}
@@ -55,19 +54,19 @@ Make a move and update the game end status flags
 */
 void Game::PlayMove(Move move)
 {
-    position[1] = Position(position[0], move);
-    ++position;
+    position_[1] = Position(position_[0], move);
+    ++position_;
 }
 
 void Game::UndoMove()
 {
-    --position;
+    --position_;
 }
 
 void Game::MakeNullMove()
 {
-    position->MakeNullMove(position[1]);
-    ++position;
+    position_->MakeNullMove(position_[1]);
+    ++position_;
 }
 
 /*
@@ -77,15 +76,15 @@ format, and update game state_flags accordingly
 returns the move if a legal move was played
 returns zero if the move was illegal or the game is over
 */
-Move Game::PlayMove(char* move_str)
+Move Game::PlayMove(const char* move_str)
 {
     string candidate { move_str };
     RemoveMoveSuffixes(candidate);
     MoveList move_list;
-    position->GenerateLegalMoves(move_list);
+    position_->GenerateLegalMoves(move_list);
     for (auto move : move_list)
     {
-        string move_string { position->MoveToString(move) };
+        string move_string { position_->MoveToString(move) };
         RemoveMoveSuffixes(move_string);
         if (move_string == candidate)
         {
@@ -104,27 +103,27 @@ Move Game::PlayMove(char* move_str)
  */
 bool Game::IsGameOver() const
 {
-    if (position->IsCheckmate())
+    if (position_->IsCheckmate())
     {
-        printf(position->ColorToMove() == BLACK ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
+        printf(position_->ColorToMove() == BLACK ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
         return true;
     }
-    if (position->IsStalemate())
+    if (position_->IsStalemate())
     {
         printf("1/2-1/2 {stalemate}\n");
         return true;
     }
-    if (position->IsDrawByRepetition(false))
+    if (position_->IsDrawByRepetition(false))
     {
         printf("1/2-1/2 {draw by repetition}\n");
         return true;
     }
-    if (position->IsDrawByMaterial())
+    if (position_->IsDrawByMaterial())
     {
         printf("1/2-1/2 {draw by insufficient material}\n");
         return true;
     }
-    if (position->IsDrawByFiftyMoves())
+    if (position_->IsDrawByFiftyMoves())
     {
         printf("1/2-1/2 {draw by 50 reversible moves}\n");
         return true;
@@ -141,7 +140,7 @@ void Game::SearchThreadEntry()
     int move = SearchRootNode(*this);
     if (move)
     {
-        std::string move_string { position->MoveToString(move) };
+        std::string move_string { position_->MoveToString(move) };
         PlayMove(move);
         printf("move %s\n", move_string.c_str());
         IsGameOver();
@@ -150,7 +149,7 @@ void Game::SearchThreadEntry()
 
 void Game::StopThinking()
 {
-    is_cancel_pending = true;
+    is_cancel_pending_ = true;
     if (worker_thread.joinable())
     {
         worker_thread.join();

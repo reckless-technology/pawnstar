@@ -1,7 +1,6 @@
 #include <string>
-
-#include <memory.h>
-#include <inttypes.h>
+#include <cstring>
+#include <cinttypes>
 
 using std::string;
 
@@ -177,7 +176,7 @@ Perft(const Position& src_position,
         {
             Position position { src_position, *move };
 #if DO_TEST_HASH_DURING_PERFT
-            if (position.hash != position.ComputeHash())
+            if (position.hash_ != position.ComputeHash())
             {
                 printf("\nERROR in hash during perft\n");
             }

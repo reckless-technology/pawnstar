@@ -7,21 +7,20 @@
 
 /**
  * @brief Try null move pruning.
- * @param position Current position
+ * @param game Current game (position)
  * @param depth Current search depth
  * @param ply Distance from root node
  * @param alpha Score floor
  * @param beta Score ceiling (opponent's floor)
- * @param cancel Cancel flag
  * @return beta on success, alpha on failure
  */
 #if DO_NULL_MOVE_PRUNING
 static int 
-AttemptNullMove(Game&            game, 
-                int              depth, 
-                int              ply, 
-                int              alpha, 
-                int              beta)
+AttemptNullMove(Game& game, 
+                int   depth, 
+                int   ply, 
+                int   alpha, 
+                int   beta)
 {
     /*
     Try null move pruning if ALL of the following are true:
@@ -34,9 +33,9 @@ AttemptNullMove(Game&            game,
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    Position& position = *game.position;
-    if (!(position.flags_ & IS_NULL_MOVE)
-        && !(position.flags_ & IS_CHECK)
+    Position& position = *game.position_;
+    if (   !(position.flags_ & IS_NULL_MOVE)
+        && !(position.flags_ & IS_CHECK    )
         && beta == alpha + 1
         && (position.knights_ | position.bishops_ | position.rooks_ | position.queens_)
         && EvaluatePosition(position, alpha, beta) >= beta)
@@ -46,7 +45,7 @@ AttemptNullMove(Game&            game,
         Variation dummy {};
         int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
         game.UndoMove();
-        if (game.is_cancel_pending)
+        if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
         }
@@ -73,27 +72,26 @@ AttemptNullMove(Game&            game,
  * @return score for this node
 */
 int 
-Search(Game&            game, 
-       int              depth, 
-       int              ply, 
-       int              alpha, 
-       int              beta, 
-       Variation&       parent_pv)
+Search(Game&        game, 
+       int          depth, 
+       int          ply, 
+       int          alpha, 
+       int          beta, 
+       Variation&   parent_pv)
 {    
-    if (game.is_cancel_pending)
+    if (game.is_cancel_pending_)
     {
         return SEARCH_CANCELLED_SCORE;
-    }
-    
-    if (!(++game.node_count & 0xFFFF)         &&
-        game.time_control.hard_stop_search_ms &&
-        GetMilliseconds() >= game.time_control.hard_stop_search_ms)
+    }    
+    if ((++game.node_count_ & 0xFFFF) == 0          &&
+        game.time_control_.hard_stop_search_ms != 0 &&
+        GetMilliseconds() >= game.time_control_.hard_stop_search_ms)
     {
-        game.is_cancel_pending = true;
+        game.is_cancel_pending_ = true;
         return SEARCH_CANCELLED_SCORE;
     }
     INCREMENT("alpha beta calls");
-    Position& position = *game.position;
+    Position& position = *game.position_;
     if (position.IsDrawByMaterial  () ||
         position.IsDrawByFiftyMoves() ||
         position.IsDrawByRepetition(true))
@@ -118,8 +116,9 @@ Search(Game&            game,
     Determine if there is an entry in the transposition table 
     for this position.
     */
-    Transposition transposition;
-    const bool is_transposition = FindTransposition(position.hash_, &transposition);
+    Variation     pv {};
+    Transposition transposition {};
+    const bool is_transposition = FindTransposition(position.hash_, transposition);
     if (is_transposition && transposition.depth >= depth)
     {
         INCREMENT("table hit");
@@ -158,14 +157,13 @@ Search(Game&            game,
             searching these few principal variation nodes is trivial.
             */
             INCREMENT("table hit pv node");
-            ++depth;
             break;
         }
     }
  
 #if DO_NULL_MOVE_PRUNING
     int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
-    if (game.is_cancel_pending)
+    if (game.is_cancel_pending_)
     {
         return SEARCH_CANCELLED_SCORE;
     }
@@ -180,17 +178,17 @@ Search(Game&            game,
     This might save us the cost of move generation altogether, or provide 
     better alpha beta bounds for the main search.
     */
-    Variation   pv {};
-    int         num_legal_moves     = 0;
-    Move        best_move           = 0;
-    bool        has_raised_alpha    = false;
+    
+    int  num_legal_moves  = 0;
+    Move best_move        = 0;
+    bool has_raised_alpha = false;
     
     if (is_transposition && transposition.move)
     {
         INCREMENT("table move");
         ++num_legal_moves;
         int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, 0);
-        if (game.is_cancel_pending)
+        if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
         }
@@ -234,21 +232,21 @@ Search(Game&            game,
         # We are not in check AND
         # We've already searched a couple of moves at full depth without success AND
         # We are not in a PV node AND
-        # The static exchange evaluation for this move is negative
+        # The static exchange evaluation for this move is non positive
         */
         if (!(position.flags_ & IS_CHECK) && 
-              num_legal_moves > 2               &&
-              beta == alpha + 1                 &&
-              MoveScore(move) < 0)
+              num_legal_moves > 1         &&
+              beta == alpha + 1           &&
+              MoveScore(move) <= 0)
         {
             if (depth <= 1)
             {
-                INCREMENT("negative SEE frontier skips");
+                INCREMENT("SEE frontier skips");
                 continue;
             }
             else
             {
-                INCREMENT("negative SEE reduction attempts");
+                INCREMENT("SEE reduction attempts");
                 score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, num_legal_moves);
             }
         }
@@ -257,7 +255,7 @@ Search(Game&            game,
         {
             score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, num_legal_moves);
         }
-        if (game.is_cancel_pending)
+        if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
         }

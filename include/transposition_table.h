@@ -1,5 +1,5 @@
 #pragma once
-#include <stdint.h>
+#include <cstdint>
 
 #include "move.h"
 
@@ -27,7 +27,8 @@ struct Transposition
     uint16_t    node_type;  /**< The alpha-beta tree search node type (cut, all, pv)    */
 };
 
-bool    FindTransposition(uint64_t hash, Transposition* transposition);
+bool    FindTransposition(uint64_t hash, Transposition& transposition);
 void    FreeTranspositionTable(void);
 bool    InitializeTranspositionTable(int megabytes);
 void    RecordTransposition(uint64_t hash, int depth, int score, Move move, int node_type);
+void    RecordTranspositionMaybe(uint64_t hash, int depth, int score, Move move, int node_type);

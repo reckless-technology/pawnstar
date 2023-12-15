@@ -8,9 +8,9 @@
 *
 * Only included when CPP flag DEBUGX is nonzero.
 */
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <cstdio>
+#include <cstring>
+#include <cstdlib>
 
 #include "debug_hashtable.h"
 #include "options.h"
@@ -37,7 +37,7 @@ static int CompareEntries(const DebugEntry** left, const DebugEntry** right)
  * @brief Write the debug dictionary out in alphabetic order.
  * @param file File to write to (typically stdout)
 */
-void DebugXWrite(FILE* file)
+void DebugXWrite()
 {
     DebugEntry* entries[DEBUG_DICT_SIZE];
     int num_entries = 0;
@@ -49,12 +49,12 @@ void DebugXWrite(FILE* file)
         }
     }
     qsort(entries, num_entries, sizeof(DebugEntry*), (int(*)(const void*, const void*))CompareEntries);
-    fputs("************************** DEBUGX **************************\n", file);
+    printf("************************** DEBUGX **************************\n");
     for (int i = 0; i != num_entries; ++i)
     {
-        fprintf(file, "%-50s%10u\n", entries[i]->key, entries[i]->count);
+        printf("%-50s%10u\n", entries[i]->key, entries[i]->count);
     }
-    fputs("************************************************************\n", file);
+    printf("************************************************************\n");
 }
 
 #endif
