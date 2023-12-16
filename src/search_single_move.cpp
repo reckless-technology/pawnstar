@@ -30,7 +30,9 @@ SearchSingleMove(Game&      game,
         return MOVED_INTO_CHECK_SCORE;
     }
     int score;
-    if (beta > alpha + 1 && move_index > 0)
+    if (beta > alpha + 1 && 
+        move_index > 0   && 
+        !(game.position_->flags_ & IS_CHECK))
     {
         INCREMENT("pvs attempts");
         score = -Search(game, depth - 1, ply + 1, -alpha - 1, -alpha, pv);
