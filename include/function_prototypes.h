@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <string>
 
 #include "bitboard.h"
 #include "move.h"
@@ -35,6 +36,20 @@ constexpr Bitboard
 QueenAttacks(Bitboard occupied_squares, uint8_t location)
 {
     return BishopAttacks(occupied_squares, location) | RookAttacks(occupied_squares, location);
+}
+
+static inline std::string MoveString(Move m)
+{
+    std::string result;
+    result += FileChar(MoveFrom(m));
+    result += RankChar(MoveFrom(m));
+    result += FileChar(MoveTo(m));
+    result += RankChar(MoveTo(m));
+    if (MovePromoted(m))
+    {
+        result += "  nbrq"[MovePromoted(m)];
+    }
+    return result;
 }
 
 int     GetMilliseconds(void);

@@ -62,12 +62,11 @@ AttemptNullMove(Game& game,
 
 /**
  * @brief Fail hard alpha beta main search algorithm.
- * @param position position to search
+ * @param game position to search
  * @param depth search depth
  * @param ply distance from root node
  * @param alpha score floor at parent node
  * @param beta score ceiling at parent node
- * @param cancel cancel thinking flag (propagates through the tree)
  * @param parent_pv principal variation at the parent node
  * @return score for this node
 */
@@ -180,14 +179,17 @@ Search(Game&        game,
     better alpha beta bounds for the main search.
     */
     
-    int  num_legal_moves  = 0;
-    Move best_move        = 0;
-    int  best_score       = ALPHA;
-    bool has_raised_alpha = false;
+    int  num_legal_moves   = 0;
+    Move best_move         = 0;
+    bool has_raised_alpha  = false;
+#if DO_LATE_MOVE_REDUCTION
+    bool has_reduced_depth = false;
+#endif
     
     if (is_transposition && transposition.move)
     {
         INCREMENT("table move");
+        best_move = transposition.move;
         ++num_legal_moves;
         int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, 0);
         if (game.is_cancel_pending_)
@@ -206,7 +208,6 @@ Search(Game&        game,
             INCREMENT("table move raised alpha");
             alpha = score;
             has_raised_alpha = true;
-            best_move = transposition.move;
             /* 
             Provisionally store this move as a CUT node - it 
             may later turn out to be a PV but we don't know that yet.
@@ -221,12 +222,19 @@ Search(Game&        game,
     */
     MoveList move_list { position.GeneratePseudoLegalMoves() };
     ScoreAndSortMoves(position, move_list, ply, depth);
+    if (best_move == 0)
+    {
+        best_move = move_list[0];
+    }
     /* 
     Start of the main loop. 
     */
     for (const auto& move : move_list)
     {
-        int score;
+        if (is_transposition && MoveBits(move) == MoveBits(transposition.move))
+        {
+            continue; /* We alrteady searched this move. */
+        }
 #if DO_LATE_MOVE_REDUCTION
         /* 
         Consider candidate move reductions in the following circumstances:
@@ -235,27 +243,19 @@ Search(Game&        game,
         # We are not in a PV node AND
         # The static exchange evaluation for this move is non positive
         */
-        if (!(position.flags_ & IS_CHECK) && 
-              num_legal_moves > 1         &&
-              beta == alpha + 1           &&
-              MoveScore(move) <= 0)
+        if (!has_reduced_depth              &&
+            !has_raised_alpha               &&
+            !(position.flags_ & IS_CHECK)   &&
+            beta == alpha + 1               &&
+            num_legal_moves > 1             &&
+            MoveScore(move) <= 0)
         {
-            if (depth <= 1)
-            {
-                INCREMENT("see frontier skips");
-                break;
-            }
-            else
-            {
-                INCREMENT("see reduction attempts");
-                score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, num_legal_moves);
-            }
+            INCREMENT("late move reductions");
+            --depth;
+            has_reduced_depth = true;
         }
-        else
 #endif
-        {
-            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, num_legal_moves);
-        }
+        int score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, num_legal_moves);
         if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
@@ -273,23 +273,19 @@ Search(Game&        game,
             RecordGoodMove(ply, move);
             return beta;
         }
-        if (score > best_score)
+        if (score > alpha)
         {
+            INCREMENT("pv changed");
+            alpha = score;
+            has_raised_alpha = true;
             best_move = move;
-            best_score = score;
-            if (score > alpha)
-            {
-                INCREMENT("pv changed");
-                alpha = score;
-                has_raised_alpha = true;
-                /* 
-                Provisionally store this move as a CUT node - it 
-                may later turn out to be a PV but we don't know that 
-                for sure yet until we have searched every move.
-                */
-                RecordTransposition(position.hash_, depth, score, move, NODE_CUT);
-                RecordGoodMove(ply, move);
-            }
+            /* 
+            Provisionally store this move as a CUT node - it 
+            may later turn out to be a PV but we don't know that 
+            for sure yet until we have searched every move.
+            */
+            RecordTransposition(position.hash_, depth, score, move, NODE_CUT);
+            RecordGoodMove(ply, move);
         }
     }
     /*

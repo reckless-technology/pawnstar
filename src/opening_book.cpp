@@ -4,6 +4,7 @@
 #include <sstream>
 #include <fstream>
 
+#include "opening_book.h"
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
@@ -15,6 +16,7 @@ using std::vector;
 using std::unordered_map;
 using std::stringstream;
 using std::ifstream;
+using std::string_view;
 
 /**
  * @brief The opening book is stored as a map, indexed by the Zobrist 
@@ -33,9 +35,9 @@ static bool InitializeOpeningBookFromStringStream(stringstream& ss);
  * @param filename Filename of book file.
  * @return true on success.
  */
-bool InitializeOpeningBookFromFile(const char* filename)
+bool InitializeOpeningBookFromFile(string_view filename)
 {
-    ifstream file { filename };
+    ifstream file { string { filename } };
     if (!file.is_open())
     {
         return false;

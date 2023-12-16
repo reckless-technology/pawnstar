@@ -52,12 +52,12 @@ EvaluatePosition(const Position& position,
     int score = (position.flags_ & IS_BLACK_TO_MOVE) ?
         scores[BLACK] - scores[WHITE] :
         scores[WHITE] - scores[BLACK];
-    if (score >= beta + 150)
+    if (score >= beta + 200)
     {
         INCREMENT("eval beta cutoff material");
         return beta;
     }
-    if (score <= alpha - 150)
+    if (score <= alpha - 200)
     {
         INCREMENT("eval alpha cutoff material");
         return alpha;

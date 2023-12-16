@@ -84,8 +84,9 @@ Move Game::PlayMove(std::string_view move_str)
     for (const auto& move : move_list)
     {
         string move_string { position_->MoveToString(move) };
+        string alebraic_move_string = MoveString(move);
         RemoveMoveSuffixes(move_string);
-        if (move_string == candidate)
+        if (move_string == candidate || alebraic_move_string == candidate)
         {
             PlayMove(move);
             return move;
