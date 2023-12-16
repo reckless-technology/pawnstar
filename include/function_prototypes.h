@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "bitboard.h"
 #include "move.h"
 #include "generated_data.h"
@@ -39,8 +41,8 @@ int     GetMilliseconds(void);
 int     EvaluateStaticExchange(const Position& src_position, Move move);
 void    InitializeGoodMoveCounts(void);
 void    RecordGoodMove(int ply, Move move);
-void    ScoreAndSortMoves(const Position& position, Move moves[], int ply, int depth);
-void    SortMoves(int num_elements, Move values[]);
+void    ScoreAndSortMoves(const Position& position, MoveList& moves, int ply, int depth);
+void    SortMoves(MoveList& moves, bool is_stable_sort);
 int     EvaluatePosition(const Position& position, int alpha, int beta);
 bool    RunMergeSortTests(void);
 void    RunPerftTests(void);

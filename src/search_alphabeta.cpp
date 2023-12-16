@@ -217,13 +217,12 @@ Search(Game&        game,
     We didn't get a cutoff from the transposition table so proceed
     with generating and searching moves.
     */
-    MoveList move_list;
-    position.GeneratePseudoLegalMoves(move_list);
-    ScoreAndSortMoves(position, move_list.moves, ply, depth);
+    MoveList move_list { position.GeneratePseudoLegalMoves() };
+    ScoreAndSortMoves(position, move_list, ply, depth);
     /* 
     Start of the main loop. 
     */
-    for (auto move : move_list)
+    for (const auto& move : move_list)
     {
         int score;
 #if DO_LATE_MOVE_REDUCTION
@@ -241,12 +240,12 @@ Search(Game&        game,
         {
             if (depth <= 1)
             {
-                INCREMENT("SEE frontier skips");
-                continue;
+                INCREMENT("see frontier skips");
+                break;
             }
             else
             {
-                INCREMENT("SEE reduction attempts");
+                INCREMENT("see reduction attempts");
                 score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, num_legal_moves);
             }
         }
@@ -319,7 +318,7 @@ Search(Game&        game,
         INCREMENT("pv nodes");
         RecordTransposition(position.hash_, depth, alpha, best_move, NODE_PV);
         RecordGoodMove(ply, best_move);
-        parent_pv.Copy(pv, best_move);
+        CopyVariation(parent_pv, pv, best_move);
     }
     else
     {

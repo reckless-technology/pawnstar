@@ -22,6 +22,8 @@
 #if DEBUGX
 /**
  * @brief Simple debug hash table dictionary fo diagnostic counts.
+ *        Has to be super fast so just take the address of a string literal and
+ *        use it as the nominal hash.
  */
 struct DebugEntry
 {

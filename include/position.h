@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <vector>
+#include <string_view>
 
 #include "bitboard.h"
 #include "move.h"
@@ -75,31 +77,28 @@ struct Position
     uint8_t         reversible_move_count_; /**< number of consecutive reversible half-moves (plies)        */
     uint8_t         full_move_count_;       /**< number of full moves (zero indexed)                        */
 
-    Position(const char* fen_string) noexcept;
-    Position(const Position& that, Move move) noexcept;
     Position() noexcept {};
-
-    operator    std::string() const;
-
-    void        MakeNullMove(Position& dst_position) const;
-    uint8_t     ColorToMove() const  { return flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE; }
-    void        AddPiece   (uint8_t color, uint8_t piece, uint8_t to);
-    Bitboard    AttacksTo  (uint8_t location, uint8_t color) const;
-    bool        IsAttacked (uint8_t location, uint8_t color) const;
-    bool        IsLegal() const;
-    bool        IsCheckmate() const;
-    bool        IsDrawByFiftyMoves() const;
-    bool        IsDrawByMaterial() const;
-    bool        IsDrawByRepetition(bool is_search) const;
-    bool        IsStalemate() const;
-    uint64_t    ComputeHash() const;
-    int         GenerateLegalMoves(MoveList& moves) const;
-    void        GeneratePseudoLegalCaptures(MoveList& moves) const;
-    void        GeneratePseudoLegalMoves(MoveList& moves) const;
-    std::string MoveToString(Move move) const;
-    std::string VariationToString(const Variation& variation) const;
+    Position(std::string_view fen_string) noexcept;                         /**< Construct a position from a FEN string. */
+    Position(const Position& previous, Move move) noexcept;                 /**< Construct a position from its predecessor and a move. */
+    operator        std::string() const;                                    /**< Return the FEN string for this position. */
+    void            MakeNullMove(Position& dst_position) const;             /**< Construct a position from this one making a null move. */
+    void            AddPiece   (uint8_t color, uint8_t piece, uint8_t to);  /**< Place a piece on the board. */
+    Bitboard        AttacksTo  (uint8_t location, uint8_t color) const;     /**< The set of attackers to a location on the board. */
+    bool            IsAttacked (uint8_t location, uint8_t color) const;     /**< Determine if location is attacked by color. */
+    bool            IsLegal() const;                                        /**< Is this a legal chess position. */
+    bool            IsCheckmate() const;                                    /**< Is this position checkmate. */
+    bool            IsDrawByFiftyMoves() const;                             /**< Is this position a dfraw by the 50 move rule. */
+    bool            IsDrawByMaterial() const;                               /**< Is this position a draw by insufficient material. */
+    bool            IsDrawByRepetition(bool is_search) const;               /**< Is this position a draw by repetition. */
+    bool            IsStalemate() const;                                    /**< Is this position stalemate. */
+    uint64_t        ComputeHash() const;                                    /**< Compute the Zobrist hash from scratch. */
+    MoveList        GenerateLegalMoves() const;                             /**< Generate all legal moves (slow). */
+    MoveList        GeneratePseudoLegalCaptures() const;                    /**< Generate pseudo legal captures and promotions. */
+    MoveList        GeneratePseudoLegalMoves() const;                       /**< Generate all pseudo legal moves. */
+    std::string     MoveToString(Move move) const;                          /**< Generate the SAN string for a specific legal move. */
+    std::string     VariationToString(const Variation& variation) const;    /**< Generate SAN strings for a legal sequence of moves. */
     
-    constexpr uint8_t PieceAt(uint8_t location) const 
+    constexpr uint8_t PieceAt(uint8_t location) const
     {
         const Bitboard square = BITBOARD(location);
         return 
@@ -109,12 +108,15 @@ struct Position
             (square & rooks_)   ? ROOK   :
             (square & queens_)  ? QUEEN  :
             (square & kings_)   ? KING   : NO_PIECE;
-    }
+    }                                                                           /**< Find the piece standing on location, if any. */
+
+    constexpr uint8_t ColorToMove() const
+    { 
+        return flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE; 
+    }                                                                           /**< Return whose turn it is to move. */
 
 private:
-    template <bool do_all_moves> void GenerateMoves(MoveList& moves) const;
-    void        RemovePiece(uint8_t color, uint8_t piece, uint8_t from);
-    void        MovePiece  (uint8_t color, uint8_t piece, uint8_t from, uint8_t to);
+    template <bool do_all_moves> MoveList GenerateMoves() const;                /**< Prototype function to generate pseudo legal moves. */
+    void RemovePiece(uint8_t color, uint8_t piece, uint8_t from);               /**< Remove a piece from the board. */
+    void MovePiece  (uint8_t color, uint8_t piece, uint8_t from, uint8_t to);   /**< Move a piece on the board. */
 };
-
-#include "position_move_generation.h"

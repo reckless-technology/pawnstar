@@ -22,8 +22,8 @@ Move SearchRootNode(Game& game)
     {
         return book_move;
     } 
-    MoveList move_list;
-    int num_legal_moves = game.position_->GenerateLegalMoves(move_list);
+    MoveList move_list = game.position_->GenerateLegalMoves();
+    int num_legal_moves = move_list.size();
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (num_legal_moves == 0)
     {
@@ -31,7 +31,7 @@ Move SearchRootNode(Game& game)
     }
     if (num_legal_moves == 1)
     {
-        return move_list.moves[0];
+        return move_list[0];
     }  
     /* Plan time usage for this search. */
     int timeout_ms      = 0;    /* cancel search when this time expires             */
@@ -79,11 +79,11 @@ Move SearchRootNode(Game& game)
     Move best_moves[MAX_PLY]; /* Best move found at each ply of search. */
     for (int i = 0; i != num_legal_moves; ++i)
     {
-        const int score = SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list.moves[i], principal_variation, i);
-        move_list.moves[i] = ScoredMove(move_list.moves[i], score);
+        const int score = SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i], principal_variation, i);
+        move_list[i] = ScoredMove(move_list[i], score);
     }   
-    SortMoves(num_legal_moves, move_list.moves);
-    Move best_move = move_list.moves[0];
+    SortMoves(move_list, true);
+    Move best_move = move_list[0];
     best_moves[STARTING_SEARCH_DEPTH] = best_move;
     
     for (int depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
@@ -92,14 +92,14 @@ Move SearchRootNode(Game& game)
         {
             break;
         }
-        SortMoves(num_legal_moves, move_list.moves); /* Sort moves from previous iteration depth. */
+        SortMoves(move_list, true); /* Sort moves from previous iteration depth. */
         Variation child_pv {};
         int alpha = ALPHA;
         game.node_count_ = 0;
         for (int i = 0; i != num_legal_moves; ++i)
         {
-            const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list.moves[i], child_pv, i);
-            move_list.moves[i] = ScoredMove(move_list.moves[i], score);
+            const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list[i], child_pv, i);
+            move_list[i] = ScoredMove(move_list[i], score);
             if (game.is_cancel_pending_)
             {
                 return best_move;
@@ -107,10 +107,10 @@ Move SearchRootNode(Game& game)
             if (score > alpha)
             {
                 alpha             = score;
-                best_move         = move_list.moves[i];
-                best_moves[depth] = move_list.moves[i];
+                best_move         = move_list[i];
+                best_moves[depth] = move_list[i];
                 RecordTransposition(game.position_->hash_, depth, alpha, best_move, NODE_PV);
-                principal_variation.Copy(child_pv, best_move);
+                CopyVariation(principal_variation, child_pv, best_move);
                 if (game.do_show_thinking_)
                 {
                     string move_string { game.position_->VariationToString(principal_variation) };

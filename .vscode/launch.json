@@ -9,7 +9,7 @@
             "cwd" : "${workspaceFolder}/debug",
             "args": [],
             "program": "${workspaceFolder}/debug/pawnstar",
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
@@ -33,7 +33,7 @@
             "cwd" : "${workspaceFolder}/release",
             "args": [],
             "program": "${workspaceFolder}/release/pawnstar",
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

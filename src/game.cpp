@@ -33,7 +33,7 @@ static void RemoveMoveSuffixes(string& move_str)
     }
 }
 
-Game::Game(const char* fen_string)
+Game::Game(std::string_view fen_string)
 {
    time_control_.hard_stop_search_ms              = 0;
    time_control_.clock_type                       = CLOCK_STANDARD;
@@ -76,13 +76,12 @@ format, and update game state_flags accordingly
 returns the move if a legal move was played
 returns zero if the move was illegal or the game is over
 */
-Move Game::PlayMove(const char* move_str)
+Move Game::PlayMove(std::string_view move_str)
 {
     string candidate { move_str };
     RemoveMoveSuffixes(candidate);
-    MoveList move_list;
-    position_->GenerateLegalMoves(move_list);
-    for (auto move : move_list)
+    MoveList move_list = position_->GenerateLegalMoves();
+    for (const auto& move : move_list)
     {
         string move_string { position_->MoveToString(move) };
         RemoveMoveSuffixes(move_string);
@@ -137,7 +136,7 @@ bool Game::IsGameOver() const
  */
 void Game::SearchThreadEntry()
 {
-    int move = SearchRootNode(*this);
+    Move move = SearchRootNode(*this);
     if (move)
     {
         std::string move_string { position_->MoveToString(move) };

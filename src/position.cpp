@@ -2,10 +2,12 @@
 #include <string>
 #include <string_view>
 #include <cstring>
+#include <vector>
 
 using std::stringstream;
 using std::string;
 using std::string_view;
+using std::vector;
 
 #include "position.h"
 #include "debug_hashtable.h"
@@ -214,15 +216,16 @@ Position::Position(const Position& that, Move move) noexcept
     }
 }
 
-#define BAD_FEN_STRING printf("ERROR: bad FEN string %s\n", fen_string); return
+#define BAD_FEN_STRING { const std::string s {fen_string}; printf("ERROR: bad FEN string %s\n", s.c_str()); return; }
 
-Position::Position(const char* fen_string) noexcept
+Position::Position(std::string_view fen_string) noexcept
 {
     static constexpr string_view white_piece_names { "PNBRQK"   };
     static constexpr string_view black_piece_names { "pnbrqk"   };
-    static constexpr string_view ep_files { "abcdefgh" };
-    static constexpr string_view ep_ranks { "36"       };
-    stringstream ss { fen_string };
+    static constexpr string_view ep_files          { "abcdefgh" };
+    static constexpr string_view ep_ranks          { "36"       };
+    stringstream ss;
+    ss << fen_string;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
     memset(this, 0, sizeof(Position));
@@ -674,20 +677,18 @@ Determine if the current position represents stalemate
 */
 bool Position::IsStalemate() const
 {
-    MoveList move_list;
     return 
         !(flags_ & IS_CHECK) && 
-        GenerateLegalMoves(move_list) == 0;
+        GenerateLegalMoves().size() == 0;
 }
 /*
 Determine if the current position represents checkmate
 */
 bool Position::IsCheckmate() const
 {
-    MoveList move_list;
     return 
         (flags_ & IS_CHECK) && 
-        GenerateLegalMoves(move_list) == 0;
+        GenerateLegalMoves().size() == 0;
 }
 
 /**
@@ -716,32 +717,32 @@ Position::ComputeHash() const
     return hash;
 }
 
-void Position::GeneratePseudoLegalMoves(MoveList& moves) const
+MoveList 
+Position::GeneratePseudoLegalMoves() const
 {
-    GenerateMoves<true>(moves);
+    return GenerateMoves<true>();
 }
 
-void Position::GeneratePseudoLegalCaptures(MoveList& moves) const
+MoveList
+Position::GeneratePseudoLegalCaptures() const
 {
-    GenerateMoves<false>(moves);
+    return GenerateMoves<false>();
 }
 
-int Position::GenerateLegalMoves(MoveList& m) const
+MoveList
+Position::GenerateLegalMoves() const
 {
-    int num_legal_moves = 0;
-    MoveList pseudo_legal_moves;
-    GeneratePseudoLegalMoves(pseudo_legal_moves);
+    MoveList pseudo_legal_moves = GeneratePseudoLegalMoves();
+    MoveList result;
     for (auto move : pseudo_legal_moves)
     {
         Position position { *this, move };
         if (!(position.flags_ & IS_MOVED_INTO_CHECK))
         {
-            m.Add(move);
-            ++num_legal_moves;
+            result.push_back(move);
         }
     }
-    m.Done();
-    return num_legal_moves;
+    return result;
 }
 
 /**
@@ -791,8 +792,7 @@ string Position::MoveToString(Move move) const
     Determine if there is more than one piece of the same type which is capable 
     of moving to the target square, and will require further disambiguation
     */
-    MoveList legal_moves;
-    GenerateLegalMoves(legal_moves);
+    MoveList legal_moves = GenerateLegalMoves();
     for (auto m : legal_moves)
     {
         if (::MovePiece(m) == ::MovePiece(move) && 

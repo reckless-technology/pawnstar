@@ -1,6 +1,7 @@
 #pragma once
 
 #include <thread>
+#include <string_view>
 
 #include "options.h"
 #include "chess_clock.h"
@@ -20,8 +21,8 @@ struct Game
     bool        is_cancel_pending_;
 
     Game();
-    Game(const char* fen_string);
-    Move    PlayMove(const char* move_string);
+    Game(std::string_view fen_string);
+    Move    PlayMove(std::string_view move_string);
     void    PlayMove(Move move);
     void    MakeNullMove();
     void    UndoMove();

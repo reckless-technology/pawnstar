@@ -9,8 +9,13 @@
 * Only included when CPP flag DEBUGX is nonzero.
 */
 #include <cstdio>
+#include <map>
+#include <string>
 #include <cstring>
-#include <cstdlib>
+#include <algorithm>
+
+using std::map;
+using std::string;
 
 #include "debug_hashtable.h"
 #include "options.h"
@@ -25,34 +30,26 @@ DebugEntry debug_dict[DEBUG_DICT_SIZE];
 */
 void DebugXClear()
 {
-    memset(debug_dict, 0, sizeof(debug_dict));
-}
-
-static int CompareEntries(const DebugEntry** left, const DebugEntry** right)
-{
-    return strcmp((*left)->key, (*right)->key);
+    std::fill(&debug_dict[0], &debug_dict[DEBUG_DICT_SIZE], DebugEntry{0,0});
 }
 
 /**
  * @brief Write the debug dictionary out in alphabetic order.
- * @param file File to write to (typically stdout)
 */
 void DebugXWrite()
 {
-    DebugEntry* entries[DEBUG_DICT_SIZE];
-    int num_entries = 0;
+    map<string, int> entries;
     for (int i = 0; i != DEBUG_DICT_SIZE; ++i)
     {
         if (debug_dict[i].key != NULL)
         {
-            entries[num_entries++] = &debug_dict[i];
+            entries[debug_dict[i].key] = debug_dict[i].count;
         }
     }
-    qsort(entries, num_entries, sizeof(DebugEntry*), (int(*)(const void*, const void*))CompareEntries);
     printf("************************** DEBUGX **************************\n");
-    for (int i = 0; i != num_entries; ++i)
+    for (const auto& i : entries)
     {
-        printf("%-50s%10u\n", entries[i]->key, entries[i]->count);
+        printf("%-50s%10u\n", i.first.c_str(), i.second);
     }
     printf("************************************************************\n");
 }

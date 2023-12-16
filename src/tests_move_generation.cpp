@@ -117,9 +117,9 @@ Categorize a null-terminated set of pseudo-legal moves into strictly-legal
 moves of various types, storing the result in counts
 */
 static void 
-CategorizeMoves(const Position& src_position, 
-                const MoveList& move_list, 
-                PerftCounts&    counts)
+CategorizeMoves(const Position&             src_position, 
+                const MoveList&    move_list, 
+                PerftCounts&                counts)
 {
     for (auto move : move_list)
     {
@@ -164,17 +164,16 @@ Perft(const Position& src_position,
       PerftCounts&    counts)
 {
     static int call_count = 0;
-    MoveList move_list;
-    src_position.GeneratePseudoLegalMoves(move_list);
+    MoveList move_list = src_position.GeneratePseudoLegalMoves();
     if (!(++call_count & 0x3FFFF))
     {
         printf("\rpositions processed %10" PRIu64, counts.legal_moves);
     }
     if (depth > 1)
     {
-        for (const Move* move = move_list.moves; *move; ++move)
+        for (const auto move : move_list)
         {
-            Position position { src_position, *move };
+            Position position { src_position, move };
 #if DO_TEST_HASH_DURING_PERFT
             if (position.hash_ != position.ComputeHash())
             {

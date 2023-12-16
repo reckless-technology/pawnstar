@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstring>
+#include <vector>
 
 #include "move.h"
 #include "debug_hashtable.h"
@@ -30,9 +31,7 @@ void InitializeGoodMoveCounts(void)
 }
 
 /**
- * @brief Sort moves "best first" using a stable sort.
- * A stable sort is required so that root node moves with equal alpha score
- * have their relative sequence preserved.
+ * @brief Sort moves "best first".
  * Uses static exchange evaluation (SEE) to provide a provisional
  * score for each move for sorting.
  * @param position position for which the moves were generated
@@ -40,72 +39,42 @@ void InitializeGoodMoveCounts(void)
  * @param ply distance from root node
 */
 void 
-ScoreAndSortMoves(const Position& position,
-                  Move            moves[], 
-                  int             ply,
-                  int             depth)
+ScoreAndSortMoves(const Position&       position,
+                  MoveList&    moves, 
+                  int                   ply,
+                  int                   depth)
 {   
-    Move* move;
     const int* const counts = &good_move_counts[ply][0];
-    for (move = moves; *move; ++move)
+    for (auto& move : moves)
     {
         /* 
         Assign provisional scores based on static exchange evaluation
         and how many cutoffs this move has caused in the search history.
         */
-        *move = ScoredMove(*move, EvaluateStaticExchange(position, *move) * 1000 + counts[*move & MOVE_MASK]);
+        move = ScoredMove(move, EvaluateStaticExchange(position, move) * 1000 + counts[move & MOVE_MASK]);
     }
-    SortMoves((int)(move - moves), moves);
+    SortMoves(moves, false);
     (void)depth;
 }
 
 /**
- * @brief Sort moves best first.
- * Uses iterative, stable merge sort algorithm.
- * Sort must be stable to preserve move ordering at the root node.
- * @param num_elements number of elements to sort
- * @param values pointer to the elements
-*/
-void 
-SortMoves(int   num_elements, 
-          Move  values[])
+ * @brief Sort moves "best first" i.e. in descending score order
+ * @param moves Moves to be sorted
+ * @param is_stable_sort true for slower stable sort (required at root node search only)
+ */
+void
+SortMoves(MoveList& moves, bool is_stable_sort)
 {
-#if 0
-    std::stable_sort(values, values + num_elements, [](Move a, Move b){ return MoveScore(a) > MoveScore(b); } );
-#else
-    /* This seems to be about 15% faster on average than std::stable_sort */
-    Move work[MAX_MOVES_PER_POSITION];
-    Move* merge_src = values;
-    Move* merge_dst = work;
-    for (int width = 1; width < num_elements; width *= 2)
+    if (is_stable_sort)
     {
-        for (int begin = 0; begin < num_elements; begin += width * 2)
-        {
-            const Move* const mid = &merge_src[min(begin + width,     num_elements)];
-            const Move* const end = &merge_src[min(begin + width * 2, num_elements)];
-            const Move* i         = &merge_src[begin];
-            const Move* j         = mid;
-            Move* dst             = &merge_dst[begin];
-            while (i < mid && j < end)
-            {
-                *dst++ = (MoveScore(*i) >= MoveScore(*j)) ? *i++ : *j++;
-            }
-            while (i < mid)
-            {
-                *dst++ = *i++;
-            }
-            while (j < end)
-            {
-                *dst++ = *j++;
-            }
-        }
-        Move* tmp = merge_src;
-        merge_src = merge_dst;
-        merge_dst = tmp;
+       std::stable_sort 
+            (moves.rbegin(), moves.rend(), 
+            [](const Move& a, const Move& b){ return MoveScore(a) < MoveScore(b); } );
     }
-    if (merge_dst == values)
+    else
     {
-        memcpy(values, work, num_elements * sizeof(Move));
+        std::sort 
+            (moves.rbegin(), moves.rend(), 
+            [](const Move& a, const Move& b){ return MoveScore(a) < MoveScore(b); } );
     }
-#endif
 }
