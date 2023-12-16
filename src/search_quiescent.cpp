@@ -47,7 +47,7 @@ SearchQuiescent(Game& game,
     ScoreAndSortMoves(*game.position_, move_list, ply, depth);
     for (const auto& move : move_list)
     {
-        if (MoveScore(move) < 0)
+        if (MoveScore(move) <= 0)
         {
             INCREMENT("quiescent negative SEE skips");
             return alpha;

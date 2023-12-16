@@ -157,6 +157,7 @@ Search(Game&        game,
             searching these few principal variation nodes is trivial.
             */
             INCREMENT("table hit pv node");
+            ++depth;
             break;
         }
     }
@@ -181,6 +182,7 @@ Search(Game&        game,
     
     int  num_legal_moves  = 0;
     Move best_move        = 0;
+    int  best_score       = ALPHA;
     bool has_raised_alpha = false;
     
     if (is_transposition && transposition.move)
@@ -271,19 +273,23 @@ Search(Game&        game,
             RecordGoodMove(ply, move);
             return beta;
         }
-        if (score > alpha)
+        if (score > best_score)
         {
-            INCREMENT("pv changed");
-            alpha = score;
-            has_raised_alpha = true;
-            /* 
-            Provisionally store this move as a CUT node - it 
-            may later turn out to be a PV but we don't know that 
-            for sure yet until we have searched every move.
-            */
-            RecordTransposition(position.hash_, depth, score, move, NODE_CUT);
-            RecordGoodMove(ply, move);
             best_move = move;
+            best_score = score;
+            if (score > alpha)
+            {
+                INCREMENT("pv changed");
+                alpha = score;
+                has_raised_alpha = true;
+                /* 
+                Provisionally store this move as a CUT node - it 
+                may later turn out to be a PV but we don't know that 
+                for sure yet until we have searched every move.
+                */
+                RecordTransposition(position.hash_, depth, score, move, NODE_CUT);
+                RecordGoodMove(ply, move);
+            }
         }
     }
     /*

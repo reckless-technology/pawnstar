@@ -5,7 +5,7 @@
 #endif 
 
 #ifndef DO_TEST_HASH_DURING_PERFT
-#define DO_TEST_HASH_DURING_PERFT 1
+#define DO_TEST_HASH_DURING_PERFT 0
 #endif
 
 #ifndef DO_NULL_MOVE_PRUNING
