@@ -23,7 +23,7 @@ Move SearchRootNode(Game& game)
         return book_move;
     } 
     MoveList move_list = game.position_->GenerateLegalMoves();
-    int num_legal_moves = move_list.size();
+    int num_legal_moves = (int)move_list.size();
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (num_legal_moves == 0)
     {
@@ -50,22 +50,21 @@ Move SearchRootNode(Game& game)
     case CLOCK_FIXED_DEPTH:
         timeout_ms     = 0;
         ms_allocated   = 0;
-		game.time_control_.hard_stop_search_ms = 0;
+        game.time_control_.hard_stop_search_ms = 0;
         break;
     
     case CLOCK_FIXED_TIME:
         timeout_ms = game.time_control_.fixed_time.milliseconds;
-		game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
         ms_allocated = 0;
         break;
     
     case CLOCK_INCREMENTAL:
         ms_allocated   = game.time_control_.incremental.increment_milliseconds + (game.time_control_.incremental.milliseconds_remaining / 30);
         timeout_ms     = max(100, min(ms_allocated * 2, game.time_control_.incremental.milliseconds_remaining - 3000));
-		game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
         break;
     }
-    InitializeGoodMoveCounts();
     DEBUG_STATEMENT(DebugXClear());
     int start_ms = GetMilliseconds();
     game.is_cancel_pending_ = false;
@@ -114,10 +113,15 @@ Move SearchRootNode(Game& game)
                 if (game.do_show_thinking_)
                 {
                     string move_string { game.position_->VariationToString(principal_variation) };
-                    printf("%2u %5d %4u %8u %s\n", depth, MoveScore(best_moves[depth]), (GetMilliseconds() - start_ms) / 10, game.node_count_, move_string.c_str());
+                    printf("%2u %5d %4u %8u %s\n", 
+                            depth, 
+                            MoveScore(best_moves[depth]), 
+                            (GetMilliseconds() - start_ms) / 10, 
+                            game.node_count_, 
+                            move_string.c_str());
                 }
             }
-        }        
+        }
         int stop_ms = GetMilliseconds();
         if (alpha > WIN_THRESHOLD || 
             alpha < LOSE_THRESHOLD)

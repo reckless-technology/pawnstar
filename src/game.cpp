@@ -83,10 +83,10 @@ Move Game::PlayMove(std::string_view move_str)
     MoveList move_list = position_->GenerateLegalMoves();
     for (const auto& move : move_list)
     {
-        string move_string { position_->MoveToString(move) };
-        string alebraic_move_string = MoveString(move);
-        RemoveMoveSuffixes(move_string);
-        if (move_string == candidate || alebraic_move_string == candidate)
+        string san_move_str { position_->MoveToString(move) };
+        string algebraic_move_str { MoveString(move) };
+        RemoveMoveSuffixes(san_move_str);
+        if (san_move_str == candidate || algebraic_move_str == candidate)
         {
             PlayMove(move);
             return move;

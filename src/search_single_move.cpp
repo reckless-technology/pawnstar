@@ -18,11 +18,7 @@ SearchSingleMove(Game&      game,
                  Move       move,
                  Variation& pv,
                  int        move_index)
-{      
-    if (game.is_cancel_pending_)
-    {
-        return SEARCH_CANCELLED_SCORE;
-    }
+{
     game.PlayMove(move);
     if (game.position_->flags_ & IS_MOVED_INTO_CHECK)
     {
@@ -30,8 +26,8 @@ SearchSingleMove(Game&      game,
         return MOVED_INTO_CHECK_SCORE;
     }
     int score;
-    if (beta > alpha + 1 && 
-        move_index > 0   && 
+    if (beta > alpha + 1    && 
+        move_index > 0      && 
         !(game.position_->flags_ & IS_CHECK))
     {
         INCREMENT("pvs attempts");

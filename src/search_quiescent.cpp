@@ -30,6 +30,7 @@ SearchQuiescent(Game& game,
     if (game.position_->flags_ & IS_CHECK)
     {
         INCREMENT("quiescent checks");
+        /* Can't beat alpha if we find check during quiescence. */
         return alpha;
     }
     int score = EvaluatePosition(*game.position_, alpha, beta);
@@ -68,14 +69,12 @@ SearchQuiescent(Game& game,
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            RecordGoodMove(ply, move);
             return beta;
         }
         if (score > alpha)
         {
             alpha = score;
             INCREMENT("quiescent pv changed");
-            RecordGoodMove(ply, move);
         }      
     }
     return alpha;

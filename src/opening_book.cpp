@@ -49,18 +49,6 @@ bool InitializeOpeningBookFromFile(string_view filename)
 }
 
 /**
- * @brief Use the internal opening book if a book file is 
- *        not available
- * @return true on success
- */
-bool InitializeDefaultOpeningBook()
-{
-    extern const char* OPENING_BOOK_MOVES;
-    stringstream ss { OPENING_BOOK_MOVES };
-    return InitializeOpeningBookFromStringStream(ss);
-}
-
-/**
  * @brief Pseudo randomly select from available book moves
  * @param hash the position hash
  * @return Move selected from book, or 0 if no move found

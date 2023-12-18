@@ -29,16 +29,11 @@ int main()
         "Compiled: " __DATE__ " " __TIME__                     "\n"
         );
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
-    InitializeGoodMoveCounts();
     if (!InitializeOpeningBookFromFile("pawnstar.book"))
     {
-        printf("NOTE: using built in opening book\n");
-        if (!InitializeDefaultOpeningBook())
-        {
-            printf("ERROR: unable to create default opening book\n");
-        }
+        printf("NOTE: unable to open book file\n");
     }
-    Game game;
+    Game game {};
     DEBUG_STATEMENT(DebugXClear());
     for ( ; ; )
     {

@@ -115,7 +115,7 @@ Search(Game&        game,
     Determine if there is an entry in the transposition table 
     for this position.
     */
-    Variation     pv {};
+    Variation pv {};
     Transposition transposition {};
     const bool is_transposition = FindTransposition(position.hash_, transposition);
     if (is_transposition && transposition.depth >= depth)
@@ -182,10 +182,6 @@ Search(Game&        game,
     int  num_legal_moves   = 0;
     Move best_move         = 0;
     bool has_raised_alpha  = false;
-#if DO_LATE_MOVE_REDUCTION
-    bool has_reduced_depth = false;
-#endif
-    
     if (is_transposition && transposition.move)
     {
         INCREMENT("table move");
@@ -200,7 +196,6 @@ Search(Game&        game,
         {
             INCREMENT("table move beta cutoffs");
             RecordTransposition(position.hash_, depth, beta, transposition.move, NODE_CUT);
-            RecordGoodMove(ply, transposition.move);
             return beta;
         }
         if (score > alpha)
@@ -213,7 +208,6 @@ Search(Game&        game,
             may later turn out to be a PV but we don't know that yet.
             */
             RecordTransposition(position.hash_, depth, alpha, transposition.move, NODE_CUT);
-            RecordGoodMove(ply, transposition.move);
         }
     } 
     /*
@@ -226,6 +220,9 @@ Search(Game&        game,
     {
         best_move = move_list[0];
     }
+#if DO_LATE_MOVE_REDUCTION
+    bool has_reduced_depth = false;
+#endif
     /* 
     Start of the main loop. 
     */
@@ -233,7 +230,7 @@ Search(Game&        game,
     {
         if (is_transposition && MoveBits(move) == MoveBits(transposition.move))
         {
-            continue; /* We alrteady searched this move. */
+            continue; /* We already searched this move. */
         }
 #if DO_LATE_MOVE_REDUCTION
         /* 
@@ -270,7 +267,6 @@ Search(Game&        game,
         {
             INCREMENT("beta cutoffs");
             RecordTransposition(position.hash_, depth, beta, move, NODE_CUT);
-            RecordGoodMove(ply, move);
             return beta;
         }
         if (score > alpha)
@@ -285,7 +281,6 @@ Search(Game&        game,
             for sure yet until we have searched every move.
             */
             RecordTransposition(position.hash_, depth, score, move, NODE_CUT);
-            RecordGoodMove(ply, move);
         }
     }
     /*
@@ -319,7 +314,6 @@ Search(Game&        game,
         */
         INCREMENT("pv nodes");
         RecordTransposition(position.hash_, depth, alpha, best_move, NODE_PV);
-        RecordGoodMove(ply, best_move);
         CopyVariation(parent_pv, pv, best_move);
     }
     else
