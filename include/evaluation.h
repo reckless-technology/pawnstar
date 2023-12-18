@@ -309,7 +309,8 @@ EvaluateKing(const Position& position)
     }
     int safety_score = 25 * PopCount(friendly_pawns & pawn_shelter_1)
                      + 10 * PopCount(friendly_pawns & pawn_shelter_2) 
-                     - 20 * PopCount(enemy_pawns    & pawn_shelter_2)
+                     - 20 * PopCount(enemy_pawns    & pawn_shelter_1)
+                     - 15 * PopCount(enemy_pawns    & pawn_shelter_2)
                      - 10 * PopCount(enemy_pawns    & pawn_shelter_3);
     
     /* Penalty for open files near our king */
@@ -328,6 +329,7 @@ EvaluateKing(const Position& position)
     {
         safety_score -= 20;
     }
+#if 0
     /* Attacks to squares adjacent to our king */
     Bitboard king_adjacent = SETS[position.king_location_[color]].king_attacks;
     while (king_adjacent)
@@ -336,6 +338,7 @@ EvaluateKing(const Position& position)
         Bitboard attacks_to = position.AttacksTo(sq_locn, EnemyOf(color));
         safety_score -= 20 * PopCount(attacks_to);
     }
+#endif
     /* Scale the king safety score according to the enemy's material. */
     safety_score = (safety_score * enemy_material) / 31;
     return piece_square_score + safety_score;

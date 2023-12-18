@@ -220,9 +220,6 @@ Search(Game&        game,
     {
         best_move = move_list[0];
     }
-#if DO_LATE_MOVE_REDUCTION
-    bool has_reduced_depth = false;
-#endif
     /* 
     Start of the main loop. 
     */
@@ -232,27 +229,34 @@ Search(Game&        game,
         {
             continue; /* We already searched this move. */
         }
+        int score;
 #if DO_LATE_MOVE_REDUCTION
         /* 
-        Consider candidate move reductions in the following circumstances:
-        # We are not in check AND
-        # We've already searched a couple of moves at full depth without success AND
-        # We are not in a PV node AND
-        # The static exchange evaluation for this move is non positive
+        Consider late move reductions in the following circumstances
+        - We are not in check
+        - We are not in a PV node
+        - We are not nearing the leaf nodes
+        - This move is not a capture
+        - This move is not a pawn promotion
+        - SEE is non positive
+        - We already examined at least a couple of moves at full depth
         */
-        if (!has_reduced_depth              &&
-            !has_raised_alpha               &&
-            !(position.flags_ & IS_CHECK)   &&
+        if (!(position.flags_ & IS_CHECK)   &&
             beta == alpha + 1               &&
-            num_legal_moves > 1             &&
-            MoveScore(move) <= 0)
+            depth > 1                       &&
+            MoveCaptured(move) == NO_PIECE  &&
+            MovePromoted(move) == NO_PIECE  &&
+            MoveScore(move) <= 0            &&
+            num_legal_moves > 2)
         {
             INCREMENT("late move reductions");
-            --depth;
-            has_reduced_depth = true;
+            score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, num_legal_moves);
         }
+        else
 #endif
-        int score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, num_legal_moves);
+        {
+            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, num_legal_moves);
+        }
         if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
