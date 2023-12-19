@@ -7,13 +7,13 @@
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 
-static int killer_move_counts[MAX_PLY][64 * 64];
+static int killer_move_counts[MAX_PLY][8 * 64 * 64];
 
 void
 RecordKillerMove(int ply, Move move)
 {
-    /* Just use the from and to fields from the move (bits 0 - 11) */
-    ++killer_move_counts[ply][move & 0xFFF];
+    /* mask all except piece, from, to (lower 15 bits) */
+    ++killer_move_counts[ply][move & 0x7FFF];
 }
 
 void 
@@ -43,7 +43,7 @@ ScoreAndSortMoves(const Position&   position,
         Assign provisional scores based on static exchange evaluation
         and how many cutoffs this move has caused in the search history.
         */
-        move = ScoredMove(move, EvaluateStaticExchange(position, move) * 1000 + counts[move & 0xFFF]);
+        move = ScoredMove(move, EvaluateStaticExchange(position, move) * 1000 + counts[move & 0x7FFF]);
     }
     SortMoves(moves, false);
     (void)ply;
