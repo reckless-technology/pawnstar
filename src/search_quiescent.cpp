@@ -30,8 +30,8 @@ SearchQuiescent(Game& game,
     if (game.position_->flags_ & IS_CHECK)
     {
         INCREMENT("quiescent checks");
-        /* Can't beat alpha if we find check during quiescence. */
-        return alpha;
+        Variation dummy {};
+        return Search(game, depth, ply, alpha, beta, dummy);
     }
     int score = EvaluatePosition(*game.position_, alpha, beta);
     if (score >= beta)

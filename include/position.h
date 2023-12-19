@@ -25,16 +25,17 @@ enum Square : uint8_t
 /**
  * @brief Bitset of position state flags.
 */
-enum StateFlags : uint8_t
+enum StateFlags : uint16_t
 {
-    MAY_WHITE_CASTLE_KINGSIDE   = 1 << 0,  /**< white has the right to castle king side                    */
-    MAY_WHITE_CASTLE_QUEENSIDE  = 1 << 1,  /**< white has the right to castle queen side                   */
-    MAY_BLACK_CASTLE_KINGSIDE   = 1 << 2,  /**< black has the right to castle king side                    */
-    MAY_BLACK_CASTLE_QUEENSIDE  = 1 << 3,  /**< black has the right to castle queen side                   */
-    IS_BLACK_TO_MOVE            = 1 << 4,  /**< it is black's turn to move                                 */
-    IS_CHECK                    = 1 << 5,  /**< is the side to move in check                               */
-    IS_MOVED_INTO_CHECK         = 1 << 6,  /**< is the side not to move in check (illegal position)        */
-    IS_NULL_MOVE                = 1 << 7,  /**< position was the result of a null move                     */
+    MAY_WHITE_CASTLE_KINGSIDE   = 1 << 0,  /**< white has the right to castle king side                                 */
+    MAY_WHITE_CASTLE_QUEENSIDE  = 1 << 1,  /**< white has the right to castle queen side                                */
+    MAY_BLACK_CASTLE_KINGSIDE   = 1 << 2,  /**< black has the right to castle king side                                 */
+    MAY_BLACK_CASTLE_QUEENSIDE  = 1 << 3,  /**< black has the right to castle queen side                                */
+    IS_BLACK_TO_MOVE            = 1 << 4,  /**< it is black's turn to move                                              */
+    IS_CHECK                    = 1 << 5,  /**< is the side to move in check                                            */
+    IS_MOVED_INTO_CHECK         = 1 << 6,  /**< is the side not to move in check (illegal position)                     */
+    IS_NULL_MOVE                = 1 << 7,  /**< position was the result of a null move                                  */
+    HAS_BEEN_REDUCED            = 1 << 8,  /**< has late move reduction been applied in this position or its ancestors  */
     CASTLING_RIGHTS_MASK        = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | 
                                    MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE),
 };
@@ -71,7 +72,7 @@ struct Position
     };    
     uint64_t        hash_;                  /**< Zobrist hash of this position, maintained incrementally    */
     const Position* previous_;              /**< position immediately prior to this in the line of play     */
-    uint8_t         flags_;                 /**< game state-machine flags                                   */
+    uint16_t        flags_;                 /**< game state-machine flags                                   */
     uint8_t         king_location_[2];      /**< square index of white and black kings                      */
     uint8_t         en_passant_index_;      /**< en passant capture availability square (0 if none)         */
     uint8_t         reversible_move_count_; /**< number of consecutive reversible half-moves (plies)        */

@@ -50,12 +50,12 @@ EvaluatePosition(const Position& position,
     if (score >= beta + 200)
     {   
         INCREMENT("eval beta cutoff");
-        return beta;
+        return score;
     }
     if (score <= alpha - 200)
     {
         INCREMENT("eval alpha cutoff");
-        return alpha;
+        return score;
     }
     /* Piece square tables */
     scores[WHITE] += EvaluatePieceSquare<WHITE>(position);

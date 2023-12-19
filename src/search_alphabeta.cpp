@@ -173,6 +173,18 @@ Search(Game&        game,
     }
 #endif
 
+#if DO_FUTILITY_PRUNING
+    if (depth == 1                          &&
+        !(position.flags_ & IS_CHECK)       &&
+        !(position.flags_ & IS_NULL_MOVE)   &&
+        beta == alpha + 1                   &&
+        EvaluatePosition(position, alpha, beta) + 500 <= alpha)
+    {
+        INCREMENT("futile prunes");
+        return alpha;
+    }
+#endif
+
     /*
     Before we generate any moves, try the transposition table move first. 
     This might save us the cost of move generation altogether, or provide 
@@ -234,14 +246,14 @@ Search(Game&        game,
         int score;
 
 #if DO_LATE_MOVE_REDUCTION
-
-        if (!(position.flags_ & IS_CHECK)   &&
-            beta == alpha + 1               &&
-            num_legal_moves > 2             &&
-            depth > 2                       &&
-            MoveCaptured(move) == NO_PIECE  &&
-            MovePromoted(move) == NO_PIECE  &&
-            MoveScore(move) <= 0)
+        if (!(position.flags_ & IS_CHECK)               &&
+            !(position.flags_ & HAS_BEEN_REDUCED)       &&
+            beta == alpha + 1                           &&
+            num_legal_moves * 3 > (int)move_list.size() &&
+            depth > 3                                   &&
+            MoveCaptured(move) == NO_PIECE              &&
+            MovePromoted(move) == NO_PIECE              &&
+            MoveScore(move) < 0)
         {
             game.PlayMove(move);
             if (game.position_->flags_ & IS_MOVED_INTO_CHECK)
@@ -252,6 +264,7 @@ Search(Game&        game,
             if (!(game.position_->flags_ & IS_CHECK))
             {
                 INCREMENT("late move reductions");
+                game.position_->flags_ |= HAS_BEEN_REDUCED;
                 score = -Search(game, depth - 2, ply + 1, -beta, -alpha, pv);
             }
             else
@@ -261,7 +274,6 @@ Search(Game&        game,
             game.UndoMove();
         }
         else
-
 #endif
 
         {

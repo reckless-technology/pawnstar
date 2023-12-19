@@ -15,19 +15,19 @@ using std::vector;
 #include "function_prototypes.h"
 #include "position_move_generation.h"
 
-#define A1M (uint8_t)( ~MAY_WHITE_CASTLE_QUEENSIDE)
-#define E1M (uint8_t)(~(MAY_WHITE_CASTLE_QUEENSIDE | MAY_WHITE_CASTLE_KINGSIDE))
-#define H1M (uint8_t)( ~MAY_WHITE_CASTLE_KINGSIDE)
-#define A8M (uint8_t)( ~MAY_BLACK_CASTLE_QUEENSIDE)
-#define E8M (uint8_t)(~(MAY_BLACK_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE))
-#define H8M (uint8_t)( ~MAY_BLACK_CASTLE_KINGSIDE)
-#define OK  0xFF
+#define A1M (uint16_t)( ~MAY_WHITE_CASTLE_QUEENSIDE)
+#define E1M (uint16_t)(~(MAY_WHITE_CASTLE_QUEENSIDE | MAY_WHITE_CASTLE_KINGSIDE))
+#define H1M (uint16_t)( ~MAY_WHITE_CASTLE_KINGSIDE)
+#define A8M (uint16_t)( ~MAY_BLACK_CASTLE_QUEENSIDE)
+#define E8M (uint16_t)(~(MAY_BLACK_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE))
+#define H8M (uint16_t)( ~MAY_BLACK_CASTLE_KINGSIDE)
+#define OK  0xFFFF
 
 /**
  * @brief Castling rights flags based on move square from and to index.
  * Moves to and from king and rook squares invalidate castling rights.
 */
-static const uint8_t CASTLING_RIGHTS_MASKS[64] =
+static const uint16_t CASTLING_RIGHTS_MASKS[64] =
 {
    A1M,  OK,  OK,  OK, E1M,  OK,  OK, H1M,
     OK,  OK,  OK,  OK,  OK,  OK,  OK,  OK,

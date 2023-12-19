@@ -330,7 +330,7 @@ EvaluateKing(const Position& position)
         safety_score -= 20;
     }
     /* Penalty for enemy pieces near the king */
-    safety_score -= 10 * PopCount(SETS[position.king_location_[color]].king_attacks2 & enemy_pieces);
+    //safety_score -= 10 * PopCount(SETS[position.king_location_[color]].king_attacks2 & enemy_pieces);
     /* Scale the king safety score according to the enemy's material. */
     safety_score = (safety_score * enemy_material) / 31;
     return piece_square_score + safety_score;

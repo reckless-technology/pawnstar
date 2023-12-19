@@ -13,7 +13,11 @@
 #endif
 
 #ifndef DO_LATE_MOVE_REDUCTION
-#define DO_LATE_MOVE_REDUCTION 1
+#define DO_LATE_MOVE_REDUCTION 0
+#endif
+
+#ifndef DO_FUTILITY_PRUNING
+#define DO_FUTILITY_PRUNING 0
 #endif
 
 const int HASHTABLE_MEGABYTES           =      1024; ///< default transposition table size in MB
