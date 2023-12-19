@@ -163,5 +163,5 @@ void Game::StopThinking()
 void Game::StartThinking()
 {
     StopThinking();
-    worker_thread = std::thread(Game::SearchThreadEntry, this);
+    worker_thread = std::thread( [this] { this->SearchThreadEntry(); } );
 }
