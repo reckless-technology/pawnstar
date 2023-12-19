@@ -196,6 +196,7 @@ Search(Game&        game,
         {
             INCREMENT("table move beta cutoffs");
             RecordTransposition(position.hash_, depth, beta, transposition.move, NODE_CUT);
+            RecordKillerMove(ply, transposition.move);
             return beta;
         }
         if (score > alpha)
@@ -208,6 +209,7 @@ Search(Game&        game,
             may later turn out to be a PV but we don't know that yet.
             */
             RecordTransposition(position.hash_, depth, alpha, transposition.move, NODE_CUT);
+            RecordKillerMove(ply, transposition.move);
         }
     } 
     /*
@@ -230,30 +232,38 @@ Search(Game&        game,
             continue; /* We already searched this move. */
         }
         int score;
+
 #if DO_LATE_MOVE_REDUCTION
-        /* 
-        Consider late move reductions in the following circumstances
-        - We are not in check
-        - We are not in a PV node
-        - We are not nearing the leaf nodes
-        - This move is not a capture
-        - This move is not a pawn promotion
-        - SEE is non positive
-        - We already examined at least a couple of moves at full depth
-        */
+
         if (!(position.flags_ & IS_CHECK)   &&
             beta == alpha + 1               &&
-            depth > 1                       &&
+            num_legal_moves > 2             &&
+            depth > 2                       &&
             MoveCaptured(move) == NO_PIECE  &&
             MovePromoted(move) == NO_PIECE  &&
-            MoveScore(move) <= 0            &&
-            num_legal_moves > 2)
+            MoveScore(move) <= 0)
         {
-            INCREMENT("late move reductions");
-            score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, num_legal_moves);
+            game.PlayMove(move);
+            if (game.position_->flags_ & IS_MOVED_INTO_CHECK)
+            {
+                game.UndoMove();
+                continue;
+            }
+            if (!(game.position_->flags_ & IS_CHECK))
+            {
+                INCREMENT("late move reductions");
+                score = -Search(game, depth - 2, ply + 1, -beta, -alpha, pv);
+            }
+            else
+            {
+                score = -Search(game, depth - 1, ply + 1, -beta, -alpha, pv);
+            }
+            game.UndoMove();
         }
         else
+
 #endif
+
         {
             score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, num_legal_moves);
         }
@@ -271,6 +281,7 @@ Search(Game&        game,
         {
             INCREMENT("beta cutoffs");
             RecordTransposition(position.hash_, depth, beta, move, NODE_CUT);
+            RecordKillerMove(ply, move);
             return beta;
         }
         if (score > alpha)
@@ -285,6 +296,7 @@ Search(Game&        game,
             for sure yet until we have searched every move.
             */
             RecordTransposition(position.hash_, depth, score, move, NODE_CUT);
+            RecordKillerMove(ply, transposition.move);
         }
     }
     /*
@@ -318,6 +330,7 @@ Search(Game&        game,
         */
         INCREMENT("pv nodes");
         RecordTransposition(position.hash_, depth, alpha, best_move, NODE_PV);
+        RecordKillerMove(ply, best_move);
         CopyVariation(parent_pv, pv, best_move);
     }
     else

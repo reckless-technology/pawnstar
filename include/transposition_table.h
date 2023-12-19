@@ -31,4 +31,3 @@ bool    FindTransposition(uint64_t hash, Transposition& transposition);
 void    FreeTranspositionTable(void);
 bool    InitializeTranspositionTable(int megabytes);
 void    RecordTransposition(uint64_t hash, int depth, int score, Move move, int node_type);
-void    RecordTranspositionMaybe(uint64_t hash, int depth, int score, Move move, int node_type);

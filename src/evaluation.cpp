@@ -44,22 +44,17 @@ EvaluatePosition(const Position& position,
     /* Phase 1: Evaluate material values alone. */
     scores[WHITE] = EvaluateMaterial<WHITE>(position);
     scores[BLACK] = EvaluateMaterial<BLACK>(position);
-    /* 
-    See if material score alone causes alpha or beta cutoff. 
-    This saves time doing more expensive evaluation when clearly it's
-    not a PV node so evaluation accuracy is not as important. 
-    */
-    int score = (position.flags_ & IS_BLACK_TO_MOVE) ?
-        scores[BLACK] - scores[WHITE] :
-        scores[WHITE] - scores[BLACK];
+    int score = position.ColorToMove() == WHITE ?
+        scores[WHITE] - scores[BLACK] :
+        scores[BLACK] - scores[WHITE];
     if (score >= beta + 200)
-    {
-        INCREMENT("eval beta cutoff material");
+    {   
+        INCREMENT("eval beta cutoff");
         return beta;
     }
     if (score <= alpha - 200)
     {
-        INCREMENT("eval alpha cutoff material");
+        INCREMENT("eval alpha cutoff");
         return alpha;
     }
     /* Piece square tables */
@@ -74,10 +69,12 @@ EvaluatePosition(const Position& position,
     /* Kings */
     scores[WHITE] += EvaluateKing<WHITE>(position);
     scores[BLACK] += EvaluateKing<BLACK>(position);
-    score = (position.flags_ & IS_BLACK_TO_MOVE) ?
-        scores[BLACK] - scores[WHITE] :
-        scores[WHITE] - scores[BLACK];
+    score = position.ColorToMove() == WHITE ?
+        scores[WHITE] - scores[BLACK] :
+        scores[BLACK] - scores[WHITE];
     eval_hash.hash = position.hash_;
     eval_hash.score = score;
     return score;
+    (void)alpha;
+    (void)beta;
 }

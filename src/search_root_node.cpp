@@ -74,6 +74,7 @@ Move SearchRootNode(Game& game)
     results of the previous iteration to sort the moves (the merge sort is
     stable).
     */
+    ResetKillerCounts();
     Variation principal_variation {};
     Move best_moves[MAX_PLY]; /* Best move found at each ply of search. */
     for (int i = 0; i != num_legal_moves; ++i)

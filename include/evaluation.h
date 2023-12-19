@@ -329,16 +329,8 @@ EvaluateKing(const Position& position)
     {
         safety_score -= 20;
     }
-#if 0
-    /* Attacks to squares adjacent to our king */
-    Bitboard king_adjacent = SETS[position.king_location_[color]].king_attacks;
-    while (king_adjacent)
-    {
-        const uint8_t sq_locn = FindAndClearLsb(king_adjacent);
-        Bitboard attacks_to = position.AttacksTo(sq_locn, EnemyOf(color));
-        safety_score -= 20 * PopCount(attacks_to);
-    }
-#endif
+    /* Penalty for enemy pieces near the king */
+    safety_score -= 10 * PopCount(SETS[position.king_location_[color]].king_attacks2 & enemy_pieces);
     /* Scale the king safety score according to the enemy's material. */
     safety_score = (safety_score * enemy_material) / 31;
     return piece_square_score + safety_score;

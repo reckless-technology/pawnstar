@@ -7,6 +7,21 @@
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 
+static int killer_move_counts[MAX_PLY][64 * 64];
+
+void
+RecordKillerMove(int ply, Move move)
+{
+    /* Just use the from and to fields from the move (bits 0 - 11) */
+    ++killer_move_counts[ply][move & 0xFFF];
+}
+
+void 
+ResetKillerCounts()
+{
+    memset(killer_move_counts, 0, sizeof(killer_move_counts));
+}
+
 /**
  * @brief Sort moves "best first".
  * Uses static exchange evaluation (SEE) to provide a provisional
@@ -21,13 +36,14 @@ ScoreAndSortMoves(const Position&   position,
                   int               ply,
                   int               depth)
 {   
+    const int* const counts = &killer_move_counts[ply][0];
     for (auto& move : moves)
     {
         /* 
         Assign provisional scores based on static exchange evaluation
         and how many cutoffs this move has caused in the search history.
         */
-        move = ScoredMove(move, EvaluateStaticExchange(position, move));
+        move = ScoredMove(move, EvaluateStaticExchange(position, move) * 1000 + counts[move & 0xFFF]);
     }
     SortMoves(moves, false);
     (void)ply;

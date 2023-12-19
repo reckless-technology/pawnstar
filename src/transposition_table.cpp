@@ -5,8 +5,15 @@
 
 static bool IsPrime(int x);
 
-static Transposition*   transposition_table;
-static int              table_num_entries;
+constexpr int num_entries_per_bucket = 4;
+
+struct HashBucket
+{
+    Transposition entries[num_entries_per_bucket];
+};
+
+static HashBucket*  transposition_table;
+static int          table_num_entries;
 /*
 Delete the transposition table
 */
@@ -27,7 +34,7 @@ bool
 InitializeTranspositionTable(int megabytes)
 {
     FreeTranspositionTable();
-    table_num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
+    table_num_entries = (megabytes * MEGABYTE) / sizeof(HashBucket);
     /* Find the next smallest prime number and make the table that size */
     if ((table_num_entries & 1) == 0)
     {
@@ -37,7 +44,7 @@ InitializeTranspositionTable(int megabytes)
     {
         table_num_entries -= 2;
     }
-    transposition_table = (Transposition*)calloc(table_num_entries, sizeof(Transposition));
+    transposition_table = (HashBucket*)calloc(table_num_entries, sizeof(HashBucket));
     if (!transposition_table)
     {
         printf("ERROR: unable to create transposition transposition_table of %u megabytes\n", megabytes);
@@ -53,18 +60,31 @@ bool
 FindTransposition(uint64_t hash, 
                   Transposition& transposition)
 {
-    const Transposition& t = transposition_table[hash % table_num_entries]; 
-    if (t.hash == hash)
+    const HashBucket& bucket = transposition_table[hash % table_num_entries]; 
+    for (int i = num_entries_per_bucket - 1; i >= 0; --i)
     {
-        transposition = t;
-        return true;
+        const Transposition& t = bucket.entries[i];
+        if (t.hash == hash)
+        {
+            transposition = t;
+            return true;
+        }
     }
     return false;
 }
-/*
-Insert a new entry into the transposition table.
 
-*/
+/**
+ * @brief Insert a new entry into the table.
+ * Hash replacement policy:
+ * - Replace entry with same hash
+ * - Replace empty entry
+ * - Replace entry with lowest depth
+ * @param hash Zobrist hash of position.
+ * @param depth Search depth.
+ * @param score Score for this position.
+ * @param move Best move found.
+ * @param node_type Node type.
+ */
 void 
 RecordTransposition(uint64_t hash, 
                     int      depth, 
@@ -72,30 +92,31 @@ RecordTransposition(uint64_t hash,
                     Move     move, 
                     int      node_type)
 {   
-    Transposition& t = transposition_table[hash % table_num_entries];
-    t.hash           = hash;
-    t.move           = move;
-    t.score          = score;
-    t.depth          = (int16_t)depth;
-    t.node_type      = (uint16_t)node_type;
-}
-
-void    
-RecordTranspositionMaybe(uint64_t hash, 
-                         int      depth, 
-                         int      score, 
-                         Move     move, 
-                         int      node_type)
-{
-    Transposition& t = transposition_table[hash % table_num_entries];
-    if (t.hash == 0 || t.depth < depth)
+    HashBucket& bucket = transposition_table[hash % table_num_entries];
+    Transposition* candidate = &bucket.entries[0];
+    for (int i = num_entries_per_bucket - 1; i >= 0; --i)
     {
-        t.hash           = hash;
-        t.move           = move;
-        t.score          = score;
-        t.depth          = (int16_t)depth;
-        t.node_type      = (uint16_t)node_type;
+        if (bucket.entries[i].hash == hash)
+        {
+            candidate = &bucket.entries[i];
+            break;
+        }
+        if (bucket.entries[i].hash == 0)
+        {
+            candidate = &bucket.entries[i];
+            continue;
+        }
+        if (bucket.entries[i].depth < candidate->depth)
+        {
+            candidate = &bucket.entries[i];
+        }
     }
+    candidate->hash = hash;
+    candidate->move = move;
+    candidate->score = score;
+    candidate->depth = depth;
+    candidate->node_type = node_type;
+    
 }
 
 /*
