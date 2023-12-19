@@ -38,14 +38,14 @@ const int PAWN_SQUARE[64] =
 
 const int KNIGHT_SQUARE[64] =
 {
-  -10,-10,-10,-10,-10,-10,-10, -10,
-  -10,  0,  0,  0,  0,  0,  0, -10,
-  -10,  0,  5,  5,  5,  5,  0, -10,
-  -10,  0,  5, 10, 10,  5,  0, -10,
-  -10,  0,  5, 10, 10,  5,  0, -10,
-  -10,  0,  5,  5,  5,  5,  0, -10,
-  -10,  0,  0,  0,  0,  0,  0, -10,
-  -10,-30,-10,-10,-10,-10,-30, -10
+   -50,-40,-30,-30,-30,-30,-40,-50,
+   -40,-20,  0,  0,  0,  0,-20,-40,
+   -30,  0, 10, 15, 15, 10,  0,-30,
+   -30,  5, 15, 20, 20, 15,  5,-30,
+   -30,  0, 15, 20, 20, 15,  0,-30,
+   -30,  5, 10, 15, 15, 10,  5,-30,
+   -40,-20,  0,  5,  5,  0,-20,-40,
+   -50,-40,-30,-30,-30,-30,-40,-50,
 };
 
 const int BISHOP_SQUARE[64] = 
@@ -111,7 +111,7 @@ const int KING_SQUARE_ENDGAME[64] =
 const int PASSED_PAWN_SQUARE[64] = 
 {
      0,  0,  0,  0,  0,  0,  0,  0,
-    50, 50, 50, 50, 50, 50, 50, 50, 
+    50, 50, 50, 50, 50, 50, 50, 50, /* all pawns are "passed" at 7th rank */
     50, 50, 50, 50, 50, 50, 50, 50,
     30, 30, 30, 30, 30, 30, 30, 30, 
     20, 20, 20, 20, 20, 20, 20, 20,
@@ -184,10 +184,10 @@ EvaluateMaterial(const Position& position)
     const Bitboard queens  = position.queens_  & friendly_pieces;
     int score = 
         PopCount(pawns)   * 100 +
-        PopCount(knights) * 300 +
-        PopCount(bishops) * 300 +
-        PopCount(rooks)   * 500 +
-        PopCount(queens)  * 900;
+        PopCount(knights) * 400 +
+        PopCount(bishops) * 400 +
+        PopCount(rooks)   * 600 +
+        PopCount(queens)  * 1200;
     /* Bonus for the bishop pair. */
     if ((bishops & WHITE_SQUARES) && (bishops & BLACK_SQUARES))
     {

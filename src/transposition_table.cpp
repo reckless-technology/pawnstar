@@ -5,14 +5,12 @@
 
 static bool IsPrime(int x);
 
-constexpr int num_entries_per_bucket = 4;
-
-struct HashBucket
+struct TableEntry
 {
-    Transposition entries[num_entries_per_bucket];
+    Transposition entries[2];
 };
 
-static HashBucket*  transposition_table;
+static TableEntry*  transposition_table;
 static int          table_num_entries;
 /*
 Delete the transposition table
@@ -34,7 +32,7 @@ bool
 InitializeTranspositionTable(int megabytes)
 {
     FreeTranspositionTable();
-    table_num_entries = (megabytes * MEGABYTE) / sizeof(HashBucket);
+    table_num_entries = (megabytes * MEGABYTE) / sizeof(TableEntry);
     /* Find the next smallest prime number and make the table that size */
     if ((table_num_entries & 1) == 0)
     {
@@ -44,7 +42,7 @@ InitializeTranspositionTable(int megabytes)
     {
         table_num_entries -= 2;
     }
-    transposition_table = (HashBucket*)calloc(table_num_entries, sizeof(HashBucket));
+    transposition_table = (TableEntry*)calloc(table_num_entries, sizeof(TableEntry));
     if (!transposition_table)
     {
         printf("ERROR: unable to create transposition transposition_table of %u megabytes\n", megabytes);
@@ -53,32 +51,33 @@ InitializeTranspositionTable(int megabytes)
     }
     return true;
 }
-/*
-Find a transposition entry for this position if one exists
-*/
+
+/**
+ * @brief Find an entry in the TT if one exists for this position.
+ * @param hash Zobrist hash of position
+ * @param transposition Reference to transposition to assign if found
+ * @return true on success
+ */
 bool 
 FindTransposition(uint64_t hash, 
                   Transposition& transposition)
 {
-    const HashBucket& bucket = transposition_table[hash % table_num_entries]; 
-    for (int i = num_entries_per_bucket - 1; i >= 0; --i)
+    const TableEntry& bucket = transposition_table[hash % table_num_entries]; 
+    if (bucket.entries[0].hash == hash)
     {
-        const Transposition& t = bucket.entries[i];
-        if (t.hash == hash)
-        {
-            transposition = t;
-            return true;
-        }
+        transposition = bucket.entries[0];
+        return true;
+    }
+    if (bucket.entries[1].hash == hash)
+    {
+        transposition = bucket.entries[1];
+        return true;
     }
     return false;
 }
 
 /**
  * @brief Insert a new entry into the table.
- * Hash replacement policy:
- * - Replace entry with same hash
- * - Replace empty entry
- * - Replace entry with lowest depth
  * @param hash Zobrist hash of position.
  * @param depth Search depth.
  * @param score Score for this position.
@@ -92,31 +91,25 @@ RecordTransposition(uint64_t hash,
                     Move     move, 
                     int      node_type)
 {   
-    HashBucket& bucket = transposition_table[hash % table_num_entries];
-    Transposition* candidate = &bucket.entries[0];
-    for (int i = num_entries_per_bucket - 1; i >= 0; --i)
+    TableEntry& bucket = transposition_table[hash % table_num_entries];
+    if (bucket.entries[0].hash == 0 || bucket.entries[0].hash == hash)
     {
-        if (bucket.entries[i].hash == hash)
-        {
-            candidate = &bucket.entries[i];
-            break;
-        }
-        if (bucket.entries[i].hash == 0)
-        {
-            candidate = &bucket.entries[i];
-            continue;
-        }
-        if (bucket.entries[i].depth < candidate->depth)
-        {
-            candidate = &bucket.entries[i];
-        }
+        bucket.entries[0].hash      = hash;
+        bucket.entries[0].move      = move;
+        bucket.entries[0].score     = score;
+        bucket.entries[0].depth     = depth;
+        bucket.entries[0].node_type = node_type;
+        return;
     }
-    candidate->hash = hash;
-    candidate->move = move;
-    candidate->score = score;
-    candidate->depth = depth;
-    candidate->node_type = node_type;
-    
+    if (bucket.entries[1].hash != 0)
+    {
+        bucket.entries[0] = bucket.entries[1];
+    }
+    bucket.entries[1].hash      = hash;
+    bucket.entries[1].move      = move;
+    bucket.entries[1].score     = score;
+    bucket.entries[1].depth     = depth;
+    bucket.entries[1].node_type = node_type;
 }
 
 /*
