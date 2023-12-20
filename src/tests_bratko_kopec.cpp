@@ -56,6 +56,7 @@ void RunPositionTests(Game &game, int depth)
         DEBUG_STATEMENT(DebugXClear());
         SearchRootNode(game);
         DEBUG_STATEMENT(DebugXWrite());
+        ShowTableUsage();
     }
     printf("total elapsed milliseconds                        %10d\n", GetMilliseconds() - first_start);
     game = Game();

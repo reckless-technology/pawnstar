@@ -5,6 +5,7 @@
 #include "game.h"
 #include "search.h"
 
+#if DO_NULL_MOVE_PRUNING
 /**
  * @brief Try null move pruning.
  * @param game Current game (position)
@@ -14,8 +15,7 @@
  * @param beta Score ceiling (opponent's floor)
  * @return beta on success, alpha on failure
  */
-#if DO_NULL_MOVE_PRUNING
-static int 
+static inline int 
 AttemptNullMove(Game& game, 
                 int   depth, 
                 int   ply, 
@@ -25,20 +25,20 @@ AttemptNullMove(Game& game,
     /*
     Try null move pruning if ALL of the following are true:
 
-    # the previous move was not a null move
-    # we are not in check   
-    # this is not a PV node
-    # we are not down to king and pawns
-    # static eval is at least beta
+    - the previous move was not a null move
+    - we are not in check   
+    - this is not a PV node
+    - we are not down to king and pawns
+    - static eval is at least beta
     
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
     Position& position = *game.position_;
-    if (   !(position.flags_ & IS_NULL_MOVE)
-        && !(position.flags_ & IS_CHECK    )
-        && beta == alpha + 1
-        && (position.knights_ | position.bishops_ | position.rooks_ | position.queens_)
-        && EvaluatePosition(position, alpha, beta) >= beta)
+    if (!(position.flags_ & IS_NULL_MOVE)                                               &&
+        !(position.flags_ & IS_CHECK    )                                               &&
+        beta == alpha + 1                                                               &&
+        (position.knights_ | position.bishops_ | position.rooks_ | position.queens_)    &&
+        EvaluatePosition(position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
         game.MakeNullMove();
@@ -60,8 +60,35 @@ AttemptNullMove(Game& game,
 }
 #endif
 
+#if DO_LATE_MOVE_REDUCTION
 /**
- * @brief Fail hard alpha beta main search algorithm.
+ * @brief Determine if a (late) move is OK to reduce
+ * @param move The move
+ * @param color Color to move
+ * @return true if OK to reduce
+ */
+static inline bool 
+IsMoveOkToReduce(Move move, uint8_t color)
+{
+    static const uint8_t seventh_rank[2] = { 6, 1 };
+    if (MoveScore(move) >= 0)
+    {
+        return false;
+    }
+    if (MoveCaptured(move) || MovePromoted(move))
+    {
+        return false;
+    }
+    if (MovePiece(move) == PAWN && RankOf(MoveTo(move)) == seventh_rank[color])
+    {
+        return false;
+    }
+    return true;
+}
+#endif
+
+/**
+ * @brief Alpha beta main search algorithm.
  * @param game position to search
  * @param depth search depth
  * @param ply distance from root node
@@ -78,10 +105,7 @@ Search(Game&        game,
        int          beta, 
        Variation&   parent_pv)
 {    
-    if (game.is_cancel_pending_)
-    {
-        return SEARCH_CANCELLED_SCORE;
-    }    
+    INCREMENT("alpha beta calls");
     if ((++game.node_count_ & 0xFFFF) == 0          &&
         game.time_control_.hard_stop_search_ms != 0 &&
         GetMilliseconds() >= game.time_control_.hard_stop_search_ms)
@@ -89,7 +113,6 @@ Search(Game&        game,
         game.is_cancel_pending_ = true;
         return SEARCH_CANCELLED_SCORE;
     }
-    INCREMENT("alpha beta calls");
     Position& position = *game.position_;
     if (position.IsDrawByMaterial  () ||
         position.IsDrawByFiftyMoves() ||
@@ -102,25 +125,21 @@ Search(Game&        game,
         INCREMENT("max ply reached");
         return EvaluatePosition(position, alpha, beta);
     }
-    if (position.flags_ & IS_CHECK)
-    {
-        INCREMENT("extensions check");
-        ++depth;
-    }
-    else if (depth <= 0)
+    if (depth <= 0 && !(position.flags_ & IS_CHECK))
     {
         return SearchQuiescent(game, depth, ply, alpha, beta);
     } 
+
     /*
     Determine if there is an entry in the transposition table 
-    for this position.
+    for this position. If so, see if it is sufficient for us
+    to avoid the search entirely.
     */
-    Variation pv {};
-    Transposition transposition {};
+
+    Transposition transposition;
     const bool is_transposition = FindTransposition(position.hash_, transposition);
     if (is_transposition && transposition.depth >= depth)
     {
-        INCREMENT("table hit");
         switch (transposition.node_type)
         {
         case NODE_CUT:
@@ -131,8 +150,8 @@ Search(Game&        game,
             INCREMENT("table hit cut node");
             if (transposition.score >= beta)
             {
-                INCREMENT("table hit beta cutoffs");
-                return beta;
+                INCREMENT("table hit cut node cutoffs");
+                return transposition.score;
             }
             break;
 
@@ -144,8 +163,8 @@ Search(Game&        game,
             INCREMENT("table hit all node");
             if (transposition.score <= alpha)
             {
-                INCREMENT("table hit alpha cutoffs");
-                return alpha;
+                INCREMENT("table hit all node cutoffs");
+                return transposition.score;
             }
             break;
 
@@ -160,7 +179,10 @@ Search(Game&        game,
             break;
         }
     }
- 
+
+    /*
+    Try null move pruning.
+    */ 
 #if DO_NULL_MOVE_PRUNING
     int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
     if (game.is_cancel_pending_)
@@ -169,19 +191,7 @@ Search(Game&        game,
     }
     if (null_move_score >= beta)
     {
-        return beta;
-    }
-#endif
-
-#if DO_FUTILITY_PRUNING
-    if (depth == 1                          &&
-        !(position.flags_ & IS_CHECK)       &&
-        !(position.flags_ & IS_NULL_MOVE)   &&
-        beta == alpha + 1                   &&
-        EvaluatePosition(position, alpha, beta) + 500 <= alpha)
-    {
-        INCREMENT("futile prunes");
-        return alpha;
+        return null_move_score;
     }
 #endif
 
@@ -190,16 +200,17 @@ Search(Game&        game,
     This might save us the cost of move generation altogether, or provide 
     better alpha beta bounds for the main search.
     */
-    
-    int  num_legal_moves   = 0;
-    Move best_move         = 0;
-    bool has_raised_alpha  = false;
+    Variation pv;
+    int  num_legal_moves    = 0;
+    Move best_move          = 0;
+    int best_score          = ALPHA;
+    bool has_raised_alpha   = false;
     if (is_transposition && transposition.move)
     {
         INCREMENT("table move");
         best_move = transposition.move;
+        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, num_legal_moves);
         ++num_legal_moves;
-        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, 0);
         if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
@@ -207,21 +218,26 @@ Search(Game&        game,
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            RecordTransposition(position.hash_, depth, beta, transposition.move, NODE_CUT);
+            RecordTransposition(position.hash_, depth, score, transposition.move, NODE_CUT);
             RecordKillerMove(ply, transposition.move);
-            return beta;
+            return score;
         }
-        if (score > alpha)
+        if (score > best_score)
         {
-            INCREMENT("table move raised alpha");
-            alpha = score;
-            has_raised_alpha = true;
-            /* 
-            Provisionally store this move as a CUT node - it 
-            may later turn out to be a PV but we don't know that yet.
-            */
-            RecordTransposition(position.hash_, depth, alpha, transposition.move, NODE_CUT);
-            RecordKillerMove(ply, transposition.move);
+            best_score = score;
+            if (score > alpha)
+            {
+                INCREMENT("table move raised alpha");
+                alpha = score;
+                has_raised_alpha = true;
+                /* 
+                Provisionally store this move as a CUT node - it 
+                may later turn out to be a PV but we don't know that yet
+                until we have searched every move.
+                */
+                RecordTransposition(position.hash_, depth, score, transposition.move, NODE_CUT);
+                RecordKillerMove(ply, transposition.move);
+            }
         }
     } 
     /*
@@ -230,10 +246,6 @@ Search(Game&        game,
     */
     MoveList move_list { position.GeneratePseudoLegalMoves() };
     ScoreAndSortMoves(position, move_list, ply, depth);
-    if (best_move == 0)
-    {
-        best_move = move_list[0];
-    }
     /* 
     Start of the main loop. 
     */
@@ -250,17 +262,10 @@ Search(Game&        game,
             !(position.flags_ & HAS_BEEN_REDUCED)       &&
             beta == alpha + 1                           &&
             num_legal_moves * 3 > (int)move_list.size() &&
-            depth > 3                                   &&
-            MoveCaptured(move) == NO_PIECE              &&
-            MovePromoted(move) == NO_PIECE              &&
-            MoveScore(move) < 0)
+            depth > 2                                   &&
+            IsMoveOkToReduce(move, position.ColorToMove()))
         {
             game.PlayMove(move);
-            if (game.position_->flags_ & IS_MOVED_INTO_CHECK)
-            {
-                game.UndoMove();
-                continue;
-            }
             if (!(game.position_->flags_ & IS_CHECK))
             {
                 INCREMENT("late move reductions");
@@ -269,6 +274,7 @@ Search(Game&        game,
             }
             else
             {
+                /* Move gave check so do not reduce. */
                 score = -Search(game, depth - 1, ply + 1, -beta, -alpha, pv);
             }
             game.UndoMove();
@@ -283,32 +289,31 @@ Search(Game&        game,
         {
             return SEARCH_CANCELLED_SCORE;
         }
-        if (score == MOVED_INTO_CHECK_SCORE)
-        {
-            INCREMENT("moved into check");
-            continue;
-        }
         ++num_legal_moves;
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            RecordTransposition(position.hash_, depth, beta, move, NODE_CUT);
-            RecordKillerMove(ply, move);
-            return beta;
-        }
-        if (score > alpha)
-        {
-            INCREMENT("pv changed");
-            alpha = score;
-            has_raised_alpha = true;
-            best_move = move;
-            /* 
-            Provisionally store this move as a CUT node - it 
-            may later turn out to be a PV but we don't know that 
-            for sure yet until we have searched every move.
-            */
             RecordTransposition(position.hash_, depth, score, move, NODE_CUT);
-            RecordKillerMove(ply, transposition.move);
+            RecordKillerMove(ply, move);
+            return score;
+        }
+        if (score > best_score)
+        {
+            best_score = score;
+            best_move = move;
+            if (score > alpha)
+            {
+                INCREMENT("pv changed");
+                alpha = score;
+                has_raised_alpha = true;
+                /* 
+                Provisionally store this move as a CUT node - it 
+                may later turn out to be a PV but we don't know that 
+                for sure yet until we have searched every move.
+                */
+                RecordTransposition(position.hash_, depth, score, move, NODE_CUT);
+                RecordKillerMove(ply, transposition.move);
+            }
         }
     }
     /*
@@ -351,7 +356,7 @@ Search(Game&        game,
         We tried every move but did not raise alpha; this was an all node
         */
         INCREMENT("all nodes");
-        RecordTransposition(position.hash_, depth, alpha, best_move, NODE_ALL);
+        RecordTransposition(position.hash_, depth, best_score, best_move, NODE_ALL);
     }
-    return alpha;
+    return best_score;
 }

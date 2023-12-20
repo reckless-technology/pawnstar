@@ -4,13 +4,13 @@
 #include "function_prototypes.h"
 #include "evaluation.h"
 
+constexpr int EVAL_HASH_SIZE = 100003; /* Prime number */
+
 struct EvalHash
 {
     uint64_t    hash;
     int         score;
 };
-
-constexpr int EVAL_HASH_SIZE = 100003; /* Prime number */
 
 static EvalHash eval_hash_table[EVAL_HASH_SIZE];
 
@@ -24,8 +24,8 @@ static EvalHash eval_hash_table[EVAL_HASH_SIZE];
 */
 int 
 EvaluatePosition(const Position& position, 
-                 int alpha, 
-                 int beta)
+                 int             alpha, 
+                 int             beta)
 {    
     INCREMENT("eval calls");
     EvalHash& eval_hash = eval_hash_table[position.hash_ % EVAL_HASH_SIZE];
@@ -44,19 +44,6 @@ EvaluatePosition(const Position& position,
     /* Phase 1: Evaluate material values alone. */
     scores[WHITE] = EvaluateMaterial<WHITE>(position);
     scores[BLACK] = EvaluateMaterial<BLACK>(position);
-    int score = position.ColorToMove() == WHITE ?
-        scores[WHITE] - scores[BLACK] :
-        scores[BLACK] - scores[WHITE];
-    if (score >= beta + 200)
-    {   
-        INCREMENT("eval beta cutoff");
-        return score;
-    }
-    if (score <= alpha - 200)
-    {
-        INCREMENT("eval alpha cutoff");
-        return score;
-    }
     /* Piece square tables */
     scores[WHITE] += EvaluatePieceSquare<WHITE>(position);
     scores[BLACK] += EvaluatePieceSquare<BLACK>(position); 
@@ -69,7 +56,7 @@ EvaluatePosition(const Position& position,
     /* Kings */
     scores[WHITE] += EvaluateKing<WHITE>(position);
     scores[BLACK] += EvaluateKing<BLACK>(position);
-    score = position.ColorToMove() == WHITE ?
+    const int score = position.ColorToMove() == WHITE ?
         scores[WHITE] - scores[BLACK] :
         scores[BLACK] - scores[WHITE];
     eval_hash.hash = position.hash_;

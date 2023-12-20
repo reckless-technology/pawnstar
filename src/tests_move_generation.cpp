@@ -117,15 +117,16 @@ Categorize a null-terminated set of pseudo-legal moves into strictly-legal
 moves of various types, storing the result in counts
 */
 static void 
-CategorizeMoves(const Position&             src_position, 
-                const MoveList&    move_list, 
-                PerftCounts&                counts)
+CategorizeMoves(const Position& src_position, 
+                const MoveList& move_list, 
+                PerftCounts&    counts)
 {
     for (auto move : move_list)
     {
         Position position { src_position, move };
         if (position.flags_ & IS_MOVED_INTO_CHECK)
         {
+            printf("ERROR illegal move!\n");
             continue;
         }
         ++counts.legal_moves;
@@ -165,6 +166,7 @@ Perft(const Position& src_position,
 {
     static int call_count = 0;
     MoveList move_list = src_position.GeneratePseudoLegalMoves();
+    ScoreAndSortMoves(src_position, move_list, 0, 0);
     if (!(++call_count & 0x3FFFF))
     {
         printf("\rpositions processed %10" PRIu64, counts.legal_moves);
@@ -174,14 +176,13 @@ Perft(const Position& src_position,
         for (const auto move : move_list)
         {
             Position position { src_position, move };
-#if DO_TEST_HASH_DURING_PERFT
             if (position.hash_ != position.ComputeHash())
             {
                 printf("\nERROR in hash during perft\n");
             }
-#endif
             if (position.flags_ & IS_MOVED_INTO_CHECK)
             {
+                printf("ERROR illegal move!\n");
                 continue;
             }
             Perft(position, depth - 1, EnemyOf(color), counts);

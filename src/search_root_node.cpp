@@ -75,6 +75,7 @@ Move SearchRootNode(Game& game)
     stable).
     */
     ResetKillerCounts();
+    AgeTranspositionTable();
     Variation principal_variation {};
     Move best_moves[MAX_PLY]; /* Best move found at each ply of search. */
     for (int i = 0; i != num_legal_moves; ++i)
@@ -85,9 +86,8 @@ Move SearchRootNode(Game& game)
     SortMoves(move_list, true);
     Move best_move = move_list[0];
     best_moves[STARTING_SEARCH_DEPTH] = best_move;
-    
     for (int depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
-    {       
+    {
         if (game.time_control_.clock_type == CLOCK_FIXED_DEPTH && depth > game.time_control_.fixed_depth.depth)
         {
             break;
@@ -109,11 +109,10 @@ Move SearchRootNode(Game& game)
                 alpha             = score;
                 best_move         = move_list[i];
                 best_moves[depth] = move_list[i];
-                RecordTransposition(game.position_->hash_, depth, alpha, best_move, NODE_PV);
                 CopyVariation(principal_variation, child_pv, best_move);
                 if (game.do_show_thinking_)
                 {
-                    string move_string { game.position_->VariationToString(principal_variation) };
+                    const string move_string { game.position_->VariationToString(principal_variation) };
                     printf("%2u %5d %4u %8u %s\n", 
                             depth, 
                             MoveScore(best_moves[depth]), 

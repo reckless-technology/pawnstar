@@ -3,36 +3,35 @@
 #include "transposition_table.h"
 #include "function_prototypes.h"
 
-static bool IsPrime(int x);
+static bool IsPrime(size_t x);
 
-struct TableEntry
-{
-    Transposition entries[2];
-};
+static Transposition*   transposition_table;
+static size_t           table_num_entries;
 
-static TableEntry*  transposition_table;
-static int          table_num_entries;
-/*
-Delete the transposition table
-*/
+/**
+ * @brief Delete the transposition table.
+ */
 void 
-FreeTranspositionTable(void)
+FreeTranspositionTable()
 {
     if (transposition_table)
     {
-        free(transposition_table);
+        delete[] transposition_table;
         transposition_table = NULL;
         table_num_entries   = 0;
     } 
 }
-/*
-Create the transposition table of a specified maximum size
-*/
+
+/**
+ * @brief Create the transposition table.
+ * @param megabytes Approx max size of the table in megabytes. May be slightly smaller (table is prime size).
+ * @return true on success
+ */
 bool 
 InitializeTranspositionTable(int megabytes)
 {
     FreeTranspositionTable();
-    table_num_entries = (megabytes * MEGABYTE) / sizeof(TableEntry);
+    table_num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
     /* Find the next smallest prime number and make the table that size */
     if ((table_num_entries & 1) == 0)
     {
@@ -42,7 +41,7 @@ InitializeTranspositionTable(int megabytes)
     {
         table_num_entries -= 2;
     }
-    transposition_table = (TableEntry*)calloc(table_num_entries, sizeof(TableEntry));
+    transposition_table = new Transposition[table_num_entries];
     if (!transposition_table)
     {
         printf("ERROR: unable to create transposition transposition_table of %u megabytes\n", megabytes);
@@ -62,15 +61,10 @@ bool
 FindTransposition(uint64_t hash, 
                   Transposition& transposition)
 {
-    const TableEntry& bucket = transposition_table[hash % table_num_entries]; 
-    if (bucket.entries[0].hash == hash)
+    const Transposition& t = transposition_table[hash % table_num_entries];
+    if (t.hash == hash)
     {
-        transposition = bucket.entries[0];
-        return true;
-    }
-    if (bucket.entries[1].hash == hash)
-    {
-        transposition = bucket.entries[1];
+        transposition = t;
         return true;
     }
     return false;
@@ -91,39 +85,60 @@ RecordTransposition(uint64_t hash,
                     Move     move, 
                     int      node_type)
 {   
-    TableEntry& bucket = transposition_table[hash % table_num_entries];
-    if (bucket.entries[0].hash == 0 || bucket.entries[0].hash == hash)
+    Transposition& t = transposition_table[hash % table_num_entries];
+    if (t.hash == 0 || t.hash == hash || t.is_previous || t.depth < depth)
     {
-        bucket.entries[0].hash      = hash;
-        bucket.entries[0].move      = move;
-        bucket.entries[0].score     = score;
-        bucket.entries[0].depth     = depth;
-        bucket.entries[0].node_type = node_type;
-        return;
+        t.hash          = hash;
+        t.move          = move;
+        t.score         = score;
+        t.depth         = depth;
+        t.node_type     = node_type;
+        t.is_previous   = false;
     }
-    if (bucket.entries[1].hash != 0)
-    {
-        bucket.entries[0] = bucket.entries[1];
-    }
-    bucket.entries[1].hash      = hash;
-    bucket.entries[1].move      = move;
-    bucket.entries[1].score     = score;
-    bucket.entries[1].depth     = depth;
-    bucket.entries[1].node_type = node_type;
 }
 
-/*
-We get marginally better dispersion when the hashtable size is a prime number
-Determine if a candidate size is prime (excluding 1 and 2)
-*/
-static bool IsPrime(int x)
+void
+ShowTableUsage()
 {
-    int i;
+    size_t count = 0;
+    for (size_t i = 0; i != table_num_entries; ++i)
+    {
+        if (transposition_table[i].hash != 0)
+        {
+            ++count;
+        }
+    }
+    printf("Transposition table used %zu of %zu entries (%zu%% full)\n", 
+        count, 
+        table_num_entries,
+        (count * 100) / table_num_entries);
+}
+
+void
+AgeTranspositionTable()
+{
+    for (size_t i = 0; i != table_num_entries; ++i)
+    {
+        if (transposition_table[i].hash != 0)
+        {
+            transposition_table[i].is_previous = true;
+        }
+    }
+}
+
+/**
+ * @brief determine if a number is a prime number.
+ * We get marginally better hash dispersion when the hashtable size is a prime number
+ * @param x candidate
+ * @return true if x is prime
+*/
+static bool IsPrime(size_t x)
+{
     if (x < 3)
     {
         return false;
     }
-    for (i = 2; i * i <= x; ++i)
+    for (size_t i = 2; i * i <= x; ++i)
     {
         if (x % i == 0)
         {

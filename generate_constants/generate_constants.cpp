@@ -1,10 +1,11 @@
 /**
  * @file Precomputes at compile time, constants used by the main Pawnstar program.
 */
-#include <stdio.h>
-#include <stdbool.h>
-#include <inttypes.h>
-#include <string.h>
+#include <cstdio>
+#include <cstdbool>
+#include <cinttypes>
+#include <cstring>
+#include <algorithm>
 
 #ifndef DO_EXTRA_PAWN_EVAL
 #define DO_EXTRA_PAWN_EVAL  1
@@ -148,7 +149,7 @@ RC4()
         is_initialized = true;
         for (int i = 0; i != 256; ++i)
         {
-            S[i] = i;
+            S[i] = i ^ 0x55;
         }
         /* Stir up the state to get some randomness going */
         for (int i = 0; i != 1013; ++i)
@@ -158,11 +159,9 @@ RC4()
     }
     ++i;
     j += S[i];
-    const uint8_t tmp = S[i];
-    S[i] = S[j];
-    S[j] = tmp;
-    const uint8_t t = S[i] + S[j];
-    return S[t];
+    std::swap(S[i], S[j]);
+    const uint8_t k = S[i] + S[j];
+    return S[k];
 }
 
 /**

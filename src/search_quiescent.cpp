@@ -13,14 +13,13 @@
  * @param alpha parent floor value
  * @param beta parent ceiling value
  * @return score The score for this position
-*/
-int 
-SearchQuiescent(Game& game, 
-                int   depth,
-                int   ply, 
-                int   alpha, 
-                int   beta)
-{    
+ */
+int SearchQuiescent(Game &game,
+                    int depth,
+                    int ply,
+                    int alpha,
+                    int beta)
+{
     INCREMENT("quiescent calls");
     if (ply == MAX_PLY)
     {
@@ -30,36 +29,31 @@ SearchQuiescent(Game& game,
     if (game.position_->flags_ & IS_CHECK)
     {
         INCREMENT("quiescent checks");
-        Variation dummy {};
+        Variation dummy{};
         return Search(game, depth, ply, alpha, beta, dummy);
     }
     int score = EvaluatePosition(*game.position_, alpha, beta);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
-        return beta;
+        return score;
     }
     if (score > alpha)
     {
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
-    MoveList move_list { game.position_->GeneratePseudoLegalCaptures() };
+    int best_score = score;
+    MoveList move_list{game.position_->GeneratePseudoLegalCaptures()};
     ScoreAndSortMoves(*game.position_, move_list, ply, depth);
-    for (const auto& move : move_list)
+    for (const auto &move : move_list)
     {
         if (MoveScore(move) < 0)
         {
             INCREMENT("quiescent negative SEE skips");
-            return alpha;
+            return best_score;
         }
         game.PlayMove(move);
-        if (game.position_->flags_ & IS_MOVED_INTO_CHECK)
-        {
-            INCREMENT("quiescent moved into check");
-            game.UndoMove();
-            continue;
-        }
         score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
         game.UndoMove();
         if (game.is_cancel_pending_)
@@ -69,13 +63,17 @@ SearchQuiescent(Game& game,
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            return beta;
+            return score;
         }
-        if (score > alpha)
+        if (score > best_score)
         {
-            alpha = score;
-            INCREMENT("quiescent pv changed");
-        }      
+            best_score = score;
+            if (score > alpha)
+            {
+                alpha = score;
+                INCREMENT("quiescent pv changed");
+            }
+        }
     }
-    return alpha;
+    return best_score;
 }

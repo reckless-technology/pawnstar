@@ -7,12 +7,13 @@
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 
-static int killer_move_counts[MAX_PLY][8 * 64 * 64];
+/*                   indexed by      ply   pce from  to */
+static uint32_t killer_move_counts[MAX_PLY][8 * 64 * 64];
 
 void
 RecordKillerMove(int ply, Move move)
 {
-    /* mask all except piece, from, to (lower 15 bits) */
+    /* Mask all except piece, from, to (lower 15 bits) */
     ++killer_move_counts[ply][move & 0x7FFF];
 }
 
@@ -26,9 +27,11 @@ ResetKillerCounts()
  * @brief Sort moves "best first".
  * Uses static exchange evaluation (SEE) to provide a provisional
  * score for each move for sorting.
+ * Removes moves found to be illegal during the scoring process.
  * @param position position for which the moves were generated
- * @param moves null terminated list of moves to be sorted
+ * @param moves list of moves to be sorted
  * @param ply distance from root node
+ * @param depth remaining search depth (unused)
 */
 void 
 ScoreAndSortMoves(const Position&   position,
@@ -36,17 +39,24 @@ ScoreAndSortMoves(const Position&   position,
                   int               ply,
                   int               depth)
 {   
-    const int* const counts = &killer_move_counts[ply][0];
-    for (auto& move : moves)
+    MoveList legal_moves {};
+    legal_moves.reserve(64);
+    const uint32_t* const counts = &killer_move_counts[ply][0];
+    for (const auto& move : moves)
     {
         /* 
         Assign provisional scores based on static exchange evaluation
         and how many cutoffs this move has caused in the search history.
         */
-        move = ScoredMove(move, EvaluateStaticExchange(position, move) * 1000 + counts[move & 0x7FFF]);
+        const int see_score = EvaluateStaticExchange(position, move);
+        if (see_score == MOVED_INTO_CHECK_SCORE)
+        {
+            continue;
+        }
+        legal_moves.push_back(ScoredMove(move, see_score * 1000 + counts[move & 0x7FFF]));
     }
+    moves.swap(legal_moves);
     SortMoves(moves, false);
-    (void)ply;
     (void)depth;
 }
 

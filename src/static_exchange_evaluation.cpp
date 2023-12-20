@@ -18,7 +18,7 @@ int EvaluateStaticExchange(const Position& src_position, Move move)
     Position position { src_position, move };
     if (position.flags_ & IS_MOVED_INTO_CHECK)
     {
-        return -10000;
+        return MOVED_INTO_CHECK_SCORE;
     }
     if (MovePromoted(move))
     {
