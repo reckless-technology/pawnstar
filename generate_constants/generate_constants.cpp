@@ -133,20 +133,50 @@ FindAndClearLsb(uint64_t* x)
 }
 
 /**
- * @brief Generate a pseudo random number. Uses XORSHIFT twice.
- * @return Next value in sequence.
+ * @brief RC4 stream PRNG
+ * @return next byte in stream
  */
-static uint64_t PseudoRandom64(void)
+static uint8_t 
+RC4()
 {
-    static uint64_t x = 0x2545F4914F6CDD1Dull;
-    x ^= x >> 12;
-    x ^= x << 25;
-    x ^= x >> 27;
-    uint64_t result = (x * 0x2545F4914F6CDD1Dull) >> 32;
-    x ^= x >> 12;
-    x ^= x << 25;
-    x ^= x >> 27;
-    result |= (x * 0x2545F4914F6CDD1Dull) & 0xFFFFFFFF00000000ull;
+    static uint8_t S[256];
+    static uint8_t i;
+    static uint8_t j;
+    static bool is_initialized;
+    if (!is_initialized)
+    {
+        is_initialized = true;
+        for (int i = 0; i != 256; ++i)
+        {
+            S[i] = i;
+        }
+        /* Stir up the state to get some randomness going */
+        for (int i = 0; i != 1013; ++i)
+        {
+            RC4();
+        }
+    }
+    ++i;
+    j += S[i];
+    const uint8_t tmp = S[i];
+    S[i] = S[j];
+    S[j] = tmp;
+    const uint8_t t = S[i] + S[j];
+    return S[t];
+}
+
+/**
+ * @brief 64 bit PRNG used to create Zobrist hash keys
+ * @return next 64 bit value
+ */
+static uint64_t 
+PseudoRandom64()
+{
+    uint64_t result = 0;
+    for (int i = 0; i != 8; ++i)
+    {
+        result = (result << 8) | RC4();
+    }
     return result;
 }
 
@@ -1008,7 +1038,7 @@ int main()
                 {
                     printf("\n            ");
                 }
-                printf("0x%016" PRIX64 "ull,", piece >= PAWN && piece <= KING ? PseudoRandom64() : 0);
+                printf("0x%016" PRIX64 "ull,", PseudoRandom64());
             }
             printf("\n        },");
         }
