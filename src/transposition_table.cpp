@@ -1,4 +1,5 @@
 #include <vector>
+#include <algorithm>
 
 #include "position.h"
 #include "debug_hashtable.h"
@@ -7,7 +8,7 @@
 
 static bool IsPrime(size_t x);
 
-static std::vector<Transposition> transposition_table;
+static std::vector<Transposition> table;
 
 /**
  * @brief Delete the transposition table.
@@ -15,7 +16,7 @@ static std::vector<Transposition> transposition_table;
 void 
 FreeTranspositionTable()
 {
-    transposition_table.clear();
+    table.clear();
 }
 
 /**
@@ -36,8 +37,8 @@ InitializeTranspositionTable(size_t megabytes)
     {
         num_entries -= 2;
     }
-    transposition_table.clear();
-    transposition_table.resize(num_entries);
+    table.clear();
+    table.resize(num_entries);
 }
 
 /**
@@ -50,7 +51,7 @@ bool
 FindTransposition(uint64_t       hash, 
                   Transposition& transposition)
 {
-    const Transposition& t = transposition_table[hash % transposition_table.size()];
+    const Transposition& t = table[hash % table.size()];
     if (t.hash == hash)
     {
         transposition = t;
@@ -74,45 +75,32 @@ RecordTransposition(uint64_t hash,
                     Move     move, 
                     int      node_type)
 {   
-    Transposition& t = transposition_table[hash % transposition_table.size()];
-    if (t.hash == 0 || t.hash == hash || t.is_previous || t.depth < depth)
+    Transposition& t = table[hash % table.size()];
+    if (t.hash == 0 || t.hash == hash || t.is_old || t.depth < depth)
     {
-        t.hash          = hash;
-        t.move          = move;
-        t.score         = score;
-        t.depth         = depth;
-        t.node_type     = node_type;
-        t.is_previous   = false;
+        t.hash      = hash;
+        t.move      = move;
+        t.score     = score;
+        t.depth     = depth;
+        t.node_type = node_type;
+        t.is_old    = false;
     }
 }
 
 void
 ShowTableUsage()
 {
-    size_t count = 0;
-    for (size_t i = 0; i != transposition_table.size(); ++i)
-    {
-        if (transposition_table[i].hash != 0)
-        {
-            ++count;
-        }
-    }
-    printf("Transposition table used %zu of %zu entries (%zu%% full)\n", 
+    const size_t count = std::ranges::count_if(table, [](const Transposition& t) { return t.hash != 0; });
+    printf("Transposition table %zu%% full (used %zu of %zu entries)\n", 
+        (count * 100) / table.size(),
         count, 
-        transposition_table.size(),
-        (count * 100) / transposition_table.size());
+        table.size());
 }
 
 void
 AgeTranspositionTable()
 {
-    for (auto& t : transposition_table)
-    {
-        if (t.hash == 0)
-        {
-            t.is_previous = true;
-        }
-    }
+    std::ranges::for_each(table, [](Transposition& t) { t.is_old = true; });
 }
 
 /**

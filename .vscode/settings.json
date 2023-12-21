@@ -66,6 +66,7 @@
         "xtree": "cpp",
         "xutility": "cpp",
         "array": "cpp",
-        "cinttypes": "cpp"
+        "cinttypes": "cpp",
+        "functional": "cpp"
     }
 }

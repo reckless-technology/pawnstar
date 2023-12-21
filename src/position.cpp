@@ -56,13 +56,13 @@ Position::MakeNullMove(Position& dst_position) const
     dst_position.flags_ ^= IS_BLACK_TO_MOVE;
     dst_position.hash_ ^= EN_PASSANT_HASHES[dst_position.en_passant_index_];
     dst_position.hash_ ^= BLACK_MOVE_HASH;
-    dst_position.en_passant_index_ = 0;
+    dst_position.en_passant_index_ = (Square)0;
 }
 
 void 
-Position::AddPiece(uint8_t color, 
-                   uint8_t piece, 
-                   uint8_t to)
+Position::AddPiece(Color color, 
+                   Piece piece, 
+                   Square to)
 {
     const Bitboard to_bb = BITBOARD(to);
     pieces_[piece - 1] ^= to_bb;
@@ -71,9 +71,9 @@ Position::AddPiece(uint8_t color,
 }
 
 void
-Position::RemovePiece(uint8_t color, 
-                      uint8_t piece, 
-                      uint8_t from)
+Position::RemovePiece(Color color, 
+                      Piece piece, 
+                      Square from)
 {
     const Bitboard from_bb = BITBOARD(from);
     pieces_[piece - 1] ^= from_bb;
@@ -82,10 +82,10 @@ Position::RemovePiece(uint8_t color,
 }
 
 void
-Position::MovePiece(uint8_t color, 
-                    uint8_t piece, 
-                    uint8_t from, 
-                    uint8_t to)
+Position::MovePiece(Color color, 
+                    Piece piece, 
+                    Square from, 
+                    Square to)
 {
     const Bitboard from_to_bb = BITBOARD(from) | BITBOARD(to);
     const uint64_t* const hash = &PIECE_SQUARE_HASHES[color][piece -1][0];
@@ -94,22 +94,22 @@ Position::MovePiece(uint8_t color,
     hash_ ^= hash[to] ^ hash[from];
 }
 
-Position::Position(const Position& that, Move move) noexcept
+Position::Position(const Position& previous, Move move) noexcept
 {                          
-    const int color    = that.ColorToMove();
-    const int from     = MoveFrom(move);
-    const int to       = MoveTo(move);
-    const int piece    = ::MovePiece(move);
-    const int captured = MoveCaptured(move);
+    const Color color    = previous.ColorToMove();
+    const Square from    = MoveFrom(move);
+    const Square to      = MoveTo(move);
+    const Piece piece    = ::MovePiece(move);
+    const Piece captured = MoveCaptured(move);
      
-    *this = that;
-    previous_ = &that;
+    *this = previous;
+    previous_ = &previous;
     flags_ &= ~IS_NULL_MOVE;
     flags_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
-    hash_ ^= CASTLING_RIGHTS_HASHES[flags_ & CASTLING_RIGHTS_MASK] 
-          ^ CASTLING_RIGHTS_HASHES[that.flags_ & CASTLING_RIGHTS_MASK];
+    hash_ ^= CASTLING_RIGHTS_HASHES[flags_          & CASTLING_RIGHTS_MASK] 
+           ^ CASTLING_RIGHTS_HASHES[previous.flags_ & CASTLING_RIGHTS_MASK];
     hash_ ^= EN_PASSANT_HASHES[en_passant_index_];
-    en_passant_index_ = 0;
+    en_passant_index_ = (Square)0;
     ++reversible_move_count_;
     switch (piece)
     {
@@ -120,7 +120,7 @@ Position::Position(const Position& that, Move move) noexcept
             if (IsEpCaptureMove(move))
             {
                 /* En passant capture: capture location is source rank, destination file. */
-                const int captured_pawn_locn = (from & 0x38) | (to & 0x07);
+                const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));
                 RemovePiece(EnemyOf(color), PAWN, captured_pawn_locn);
             }
             else
@@ -140,7 +140,7 @@ Position::Position(const Position& that, Move move) noexcept
             if (IsPawnDoublePushMove(move))
             {
                 /* Pawn double push: affects en passant. */
-                en_passant_index_ = (uint8_t)((from + to) >> 1);
+                en_passant_index_ = (Square)((from + to) >> 1);
                 hash_ ^= EN_PASSANT_HASHES[en_passant_index_];
             } 
         }
@@ -239,7 +239,7 @@ Position::Position(std::string_view fen_string) noexcept
         BAD_FEN_STRING;
     }
     int x = 0, y = 7;
-    for (const auto& c : pieces)
+    for (const char& c : pieces)
     {
         if (c == '/')
         {
@@ -266,16 +266,16 @@ Position::Position(std::string_view fen_string) noexcept
         auto a = white_piece_names.find(c);
         if (a != string::npos)
         {
-            const int piece = a + 1;
-            AddPiece(WHITE, piece, x + 8 * y);
+            const Piece piece = (Piece)(a + 1);
+            AddPiece(WHITE, piece, (Square)(x + 8 * y));
             ++x;
             continue;
         }
         a = black_piece_names.find(c);
         if (a != string::npos)
         {
-            const int piece = a + 1;
-            AddPiece(BLACK, piece, x + 8 * y);
+            const Piece piece = (Piece)(a + 1);
+            AddPiece(BLACK, piece, (Square)(x + 8 * y));
             ++x;
             continue;
         }
@@ -345,7 +345,7 @@ Position::Position(std::string_view fen_string) noexcept
     }
     if (ep_square == "-")
     {
-        en_passant_index_ = 0;
+        en_passant_index_ = (Square)0;
     }
     else
     {
@@ -355,7 +355,7 @@ Position::Position(std::string_view fen_string) noexcept
         {
             BAD_FEN_STRING;
         }
-        en_passant_index_ = (ep_square[0] - 'a') + 8 * (ep_square[1] - '1');
+        en_passant_index_ = (Square)((ep_square[0] - 'a') + 8 * (ep_square[1] - '1'));
     }
     if (ss)
     {
@@ -378,7 +378,7 @@ Position::Position(std::string_view fen_string) noexcept
         BAD_FEN_STRING;
     }
     /* Is the position in check? */
-    const int color = ColorToMove();
+    const Color color = ColorToMove();
     if (IsAttacked(king_location_[color], EnemyOf(color)))
     {
         flags_ |= IS_CHECK;
@@ -407,8 +407,8 @@ Position::operator std::string() const
                     num_empty_squares = 0;
                 }
                 const char piece = (white_pieces_ & BITBOARD(x, y)) ?
-                    " PNBRQK"[PieceAt(x + 8 * y)] : 
-                    " pnbrqk"[PieceAt(x + 8 * y)];
+                    " PNBRQK"[PieceAt((Square)(x + 8 * y))] : 
+                    " pnbrqk"[PieceAt((Square)(x + 8 * y))];
                 ss << piece;
             }
         }
@@ -471,7 +471,7 @@ Position::operator std::string() const
  * @param color attacking color
  * @return true if color attacks position, otherwise false
 */
-bool Position::IsAttacked(uint8_t location, uint8_t color) const
+bool Position::IsAttacked(uint8_t location, Color color) const
 {
     const Sets& sets = SETS[location];
     const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
@@ -520,7 +520,7 @@ bool Position::IsAttacked(uint8_t location, uint8_t color) const
  * @param color Attacking color.
  * @return Set of squares of color containing a piece attacking location.
  */
-Bitboard Position::AttacksTo(uint8_t location, uint8_t color) const
+Bitboard Position::AttacksTo(uint8_t location, Color color) const
 {
     const Sets& sets = SETS[location];
     const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
@@ -541,7 +541,7 @@ Bitboard Position::AttacksTo(uint8_t location, uint8_t color) const
     Bitboard sliding_attackers = (rooks_ | queens_) & sets.rook_attacks & attacking_pieces;
     while (sliding_attackers)
     {
-        const int locn = FindAndClearLsb(sliding_attackers);
+        const Square locn = FindAndClearLsb(sliding_attackers);
         if (!(intervening_squares[locn] & occupied_squares))
         {
             result |= BITBOARD(locn);
@@ -553,7 +553,7 @@ Bitboard Position::AttacksTo(uint8_t location, uint8_t color) const
     sliding_attackers = (bishops_ | queens_) & sets.bishop_attacks & attacking_pieces;
     while (sliding_attackers)
     {
-        const int locn = FindAndClearLsb(sliding_attackers);
+        const Square locn = FindAndClearLsb(sliding_attackers);
         if (!(intervening_squares[locn] & occupied_squares))
         {
             result |= BITBOARD(locn);
@@ -570,7 +570,7 @@ Bitboard Position::AttacksTo(uint8_t location, uint8_t color) const
  */
 bool Position::IsLegal() const
 {
-    const int color           = ColorToMove();
+    const Color color       = ColorToMove();
     const Bitboard white_king = kings_ & white_pieces_;
     const Bitboard black_king = kings_ & black_pieces_;
     return
@@ -701,7 +701,7 @@ Position::ComputeHash() const
     uint64_t hash = flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
     hash ^= CASTLING_RIGHTS_HASHES[flags_ & CASTLING_RIGHTS_MASK];
     hash ^= EN_PASSANT_HASHES[en_passant_index_];
-    for (int piece = PAWN - 1; piece <= KING - 1; ++piece) /* -1 because the arrays are zero indexed and PAWN value is 1 */
+    for (int piece = PAWN - 1; piece <= KING - 1; ++piece)
     {
         Bitboard b = pieces_[piece] & white_pieces_;
         while (b)
@@ -793,7 +793,7 @@ string Position::MoveToString(Move move) const
     of moving to the target square, and will require further disambiguation
     */
     MoveList legal_moves = GenerateLegalMoves();
-    for (auto m : legal_moves)
+    for (const Move& m : legal_moves)
     {
         if (::MovePiece(m) == ::MovePiece(move) && 
               MoveTo   (m) ==   MoveTo   (move) &&
@@ -859,6 +859,8 @@ string Position::MoveToString(Move move) const
             case C1:
             case C8:
                 result <<  "O-O-O";
+                break;
+            default:
                 break;
             }
         }

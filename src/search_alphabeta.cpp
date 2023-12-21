@@ -68,7 +68,7 @@ AttemptNullMove(Game& game,
  * @return true if OK to reduce
  */
 static inline bool
-IsMoveOkToReduce(Move move, uint8_t color)
+IsMoveOkToReduce(Move move, Color color)
 {
     static const uint8_t seventh_rank[2] = { 6, 1 };
     if (IsCheckingMove(move))

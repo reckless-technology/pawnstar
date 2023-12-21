@@ -3,7 +3,7 @@
 #include "transposition_table.h"
 #include "function_prototypes.h"
 
-static int EvaluateSwapOff(Position& position, uint8_t location, int color, int piece_on_square);
+static int EvaluateSwapOff(Position& position, Square location, Color color, Piece piece_on_square);
 
 /*
 Use nominal 1-3-3-5-9 material values for SEE
@@ -39,7 +39,7 @@ function destroys its position during execution, and does not update flags etc
 for speed, since it is called for every move at every node in the tree it must
 be super fast.
 */
-static int EvaluateSwapOff(Position& position, uint8_t location, int color, int piece_on_square)
+static int EvaluateSwapOff(Position& position, Square location, Color color, Piece piece_on_square)
 {
     const Sets* const sets                    = &SETS[location];
     const Bitboard square                     = BITBOARD(location);
@@ -51,7 +51,7 @@ static int EvaluateSwapOff(Position& position, uint8_t location, int color, int 
     for (ply = 0; ply != 32; ++ply)
     {
         /* Find the least valuable piece of color which directly attacks location */
-        int capturing_piece;
+        Piece capturing_piece;
         Bitboard sliders; 
         const Bitboard attacking_pieces = position.pieces_of_color_[color];
         Bitboard attacker = sets->pawn_attacks[EnemyOf(color)] & attacking_pieces & position.pawns_;
@@ -71,7 +71,7 @@ static int EvaluateSwapOff(Position& position, uint8_t location, int color, int 
         sliders = sets->bishop_attacks & attacking_pieces & position.bishops_;
         while (sliders)
         {
-            const int slider_locn = FindAndClearLsb(sliders);
+            const Square slider_locn = FindAndClearLsb(sliders);
             if (!(intervening_squares[slider_locn] & occupied_squares))
             {
                 capturing_piece = BISHOP;
@@ -82,7 +82,7 @@ static int EvaluateSwapOff(Position& position, uint8_t location, int color, int 
         sliders = sets->rook_attacks & attacking_pieces & position.rooks_;
         while (sliders)
         {
-            const int slider_locn = FindAndClearLsb(sliders);
+            const Square slider_locn = FindAndClearLsb(sliders);
             if (!(intervening_squares[slider_locn] & occupied_squares))
             {
                 capturing_piece = ROOK;
@@ -93,7 +93,7 @@ static int EvaluateSwapOff(Position& position, uint8_t location, int color, int 
         sliders = sets->queen_attacks & attacking_pieces & position.queens_;
         while (sliders)
         {
-            const int slider_locn = FindAndClearLsb(sliders);
+            const Square slider_locn = FindAndClearLsb(sliders);
             if (!(intervening_squares[slider_locn] & occupied_squares))
             {
                 capturing_piece = QUEEN;

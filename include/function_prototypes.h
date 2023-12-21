@@ -10,13 +10,13 @@
 struct Position;
 struct Game;
 
-constexpr uint8_t   FileOf(int locn)    { return locn & 7;              }
-constexpr uint8_t   RankOf(int locn)    { return locn >> 3;             }
-constexpr char      FileChar(int locn)  { return 'a' + FileOf(locn);    }
-constexpr char      RankChar(int locn)  { return '1' + RankOf(locn);    }
-constexpr uint8_t   EnemyOf(int color)  { return !color;                }
-constexpr int       min(int a, int b)   { return a < b ? a : b;         }
-constexpr int       max(int a, int b)   { return a > b ? a : b;         }
+constexpr uint8_t   FileOf(int locn)    { return locn & 7;                          }
+constexpr uint8_t   RankOf(int locn)    { return locn >> 3;                         }
+constexpr char      FileChar(int locn)  { return 'a' + FileOf(locn);                }
+constexpr char      RankChar(int locn)  { return '1' + RankOf(locn);                }
+constexpr Color     EnemyOf(Color color){ return color == WHITE ? BLACK : WHITE;    }
+constexpr int       min(int a, int b)   { return a < b ? a : b;                     }
+constexpr int       max(int a, int b)   { return a > b ? a : b;                     }
 
 constexpr Bitboard 
 BishopAttacks(Bitboard occupied_squares, uint8_t location)

@@ -25,7 +25,7 @@ struct Transposition
     int         score;          /**< The score computed from this position                          */
     int16_t     depth;          /**< The depth to which this position was searched                  */
     uint8_t     node_type;      /**< The alpha-beta tree search node type (cut, all, pv)            */
-    bool        is_previous;    /**< This entry is from a previous search and can thus be replaced  */
+    bool        is_old;         /**< This entry is from a previous search and can thus be replaced  */
 };
 
 bool    FindTransposition(uint64_t hash, Transposition& transposition);

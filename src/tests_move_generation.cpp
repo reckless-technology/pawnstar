@@ -161,7 +161,7 @@ http://chessprogramming.wikispaces.com/Perft+Results
 static void 
 Perft(const Position& src_position, 
       int             depth, 
-      int             color, 
+      Color           color, 
       PerftCounts&    counts)
 {
     static int call_count = 0;

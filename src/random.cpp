@@ -1,8 +1,10 @@
 #include <cstdint>
-#include <ctime>
+#include <chrono>
+
+using namespace std::chrono;
 
 /**
- * @brief Xorshift simple PRNG
+ * @brief XORshift simple PRNG
  * @return next pseudo random integer
 */
 int NextRandom(void)
@@ -10,7 +12,7 @@ int NextRandom(void)
     static uint64_t x;
     if (x == 0)
     {
-        x = (uint64_t)time(NULL);
+        x = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
         for (int i = 0; i != 1000; ++i)
         {
             NextRandom();
@@ -19,5 +21,5 @@ int NextRandom(void)
     x ^= x >> 12;
     x ^= x << 25;
     x ^= x >> 27;
-    return (int)((x * 2685821657736338717ull) >> 32);
+    return (int)((x * 0x2545F4914F6CDD1Dull) >> 32);
 }

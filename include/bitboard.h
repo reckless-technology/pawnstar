@@ -1,5 +1,7 @@
 #pragma once
 #include <cstdint>
+
+#include "move.h"
 /**
  * @file Functions and macros to use Bitboards.
  * 
@@ -63,11 +65,10 @@ const Bitboard CTR_16_SQUARES  = 0x00003C3C3C3C0000ull;
 const Bitboard CTR_4_SQUARES   = 0x0000001818000000ull;
 const Bitboard BLACK_MOVE_HASH = 0xB92B78FCCF92F8CDull;
 
-constexpr Bitboard BITBOARD(uint8_t location)   { return 1ull << location;                  }
+constexpr Bitboard BITBOARD(Square location)    { return 1ull << location;                  }
 constexpr Bitboard BITBOARD(int x, int y)       { return 1ull << (x + 8 * y);               }
-constexpr Bitboard BITBOARD(const char* s)      { return BITBOARD(s[0] - 'a', s[1] - '1');  }
-constexpr uint8_t  Lsb(Bitboard x)              { return (uint8_t)__builtin_ctzll(x);       }
-constexpr uint8_t  Msb(Bitboard x)              { return 63 - (uint8_t)__builtin_clzll(x);  }
+constexpr Square   Lsb(Bitboard x)              { return (Square)__builtin_ctzll(x);        }
+constexpr Square   Msb(Bitboard x)              { return (Square)(63 - __builtin_clzll(x)); }
 constexpr uint8_t  PopCount(Bitboard x)         { return (uint8_t)__builtin_popcountll(x);  }
 constexpr Bitboard ShiftNorth(Bitboard b)       { return  b << 8;                           }
 constexpr Bitboard ShiftNortheast(Bitboard b)   { return (b & MASK_EAST_1) << 9;            }
@@ -78,10 +79,10 @@ constexpr Bitboard ShiftSouthwest(Bitboard b)   { return (b & MASK_WEST_1) >> 9;
 constexpr Bitboard ShiftWest(Bitboard b)        { return (b & MASK_WEST_1) >> 1;            }
 constexpr Bitboard ShiftNorthwest(Bitboard b)   { return (b & MASK_WEST_1) << 7;            }
 
-constexpr uint8_t 
+constexpr Square 
 FindAndClearLsb(Bitboard& x)
 {
-    const uint8_t lsb = (uint8_t)__builtin_ctzll(x);
+    const Square lsb = (Square)__builtin_ctzll(x);
     x &= (x - 1);
     return lsb;
 }

@@ -8,21 +8,6 @@
 #include "move.h"
 
 /**
- * @brief Chess board square indices.
-*/
-enum Square : uint8_t
-{
-    A1, B1, C1, D1, E1, F1, G1, H1,
-    A2, B2, C2, D2, E2, F2, G2, H2,
-    A3, B3, C3, D3, E3, F3, G3, H3,
-    A4, B4, C4, D4, E4, F4, G4, H4,
-    A5, B5, C5, D5, E5, F5, G5, H5,
-    A6, B6, C6, D6, E6, F6, G6, H6,
-    A7, B7, C7, D7, E7, F7, G7, H7,
-    A8, B8, C8, D8, E8, F8, G8, H8,
-};
-
-/**
  * @brief Bitset of position state flags.
 */
 enum StateFlags : uint16_t
@@ -73,8 +58,8 @@ struct Position
     uint64_t        hash_;                  /**< Zobrist hash of this position, maintained incrementally    */
     const Position* previous_;              /**< position immediately prior to this in the line of play     */
     uint16_t        flags_;                 /**< game state-machine flags                                   */
-    uint8_t         king_location_[2];      /**< square index of white and black kings                      */
-    uint8_t         en_passant_index_;      /**< en passant capture availability square (0 if none)         */
+    Square          king_location_[2];      /**< square index of white and black kings                      */
+    Square          en_passant_index_;      /**< en passant capture availability square (0 if none)         */
     uint8_t         reversible_move_count_; /**< number of consecutive reversible half-moves (plies)        */
     uint8_t         full_move_count_;       /**< number of full moves (zero indexed)                        */
 
@@ -83,9 +68,9 @@ struct Position
     Position(const Position& previous, Move move) noexcept;                 /**< Construct a position from its predecessor and a move. */
     operator        std::string() const;                                    /**< Return the FEN string for this position. */
     void            MakeNullMove(Position& dst_position) const;             /**< Construct a position from this one making a null move. */
-    void            AddPiece   (uint8_t color, uint8_t piece, uint8_t to);  /**< Place a piece on the board. */
-    Bitboard        AttacksTo  (uint8_t location, uint8_t color) const;     /**< The set of attackers to a location on the board. */
-    bool            IsAttacked (uint8_t location, uint8_t color) const;     /**< Determine if location is attacked by color. */
+    void            AddPiece   (Color color, Piece piece, Square to);  /**< Place a piece on the board. */
+    Bitboard        AttacksTo  (uint8_t location, Color color) const;     /**< The set of attackers to a location on the board. */
+    bool            IsAttacked (uint8_t location, Color color) const;     /**< Determine if location is attacked by color. */
     bool            IsLegal() const;                                        /**< Is this a legal chess position. */
     bool            IsCheckmate() const;                                    /**< Is this position checkmate. */
     bool            IsDrawByFiftyMoves() const;                             /**< Is this position a dfraw by the 50 move rule. */
@@ -99,7 +84,7 @@ struct Position
     std::string     MoveToString(Move move) const;                          /**< Generate the SAN string for a specific legal move. */
     std::string     VariationToString(const Variation& variation) const;    /**< Generate SAN strings for a legal sequence of moves. */
     
-    constexpr uint8_t PieceAt(uint8_t location) const
+    constexpr Piece PieceAt(Square location) const
     {
         const Bitboard square = BITBOARD(location);
         return 
@@ -109,15 +94,15 @@ struct Position
             (square & rooks_)   ? ROOK   :
             (square & queens_)  ? QUEEN  :
             (square & kings_)   ? KING   : NO_PIECE;
-    }                                                                           /**< Find the piece standing on location, if any. */
+    }
 
-    constexpr uint8_t ColorToMove() const
+    constexpr Color ColorToMove() const
     { 
         return flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE; 
     }
 
 private:
     template <bool do_all_moves> MoveList GenerateMoves() const;                /**< Prototype function to generate pseudo legal moves. */
-    void RemovePiece(uint8_t color, uint8_t piece, uint8_t from);               /**< Remove a piece from the board. */
-    void MovePiece  (uint8_t color, uint8_t piece, uint8_t from, uint8_t to);   /**< Move a piece on the board. */
+    void RemovePiece(Color color, Piece piece, Square from);               /**< Remove a piece from the board. */
+    void MovePiece  (Color color, Piece piece, Square from, Square to);   /**< Move a piece on the board. */
 };

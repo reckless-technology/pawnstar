@@ -13,17 +13,17 @@
 void DeterminePins(const Position& position, Pins& pins)
 {
     pins.pinned_pieces              = NO_SQUARES;
-    const int color                 = position.ColorToMove();
+    const Color color               = position.ColorToMove();
     const Bitboard occupied_squares = position.white_pieces_ | position.black_pieces_;
     const Bitboard friendly_pieces  = position.pieces_of_color_[color];
-    const int king_location         = position.king_location_[color];
+    const uint8_t king_location     = position.king_location_[color];
     const Bitboard* intervening     = &INTERVENING_SQUARES[king_location][0];
     Bitboard enemy_sliding_pieces   = 
         ((SETS[king_location].bishop_attacks & (position.bishops_ | position.queens_)) | 
         ( SETS[king_location].rook_attacks   & (position.rooks_   | position.queens_))) & ~friendly_pieces;
     while (enemy_sliding_pieces)
     {
-        const int slider_location                   = FindAndClearLsb(enemy_sliding_pieces);
+        const Square   slider_location              = FindAndClearLsb(enemy_sliding_pieces);
         const Bitboard intervening_squares          = intervening[slider_location];
         const Bitboard intervening_pieces           = intervening_squares & occupied_squares;
         const Bitboard intervening_friendly_piece   = intervening_pieces & friendly_pieces;
@@ -42,12 +42,12 @@ void DeterminePins(const Position& position, Pins& pins)
         Bitboard b = pins.pinned_pieces;
         while (b)
         {
-            const int locn = FindAndClearLsb(&b);
+            const Square locn = FindAndClearLsb(&b);
             printf("Piece pinned at %c%c may move to ", FileChar(locn), RankChar(locn));
             Bitboard c = pins.allowed_squares[locn];
             while (c)
             {
-                const int allowed_locn = FindAndClearLsb(&c);
+                const uint8_t allowed_locn = FindAndClearLsb(&c);
                 printf("%c%c ", FileChar(allowed_locn), RankChar(allowed_locn));
             }
             printf("\n");
