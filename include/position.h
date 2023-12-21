@@ -68,9 +68,9 @@ struct Position
     Position(const Position& previous, Move move) noexcept;                 /**< Construct a position from its predecessor and a move. */
     operator        std::string() const;                                    /**< Return the FEN string for this position. */
     void            MakeNullMove(Position& dst_position) const;             /**< Construct a position from this one making a null move. */
-    void            AddPiece   (Color color, Piece piece, Square to);  /**< Place a piece on the board. */
-    Bitboard        AttacksTo  (uint8_t location, Color color) const;     /**< The set of attackers to a location on the board. */
-    bool            IsAttacked (uint8_t location, Color color) const;     /**< Determine if location is attacked by color. */
+    void            AddPiece   (Color color, Piece piece, Square to);       /**< Place a piece on the board. */
+    Bitboard        AttacksTo  (Square location, Color color) const;        /**< The set of attackers to a location on the board. */
+    bool            IsAttacked (Square location, Color color) const;        /**< Determine if location is attacked by color. */
     bool            IsLegal() const;                                        /**< Is this a legal chess position. */
     bool            IsCheckmate() const;                                    /**< Is this position checkmate. */
     bool            IsDrawByFiftyMoves() const;                             /**< Is this position a dfraw by the 50 move rule. */
@@ -102,7 +102,7 @@ struct Position
     }
 
 private:
-    template <bool do_all_moves> MoveList GenerateMoves() const;                /**< Prototype function to generate pseudo legal moves. */
-    void RemovePiece(Color color, Piece piece, Square from);               /**< Remove a piece from the board. */
-    void MovePiece  (Color color, Piece piece, Square from, Square to);   /**< Move a piece on the board. */
+    template <bool do_all_moves> MoveList GenerateMoves() const;            /**< Prototype function to generate pseudo legal moves. */
+    void RemovePiece(Color color, Piece piece, Square from);                /**< Remove a piece from the board. */
+    void MovePiece  (Color color, Piece piece, Square from, Square to);     /**< Move a piece on the board. */
 };

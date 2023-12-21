@@ -471,7 +471,7 @@ Position::operator std::string() const
  * @param color attacking color
  * @return true if color attacks position, otherwise false
 */
-bool Position::IsAttacked(uint8_t location, Color color) const
+bool Position::IsAttacked(Square location, Color color) const
 {
     const Sets& sets = SETS[location];
     const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
@@ -520,7 +520,7 @@ bool Position::IsAttacked(uint8_t location, Color color) const
  * @param color Attacking color.
  * @return Set of squares of color containing a piece attacking location.
  */
-Bitboard Position::AttacksTo(uint8_t location, Color color) const
+Bitboard Position::AttacksTo(Square location, Color color) const
 {
     const Sets& sets = SETS[location];
     const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
@@ -570,7 +570,7 @@ Bitboard Position::AttacksTo(uint8_t location, Color color) const
  */
 bool Position::IsLegal() const
 {
-    const Color color       = ColorToMove();
+    const Color color         = ColorToMove();
     const Bitboard white_king = kings_ & white_pieces_;
     const Bitboard black_king = kings_ & black_pieces_;
     return
