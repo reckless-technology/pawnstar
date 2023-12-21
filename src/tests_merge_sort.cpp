@@ -7,7 +7,6 @@
 
 bool RunMergeSortTests(void)
 {
-
     MoveList values {};
     for (int run = 0; run != 100000; ++run)
     {

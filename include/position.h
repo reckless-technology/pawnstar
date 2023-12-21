@@ -114,7 +114,7 @@ struct Position
     constexpr uint8_t ColorToMove() const
     { 
         return flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE; 
-    }                                                                           /**< Return whose turn it is to move. */
+    }
 
 private:
     template <bool do_all_moves> MoveList GenerateMoves() const;                /**< Prototype function to generate pseudo legal moves. */

@@ -53,7 +53,7 @@ static inline std::string MoveString(Move m)
 }
 
 int     GetMilliseconds(void);
-int     EvaluateStaticExchange(const Position& src_position, Move move);
+int     EvaluateStaticExchange(const Position& src_position, Move move, bool& is_checking);
 void    RecordKillerMove(int ply, Move move);
 void    ResetKillerCounts();
 void    ScoreAndSortMoves(const Position& position, MoveList& moves, int ply, int depth);

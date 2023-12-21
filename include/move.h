@@ -17,8 +17,9 @@
  * 21 - 21  Castling move flag
  * 22 - 22  En passant capture flag
  * 23 - 23  Pawn double push flag
- * 32 - 63  May contain move score (as signed 32 bit int) 
- *          after move has been evaluated / scored
+ * 24 - 24  Is checking move flag (move gives check)
+ * 32 - 63  Contains the move score (as signed 32 bit int) 
+ *          after move has been evaluated / sorted
  * 
  * A value of 0 terminates a move list.
 */
@@ -56,17 +57,19 @@ constexpr Move DoublePushMove(uint8_t from, uint8_t to)                         
 constexpr Move CaptureMove   (uint8_t from, uint8_t to, uint8_t piece, uint8_t captured)    { return to|(from<<6)|(piece<<12)|(captured<<15);                }
 constexpr Move NonCaptureMove(uint8_t from, uint8_t to, uint8_t piece)                      { return to|(from<<6)|(piece<<12);                               }
 
-constexpr uint8_t   MoveTo(Move m)                  { return  m        & 0x3F;      }
-constexpr uint8_t   MoveFrom(Move m)                { return (m >>  6) & 0x3F;      }
-constexpr uint8_t   MovePiece(Move m)               { return (m >> 12) & 0x07;      }
-constexpr uint8_t   MoveCaptured(Move m)            { return (m >> 15) & 0x07;      }
-constexpr uint8_t   MovePromoted(Move m)            { return (m >> 18) & 0x07;      }
-constexpr bool      IsCastlingMove(Move m)          { return  m        & (1 << 21); }
-constexpr bool      IsEpCaptureMove(Move m)         { return  m        & (1 << 22); }
-constexpr bool      IsPawnDoublePushMove(Move m)    { return  m        & (1 << 23); }
-constexpr int       MoveScore(Move m)               { return  (int)(m >> 32);       }
-constexpr uint32_t  MoveBits(Move m)                { return  m & 0xFFFFFFFF;       }
-constexpr Move      ScoredMove(Move m, int score)   { return (m & 0xFFFFFFFF) | ((int64_t)score << 32); }
+constexpr uint8_t   MoveTo(Move m)                          { return  m        & 0x3F;                                      }
+constexpr uint8_t   MoveFrom(Move m)                        { return (m >>  6) & 0x3F;                                      }
+constexpr uint8_t   MovePiece(Move m)                       { return (m >> 12) & 0x07;                                      }
+constexpr uint8_t   MoveCaptured(Move m)                    { return (m >> 15) & 0x07;                                      }
+constexpr uint8_t   MovePromoted(Move m)                    { return (m >> 18) & 0x07;                                      }
+constexpr bool      IsCastlingMove(Move m)                  { return  m        & (1 << 21);                                 }
+constexpr bool      IsEpCaptureMove(Move m)                 { return  m        & (1 << 22);                                 }
+constexpr bool      IsPawnDoublePushMove(Move m)            { return  m        & (1 << 23);                                 }
+constexpr bool      IsCheckingMove(Move m)                  { return  m        & (1 << 24);                                 }
+constexpr int       MoveScore(Move m)                       { return  (int)(m >> 32);                                       }
+constexpr uint32_t  MoveBits(Move m)                        { return  m & 0x00FFFFFF;                                       }
+constexpr Move      ScoredCheckingMove(Move m, int score)   { return (m & 0x00FFFFFF) | (1 << 24) | ((int64_t)score << 32); }
+constexpr Move      ScoredMove(Move m, int score)           { return (m & 0x00FFFFFF) |             ((int64_t)score << 32); }
 
 typedef std::vector<Move> Variation;
 typedef std::vector<Move> MoveList;

@@ -27,7 +27,8 @@ void RunStaticExchangeTests(void)
     {
         Position position { test->fen_string };
         string move_string { position.MoveToString(test->move) };
-        int score = EvaluateStaticExchange(position, test->move);
+        bool is_checking;
+        int score = EvaluateStaticExchange(position, test->move, is_checking);
         printf("\n%s\nSEE for %s = %d\n", test->fen_string, move_string.c_str(), score);
         is_pass &= (score == test->see_score);
 

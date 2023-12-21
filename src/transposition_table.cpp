@@ -1,3 +1,5 @@
+#include <vector>
+
 #include "position.h"
 #include "debug_hashtable.h"
 #include "transposition_table.h"
@@ -5,8 +7,7 @@
 
 static bool IsPrime(size_t x);
 
-static Transposition*   transposition_table;
-static size_t           table_num_entries;
+static std::vector<Transposition> transposition_table;
 
 /**
  * @brief Delete the transposition table.
@@ -14,12 +15,7 @@ static size_t           table_num_entries;
 void 
 FreeTranspositionTable()
 {
-    if (transposition_table)
-    {
-        delete[] transposition_table;
-        transposition_table = NULL;
-        table_num_entries   = 0;
-    } 
+    transposition_table.clear();
 }
 
 /**
@@ -27,28 +23,21 @@ FreeTranspositionTable()
  * @param megabytes Approx max size of the table in megabytes. May be slightly smaller (table is prime size).
  * @return true on success
  */
-bool 
-InitializeTranspositionTable(int megabytes)
+void 
+InitializeTranspositionTable(size_t megabytes)
 {
-    FreeTranspositionTable();
-    table_num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
+    size_t num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
     /* Find the next smallest prime number and make the table that size */
-    if ((table_num_entries & 1) == 0)
+    if ((num_entries & 1) == 0)
     {
-        --table_num_entries;
+        --num_entries;
     }
-    while (!IsPrime(table_num_entries))
+    while (!IsPrime(num_entries))
     {
-        table_num_entries -= 2;
+        num_entries -= 2;
     }
-    transposition_table = new Transposition[table_num_entries];
-    if (!transposition_table)
-    {
-        printf("ERROR: unable to create transposition transposition_table of %u megabytes\n", megabytes);
-        table_num_entries = 0;
-        return false;
-    }
-    return true;
+    transposition_table.clear();
+    transposition_table.resize(num_entries);
 }
 
 /**
@@ -58,10 +47,10 @@ InitializeTranspositionTable(int megabytes)
  * @return true on success
  */
 bool 
-FindTransposition(uint64_t hash, 
+FindTransposition(uint64_t       hash, 
                   Transposition& transposition)
 {
-    const Transposition& t = transposition_table[hash % table_num_entries];
+    const Transposition& t = transposition_table[hash % transposition_table.size()];
     if (t.hash == hash)
     {
         transposition = t;
@@ -85,7 +74,7 @@ RecordTransposition(uint64_t hash,
                     Move     move, 
                     int      node_type)
 {   
-    Transposition& t = transposition_table[hash % table_num_entries];
+    Transposition& t = transposition_table[hash % transposition_table.size()];
     if (t.hash == 0 || t.hash == hash || t.is_previous || t.depth < depth)
     {
         t.hash          = hash;
@@ -101,7 +90,7 @@ void
 ShowTableUsage()
 {
     size_t count = 0;
-    for (size_t i = 0; i != table_num_entries; ++i)
+    for (size_t i = 0; i != transposition_table.size(); ++i)
     {
         if (transposition_table[i].hash != 0)
         {
@@ -110,18 +99,18 @@ ShowTableUsage()
     }
     printf("Transposition table used %zu of %zu entries (%zu%% full)\n", 
         count, 
-        table_num_entries,
-        (count * 100) / table_num_entries);
+        transposition_table.size(),
+        (count * 100) / transposition_table.size());
 }
 
 void
 AgeTranspositionTable()
 {
-    for (size_t i = 0; i != table_num_entries; ++i)
+    for (auto& t : transposition_table)
     {
-        if (transposition_table[i].hash != 0)
+        if (t.hash == 0)
         {
-            transposition_table[i].is_previous = true;
+            t.is_previous = true;
         }
     }
 }

@@ -261,7 +261,7 @@ EvaluatePawnStructure(const PawnStructure& ps)
     {
         score += PASSED_PAWN_SQUARE[FindAndClearLsb(b) ^ rank_flip];
     }
-    score -= PopCount(ps.backward_pawns) * 10;
+    score -= PopCount(ps.backward_pawns) * 20;
     score -= PopCount(ps.doubled_pawns)  * 10;
     score -= PopCount(ps.isolated_pawns) * 20;
     return score;

@@ -48,12 +48,20 @@ ScoreAndSortMoves(const Position&   position,
         Assign provisional scores based on static exchange evaluation
         and how many cutoffs this move has caused in the search history.
         */
-        const int see_score = EvaluateStaticExchange(position, move);
+        bool is_checking;
+        const int see_score = EvaluateStaticExchange(position, move, is_checking);
         if (see_score == MOVED_INTO_CHECK_SCORE)
         {
             continue;
         }
-        legal_moves.push_back(ScoredMove(move, see_score * 1000 + counts[move & 0x7FFF]));
+        if (is_checking)
+        {
+            legal_moves.push_back(ScoredCheckingMove(move, see_score * 1000 + counts[move & 0x7FFF]));
+        }
+        else
+        {
+            legal_moves.push_back(ScoredMove(move, see_score * 1000 + counts[move & 0x7FFF]));
+        }
     }
     moves.swap(legal_moves);
     SortMoves(moves, false);

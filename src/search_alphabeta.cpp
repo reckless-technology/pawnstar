@@ -15,7 +15,7 @@
  * @param beta Score ceiling (opponent's floor)
  * @return beta on success, alpha on failure
  */
-static inline int 
+static inline int
 AttemptNullMove(Game& game, 
                 int   depth, 
                 int   ply, 
@@ -67,11 +67,11 @@ AttemptNullMove(Game& game,
  * @param color Color to move
  * @return true if OK to reduce
  */
-static inline bool 
+static inline bool
 IsMoveOkToReduce(Move move, uint8_t color)
 {
     static const uint8_t seventh_rank[2] = { 6, 1 };
-    if (MoveScore(move) >= 0)
+    if (IsCheckingMove(move))
     {
         return false;
     }
@@ -261,22 +261,14 @@ Search(Game&        game,
         if (!(position.flags_ & IS_CHECK)               &&
             !(position.flags_ & HAS_BEEN_REDUCED)       &&
             beta == alpha + 1                           &&
-            num_legal_moves * 3 > (int)move_list.size() &&
-            depth > 2                                   &&
+            num_legal_moves > 0                         &&
+            depth > 3                                   &&
             IsMoveOkToReduce(move, position.ColorToMove()))
         {
             game.PlayMove(move);
-            if (!(game.position_->flags_ & IS_CHECK))
-            {
-                INCREMENT("late move reductions");
-                game.position_->flags_ |= HAS_BEEN_REDUCED;
-                score = -Search(game, depth - 2, ply + 1, -beta, -alpha, pv);
-            }
-            else
-            {
-                /* Move gave check so do not reduce. */
-                score = -Search(game, depth - 1, ply + 1, -beta, -alpha, pv);
-            }
+            INCREMENT("late move reductions");
+            game.position_->flags_ |= HAS_BEEN_REDUCED;
+            score = -Search(game, depth - 2, ply + 1, -beta, -alpha, pv);
             game.UndoMove();
         }
         else

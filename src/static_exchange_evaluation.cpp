@@ -13,13 +13,14 @@ static const int piece_values[7] = { 0, 100, 300, 300, 500, 900, 10000 };
 Determine the SEE (static exchange evaluation) for a move.
 Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
 */
-int EvaluateStaticExchange(const Position& src_position, Move move)
+int EvaluateStaticExchange(const Position& src_position, Move move, bool& is_checking)
 {
     Position position { src_position, move };
     if (position.flags_ & IS_MOVED_INTO_CHECK)
     {
         return MOVED_INTO_CHECK_SCORE;
     }
+    is_checking = !!(position.flags_ & IS_CHECK);
     if (MovePromoted(move))
     {
         return 
