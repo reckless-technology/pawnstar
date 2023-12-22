@@ -2,14 +2,17 @@
 
 using namespace std::chrono;
 
-extern int GetMilliseconds(void)
+static system_clock::time_point start_time;
+static bool has_been_called;
+
+int GetMilliseconds()
 {
-    static long long start_ms = 0;
-    if (start_ms == 0)
+    if (!has_been_called)
     {
-        start_ms = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
+        has_been_called = true;
+        start_time = system_clock::now();
         return 0;
     }
-    const long long now_ms = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
-    return static_cast<int>(now_ms - start_ms);
+    const auto now_time = system_clock::now();
+    return duration_cast<milliseconds>(now_time - start_time).count();
 }

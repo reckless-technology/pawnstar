@@ -28,7 +28,7 @@
 struct DebugEntry
 {
     const char* key;
-    int        count;
+    uint32_t    count;
 };
 
 extern DebugEntry debug_dict[DEBUG_DICT_SIZE];

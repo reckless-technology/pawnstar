@@ -12,7 +12,7 @@ using std::string;
 /*
 Structure to hold the counts of different move types
 */
-typedef struct
+struct PerftCounts
 {
     uint64_t legal_moves;
     uint64_t captures;
@@ -20,7 +20,9 @@ typedef struct
     uint64_t castles;
     uint64_t promotions;
     uint64_t checks;
-} PerftCounts;
+
+    bool operator==(const PerftCounts&) const = default;
+};
 /*
 Structure to hold a single perft test
 */
@@ -102,7 +104,7 @@ Refer to:
 http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
 */
-static const PerftTest perft_tests[] =
+static constexpr PerftTest perft_tests[] =
 {/*    position                                                            depth      nodes   captures      ep   castles promotions   checks */
     { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",                6, { 119060324,   2812008,   5248,        0,        0,   809099 } },
     { "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -",    5, { 193690690,  35043416,  73365,  4993637,     8392,  3309887 } },
@@ -110,7 +112,6 @@ static const PerftTest perft_tests[] =
     { "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq -",        6, { 706045033, 210369132,    212, 10882006, 81102984, 26973664 } },
     { "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ -",               5, {  89941194,  12320378,    140,  1240828,  6655216,  3078299 } },
     { "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - -", 5, { 164075551,  19528068,    122,        0,        0,  2998608 } },
-    { NULL,                                                                  0, {         0,         0,      0,        0,        0,        0 } },
 };
 /*
 Categorize a null-terminated set of pseudo-legal moves into strictly-legal
@@ -197,27 +198,25 @@ Run perft test on the standard test positions
 void 
 RunPerftTests(void)
 {
-    PerftCounts counts;
     int start, first_start, stop = 0;
     bool is_good = true;
     uint64_t total_nodes = 0;
-    const PerftTest* test;
     first_start = GetMilliseconds();
-    for (test = perft_tests; test->position; ++test)
+    for (auto& test : perft_tests)
     {
-        Position position { test->position };
-        string pos_string = position.operator std::string();
+        Position position { test.position };
+        string pos_string { position };
         printf("\n%s\n", pos_string.c_str());
-        memset(&counts, 0, sizeof(counts));
-        total_nodes += test->counts.legal_moves;
+        PerftCounts counts { 0, 0, 0, 0, 0, 0 };
+        total_nodes += test.counts.legal_moves;
         start = GetMilliseconds();
-        Perft(position, test->depth, position.ColorToMove(), counts);
+        Perft(position, test.depth, position.ColorToMove(), counts);
         stop = GetMilliseconds();
         if (stop == start)
         {
             stop = start + 1; // avoid divide by zero error in positions per second for short tests
         }
-        printf("\rdepth                                   %10d\n",          test->depth);
+        printf("\rdepth                                   %10d\n",          test.depth);
         printf(  "positions                               %10" PRIu64 "\n", counts.legal_moves);
         printf(  "captures                                %10" PRIu64 "\n", counts.captures);
         printf(  "ep captures                             %10" PRIu64 "\n", counts.ep_captures);
@@ -226,7 +225,7 @@ RunPerftTests(void)
         printf(  "checks                                  %10" PRIu64 "\n", counts.checks);
         printf(  "elapsed milliseconds                    %10d\n",          stop - start);
         printf(  "positions per second                    %10" PRIu64 "\n", counts.legal_moves * 1000 / (stop - start));
-        if (!!memcmp(&counts, &test->counts, sizeof(PerftCounts)))
+        if (counts != test.counts)
         {
             printf("************* ERROR on this position *************\n");
             is_good = false;

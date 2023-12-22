@@ -8,6 +8,10 @@
 
 static bool IsPrime(size_t x);
 
+/**
+ * Transposition table is just a vector of Transpositions, which
+ * we index by using the Zobrist hash of the position.
+*/
 static std::vector<Transposition> table;
 
 /**
@@ -76,7 +80,7 @@ RecordTransposition(uint64_t hash,
                     int      node_type)
 {   
     Transposition& t = table[hash % table.size()];
-    if (t.hash == 0 || t.hash == hash || t.is_old || t.depth < depth)
+    if (t.hash == 0 || t.is_old || t.depth < depth)
     {
         t.hash      = hash;
         t.move      = move;

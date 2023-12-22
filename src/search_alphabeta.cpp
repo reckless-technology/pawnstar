@@ -115,7 +115,7 @@ Search(Game&        game,
         game.is_cancel_pending_ = true;
         return SEARCH_CANCELLED_SCORE;
     }
-    Position& position = *game.position_;
+    const Position& position = *game.position_;
     if (position.IsDrawByMaterial  () ||
         position.IsDrawByFiftyMoves() ||
         position.IsDrawByRepetition(true))

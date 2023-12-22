@@ -24,7 +24,7 @@ struct PawnStructure
     Bitboard doubled_pawns;
 };
 
-const int PAWN_SQUARE[64] =
+constexpr int PAWN_SQUARE[64] =
 {
      0,  0,  0,  0,  0,  0,  0,  0,
     25, 25, 25, 25, 25, 25, 25, 25,
@@ -36,7 +36,7 @@ const int PAWN_SQUARE[64] =
      0,  0,  0,  0,  0,  0,  0,  0
 };
 
-const int KNIGHT_SQUARE[64] =
+constexpr int KNIGHT_SQUARE[64] =
 {
    -50,-40,-30,-30,-30,-30,-40,-50,
    -40,-20,  0,  0,  0,  0,-20,-40,
@@ -48,7 +48,7 @@ const int KNIGHT_SQUARE[64] =
    -50,-40,-30,-30,-30,-30,-40,-50,
 };
 
-const int BISHOP_SQUARE[64] = 
+constexpr int BISHOP_SQUARE[64] = 
 {
    -20,-10,-10,-10,-10,-10,-10,-20,
    -10,  0,  0,  0,  0,  0,  0,-10,
@@ -60,7 +60,7 @@ const int BISHOP_SQUARE[64] =
    -20,-10,-10,-10,-10,-10,-10,-20,
 };
 
-const int ROOK_SQUARE[64] = 
+constexpr int ROOK_SQUARE[64] = 
 {
      0,  0,  0,  0,  0,  0,  0,  0,
      5, 10, 10, 10, 10, 10, 10,  5,
@@ -72,7 +72,7 @@ const int ROOK_SQUARE[64] =
     -5,  0,  0,  5,  5,  0,  0, -5,
 };
 
-const int QUEEN_SQUARE[64] = 
+constexpr int QUEEN_SQUARE[64] = 
 {
    -20,-10,-10, -5, -5,-10,-10,-20,
    -10,  0,  0,  0,  0,  0,  0,-10,
@@ -84,7 +84,7 @@ const int QUEEN_SQUARE[64] =
    -20,-10,-10, -5, -5,-10,-10,-20
 };
 
-const int KING_SQUARE_MIDGAME[64] =
+constexpr int KING_SQUARE_MIDGAME[64] =
 {
    -40,-40,-40,-40,-40,-40,-40,-40,
    -40,-40,-40,-40,-40,-40,-40,-40,
@@ -96,7 +96,7 @@ const int KING_SQUARE_MIDGAME[64] =
      0, 40, 20,-20,  0,-20, 40, 20
 };
 
-const int KING_SQUARE_ENDGAME[64] =
+constexpr int KING_SQUARE_ENDGAME[64] =
 {
      0, 10, 20, 30, 30, 20, 10,  0,
     10, 20, 30, 40, 40, 30, 20, 10,
@@ -108,7 +108,7 @@ const int KING_SQUARE_ENDGAME[64] =
      0, 10, 20, 30, 30, 20, 10,  0
 };
 
-const int PASSED_PAWN_SQUARE[64] = 
+constexpr int PASSED_PAWN_SQUARE[64] = 
 {
      0,  0,  0,  0,  0,  0,  0,  0,
     50, 50, 50, 50, 50, 50, 50, 50, /* all pawns are "passed" at 7th rank */
@@ -120,10 +120,11 @@ const int PASSED_PAWN_SQUARE[64] =
      0,  0,  0,  0,  0,  0,  0,  0,
 };
 
-const Bitboard FILE_BITBOARDS[8] = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
+constexpr Bitboard FILE_BITBOARDS[8] = { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H };
 
 template<Color color> void
-DeterminePawnStructure(const Position& position, PawnStructure& s)
+DeterminePawnStructure(const Position& position, 
+                       PawnStructure&  s)
 {
     const Bitboard friendly_pawns = position.pawns_ & position.pieces_of_color_[color];
     const Bitboard enemy_pawns    = position.pawns_ ^ friendly_pawns;
@@ -225,7 +226,6 @@ EvaluatePieceSquare(const Position& position)
     {
         score += KNIGHT_SQUARE[FindAndClearLsb(b) ^ rank_flip];
     }
-    /* For bishops and rooks we use mobility as well as piece square */
     b = position.bishops_ & friendly_pieces;
     while (b)
     {
