@@ -46,7 +46,7 @@ int SearchQuiescent(Game &game,
     int best_score = score;
     MoveList move_list{game.position_->GeneratePseudoLegalCaptures()};
     ScoreAndSortMoves(*game.position_, move_list, ply, depth);
-    for (const auto &move : move_list)
+    for (Move move : move_list)
     {
         if (MoveScore(move) < 0)
         {

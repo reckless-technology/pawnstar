@@ -16,7 +16,7 @@ struct Game
     Position    stack_[MAX_GAME_LENGTH]; /**< position stack                                 */
     TimeControl time_control_;           /**< Clock controls for the current game            */
     int         node_count_;             /**< Number of nodes (positions) during search      */
-    int         engine_color_;           /**< The color which pawnstar is playing            */
+    Color       engine_color_;           /**< The color which pawnstar is playing            */
     bool        do_show_thinking_;       /**< Whether to show scores and PV during search    */
     bool        is_cancel_pending_;
 

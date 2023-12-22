@@ -9,4 +9,4 @@ struct Position;
 bool    InitializeOpeningBookFromFile(std::string_view filename);
 void    DisplayAvailableBookMoves(const Position& position);
 Move    GetBookMove(uint64_t hash);
-void    FreeOpeningBook(void);
+void    FreeOpeningBook();

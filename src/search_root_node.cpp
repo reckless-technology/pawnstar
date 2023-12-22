@@ -23,13 +23,12 @@ Move SearchRootNode(Game& game)
         return book_move;
     } 
     MoveList move_list = game.position_->GenerateLegalMoves();
-    int num_legal_moves = (int)move_list.size();
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
-    if (num_legal_moves == 0)
+    if (move_list.size() == 0)
     {
         return 0;
     }
-    if (num_legal_moves == 1)
+    if (move_list.size() == 1)
     {
         return move_list[0];
     }  
@@ -78,7 +77,7 @@ Move SearchRootNode(Game& game)
     AgeTranspositionTable();
     Variation principal_variation {};
     Move best_moves[MAX_PLY]; /* Best move found at each ply of search. */
-    for (int i = 0; i != num_legal_moves; ++i)
+    for (size_t i = 0; i != move_list.size(); ++i)
     {
         const int score = SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i], principal_variation, i);
         move_list[i] = ScoredMove(move_list[i], score);
@@ -96,7 +95,7 @@ Move SearchRootNode(Game& game)
         Variation child_pv {};
         int alpha = ALPHA;
         game.node_count_ = 0;
-        for (int i = 0; i != num_legal_moves; ++i)
+        for (size_t i = 0; i != move_list.size(); ++i)
         {
             const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list[i], child_pv, i);
             move_list[i] = ScoredMove(move_list[i], score);

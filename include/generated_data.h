@@ -74,7 +74,7 @@ struct PawnSets
  * 
  * To get sliding move targets without branches or loops we use:
  * 
- * m->attacks[m->indices[((occupied_squares & m->occupancy_mask) * m->magic) >> m->shift]]
+ * m.attacks[m.indices[((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]]
  * 
  * The magic bitboard sets are generated at compile time by 
  * compiling and then running "generate_constants.cpp"

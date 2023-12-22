@@ -214,7 +214,6 @@ EvaluatePieceSquare(const Position& position)
 {
     constexpr int rank_flip = (color == WHITE ? RANK_FLIP : 0);
     const Bitboard friendly_pieces = position.pieces_of_color_[color];
-    const Bitboard occupied_squares = position.white_pieces_ | position.black_pieces_;
     int score = 0;
     Bitboard b = position.pawns_ & friendly_pieces;
     while (b)
@@ -230,18 +229,12 @@ EvaluatePieceSquare(const Position& position)
     b = position.bishops_ & friendly_pieces;
     while (b)
     {
-        const Square locn = FindAndClearLsb(b);
-        score += BISHOP_SQUARE[locn ^ rank_flip];
-        const Bitboard moves = BishopAttacks(occupied_squares, locn);
-        score += 3 * (PopCount(moves) - 5);
+        score += BISHOP_SQUARE[FindAndClearLsb(b) ^ rank_flip];
     }
     b = position.rooks_ & friendly_pieces;
     while (b)
     {
-        const Square locn = FindAndClearLsb(b);
-        score += ROOK_SQUARE[locn ^ rank_flip];
-        const Bitboard moves = RookAttacks(occupied_squares, locn);
-        score += 3 * (PopCount(moves) - 7);
+        score += ROOK_SQUARE[FindAndClearLsb(b) ^ rank_flip];
     }
     b = position.queens_ & friendly_pieces;
     while (b)

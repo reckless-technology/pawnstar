@@ -56,7 +56,7 @@ Position::MakeNullMove(Position& dst_position) const
     dst_position.flags_ ^= IS_BLACK_TO_MOVE;
     dst_position.hash_ ^= EN_PASSANT_HASHES[dst_position.en_passant_index_];
     dst_position.hash_ ^= BLACK_MOVE_HASH;
-    dst_position.en_passant_index_ = (Square)0;
+    dst_position.en_passant_index_ = NO_SQUARE;
 }
 
 void 
@@ -109,7 +109,7 @@ Position::Position(const Position& previous, Move move) noexcept
     hash_ ^= CASTLING_RIGHTS_HASHES[flags_          & CASTLING_RIGHTS_MASK] 
            ^ CASTLING_RIGHTS_HASHES[previous.flags_ & CASTLING_RIGHTS_MASK];
     hash_ ^= EN_PASSANT_HASHES[en_passant_index_];
-    en_passant_index_ = (Square)0;
+    en_passant_index_ = NO_SQUARE;
     ++reversible_move_count_;
     switch (piece)
     {
@@ -345,7 +345,7 @@ Position::Position(std::string_view fen_string) noexcept
     }
     if (ep_square == "-")
     {
-        en_passant_index_ = (Square)0;
+        en_passant_index_ = NO_SQUARE;
     }
     else
     {

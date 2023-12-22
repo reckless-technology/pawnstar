@@ -43,7 +43,9 @@ AttemptNullMove(Game& game,
         INCREMENT("null move attempts");
         game.MakeNullMove();
         Variation dummy {};
-        int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
+        int score = depth > 3 ? 
+            -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy) : 
+            -SearchQuiescent(game, depth - 3, ply + 1, -beta, -alpha);
         game.UndoMove();
         if (game.is_cancel_pending_)
         {
@@ -261,8 +263,8 @@ Search(Game&        game,
         if (!(position.flags_ & IS_CHECK)               &&
             !(position.flags_ & HAS_BEEN_REDUCED)       &&
             beta == alpha + 1                           &&
-            num_legal_moves > 0                         &&
-            depth > 3                                   &&
+            num_legal_moves > 1                         &&
+            depth > 2                                   &&
             IsMoveOkToReduce(move, position.ColorToMove()))
         {
             game.PlayMove(move);

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <vector>
 #include <string>
 
 #include "bitboard.h"
@@ -10,30 +9,30 @@
 struct Position;
 struct Game;
 
-constexpr uint8_t   FileOf(int locn)    { return locn & 7;                          }
-constexpr uint8_t   RankOf(int locn)    { return locn >> 3;                         }
-constexpr char      FileChar(int locn)  { return 'a' + FileOf(locn);                }
-constexpr char      RankChar(int locn)  { return '1' + RankOf(locn);                }
-constexpr Color     EnemyOf(Color color){ return color == WHITE ? BLACK : WHITE;    }
-constexpr int       min(int a, int b)   { return a < b ? a : b;                     }
-constexpr int       max(int a, int b)   { return a > b ? a : b;                     }
+constexpr uint8_t   FileOf(Square locn)     { return locn & 7;                          }
+constexpr uint8_t   RankOf(Square locn)     { return locn >> 3;                         }
+constexpr char      FileChar(Square locn)   { return 'a' + FileOf(locn);                }
+constexpr char      RankChar(Square locn)   { return '1' + RankOf(locn);                }
+constexpr Color     EnemyOf(Color color)    { return color == WHITE ? BLACK : WHITE;    }
+constexpr int       min(int a, int b)       { return a < b ? a : b;                     }
+constexpr int       max(int a, int b)       { return a > b ? a : b;                     }
 
 constexpr Bitboard 
-BishopAttacks(Bitboard occupied_squares, uint8_t location)
+BishopAttacks(Bitboard occupied_squares, Square location)
 {
     const MagicMoveEntry& m = BISHOP_MAGICS[location];
     return m.attacks[m.indices[((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
 }
 
 constexpr Bitboard 
-RookAttacks(Bitboard occupied_squares, uint8_t location)
+RookAttacks(Bitboard occupied_squares, Square location)
 {
     const MagicMoveEntry& m = ROOK_MAGICS[location];
     return m.attacks[m.indices[((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
 }
 
 constexpr Bitboard 
-QueenAttacks(Bitboard occupied_squares, uint8_t location)
+QueenAttacks(Bitboard occupied_squares, Square location)
 {
     return BishopAttacks(occupied_squares, location) | RookAttacks(occupied_squares, location);
 }
