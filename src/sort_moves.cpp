@@ -42,7 +42,7 @@ ScoreAndSortMoves(const Position&   position,
     MoveList legal_moves {};
     legal_moves.reserve(64);
     const uint32_t* const counts = &killer_move_counts[ply][0];
-    for (const auto& move : moves)
+    for (Move move : moves)
     {
         /* 
         Assign provisional scores based on static exchange evaluation

@@ -1,8 +1,10 @@
 #include <string>
+#include <string_view>
 #include <cstring>
 #include <cinttypes>
 
 using std::string;
+using std::string_view;
 
 #include "position.h"
 #include "debug_hashtable.h"
@@ -28,7 +30,7 @@ Structure to hold a single perft test
 */
 typedef struct
 {
-    const char* position;
+    string_view position;
     int         depth;
     PerftCounts counts;
 } PerftTest;
@@ -104,7 +106,7 @@ Refer to:
 http://chessprogramming.wikispaces.com/Perft
 http://chessprogramming.wikispaces.com/Perft+Results
 */
-static constexpr PerftTest perft_tests[] =
+constexpr PerftTest perft_tests[] =
 {/*    position                                                            depth      nodes   captures      ep   castles promotions   checks */
     { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",                6, { 119060324,   2812008,   5248,        0,        0,   809099 } },
     { "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -",    5, { 193690690,  35043416,  73365,  4993637,     8392,  3309887 } },
@@ -117,12 +119,12 @@ static constexpr PerftTest perft_tests[] =
 Categorize a null-terminated set of pseudo-legal moves into strictly-legal
 moves of various types, storing the result in counts
 */
-static void 
+static inline void 
 CategorizeMoves(const Position& src_position, 
                 const MoveList& move_list, 
                 PerftCounts&    counts)
 {
-    for (auto move : move_list)
+    for (Move move : move_list)
     {
         Position position { src_position, move };
         if (position.flags_ & IS_MOVED_INTO_CHECK)
@@ -165,7 +167,7 @@ Perft(const Position& src_position,
       Color           color, 
       PerftCounts&    counts)
 {
-    static int call_count = 0;
+    static uint32_t call_count = 0;
     MoveList move_list = src_position.GeneratePseudoLegalMoves();
     ScoreAndSortMoves(src_position, move_list, 0, 0);
     if (!(++call_count & 0x3FFFF))
@@ -174,7 +176,7 @@ Perft(const Position& src_position,
     }
     if (depth > 1)
     {
-        for (const auto move : move_list)
+        for (Move move : move_list)
         {
             Position position { src_position, move };
             if (position.hash_ != position.ComputeHash())
@@ -202,7 +204,7 @@ RunPerftTests(void)
     bool is_good = true;
     uint64_t total_nodes = 0;
     first_start = GetMilliseconds();
-    for (auto& test : perft_tests)
+    for (const PerftTest& test : perft_tests)
     {
         Position position { test.position };
         string pos_string { position };
@@ -216,15 +218,15 @@ RunPerftTests(void)
         {
             stop = start + 1; // avoid divide by zero error in positions per second for short tests
         }
-        printf("\rdepth                                   %10d\n",          test.depth);
-        printf(  "positions                               %10" PRIu64 "\n", counts.legal_moves);
-        printf(  "captures                                %10" PRIu64 "\n", counts.captures);
-        printf(  "ep captures                             %10" PRIu64 "\n", counts.ep_captures);
-        printf(  "castles                                 %10" PRIu64 "\n", counts.castles);
-        printf(  "promotions                              %10" PRIu64 "\n", counts.promotions);
-        printf(  "checks                                  %10" PRIu64 "\n", counts.checks);
-        printf(  "elapsed milliseconds                    %10d\n",          stop - start);
-        printf(  "positions per second                    %10" PRIu64 "\n", counts.legal_moves * 1000 / (stop - start));
+        printf("\rdepth                     %10d\n",          test.depth);
+        printf(  "positions                 %10" PRIu64 "\n", counts.legal_moves);
+        printf(  "captures                  %10" PRIu64 "\n", counts.captures);
+        printf(  "ep captures               %10" PRIu64 "\n", counts.ep_captures);
+        printf(  "castles                   %10" PRIu64 "\n", counts.castles);
+        printf(  "promotions                %10" PRIu64 "\n", counts.promotions);
+        printf(  "checks                    %10" PRIu64 "\n", counts.checks);
+        printf(  "elapsed milliseconds      %10d\n",          stop - start);
+        printf(  "positions per second      %10" PRIu64 "\n", counts.legal_moves * 1000 / (stop - start));
         if (counts != test.counts)
         {
             printf("************* ERROR on this position *************\n");

@@ -60,7 +60,7 @@ void    SortMoves(MoveList& moves, bool is_stable_sort);
 int     EvaluatePosition(const Position& position, int alpha, int beta);
 bool    RunMergeSortTests(void);
 void    RunPerftTests(void);
-void    RunPositionTests(Game& game, int depth);
+void    RunPositionTests(int depth);
 void    RunStaticExchangeTests(void);
 int     NextRandom(void);
 void    ProcessInput(Game& game, char* line);

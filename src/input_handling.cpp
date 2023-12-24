@@ -47,7 +47,7 @@ static void handle_postests(Game& game, int argc, char* argv[])
             depth = d;
         }
     }    
-    RunPositionTests(game, depth);
+    RunPositionTests(depth);
     (void)game;
 }
 

@@ -11,7 +11,7 @@ using std::string_view;
 /*
 Standard Bratko-Kopec test positions
 */
-static constexpr const char* POSITION_TESTS[] = {
+constexpr string_view POSITION_TESTS[] = {
     "1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -",
     "3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - -",
     "2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - -",
@@ -41,24 +41,20 @@ static constexpr const char* POSITION_TESTS[] = {
 /*
 Run the standard Bratko-Kopec test suite at fixed search depth
 */
-void RunPositionTests(Game &game, int depth)
+void RunPositionTests(int depth)
 {
-    int first_start;
-    const TimeControl prev_time_control = game.time_control_;
-    first_start = GetMilliseconds();
-    for (auto test : POSITION_TESTS)
+    const int start_ms = GetMilliseconds();
+    for (string_view test_pos : POSITION_TESTS)
     {
-        game = Game(test);
+        Game game { test_pos };
         game.time_control_.clock_type = CLOCK_FIXED_DEPTH;
         game.time_control_.fixed_depth.depth = depth;
         game.do_show_thinking_ = true;
-        printf("\n%s\n", test);
+        printf("\n%s\n", game.position_->operator std::string().c_str());
         DEBUG_STATEMENT(DebugXClear());
         SearchRootNode(game);
         DEBUG_STATEMENT(DebugXWrite());
         ShowTableUsage();
     }
-    printf("total elapsed milliseconds                        %10d\n", GetMilliseconds() - first_start);
-    game = Game();
-    game.time_control_ = prev_time_control;
+    printf("total elapsed milliseconds                        %10d\n", GetMilliseconds() - start_ms);
 }
