@@ -1,3 +1,4 @@
+#define _POSIX_SOURCE
 #include <cstring>
 #include <string>
 
@@ -12,23 +13,23 @@ using std::string;
 
 /**
  * @brief Handling for input commands (xboard support)
-*/
+ */
 typedef struct
 {
-    void (*function)(Game& game, int argc, char* argv[]);   /**< function to be called  */
-    const char* name;                                       /**< command name           */
-    const char* description;                                /**< command description    */
+    void (*function)(Game &game, int argc, char *argv[]); /**< function to be called  */
+    const char *name;                                     /**< command name           */
+    const char *description;                              /**< command description    */
 } InputHandler;
 
-static void handle_quit(Game& game, int argc, char* argv[])
+static void handle_quit(Game &game, int argc, char *argv[])
 {
-	game.StopThinking();
+    game.StopThinking();
     exit(0);
     (void)argc;
     (void)argv;
 }
 
-static void handle_perft(Game& game, int argc, char* argv[])
+static void handle_perft(Game &game, int argc, char *argv[])
 {
     RunPerftTests();
     (void)argc;
@@ -36,7 +37,7 @@ static void handle_perft(Game& game, int argc, char* argv[])
     (void)game;
 }
 
-static void handle_postests(Game& game, int argc, char* argv[])
+static void handle_postests(Game &game, int argc, char *argv[])
 {
     int depth = 9;
     if (argc > 1)
@@ -46,18 +47,18 @@ static void handle_postests(Game& game, int argc, char* argv[])
         {
             depth = d;
         }
-    }    
+    }
     RunPositionTests(depth);
     (void)game;
 }
 
-static void handle_ping(Game& game, int argc, char* argv[])
+static void handle_ping(Game &game, int argc, char *argv[])
 {
     printf("pong %s\n", argc > 1 ? argv[1] : "");
     (void)game;
 }
 
-static void handle_xboard(Game& game, int argc, char* argv[])
+static void handle_xboard(Game &game, int argc, char *argv[])
 {
     printf("\n");
     (void)argc;
@@ -65,14 +66,14 @@ static void handle_xboard(Game& game, int argc, char* argv[])
     (void)game;
 }
 
-static void handle_bookmoves(Game& game, int argc, char* argv[])
+static void handle_bookmoves(Game &game, int argc, char *argv[])
 {
     DisplayAvailableBookMoves(*game.position_);
     (void)argc;
     (void)argv;
 }
 
-static void handle_freebook(Game& game, int argc, char* argv[])
+static void handle_freebook(Game &game, int argc, char *argv[])
 {
     FreeOpeningBook();
     (void)argc;
@@ -80,7 +81,7 @@ static void handle_freebook(Game& game, int argc, char* argv[])
     (void)game;
 }
 
-static void handle_protover(Game& game, int argc, char* argv[])
+static void handle_protover(Game &game, int argc, char *argv[])
 {
     if (argc != 2)
     {
@@ -102,7 +103,7 @@ static void handle_protover(Game& game, int argc, char* argv[])
     (void)game;
 }
 
-static void handle_new(Game& game, int argc, char* argv[])
+static void handle_new(Game &game, int argc, char *argv[])
 {
     game.StopThinking();
     game = Game();
@@ -110,14 +111,14 @@ static void handle_new(Game& game, int argc, char* argv[])
     (void)argv;
 }
 
-static void handle_force(Game &game, int argc, char* argv[])
+static void handle_force(Game &game, int argc, char *argv[])
 {
     game.engine_color_ = NEITHER_COLOR;
     (void)argc;
     (void)argv;
 }
 
-static void handle_go(Game& game, int argc, char* argv[])
+static void handle_go(Game &game, int argc, char *argv[])
 {
     game.engine_color_ = game.position_->ColorToMove();
     game.StartThinking();
@@ -125,14 +126,14 @@ static void handle_go(Game& game, int argc, char* argv[])
     (void)argv;
 }
 
-static void handle_playother(Game& game, int argc, char* argv[])
+static void handle_playother(Game &game, int argc, char *argv[])
 {
     game.engine_color_ = EnemyOf(game.position_->ColorToMove());
     (void)argc;
     (void)argv;
 }
 
-static void handle_usermove(Game& game, int argc, char* argv[])
+static void handle_usermove(Game &game, int argc, char *argv[])
 {
     if (argc != 2)
     {
@@ -153,20 +154,20 @@ static void handle_usermove(Game& game, int argc, char* argv[])
     }
 }
 
-static void handle_setboard(Game& game, int argc, char* argv[])
+static void handle_setboard(Game &game, int argc, char *argv[])
 {
     char fen_string[256];
-    char* p = fen_string;
+    char *p = fen_string;
     for (int i = 1; i < argc; ++i)
     {
         p += sprintf(p, "%s ", argv[i]);
     }
     *p = 0;
     game.position_ = game.stack_;
-    *game.position_ = Position { fen_string };
+    *game.position_ = Position{fen_string};
 }
 
-static void handle_getboard(Game& game, int argc, char* argv[])
+static void handle_getboard(Game &game, int argc, char *argv[])
 {
     std::string fen_string = game.position_->operator std::string();
     printf("%s\n", fen_string.c_str());
@@ -174,21 +175,21 @@ static void handle_getboard(Game& game, int argc, char* argv[])
     (void)argv;
 }
 
-static void handle_nopost(Game& game, int argc, char* argv[])
+static void handle_nopost(Game &game, int argc, char *argv[])
 {
     game.do_show_thinking_ = false;
     (void)argc;
     (void)argv;
 }
 
-static void handle_post(Game& game, int argc, char* argv[])
+static void handle_post(Game &game, int argc, char *argv[])
 {
     game.do_show_thinking_ = true;
     (void)argc;
     (void)argv;
 }
 
-static void handle_time(Game& game, int argc, char* argv[])
+static void handle_time(Game &game, int argc, char *argv[])
 {
     if (argc != 2)
     {
@@ -202,14 +203,14 @@ static void handle_time(Game& game, int argc, char* argv[])
     }
 }
 
-static void handle_cancel(Game& game, int argc, char* argv[])
+static void handle_cancel(Game &game, int argc, char *argv[])
 {
     game.StopThinking();
     (void)argc;
     (void)argv;
 }
 
-static void handle_level(Game& game, int argc, char* argv[])
+static void handle_level(Game &game, int argc, char *argv[])
 {
     if (argc != 4)
     {
@@ -243,7 +244,7 @@ static void handle_level(Game& game, int argc, char* argv[])
     }
 }
 
-static void handle_st(Game& game, int argc, char* argv[])
+static void handle_st(Game &game, int argc, char *argv[])
 {
     if (argc != 2)
     {
@@ -251,14 +252,14 @@ static void handle_st(Game& game, int argc, char* argv[])
         return;
     }
     int seconds = 0;
-    if (sscanf(argv[1], "%d", &seconds) == 1) 
+    if (sscanf(argv[1], "%d", &seconds) == 1)
     {
         game.time_control_.clock_type = CLOCK_FIXED_TIME;
         game.time_control_.fixed_time.milliseconds = seconds * 1000;
     }
 }
 
-static void handle_sd(Game& game, int argc, char* argv[])
+static void handle_sd(Game &game, int argc, char *argv[])
 {
     if (argc != 2)
     {
@@ -275,7 +276,7 @@ static void handle_sd(Game& game, int argc, char* argv[])
 
 #define PRINT_MIN_SEC(milliseconds) printf("%02d:%02d\n", (milliseconds) / 60000, ((milliseconds) / 1000) % 60)
 
-static void handle_showtime(Game& game, int argc, char* argv[])
+static void handle_showtime(Game &game, int argc, char *argv[])
 {
     switch (game.time_control_.clock_type)
     {
@@ -310,7 +311,7 @@ static void handle_showtime(Game& game, int argc, char* argv[])
     (void)argv;
 }
 
-static void handle_eval(Game& game, int argc, char* argv[])
+static void handle_eval(Game &game, int argc, char *argv[])
 {
     printf("evaluation %5d\n", EvaluatePosition(*game.position_, ALPHA, BETA));
     (void)argc;
@@ -318,7 +319,7 @@ static void handle_eval(Game& game, int argc, char* argv[])
 }
 
 #if DEBUGX
-static void handle_dbg(Game& game, int argc, char* argv[])
+static void handle_dbg(Game &game, int argc, char *argv[])
 {
     DebugXWrite();
     (void)argc;
@@ -326,7 +327,7 @@ static void handle_dbg(Game& game, int argc, char* argv[])
     (void)game;
 }
 
-static void handle_dbgclear(Game& game, int argc, char* argv[])
+static void handle_dbgclear(Game &game, int argc, char *argv[])
 {
     DebugXClear();
     (void)argc;
@@ -335,7 +336,7 @@ static void handle_dbgclear(Game& game, int argc, char* argv[])
 }
 #endif
 
-static void handle_undo(Game& game, int argc, char* argv[])
+static void handle_undo(Game &game, int argc, char *argv[])
 {
     if (game.position_ != game.stack_)
     {
@@ -345,7 +346,7 @@ static void handle_undo(Game& game, int argc, char* argv[])
     (void)argv;
 }
 
-static void handle_remove(Game& game, int argc, char* argv[])
+static void handle_remove(Game &game, int argc, char *argv[])
 {
     if (game.position_ - game.stack_ >= 2)
     {
@@ -355,7 +356,7 @@ static void handle_remove(Game& game, int argc, char* argv[])
     (void)argv;
 }
 
-static void handle_seetests(Game& game, int argc, char* argv[])
+static void handle_seetests(Game &game, int argc, char *argv[])
 {
     RunStaticExchangeTests();
     (void)argc;
@@ -363,7 +364,7 @@ static void handle_seetests(Game& game, int argc, char* argv[])
     (void)game;
 }
 
-static void handle_mergetest(Game& game, int argc, char* argv[])
+static void handle_mergetest(Game &game, int argc, char *argv[])
 {
     const bool is_pass = RunMergeSortTests();
     printf("Merge sort tests: %s\n", is_pass ? "PASS" : "FAIL");
@@ -372,50 +373,50 @@ static void handle_mergetest(Game& game, int argc, char* argv[])
     (void)game;
 }
 
-static void handle_help(Game& game, int argc, char* argv[]);
+static void handle_help(Game &game, int argc, char *argv[]);
 
-#define COMMAND(name) handle_ ## name, #name
+#define COMMAND(name) handle_##name, #name
 
 const InputHandler handlers[] = {
-    { COMMAND(bookmoves),   "display available book moves for current position"         },
+    {COMMAND(bookmoves), "display available book moves for current position"},
 #if DEBUGX
-    { COMMAND(dbg),         "display diagnostic counts"                                 },
-    { COMMAND(dbgclear),    "reset diagnostic counts"                                   },
+    {COMMAND(dbg), "display diagnostic counts"},
+    {COMMAND(dbgclear), "reset diagnostic counts"},
 #endif
-    { COMMAND(eval),        "display the current static evaluation"                     },
-    { COMMAND(force),       "assign pawnstar to play neither color"                     },
-    { COMMAND(freebook),    "delete the opening book from memory"                       },
-    { COMMAND(getboard),    "get the Forsyth Edwards string for the position"           },
-    { COMMAND(go),          "assign pawnstar to play the color to move"                 },
-    { COMMAND(help),        "display a summary of commands"                             },
-    { COMMAND(level),       "set a chess clock: 'level moves min:sec increment'"        },
-    { COMMAND(mergetest),   "run merge sort tests"                                      },
-    { COMMAND(new),         "start a new game (pawnstar will play black)"               },
-    { COMMAND(nopost),      "turns off analysis output while thinking"                  },
-    { COMMAND(perft),       "run standard move generation tests"                        },
-    { COMMAND(ping),        "responds with pong <n> (check worker still alive)"         },
-    { COMMAND(playother),   "assign pawnstar to play the color not to move"             },
-    { COMMAND(post),        "turns on analysis output while thinking"                   },
-    { COMMAND(postests),    "search the Bratko Kopec test positions"                    },
-    { COMMAND(protover),    "specify xboard protocol revision (currently 2)"            },
-    { COMMAND(quit),        "exit the program"                                          },
-    { COMMAND(remove),      "undo the last move made by each side"                      },
-    { COMMAND(sd),          "set a fixed search depth regardless of time spent"         },
-    { COMMAND(seetests),    "perform very simple static exchange tests"                 },
-    { COMMAND(setboard),    "set the current position to a Forsyth Edwards string"      },
-    { COMMAND(showtime),    "show the current time controls"                            },
-    { COMMAND(st),          "set a fixed search time per move in seconds"               },
-    { COMMAND(time),        "set the time on pawnstar's clock (centiseconds)"           },
-    { COMMAND(undo),        "undo the last (half) move made"                            },
-    { COMMAND(usermove),    "enter the user move in algebraic xboard format"            },
-    { COMMAND(xboard),      "enter xboard protocol"                                     },
-    { handle_cancel, "?",   "if thinking, stop now and move immediately"                },
-    { NULL, NULL,           NULL                                                        },
+    {COMMAND(eval), "display the current static evaluation"},
+    {COMMAND(force), "assign pawnstar to play neither color"},
+    {COMMAND(freebook), "delete the opening book from memory"},
+    {COMMAND(getboard), "get the Forsyth Edwards string for the position"},
+    {COMMAND(go), "assign pawnstar to play the color to move"},
+    {COMMAND(help), "display a summary of commands"},
+    {COMMAND(level), "set a chess clock: 'level moves min:sec increment'"},
+    {COMMAND(mergetest), "run merge sort tests"},
+    {COMMAND(new), "start a new game (pawnstar will play black)"},
+    {COMMAND(nopost), "turns off analysis output while thinking"},
+    {COMMAND(perft), "run standard move generation tests"},
+    {COMMAND(ping), "responds with pong <n> (check worker still alive)"},
+    {COMMAND(playother), "assign pawnstar to play the color not to move"},
+    {COMMAND(post), "turns on analysis output while thinking"},
+    {COMMAND(postests), "search the Bratko Kopec test positions"},
+    {COMMAND(protover), "specify xboard protocol revision (currently 2)"},
+    {COMMAND(quit), "exit the program"},
+    {COMMAND(remove), "undo the last move made by each side"},
+    {COMMAND(sd), "set a fixed search depth regardless of time spent"},
+    {COMMAND(seetests), "perform very simple static exchange tests"},
+    {COMMAND(setboard), "set the current position to a Forsyth Edwards string"},
+    {COMMAND(showtime), "show the current time controls"},
+    {COMMAND(st), "set a fixed search time per move in seconds"},
+    {COMMAND(time), "set the time on pawnstar's clock (centiseconds)"},
+    {COMMAND(undo), "undo the last (half) move made"},
+    {COMMAND(usermove), "enter the user move in algebraic xboard format"},
+    {COMMAND(xboard), "enter xboard protocol"},
+    {handle_cancel, "?", "if thinking, stop now and move immediately"},
+    {NULL, NULL, NULL},
 };
 
-static void handle_help(Game& game, int argc, char* argv[])
+static void handle_help(Game &game, int argc, char *argv[])
 {
-    const InputHandler* i;
+    const InputHandler *i;
     printf("refer to 'engine_protocol.html' for details of the communication\n");
     printf("between an xboard protocol chess engine and a user interface\n\n");
     printf("available commands:\n");
@@ -430,12 +431,12 @@ static void handle_help(Game& game, int argc, char* argv[])
 
 #define MAX_NUM_ARGS 8
 
-void ProcessInput(Game& game, char* line)
+void ProcessInput(Game &game, char *line)
 {
-    int argc                    = 0;
-    char* argv[MAX_NUM_ARGS]    = { 0 };
-    char* save_ptr              = NULL;
-    char* newline               = strchr(line, '\n');
+    int argc = 0;
+    char *argv[MAX_NUM_ARGS] = {0};
+    char *save_ptr = NULL;
+    char *newline = strchr(line, '\n');
     if (newline)
     {
         *newline = '\0';
@@ -453,7 +454,7 @@ void ProcessInput(Game& game, char* line)
     {
         return;
     }
-    for (const InputHandler* handler = handlers; handler->name; ++handler)
+    for (const InputHandler *handler = handlers; handler->name; ++handler)
     {
         if (!strcmp(handler->name, argv[0]))
         {
