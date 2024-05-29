@@ -1,42 +1,36 @@
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <cstring>
 #include <vector>
 
-using std::stringstream;
 using std::string;
 using std::string_view;
+using std::stringstream;
 using std::vector;
 
-#include "position.h"
 #include "debug_hashtable.h"
-#include "transposition_table.h"
 #include "function_prototypes.h"
+#include "position.h"
 #include "position_move_generation.h"
+#include "transposition_table.h"
 
-#define A1M (uint16_t)( ~MAY_WHITE_CASTLE_QUEENSIDE)
+#define A1M (uint16_t)(~MAY_WHITE_CASTLE_QUEENSIDE)
 #define E1M (uint16_t)(~(MAY_WHITE_CASTLE_QUEENSIDE | MAY_WHITE_CASTLE_KINGSIDE))
-#define H1M (uint16_t)( ~MAY_WHITE_CASTLE_KINGSIDE)
-#define A8M (uint16_t)( ~MAY_BLACK_CASTLE_QUEENSIDE)
+#define H1M (uint16_t)(~MAY_WHITE_CASTLE_KINGSIDE)
+#define A8M (uint16_t)(~MAY_BLACK_CASTLE_QUEENSIDE)
 #define E8M (uint16_t)(~(MAY_BLACK_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE))
-#define H8M (uint16_t)( ~MAY_BLACK_CASTLE_KINGSIDE)
+#define H8M (uint16_t)(~MAY_BLACK_CASTLE_KINGSIDE)
 #define OK  0xFFFF
 
 /**
  * @brief Castling rights flags based on move square from and to index.
  * Moves to and from king and rook squares invalidate castling rights.
-*/
-static const uint16_t CASTLING_RIGHTS_MASKS[64] =
-{
-   A1M,  OK,  OK,  OK, E1M,  OK,  OK, H1M,
-    OK,  OK,  OK,  OK,  OK,  OK,  OK,  OK,
-    OK,  OK,  OK,  OK,  OK,  OK,  OK,  OK,
-    OK,  OK,  OK,  OK,  OK,  OK,  OK,  OK,
-    OK,  OK,  OK,  OK,  OK,  OK,  OK,  OK,
-    OK,  OK,  OK,  OK,  OK,  OK,  OK,  OK,
-    OK,  OK,  OK,  OK,  OK,  OK,  OK,  OK,
-   A8M,  OK,  OK,  OK, E8M,  OK,  OK, H8M,
+ */
+static const uint16_t CASTLING_RIGHTS_MASKS[64] = {
+    A1M, OK, OK, OK, E1M, OK, OK, H1M, OK, OK, OK, OK, OK,  OK, OK, OK, OK,  OK, OK, OK,  OK, OK,
+    OK,  OK, OK, OK, OK,  OK, OK, OK,  OK, OK, OK, OK, OK,  OK, OK, OK, OK,  OK, OK, OK,  OK, OK,
+    OK,  OK, OK, OK, OK,  OK, OK, OK,  OK, OK, OK, OK, A8M, OK, OK, OK, E8M, OK, OK, H8M,
 };
 
 /**
@@ -46,11 +40,10 @@ static const uint16_t CASTLING_RIGHTS_MASKS[64] =
  * # Set the flag indicating this position is the result of a null move
  * @param position destination position
  * @param src_position source position
-*/
-void 
-Position::MakeNullMove(Position& dst_position) const
+ */
+void Position::MakeNullMove(Position &dst_position) const
 {
-    dst_position = *this;
+    dst_position           = *this;
     dst_position.previous_ = this;
     dst_position.flags_ |= IS_NULL_MOVE;
     dst_position.flags_ ^= IS_BLACK_TO_MOVE;
@@ -59,10 +52,7 @@ Position::MakeNullMove(Position& dst_position) const
     dst_position.en_passant_index_ = NO_SQUARE;
 }
 
-void 
-Position::AddPiece(Color color, 
-                   Piece piece, 
-                   Square to)
+void Position::AddPiece(Color color, Piece piece, Square to)
 {
     const Bitboard to_bb = BITBOARD(to);
     pieces_[piece - 1] ^= to_bb;
@@ -70,10 +60,7 @@ Position::AddPiece(Color color,
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
 }
 
-void
-Position::RemovePiece(Color color, 
-                      Piece piece, 
-                      Square from)
+void Position::RemovePiece(Color color, Piece piece, Square from)
 {
     const Bitboard from_bb = BITBOARD(from);
     pieces_[piece - 1] ^= from_bb;
@@ -81,33 +68,29 @@ Position::RemovePiece(Color color,
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
 }
 
-void
-Position::MovePiece(Color color, 
-                    Piece piece, 
-                    Square from, 
-                    Square to)
+void Position::MovePiece(Color color, Piece piece, Square from, Square to)
 {
-    const Bitboard from_to_bb = BITBOARD(from) | BITBOARD(to);
-    const uint64_t* const hash = &PIECE_SQUARE_HASHES[color][piece -1][0];
+    const Bitboard        from_to_bb = BITBOARD(from) | BITBOARD(to);
+    const uint64_t *const hash       = &PIECE_SQUARE_HASHES[color][piece - 1][0];
     pieces_[piece - 1] ^= from_to_bb;
     pieces_of_color_[color] ^= from_to_bb;
     hash_ ^= hash[to] ^ hash[from];
 }
 
-Position::Position(const Position& previous, Move move) noexcept
-{                          
-    const Color color    = previous.ColorToMove();
-    const Square from    = MoveFrom(move);
-    const Square to      = MoveTo(move);
-    const Piece piece    = ::MovePiece(move);
-    const Piece captured = MoveCaptured(move);
-     
-    *this = previous;
+Position::Position(const Position &previous, Move move) noexcept
+{
+    const Color  color    = previous.ColorToMove();
+    const Square from     = MoveFrom(move);
+    const Square to       = MoveTo(move);
+    const Piece  piece    = ::MovePiece(move);
+    const Piece  captured = MoveCaptured(move);
+
+    *this     = previous;
     previous_ = &previous;
     flags_ &= ~IS_NULL_MOVE;
     flags_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
-    hash_ ^= CASTLING_RIGHTS_HASHES[flags_          & CASTLING_RIGHTS_MASK] 
-           ^ CASTLING_RIGHTS_HASHES[previous.flags_ & CASTLING_RIGHTS_MASK];
+    hash_ ^= CASTLING_RIGHTS_HASHES[flags_ & CASTLING_RIGHTS_MASK] ^
+             CASTLING_RIGHTS_HASHES[previous.flags_ & CASTLING_RIGHTS_MASK];
     hash_ ^= EN_PASSANT_HASHES[en_passant_index_];
     en_passant_index_ = NO_SQUARE;
     ++reversible_move_count_;
@@ -127,7 +110,7 @@ Position::Position(const Position& previous, Move move) noexcept
             {
                 RemovePiece(EnemyOf(color), captured, to);
             }
-        }                
+        }
         if (MovePromoted(move))
         {
             /* Replace the pawn with the promoted piece. */
@@ -142,7 +125,7 @@ Position::Position(const Position& previous, Move move) noexcept
                 /* Pawn double push: affects en passant. */
                 en_passant_index_ = (Square)((from + to) >> 1);
                 hash_ ^= EN_PASSANT_HASHES[en_passant_index_];
-            } 
+            }
         }
         break;
 
@@ -193,7 +176,7 @@ Position::Position(const Position& previous, Move move) noexcept
             break;
         }
         break;
-    };  
+    };
     flags_ ^= IS_BLACK_TO_MOVE;
     hash_ ^= BLACK_MOVE_HASH;
     full_move_count_ += color;
@@ -216,20 +199,22 @@ Position::Position(const Position& previous, Move move) noexcept
     }
 }
 
-#define BAD_FEN_STRING { const std::string s {fen_string}; printf("ERROR: bad FEN string %s\n", s.c_str()); return; }
+#define BAD_FEN_STRING                                   \
+    {                                                    \
+        const std::string s{fen_string};                 \
+        printf("ERROR: bad FEN string %s\n", s.c_str()); \
+        return;                                          \
+    }
 
 Position::Position(std::string_view fen_string) noexcept
 {
-    static constexpr string_view white_piece_names { "PNBRQK"   };
-    static constexpr string_view black_piece_names { "pnbrqk"   };
-    static constexpr string_view ep_files          { "abcdefgh" };
-    static constexpr string_view ep_ranks          { "36"       };
-    stringstream ss;
+    static constexpr string_view white_piece_names{"PNBRQK"};
+    static constexpr string_view black_piece_names{"pnbrqk"};
+    static constexpr string_view ep_files{"abcdefgh"};
+    static constexpr string_view ep_ranks{"36"};
+    stringstream                 ss;
     ss << fen_string;
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wclass-memaccess"
-    memset(this, 0, sizeof(Position));
-#pragma GCC diagnostic pop
+    std::memset(this, 0, sizeof(Position));
     previous_ = this;
     /* Pieces on the board */
     string pieces;
@@ -239,7 +224,7 @@ Position::Position(std::string_view fen_string) noexcept
         BAD_FEN_STRING;
     }
     int x = 0, y = 7;
-    for (const char& c : pieces)
+    for (const char &c : pieces)
     {
         if (c == '/')
         {
@@ -315,7 +300,7 @@ Position::Position(std::string_view fen_string) noexcept
     }
     else
     {
-        for (const char& c : castling_rights)
+        for (const char &c : castling_rights)
         {
             switch (c)
             {
@@ -349,8 +334,7 @@ Position::Position(std::string_view fen_string) noexcept
     }
     else
     {
-        if (ep_square.length() != 2 || 
-            ep_files.find(ep_square[0]) == string::npos ||
+        if (ep_square.length() != 2 || ep_files.find(ep_square[0]) == string::npos ||
             ep_ranks.find(ep_square[1]) == string::npos)
         {
             BAD_FEN_STRING;
@@ -406,9 +390,8 @@ Position::operator std::string() const
                     ss << (char)('0' + num_empty_squares);
                     num_empty_squares = 0;
                 }
-                const char piece = (white_pieces_ & BITBOARD(x, y)) ?
-                    " PNBRQK"[PieceAt((Square)(x + 8 * y))] : 
-                    " pnbrqk"[PieceAt((Square)(x + 8 * y))];
+                const char piece = (white_pieces_ & BITBOARD(x, y)) ? " PNBRQK"[PieceAt((Square)(x + 8 * y))]
+                                                                    : " pnbrqk"[PieceAt((Square)(x + 8 * y))];
                 ss << piece;
             }
         }
@@ -458,11 +441,10 @@ Position::operator std::string() const
     {
         ss << FileChar(en_passant_index_) << RankChar(en_passant_index_);
     }
-    ss <<  ' ';
+    ss << ' ';
     /* Half move clock and full move number */
     ss << (int)reversible_move_count_ << ' ' << (int)(full_move_count_ + 1);
     return ss.str();
-
 }
 
 /**
@@ -470,21 +452,19 @@ Position::operator std::string() const
  * @param location  location of attacked square
  * @param color attacking color
  * @return true if color attacks position, otherwise false
-*/
+ */
 bool Position::IsAttacked(Square location, Color color) const
 {
-    const Sets& sets = SETS[location];
-    const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard attacking_pieces = pieces_of_color_[color];
-    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
+    const Sets           &sets                = SETS[location];
+    const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
+    const Bitboard        attacking_pieces    = pieces_of_color_[color];
+    const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
     /*
-    Pawn, knight and king attacks can be done by direct lookup since blockers 
+    Pawn, knight and king attacks can be done by direct lookup since blockers
     do not affect their attack set.
     */
-    if (attacking_pieces & 
-        ((sets.pawn_attacks[EnemyOf(color)] & pawns_) |
-        (             sets.knight_attacks & knights_) |
-        (               sets.king_attacks & kings_)))
+    if (attacking_pieces & ((sets.pawn_attacks[EnemyOf(color)] & pawns_) | (sets.knight_attacks & knights_) |
+                            (sets.king_attacks & kings_)))
     {
         return true;
     }
@@ -522,19 +502,16 @@ bool Position::IsAttacked(Square location, Color color) const
  */
 Bitboard Position::AttacksTo(Square location, Color color) const
 {
-    const Sets& sets = SETS[location];
-    const Bitboard* const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard attacking_pieces = pieces_of_color_[color];
-    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
+    const Sets           &sets                = SETS[location];
+    const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
+    const Bitboard        attacking_pieces    = pieces_of_color_[color];
+    const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
     /*
-    Pawn, knight and king attacks can be done by direct lookup since blockers 
+    Pawn, knight and king attacks can be done by direct lookup since blockers
     do not affect their attack set.
     */
-    Bitboard result = 
-        (attacking_pieces & 
-        ((sets.pawn_attacks[EnemyOf(color)] & pawns_) |
-        (             sets.knight_attacks & knights_) |
-        (               sets.king_attacks & kings_)));
+    Bitboard result = (attacking_pieces & ((sets.pawn_attacks[EnemyOf(color)] & pawns_) |
+                                           (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)));
     /*
     Rook and queen horizontal and vertical sliding attacks
     */
@@ -570,32 +547,26 @@ Bitboard Position::AttacksTo(Square location, Color color) const
  */
 bool Position::IsLegal() const
 {
-    const Color color         = ColorToMove();
+    const Color    color      = ColorToMove();
     const Bitboard white_king = kings_ & white_pieces_;
     const Bitboard black_king = kings_ & black_pieces_;
-    return
-        PopCount(white_king) == 1                           &&
-        PopCount(black_king) == 1                           &&
-        white_king != black_king                            &&
-        !(SETS[Lsb(white_king)].king_attacks & black_king)  &&
-        !IsAttacked(king_location_[EnemyOf(color)], color);
+    return PopCount(white_king) == 1 && PopCount(black_king) == 1 && white_king != black_king &&
+           !(SETS[Lsb(white_king)].king_attacks & black_king) && !IsAttacked(king_location_[EnemyOf(color)], color);
 }
 
 /*
 Determine if the current position represents a draw by repetition.
 
 We use position Zobrist hash values to determine position equality - there is a
-tiny chance of hash collision causing an error - I have not seen it happen 
+tiny chance of hash collision causing an error - I have not seen it happen
 in practice.
 */
-bool Position::IsDrawByRepetition(bool is_search) const 
+bool Position::IsDrawByRepetition(bool is_search) const
 {
-    const Position* position = this;
-    const uint64_t hash = hash_;
-    int repetitions = is_search ? 1 : 2;
-    for (position = position->previous_; 
-         position->reversible_move_count_ != 0; 
-         position = position->previous_)
+    const Position *position    = this;
+    const uint64_t  hash        = hash_;
+    int             repetitions = is_search ? 1 : 2;
+    for (position = position->previous_; position->reversible_move_count_ != 0; position = position->previous_)
     {
         if (position->hash_ == hash && --repetitions == 0)
         {
@@ -653,7 +624,7 @@ bool Position::IsDrawByMaterial() const
             INCREMENT("draws by material (3)");
             return true;
         }
-        return false;       
+        return false;
     case 4:
         /*
         king and bishop vs king and bishop with bishops on same color square
@@ -661,7 +632,8 @@ bool Position::IsDrawByMaterial() const
         {
             const Bitboard white_bishops = bishops_ & white_pieces_;
             const Bitboard black_bishops = bishops_ ^ white_bishops;
-            if (white_bishops && black_bishops && (!(white_bishops & WHITE_SQUARES) == !(black_bishops & WHITE_SQUARES)))
+            if (white_bishops && black_bishops &&
+                (!(white_bishops & WHITE_SQUARES) == !(black_bishops & WHITE_SQUARES)))
             {
                 INCREMENT("draws by material (4)");
                 return true;
@@ -677,26 +649,21 @@ Determine if the current position represents stalemate
 */
 bool Position::IsStalemate() const
 {
-    return 
-        !(flags_ & IS_CHECK) && 
-        GenerateLegalMoves().size() == 0;
+    return !(flags_ & IS_CHECK) && GenerateLegalMoves().size() == 0;
 }
 /*
 Determine if the current position represents checkmate
 */
 bool Position::IsCheckmate() const
 {
-    return 
-        (flags_ & IS_CHECK) && 
-        GenerateLegalMoves().size() == 0;
+    return (flags_ & IS_CHECK) && GenerateLegalMoves().size() == 0;
 }
 
 /**
  * @brief Compute the Zobrist hash for a chess position.
  * @return the 64 bit hash
-*/
-uint64_t
-Position::ComputeHash() const
+ */
+uint64_t Position::ComputeHash() const
 {
     uint64_t hash = flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
     hash ^= CASTLING_RIGHTS_HASHES[flags_ & CASTLING_RIGHTS_MASK];
@@ -717,26 +684,23 @@ Position::ComputeHash() const
     return hash;
 }
 
-MoveList 
-Position::GeneratePseudoLegalMoves() const
+MoveList Position::GeneratePseudoLegalMoves() const
 {
     return GenerateMoves<true>();
 }
 
-MoveList
-Position::GeneratePseudoLegalCaptures() const
+MoveList Position::GeneratePseudoLegalCaptures() const
 {
     return GenerateMoves<false>();
 }
 
-MoveList
-Position::GenerateLegalMoves() const
+MoveList Position::GenerateLegalMoves() const
 {
     MoveList pseudo_legal_moves = GeneratePseudoLegalMoves();
     MoveList result;
     for (auto move : pseudo_legal_moves)
     {
-        Position position { *this, move };
+        Position position{*this, move};
         if (!(position.flags_ & IS_MOVED_INTO_CHECK))
         {
             result.push_back(move);
@@ -752,11 +716,11 @@ Position::GenerateLegalMoves() const
  * @param move_string Pointer to store the formatted string.
  * @return Number of characters written to output.
  */
-string Position::VariationToString(const Variation& variation) const
+string Position::VariationToString(const Variation &variation) const
 {
     stringstream ss;
-    bool is_first_move = true;
-    Position src_position { *this };
+    bool         is_first_move = true;
+    Position     src_position{*this};
     for (const auto move : variation)
     {
         if (!is_first_move)
@@ -764,8 +728,8 @@ string Position::VariationToString(const Variation& variation) const
             ss << ' ';
         }
         ss << src_position.MoveToString(move);
-        Position dst_position { src_position, move };
-        src_position = dst_position;
+        Position dst_position{src_position, move};
+        src_position  = dst_position;
         is_first_move = false;
     }
     return ss.str();
@@ -781,23 +745,21 @@ string Position::VariationToString(const Variation& variation) const
 string Position::MoveToString(Move move) const
 {
     stringstream result;
-    string disambiguation;
-    string from_square { FileChar(MoveFrom(move)), RankChar(MoveFrom(move)) };
-    string to_square   { FileChar(MoveTo  (move)), RankChar(MoveTo  (move)) };
-    bool is_source_ambiguous = false;
-    bool is_file_unique      = true;
-    bool is_rank_unique      = true;   
-    const char move_piece    = " PNBRQK"[::MovePiece(move)];
+    string       disambiguation;
+    string       from_square{FileChar(MoveFrom(move)), RankChar(MoveFrom(move))};
+    string       to_square{FileChar(MoveTo(move)), RankChar(MoveTo(move))};
+    bool         is_source_ambiguous = false;
+    bool         is_file_unique      = true;
+    bool         is_rank_unique      = true;
+    const char   move_piece          = " PNBRQK"[::MovePiece(move)];
     /*
-    Determine if there is more than one piece of the same type which is capable 
+    Determine if there is more than one piece of the same type which is capable
     of moving to the target square, and will require further disambiguation
     */
     MoveList legal_moves = GenerateLegalMoves();
-    for (const Move& m : legal_moves)
+    for (const Move &m : legal_moves)
     {
-        if (::MovePiece(m) == ::MovePiece(move) && 
-              MoveTo   (m) ==   MoveTo   (move) &&
-              MoveFrom (m) !=   MoveFrom (move))
+        if (::MovePiece(m) == ::MovePiece(move) && MoveTo(m) == MoveTo(move) && MoveFrom(m) != MoveFrom(move))
         {
             is_source_ambiguous = true;
             if (FileOf(MoveFrom(m)) == FileOf(MoveFrom(move)))
@@ -807,18 +769,18 @@ string Position::MoveToString(Move move) const
             if (RankOf(MoveFrom(m)) == RankOf(MoveFrom(move)))
             {
                 is_rank_unique = false;
-            }   
+            }
         }
     }
     /*
-    Determine how to disambiguate source square based on the uniqueness of the 
+    Determine how to disambiguate source square based on the uniqueness of the
     source rank and file
     */
     if (is_source_ambiguous)
     {
         if (is_file_unique)
         {
-            disambiguation = from_square[0]; 
+            disambiguation = from_square[0];
         }
         else if (is_rank_unique)
         {
@@ -843,10 +805,11 @@ string Position::MoveToString(Move move) const
         }
         else
         {
-            result << move_piece << disambiguation << to_square;;
+            result << move_piece << disambiguation << to_square;
+            ;
         }
         break;
-    
+
     case KING:
         if (IsCastlingMove(move))
         {
@@ -858,7 +821,7 @@ string Position::MoveToString(Move move) const
                 break;
             case C1:
             case C8:
-                result <<  "O-O-O";
+                result << "O-O-O";
                 break;
             default:
                 break;
@@ -888,11 +851,11 @@ string Position::MoveToString(Move move) const
             result << '=' << "  NBRQ"[MovePromoted(move)];
         }
         break;
-    }    
+    }
     /*
     Determine if this move results in check or checkmate
     */
-    Position dst_position { *this, move };
+    Position dst_position{*this, move};
     if (dst_position.IsCheckmate())
     {
         result << '#';

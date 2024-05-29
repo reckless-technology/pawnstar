@@ -1,15 +1,17 @@
-#define _POSIX_SOURCE
+// #define _POSIX_SOURCE
 #include <cstring>
 #include <string>
+#include <string_view>
 
-#include "position.h"
 #include "debug_hashtable.h"
-#include "transposition_table.h"
 #include "function_prototypes.h"
 #include "game.h"
 #include "opening_book.h"
+#include "position.h"
+#include "transposition_table.h"
 
 using std::string;
+using std::string_view;
 
 /**
  * @brief Handling for input commands (xboard support)
@@ -90,11 +92,10 @@ static void handle_protover(Game &game, int argc, char *argv[])
     }
     if (!strcmp(argv[1], "2"))
     {
-        printf(
-            "feature ping=1 setboard=1 playother=1 san=1 usermove=1 time=1 draw=0 "
-            "sigint=0 sigterm=0 reuse=1 analyze=0 "
-            "myname=\"Pawnstar " __DATE__ " " __TIME__ "\" variants=\"normal\" "
-            "colors=0 ics=0 name=0 pause=0 nps=0 debug=0 memory=0 smp=0 done=1 \n");
+        printf("feature ping=1 setboard=1 playother=1 san=1 usermove=1 time=1 draw=0 "
+               "sigint=0 sigterm=0 reuse=1 analyze=0 "
+               "myname=\"Pawnstar " __DATE__ " " __TIME__ "\" variants=\"normal\" "
+               "colors=0 ics=0 name=0 pause=0 nps=0 debug=0 memory=0 smp=0 done=1 \n");
     }
     else
     {
@@ -156,14 +157,14 @@ static void handle_usermove(Game &game, int argc, char *argv[])
 
 static void handle_setboard(Game &game, int argc, char *argv[])
 {
-    char fen_string[256];
+    char  fen_string[256];
     char *p = fen_string;
     for (int i = 1; i < argc; ++i)
     {
-        p += sprintf(p, "%s ", argv[i]);
+        p += snprintf(p, fen_string + sizeof(fen_string) - p, "%s ", argv[i]);
     }
-    *p = 0;
-    game.position_ = game.stack_;
+    *p              = 0;
+    game.position_  = game.stack_;
     *game.position_ = Position{fen_string};
 }
 
@@ -230,15 +231,15 @@ static void handle_level(Game &game, int argc, char *argv[])
     sscanf(argv[3], "%d", &increment);
     if (moves)
     {
-        game.time_control_.clock_type = CLOCK_STANDARD;
-        game.time_control_.standard.moves_per_period = moves;
+        game.time_control_.clock_type                       = CLOCK_STANDARD;
+        game.time_control_.standard.moves_per_period        = moves;
         game.time_control_.standard.milliseconds_per_period = minutes * 60000 + seconds * 1000;
-        game.time_control_.standard.milliseconds_remaining = game.time_control_.standard.milliseconds_per_period;
+        game.time_control_.standard.milliseconds_remaining  = game.time_control_.standard.milliseconds_per_period;
     }
     else
     {
-        game.time_control_.clock_type = CLOCK_INCREMENTAL;
-        game.time_control_.incremental.base_milliseconds = minutes * 60000 + seconds * 1000;
+        game.time_control_.clock_type                         = CLOCK_INCREMENTAL;
+        game.time_control_.incremental.base_milliseconds      = minutes * 60000 + seconds * 1000;
         game.time_control_.incremental.increment_milliseconds = increment * 1000;
         game.time_control_.incremental.milliseconds_remaining = game.time_control_.incremental.base_milliseconds;
     }
@@ -254,7 +255,7 @@ static void handle_st(Game &game, int argc, char *argv[])
     int seconds = 0;
     if (sscanf(argv[1], "%d", &seconds) == 1)
     {
-        game.time_control_.clock_type = CLOCK_FIXED_TIME;
+        game.time_control_.clock_type              = CLOCK_FIXED_TIME;
         game.time_control_.fixed_time.milliseconds = seconds * 1000;
     }
 }
@@ -269,7 +270,7 @@ static void handle_sd(Game &game, int argc, char *argv[])
     int depth = 0;
     if (sscanf(argv[1], "%d", &depth) == 1)
     {
-        game.time_control_.clock_type = CLOCK_FIXED_DEPTH;
+        game.time_control_.clock_type        = CLOCK_FIXED_DEPTH;
         game.time_control_.fixed_depth.depth = depth;
     }
 }
@@ -433,10 +434,10 @@ static void handle_help(Game &game, int argc, char *argv[])
 
 void ProcessInput(Game &game, char *line)
 {
-    int argc = 0;
+    int   argc               = 0;
     char *argv[MAX_NUM_ARGS] = {0};
-    char *save_ptr = NULL;
-    char *newline = strchr(line, '\n');
+    char *save_ptr           = NULL;
+    char *newline            = strchr(line, '\n');
     if (newline)
     {
         *newline = '\0';
