@@ -27,10 +27,18 @@ using std::vector;
  * @brief Castling rights flags based on move square from and to index.
  * Moves to and from king and rook squares invalidate castling rights.
  */
+
 static const uint16_t CASTLING_RIGHTS_MASKS[64] = {
-    A1M, OK, OK, OK, E1M, OK, OK, H1M, OK, OK, OK, OK, OK,  OK, OK, OK, OK,  OK, OK, OK,  OK, OK,
-    OK,  OK, OK, OK, OK,  OK, OK, OK,  OK, OK, OK, OK, OK,  OK, OK, OK, OK,  OK, OK, OK,  OK, OK,
-    OK,  OK, OK, OK, OK,  OK, OK, OK,  OK, OK, OK, OK, A8M, OK, OK, OK, E8M, OK, OK, H8M,
+    /* clang-format off */
+    A1M, OK, OK, OK,E1M, OK, OK,H1M, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+    A8M, OK, OK, OK,E8M, OK, OK,H8M,
+    /* clang-format on */
 };
 
 /**

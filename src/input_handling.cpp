@@ -1,7 +1,7 @@
-// #define _POSIX_SOURCE
-#include <cstring>
+#include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
@@ -12,85 +12,72 @@
 
 using std::string;
 using std::string_view;
+using std::stringstream;
+using std::vector;
 
 /**
  * @brief Handling for input commands (xboard support)
  */
 typedef struct
 {
-    void (*function)(Game &game, int argc, char *argv[]); /**< function to be called  */
-    const char *name;                                     /**< command name           */
-    const char *description;                              /**< command description    */
+    void (*function)(Game &game, const vector<string> &args); /**< function to be called  */
+    string name;                                              /**< command name           */
+    string description;                                       /**< command description    */
 } InputHandler;
 
-static void handle_quit(Game &game, int argc, char *argv[])
+static void handle_quit(Game &game, const vector<string> &)
 {
     game.StopThinking();
     exit(0);
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_perft(Game &game, int argc, char *argv[])
+static void handle_perft(Game &, const vector<string> &)
 {
     RunPerftTests();
-    (void)argc;
-    (void)argv;
-    (void)game;
 }
 
-static void handle_postests(Game &game, int argc, char *argv[])
+static void handle_postests(Game &, const vector<string> &args)
 {
     int depth = 9;
-    if (argc > 1)
+    if (args.size() > 1)
     {
-        int d = 0;
-        if (sscanf(argv[1], "%d", &d) == 1)
-        {
-            depth = d;
-        }
+        const int d = stoi(args[1]);
+        depth       = d;
     }
     RunPositionTests(depth);
-    (void)game;
 }
 
-static void handle_ping(Game &game, int argc, char *argv[])
+static void handle_ping(Game &, const vector<string> &args)
 {
-    printf("pong %s\n", argc > 1 ? argv[1] : "");
-    (void)game;
+    if (args.size() > 1)
+    {
+        printf("pong %s\n", args[1].c_str());
+    }
 }
 
-static void handle_xboard(Game &game, int argc, char *argv[])
+static void handle_xboard(Game &, const vector<string> &)
 {
     printf("\n");
-    (void)argc;
-    (void)argv;
-    (void)game;
 }
 
-static void handle_bookmoves(Game &game, int argc, char *argv[])
+static void handle_bookmoves(Game &game, const vector<string> &)
 {
     DisplayAvailableBookMoves(*game.position_);
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_freebook(Game &game, int argc, char *argv[])
+static void handle_freebook(Game &, const vector<string> &)
 {
     FreeOpeningBook();
-    (void)argc;
-    (void)argv;
-    (void)game;
 }
 
-static void handle_protover(Game &game, int argc, char *argv[])
+static void handle_protover(Game &, const vector<string> &args)
 {
-    if (argc != 2)
+    if (args.size() != 2)
     {
         printf("ERROR protocol not defined\n");
         return;
     }
-    if (!strcmp(argv[1], "2"))
+    if (args[1] == "2")
     {
         printf("feature ping=1 setboard=1 playother=1 san=1 usermove=1 time=1 draw=0 "
                "sigint=0 sigterm=0 reuse=1 analyze=0 "
@@ -99,52 +86,43 @@ static void handle_protover(Game &game, int argc, char *argv[])
     }
     else
     {
-        printf("ERROR: unsupported XBoard protocol version %s\n", argv[1]);
+        printf("ERROR: unsupported XBoard protocol version %s\n", args[1].c_str());
     }
-    (void)game;
 }
 
-static void handle_new(Game &game, int argc, char *argv[])
+static void handle_new(Game &game, const vector<string> &)
 {
     game.StopThinking();
     game = Game();
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_force(Game &game, int argc, char *argv[])
+static void handle_force(Game &game, const vector<string> &)
 {
     game.engine_color_ = NEITHER_COLOR;
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_go(Game &game, int argc, char *argv[])
+static void handle_go(Game &game, const vector<string> &)
 {
     game.engine_color_ = game.position_->ColorToMove();
     game.StartThinking();
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_playother(Game &game, int argc, char *argv[])
+static void handle_playother(Game &game, const vector<string> &)
 {
     game.engine_color_ = EnemyOf(game.position_->ColorToMove());
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_usermove(Game &game, int argc, char *argv[])
+static void handle_usermove(Game &game, const vector<string> &args)
 {
-    if (argc != 2)
+    if (args.size() != 2)
     {
         printf("ERROR: move not specified\n");
         return;
     }
-    Move move = game.PlayMove(argv[1]);
+    Move move = game.PlayMove(args[1]);
     if (move == 0)
     {
-        printf("Illegal move: %s\n", argv[1]);
+        printf("Illegal move: %s\n", args[1].c_str());
     }
     if (!game.IsGameOver())
     {
@@ -155,80 +133,70 @@ static void handle_usermove(Game &game, int argc, char *argv[])
     }
 }
 
-static void handle_setboard(Game &game, int argc, char *argv[])
+static void handle_setboard(Game &game, const vector<string> &args)
 {
-    char  fen_string[256];
-    char *p = fen_string;
-    for (int i = 1; i < argc; ++i)
+    stringstream ss;
+    for (size_t i = 1; i < args.size(); ++i)
     {
-        p += snprintf(p, fen_string + sizeof(fen_string) - p, "%s ", argv[i]);
+        ss << args[i] << ' ';
     }
-    *p              = 0;
     game.position_  = game.stack_;
-    *game.position_ = Position{fen_string};
+    *game.position_ = Position{ss.str()};
 }
 
-static void handle_getboard(Game &game, int argc, char *argv[])
+static void handle_getboard(Game &game, const vector<string> &)
 {
     std::string fen_string = game.position_->operator std::string();
     printf("%s\n", fen_string.c_str());
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_nopost(Game &game, int argc, char *argv[])
+static void handle_nopost(Game &game, const vector<string> &)
 {
     game.do_show_thinking_ = false;
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_post(Game &game, int argc, char *argv[])
+static void handle_post(Game &game, const vector<string> &)
 {
     game.do_show_thinking_ = true;
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_time(Game &game, int argc, char *argv[])
+static void handle_time(Game &game, const vector<string> &args)
 {
-    if (argc != 2)
+    if (args.size() != 2)
     {
         printf("ERROR: time not specified\n");
         return;
     }
-    int time;
-    if (sscanf(argv[1], "%d", &time) == 1)
+    int centiseconds = stoi(args[1]);
+    if (centiseconds != 0)
     {
-        game.time_control_.standard.milliseconds_remaining = time * 10;
+        game.time_control_.standard.milliseconds_remaining = centiseconds * 10;
     }
 }
 
-static void handle_cancel(Game &game, int argc, char *argv[])
+static void handle_cancel(Game &game, const vector<string> &)
 {
     game.StopThinking();
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_level(Game &game, int argc, char *argv[])
+static void handle_level(Game &game, const vector<string> &args)
 {
-    if (argc != 4)
+    if (args.size() != 4)
     {
         printf("ERROR: time control specification invalid\n");
         return;
     }
     int moves = 40, minutes = 5, seconds = 0, increment = 5;
-    sscanf(argv[1], "%d", &moves);
-    if (strchr(argv[2], ':'))
+    sscanf(args[1].c_str(), "%d", &moves);
+    if (strchr(args[2].c_str(), ':'))
     {
-        sscanf(argv[2], "%d:%d", &minutes, &seconds);
+        sscanf(args[2].c_str(), "%d:%d", &minutes, &seconds);
     }
     else
     {
-        sscanf(argv[2], "%d", &minutes);
+        sscanf(args[2].c_str(), "%d", &minutes);
     }
-    sscanf(argv[3], "%d", &increment);
+    sscanf(args[3].c_str(), "%d", &increment);
     if (moves)
     {
         game.time_control_.clock_type                       = CLOCK_STANDARD;
@@ -245,30 +213,30 @@ static void handle_level(Game &game, int argc, char *argv[])
     }
 }
 
-static void handle_st(Game &game, int argc, char *argv[])
+static void handle_st(Game &game, const vector<string> &args)
 {
-    if (argc != 2)
+    if (args.size() != 2)
     {
         printf("ERROR: time not specified\n");
         return;
     }
     int seconds = 0;
-    if (sscanf(argv[1], "%d", &seconds) == 1)
+    if (sscanf(args[1].c_str(), "%d", &seconds) == 1)
     {
         game.time_control_.clock_type              = CLOCK_FIXED_TIME;
         game.time_control_.fixed_time.milliseconds = seconds * 1000;
     }
 }
 
-static void handle_sd(Game &game, int argc, char *argv[])
+static void handle_sd(Game &game, const vector<string> &args)
 {
-    if (argc != 2)
+    if (args.size() != 2)
     {
         printf("ERROR: depth not specified\n");
         return;
     }
     int depth = 0;
-    if (sscanf(argv[1], "%d", &depth) == 1)
+    if (sscanf(args[1].c_str(), "%d", &depth) == 1)
     {
         game.time_control_.clock_type        = CLOCK_FIXED_DEPTH;
         game.time_control_.fixed_depth.depth = depth;
@@ -277,7 +245,7 @@ static void handle_sd(Game &game, int argc, char *argv[])
 
 #define PRINT_MIN_SEC(milliseconds) printf("%02d:%02d\n", (milliseconds) / 60000, ((milliseconds) / 1000) % 60)
 
-static void handle_showtime(Game &game, int argc, char *argv[])
+static void handle_showtime(Game &game, const vector<string> &)
 {
     switch (game.time_control_.clock_type)
     {
@@ -308,73 +276,53 @@ static void handle_showtime(Game &game, int argc, char *argv[])
         PRINT_MIN_SEC(game.time_control_.fixed_time.milliseconds);
         break;
     }
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_eval(Game &game, int argc, char *argv[])
+static void handle_eval(Game &game, const vector<string> &)
 {
     printf("evaluation %5d\n", EvaluatePosition(*game.position_, ALPHA, BETA));
-    (void)argc;
-    (void)argv;
 }
 
 #if DEBUGX
-static void handle_dbg(Game &game, int argc, char *argv[])
+static void handle_dbg(Game &, const vector<string> &)
 {
     DebugXWrite();
-    (void)argc;
-    (void)argv;
-    (void)game;
 }
 
-static void handle_dbgclear(Game &game, int argc, char *argv[])
+static void handle_dbgclear(Game &, const vector<string> &)
 {
     DebugXClear();
-    (void)argc;
-    (void)argv;
-    (void)game;
 }
 #endif
 
-static void handle_undo(Game &game, int argc, char *argv[])
+static void handle_undo(Game &game, const vector<string> &)
 {
     if (game.position_ != game.stack_)
     {
         --game.position_;
     }
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_remove(Game &game, int argc, char *argv[])
+static void handle_remove(Game &game, const vector<string> &)
 {
     if (game.position_ - game.stack_ >= 2)
     {
         game.position_ -= 2;
     }
-    (void)argc;
-    (void)argv;
 }
 
-static void handle_seetests(Game &game, int argc, char *argv[])
+static void handle_seetests(Game &, const vector<string> &)
 {
     RunStaticExchangeTests();
-    (void)argc;
-    (void)argv;
-    (void)game;
 }
 
-static void handle_mergetest(Game &game, int argc, char *argv[])
+static void handle_mergetest(Game &, const vector<string> &)
 {
     const bool is_pass = RunMergeSortTests();
     printf("Merge sort tests: %s\n", is_pass ? "PASS" : "FAIL");
-    (void)argc;
-    (void)argv;
-    (void)game;
 }
 
-static void handle_help(Game &game, int argc, char *argv[]);
+static void handle_help(Game &, const vector<string> &);
 
 #define COMMAND(name) handle_##name, #name
 
@@ -412,54 +360,37 @@ const InputHandler handlers[] = {
     {COMMAND(usermove), "enter the user move in algebraic xboard format"},
     {COMMAND(xboard), "enter xboard protocol"},
     {handle_cancel, "?", "if thinking, stop now and move immediately"},
-    {NULL, NULL, NULL},
+    {NULL, "", ""},
 };
 
-static void handle_help(Game &game, int argc, char *argv[])
+static void handle_help(Game &, const vector<string> &)
 {
     const InputHandler *i;
     printf("refer to 'engine_protocol.html' for details of the communication\n");
     printf("between an xboard protocol chess engine and a user interface\n\n");
     printf("available commands:\n");
-    for (i = handlers; i->name; ++i)
+    for (i = handlers; i->function != NULL; ++i)
     {
-        printf("%-12s %s\n", i->name, i->description);
+        printf("%-12s %s\n", i->name.c_str(), i->description.c_str());
     }
-    (void)argc;
-    (void)argv;
-    (void)game;
 }
 
 #define MAX_NUM_ARGS 8
 
-void ProcessInput(Game &game, char *line)
+void ProcessInput(Game &game, const string &line)
 {
-    int   argc               = 0;
-    char *argv[MAX_NUM_ARGS] = {0};
-    char *save_ptr           = NULL;
-    char *newline            = strchr(line, '\n');
-    if (newline)
-    {
-        *newline = '\0';
-    }
-    for (int i = 0; i != MAX_NUM_ARGS; ++i)
-    {
-        argv[i] = strtok_r(i == 0 ? line : NULL, " ", &save_ptr);
-        if (!argv[i])
-        {
-            break;
-        }
-        ++argc;
-    }
-    if (argc == 0)
+    stringstream ss;
+    ss << line;
+    vector<string> args(std::istream_iterator<string>(ss), {});
+    if (args.size() == 0)
     {
         return;
     }
-    for (const InputHandler *handler = handlers; handler->name; ++handler)
+    for (const InputHandler *handler = handlers; handler->function != NULL; ++handler)
     {
-        if (!strcmp(handler->name, argv[0]))
+        if (args[0] == handler->name)
         {
-            handler->function(game, argc, argv);
+            handler->function(game, args);
             break;
         }
     }

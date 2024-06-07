@@ -3,51 +3,17 @@
     "configurations": [
         {
             "name": "Launch pawnstar debug",
-            "type": "cppdbg",
-            "miDebuggerPath": "gdb",
+            "type": "lldb",
             "request": "launch",
-            "cwd" : "${workspaceFolder}/debug",
-            "args": [],
+            "cwd": "${workspaceFolder}/debug",
             "program": "${workspaceFolder}/debug/pawnstar",
-            "stopAtEntry": false,
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description":  "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                },
-                { "text": "set output-radix 16" }
-            ],
-            "externalConsole": true,
-          },
-          {
+        },
+        {
             "name": "Launch pawnstar release",
-            "type": "cppdbg",
-            "miDebuggerPath": "gdb",
+            "type": "lldb",
             "request": "launch",
-            "cwd" : "${workspaceFolder}/release",
-            "args": [],
+            "cwd": "${workspaceFolder}/release",
             "program": "${workspaceFolder}/release/pawnstar",
-            "stopAtEntry": false,
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description":  "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                },
-                { "text": "set output-radix 16" }
-            ],
-            "externalConsole": true,
-          }
+        },
     ]
 }
