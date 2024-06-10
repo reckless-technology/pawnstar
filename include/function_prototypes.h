@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 
 #include "bitboard.h"
 #include "generated_data.h"
@@ -81,4 +82,4 @@ void RunPerftTests(void);
 void RunPositionTests(int depth);
 void RunStaticExchangeTests(void);
 int  NextRandom(void);
-void ProcessInput(Game &game, const std::string &line);
+void ProcessInput(Game &game, std::string_view line);

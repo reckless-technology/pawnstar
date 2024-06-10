@@ -1,3 +1,4 @@
+#include <span>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -10,6 +11,7 @@
 #include "position.h"
 #include "transposition_table.h"
 
+using std::span;
 using std::string;
 using std::string_view;
 using std::stringstream;
@@ -20,23 +22,23 @@ using std::vector;
  */
 typedef struct
 {
-    void (*function)(Game &game, const vector<string> &args); /**< function to be called  */
-    string name;                                              /**< command name           */
-    string description;                                       /**< command description    */
+    void (*function)(Game &game, span<string> args); /**< function to be called  */
+    string name;                                     /**< command name           */
+    string description;                              /**< command description    */
 } InputHandler;
 
-static void handle_quit(Game &game, const vector<string> &)
+static void handle_quit(Game &game, span<string>)
 {
     game.StopThinking();
     exit(0);
 }
 
-static void handle_perft(Game &, const vector<string> &)
+static void handle_perft(Game &, span<string>)
 {
     RunPerftTests();
 }
 
-static void handle_postests(Game &, const vector<string> &args)
+static void handle_postests(Game &, span<string> args)
 {
     int depth = 9;
     if (args.size() > 1)
@@ -47,7 +49,7 @@ static void handle_postests(Game &, const vector<string> &args)
     RunPositionTests(depth);
 }
 
-static void handle_ping(Game &, const vector<string> &args)
+static void handle_ping(Game &, span<string> args)
 {
     if (args.size() > 1)
     {
@@ -55,22 +57,22 @@ static void handle_ping(Game &, const vector<string> &args)
     }
 }
 
-static void handle_xboard(Game &, const vector<string> &)
+static void handle_xboard(Game &, span<string>)
 {
     printf("\n");
 }
 
-static void handle_bookmoves(Game &game, const vector<string> &)
+static void handle_bookmoves(Game &game, span<string>)
 {
     DisplayAvailableBookMoves(*game.position_);
 }
 
-static void handle_freebook(Game &, const vector<string> &)
+static void handle_freebook(Game &, span<string>)
 {
     FreeOpeningBook();
 }
 
-static void handle_protover(Game &, const vector<string> &args)
+static void handle_protover(Game &, span<string> args)
 {
     if (args.size() != 2)
     {
@@ -90,29 +92,29 @@ static void handle_protover(Game &, const vector<string> &args)
     }
 }
 
-static void handle_new(Game &game, const vector<string> &)
+static void handle_new(Game &game, span<string>)
 {
     game.StopThinking();
     game = Game();
 }
 
-static void handle_force(Game &game, const vector<string> &)
+static void handle_force(Game &game, span<string>)
 {
     game.engine_color_ = NEITHER_COLOR;
 }
 
-static void handle_go(Game &game, const vector<string> &)
+static void handle_go(Game &game, span<string>)
 {
     game.engine_color_ = game.position_->ColorToMove();
     game.StartThinking();
 }
 
-static void handle_playother(Game &game, const vector<string> &)
+static void handle_playother(Game &game, span<string>)
 {
     game.engine_color_ = EnemyOf(game.position_->ColorToMove());
 }
 
-static void handle_usermove(Game &game, const vector<string> &args)
+static void handle_usermove(Game &game, span<string> args)
 {
     if (args.size() != 2)
     {
@@ -133,7 +135,7 @@ static void handle_usermove(Game &game, const vector<string> &args)
     }
 }
 
-static void handle_setboard(Game &game, const vector<string> &args)
+static void handle_setboard(Game &game, span<string> args)
 {
     stringstream ss;
     for (size_t i = 1; i < args.size(); ++i)
@@ -144,23 +146,23 @@ static void handle_setboard(Game &game, const vector<string> &args)
     *game.position_ = Position{ss.str()};
 }
 
-static void handle_getboard(Game &game, const vector<string> &)
+static void handle_getboard(Game &game, span<string>)
 {
     std::string fen_string = game.position_->operator std::string();
     printf("%s\n", fen_string.c_str());
 }
 
-static void handle_nopost(Game &game, const vector<string> &)
+static void handle_nopost(Game &game, span<string>)
 {
     game.do_show_thinking_ = false;
 }
 
-static void handle_post(Game &game, const vector<string> &)
+static void handle_post(Game &game, span<string>)
 {
     game.do_show_thinking_ = true;
 }
 
-static void handle_time(Game &game, const vector<string> &args)
+static void handle_time(Game &game, span<string> args)
 {
     if (args.size() != 2)
     {
@@ -174,12 +176,12 @@ static void handle_time(Game &game, const vector<string> &args)
     }
 }
 
-static void handle_cancel(Game &game, const vector<string> &)
+static void handle_cancel(Game &game, span<string>)
 {
     game.StopThinking();
 }
 
-static void handle_level(Game &game, const vector<string> &args)
+static void handle_level(Game &game, span<string> args)
 {
     if (args.size() != 4)
     {
@@ -213,7 +215,7 @@ static void handle_level(Game &game, const vector<string> &args)
     }
 }
 
-static void handle_st(Game &game, const vector<string> &args)
+static void handle_st(Game &game, span<string> args)
 {
     if (args.size() != 2)
     {
@@ -228,7 +230,7 @@ static void handle_st(Game &game, const vector<string> &args)
     }
 }
 
-static void handle_sd(Game &game, const vector<string> &args)
+static void handle_sd(Game &game, span<string> args)
 {
     if (args.size() != 2)
     {
@@ -245,7 +247,7 @@ static void handle_sd(Game &game, const vector<string> &args)
 
 #define PRINT_MIN_SEC(milliseconds) printf("%02d:%02d\n", (milliseconds) / 60000, ((milliseconds) / 1000) % 60)
 
-static void handle_showtime(Game &game, const vector<string> &)
+static void handle_showtime(Game &game, span<string>)
 {
     switch (game.time_control_.clock_type)
     {
@@ -278,24 +280,24 @@ static void handle_showtime(Game &game, const vector<string> &)
     }
 }
 
-static void handle_eval(Game &game, const vector<string> &)
+static void handle_eval(Game &game, span<string>)
 {
     printf("evaluation %5d\n", EvaluatePosition(*game.position_, ALPHA, BETA));
 }
 
 #if DEBUGX
-static void handle_dbg(Game &, const vector<string> &)
+static void handle_dbg(Game &, span<string>)
 {
     DebugXWrite();
 }
 
-static void handle_dbgclear(Game &, const vector<string> &)
+static void handle_dbgclear(Game &, span<string>)
 {
     DebugXClear();
 }
 #endif
 
-static void handle_undo(Game &game, const vector<string> &)
+static void handle_undo(Game &game, span<string>)
 {
     if (game.position_ != game.stack_)
     {
@@ -303,7 +305,7 @@ static void handle_undo(Game &game, const vector<string> &)
     }
 }
 
-static void handle_remove(Game &game, const vector<string> &)
+static void handle_remove(Game &game, span<string>)
 {
     if (game.position_ - game.stack_ >= 2)
     {
@@ -311,18 +313,18 @@ static void handle_remove(Game &game, const vector<string> &)
     }
 }
 
-static void handle_seetests(Game &, const vector<string> &)
+static void handle_seetests(Game &, span<string>)
 {
     RunStaticExchangeTests();
 }
 
-static void handle_mergetest(Game &, const vector<string> &)
+static void handle_mergetest(Game &, span<string>)
 {
     const bool is_pass = RunMergeSortTests();
     printf("Merge sort tests: %s\n", is_pass ? "PASS" : "FAIL");
 }
 
-static void handle_help(Game &, const vector<string> &);
+static void handle_help(Game &, span<string>);
 
 #define COMMAND(name) handle_##name, #name
 
@@ -363,7 +365,7 @@ const InputHandler handlers[] = {
     {NULL, "", ""},
 };
 
-static void handle_help(Game &, const vector<string> &)
+static void handle_help(Game &, span<string>)
 {
     const InputHandler *i;
     printf("refer to 'engine_protocol.html' for details of the communication\n");
@@ -377,7 +379,7 @@ static void handle_help(Game &, const vector<string> &)
 
 #define MAX_NUM_ARGS 8
 
-void ProcessInput(Game &game, const string &line)
+void ProcessInput(Game &game, string_view line)
 {
     stringstream ss;
     ss << line;

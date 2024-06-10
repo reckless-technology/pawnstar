@@ -85,7 +85,7 @@ void Position::MovePiece(Color color, Piece piece, Square from, Square to)
     hash_ ^= hash[to] ^ hash[from];
 }
 
-Position::Position(const Position &previous, Move move) noexcept
+Position::Position(const Position &previous, Move move)
 {
     const Color  color    = previous.ColorToMove();
     const Square from     = MoveFrom(move);
@@ -214,7 +214,7 @@ Position::Position(const Position &previous, Move move) noexcept
         return;                                          \
     }
 
-Position::Position(std::string_view fen_string) noexcept
+Position::Position(std::string_view fen_string)
 {
     static constexpr string_view white_piece_names{"PNBRQK"};
     static constexpr string_view black_piece_names{"pnbrqk"};

@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <string>
+#include <string_view>
 
 int main()
 {
@@ -28,7 +29,7 @@ int main()
         "                    /________\\                      \n\n"
 #endif
         "Pawnstar: A Winboard and Xboard compatible chess engine\n"
-        "(C) Jonny Reckless 2009 - 2023                         \n"
+        "(C) Jonny Reckless 2009 - 2024                         \n"
         "Compiled: " __DATE__ " " __TIME__ "\n");
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
     if (!InitializeOpeningBookFromFile("pawnstar.book"))
@@ -37,10 +38,8 @@ int main()
     }
     Game game{};
     DEBUG_STATEMENT(DebugXClear());
-    for (;;)
+    for (std::string line; std::getline(std::cin, line);)
     {
-        std::string line;
-        std::getline(std::cin, line);
-        ProcessInput(game, line);
+        ProcessInput(game, std::string_view(line));
     }
 }
