@@ -97,8 +97,7 @@ Position::Position(const Position &previous, Move move)
     previous_ = &previous;
     flags_ &= ~IS_NULL_MOVE;
     flags_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
-    hash_ ^= CASTLING_RIGHTS_HASHES[flags_ & CASTLING_RIGHTS_MASK] ^
-             CASTLING_RIGHTS_HASHES[previous.flags_ & CASTLING_RIGHTS_MASK];
+    hash_ ^= CASTLING_RIGHTS_HASHES[flags_ & CASTLING_RIGHTS_MASK] ^ CASTLING_RIGHTS_HASHES[previous.flags_ & CASTLING_RIGHTS_MASK];
     hash_ ^= EN_PASSANT_HASHES[en_passant_index_];
     en_passant_index_ = NO_SQUARE;
     ++reversible_move_count_;
@@ -342,8 +341,7 @@ Position::Position(std::string_view fen_string)
     }
     else
     {
-        if (ep_square.length() != 2 || ep_files.find(ep_square[0]) == string::npos ||
-            ep_ranks.find(ep_square[1]) == string::npos)
+        if (ep_square.length() != 2 || ep_files.find(ep_square[0]) == string::npos || ep_ranks.find(ep_square[1]) == string::npos)
         {
             BAD_FEN_STRING;
         }
@@ -398,8 +396,8 @@ Position::operator std::string() const
                     ss << (char)('0' + num_empty_squares);
                     num_empty_squares = 0;
                 }
-                const char piece = (white_pieces_ & BITBOARD(x, y)) ? " PNBRQK"[PieceAt((Square)(x + 8 * y))]
-                                                                    : " pnbrqk"[PieceAt((Square)(x + 8 * y))];
+                const char piece =
+                    (white_pieces_ & BITBOARD(x, y)) ? " PNBRQK"[PieceAt((Square)(x + 8 * y))] : " pnbrqk"[PieceAt((Square)(x + 8 * y))];
                 ss << piece;
             }
         }
@@ -471,8 +469,7 @@ bool Position::IsAttacked(Square location, Color color) const
     Pawn, knight and king attacks can be done by direct lookup since blockers
     do not affect their attack set.
     */
-    if (attacking_pieces & ((sets.pawn_attacks[EnemyOf(color)] & pawns_) | (sets.knight_attacks & knights_) |
-                            (sets.king_attacks & kings_)))
+    if (attacking_pieces & ((sets.pawn_attacks[EnemyOf(color)] & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)))
     {
         return true;
     }
@@ -518,8 +515,8 @@ Bitboard Position::AttacksTo(Square location, Color color) const
     Pawn, knight and king attacks can be done by direct lookup since blockers
     do not affect their attack set.
     */
-    Bitboard result = (attacking_pieces & ((sets.pawn_attacks[EnemyOf(color)] & pawns_) |
-                                           (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)));
+    Bitboard result = (attacking_pieces &
+                       ((sets.pawn_attacks[EnemyOf(color)] & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)));
     /*
     Rook and queen horizontal and vertical sliding attacks
     */
@@ -640,8 +637,7 @@ bool Position::IsDrawByMaterial() const
         {
             const Bitboard white_bishops = bishops_ & white_pieces_;
             const Bitboard black_bishops = bishops_ ^ white_bishops;
-            if (white_bishops && black_bishops &&
-                (!(white_bishops & WHITE_SQUARES) == !(black_bishops & WHITE_SQUARES)))
+            if (white_bishops && black_bishops && (!(white_bishops & WHITE_SQUARES) == !(black_bishops & WHITE_SQUARES)))
             {
                 INCREMENT("draws by material (4)");
                 return true;
@@ -814,7 +810,6 @@ string Position::MoveToString(Move move) const
         else
         {
             result << move_piece << disambiguation << to_square;
-            ;
         }
         break;
 

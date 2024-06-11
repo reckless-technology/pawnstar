@@ -6,6 +6,6 @@ AlignConsecutiveDeclarations: 'true'
 AlignEscapedNewlines: Left
 AlignOperands: 'true'
 AlignTrailingComments: 'true'
-ColumnLimit: '120'
+ColumnLimit: '140'
 
 ...

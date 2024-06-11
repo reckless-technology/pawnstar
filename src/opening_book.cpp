@@ -1,34 +1,37 @@
-#include <string>
-#include <vector>
-#include <unordered_map>
-#include <sstream>
 #include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
-#include "opening_book.h"
-#include "position.h"
 #include "debug_hashtable.h"
-#include "transposition_table.h"
 #include "function_prototypes.h"
 #include "game.h"
+#include "opening_book.h"
+#include "position.h"
+#include "transposition_table.h"
 
-using std::string;
-using std::vector;
-using std::unordered_map;
-using std::stringstream;
 using std::ifstream;
+using std::istream;
+using std::string;
 using std::string_view;
+using std::stringstream;
+using std::unordered_map;
+using std::vector;
 
 /**
- * @brief The opening book is stored as a map, indexed by the Zobrist 
+ * @brief The opening book is stored as a map, indexed by the Zobrist
  * hash of the position, containing a vector of Moves which are
- * available from that position. The same move may be in the 
+ * available from that position. The same move may be in the
  * moves vector multiple times if it appears in several lines of
  * play, i.e. the frequency of occurence of a move in the list
  * is proportional to the liklihood that we want to play it.
  */
 static unordered_map<uint64_t, vector<Move>> book;
 
-static bool InitializeOpeningBookFromStringStream(stringstream& ss);
+static bool InitializeOpeningBookFromStream(istream &ss);
 
 /**
  * @brief Parse the opening book file and create the opening book from it.
@@ -37,27 +40,26 @@ static bool InitializeOpeningBookFromStringStream(stringstream& ss);
  */
 bool InitializeOpeningBookFromFile(string_view filename)
 {
-    ifstream file { string { filename } };
-    if (!file.is_open())
+    ifstream file{filename};
+    if (!file)
     {
         return false;
     }
-    stringstream ss;
-    ss << file.rdbuf();
+    const bool is_ok = InitializeOpeningBookFromStream(file);
     file.close();
-    return InitializeOpeningBookFromStringStream(ss);
+    return is_ok;
 }
 
 /**
  * @brief Pseudo randomly select from available book moves
  * @param hash the position hash
  * @return Move selected from book, or 0 if no move found
-*/
+ */
 Move GetBookMove(uint64_t hash)
 {
     if (book.count(hash))
     {
-        const auto& moves = book[hash];
+        const auto &moves = book[hash];
         return moves[NextRandom() % moves.size()];
     }
     return 0;
@@ -65,7 +67,7 @@ Move GetBookMove(uint64_t hash)
 
 /**
  * @brief Free the opening book
-*/
+ */
 void FreeOpeningBook()
 {
     book.clear();
@@ -74,22 +76,22 @@ void FreeOpeningBook()
 /**
  * @brief Print available book moves for a position
  * @param position Position to consider for book moves
-*/
-void DisplayAvailableBookMoves(const Position& position)
+ */
+void DisplayAvailableBookMoves(const Position &position)
 {
     if (!book.count(position.hash_))
     {
         return;
     }
     unordered_map<Move, int> move_counts;
-    for (const auto& move : book[position.hash_])
+    for (const auto &move : book[position.hash_])
     {
         ++move_counts[move];
     }
     printf("MOVE   COUNT\n");
-    for (const auto& [move, freq] : move_counts)
+    for (const auto &[move, freq] : move_counts)
     {
-        string move_string { position.MoveToString(move) };
+        string move_string{position.MoveToString(move)};
         printf("%-8s %3d\n", move_string.c_str(), freq);
     }
 }
@@ -102,30 +104,31 @@ void DisplayAvailableBookMoves(const Position& position)
  * @param line The line of play
  * @return true on success
  */
-static bool ParseLineOfPlay(const string& line)
+static bool ParseLineOfPlay(std::string_view line)
 {
-    Game game {};
-    stringstream ss { line };
+    Game         game{};
+    stringstream ss;
+    ss << line;
     while (ss)
     {
-        string token;
-        ss >> token;
-        if (token.length() == 0 || isdigit(token[0]))
+        string move_string;
+        ss >> move_string;
+        if (move_string.length() == 0 || isdigit(move_string[0]))
         {
             continue; /* Ignore move numbers or blanks. */
         }
-        if (token[0] == '#')
+        if (move_string[0] == '#')
         {
             return true; /* Done with this line. */
         }
         const uint64_t hash = game.position_->hash_;
-        const Move move = game.PlayMove(token.c_str());
+        const Move     move = game.PlayMove(move_string);
         if (move == 0)
         {
-            printf("ERROR found in book line '%s' move '%s'\n", line.c_str(), token.c_str());
+            std::cout << "ERROR found in book line " << line << " move " << move_string << std::endl;
             return false;
         }
-        if (token.find('?') == string::npos) /* Ignore bad moves */
+        if (move_string.find('?') == string::npos) /* Ignore bad moves */
         {
             book[hash].push_back(move);
         }
@@ -134,12 +137,12 @@ static bool ParseLineOfPlay(const string& line)
 }
 
 /**
- * @brief Parse a multiline stringstream containing open book lines of 
+ * @brief Parse a multiline stringstream containing open book lines of
  *        play and create the opening book from it.
  * @param iss stringstream to be parsed, with one line of play per new line.
  * @return true on success
  */
-static bool InitializeOpeningBookFromStringStream(stringstream& ss)
+static bool InitializeOpeningBookFromStream(istream &ss)
 {
     while (ss)
     {

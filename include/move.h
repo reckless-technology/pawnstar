@@ -18,11 +18,13 @@
  * 22 - 22  En passant capture flag
  * 23 - 23  Pawn double push flag
  * 24 - 24  Is checking move flag (move gives check)
- * 32 - 63  Contains the move score (as signed 32 bit int) 
+ * 32 - 63  Contains the move score (as signed 32 bit int)
  *          after move has been evaluated / sorted
- * 
+ *
  * A value of 0 terminates a move list.
-*/
+ */
+
+/* clang-format off */
 
 typedef int64_t Move;
 
@@ -88,3 +90,4 @@ CopyVariation(Variation& dst, const Variation& src, Move best_move)
     dst.push_back(best_move);
     dst.insert(dst.end(), src.begin(), src.end());
 }
+/* clang-format on */

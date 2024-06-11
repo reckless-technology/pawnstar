@@ -1,63 +1,31 @@
 #pragma once
-#include <cstdint>
+#include <string_view>
+#include <unordered_map>
 
 #include "options.h"
 
 #if DEBUGX
+
+typedef std::unordered_map<std::string_view, uint32_t> DebugTable;
+extern DebugTable                                      debug_dictionary;
+
+void DebugXClear();
+void DebugXWrite();
+
 #define DEBUG_STATEMENT(x) x
-#define INCREMENT(x)       DebugXIncrement(x)
-#define INCREMENT_IF(b, x) DebugXIncrementIf(b, x)
+#define INCREMENT(x)       ++debug_dictionary[x];
+#define INCREMENT_IF(b, x)     \
+    if (b)                     \
+    {                          \
+        ++debug_dictionary[x]; \
+    }
+
 #else
+
 #define DEBUG_STATEMENT(x)
 #define INCREMENT(x)
 #define INCREMENT_IF(b, x)
+#define DebugXClear(x)
+#define DebugXWrite(x)
+
 #endif
-
-#if EVAL_DEBUGX
-#define EVAL_INCREMENT(x) DebugXIncrement(x)
-#else
-#define EVAL_INCREMENT(x)
-#endif
-
-#if DEBUGX
-/**
- * @brief Simple debug hash table dictionary fo diagnostic counts.
- *        Has to be super fast so just take the address of a string literal and
- *        use it as the nominal hash.
- */
-struct DebugEntry
-{
-    const char *key;
-    uint32_t    count;
-};
-
-extern DebugEntry debug_dict[DEBUG_DICT_SIZE];
-
-/**
- * @brief Increment the count associated with the string literal in key
- */
-static inline void DebugXIncrement(const char *const key)
-{
-    /*
-    String literals are typically aligned on 4 byte boundaries, so throw away
-    the bottom 2 bits of the address before finding the index into the table
-    */
-    DebugEntry *entry = &debug_dict[((uint64_t)key >> 2) % DEBUG_DICT_SIZE];
-    entry->key        = key;
-    ++entry->count;
-}
-
-/**
- * @brief Conditionally increment the count associated with the string literal in key
- */
-constexpr void DebugXIncrementIf(bool condition, const char *key)
-{
-    if (condition)
-    {
-        DebugXIncrement(key);
-    }
-}
-
-void DebugXClear(void);
-void DebugXWrite();
-#endif /* DEBUGX */

@@ -138,8 +138,8 @@ constexpr Bitboard KnightFill(Bitboard b)
 
 constexpr Bitboard KingFill(Bitboard b)
 {
-    return ShiftNorth(b) | ShiftNortheast(b) | ShiftEast(b) | ShiftSoutheast(b) | ShiftSouth(b) | ShiftSouthwest(b) |
-           ShiftWest(b) | ShiftNorthwest(b);
+    return ShiftNorth(b) | ShiftNortheast(b) | ShiftEast(b) | ShiftSoutheast(b) | ShiftSouth(b) | ShiftSouthwest(b) | ShiftWest(b) |
+           ShiftNorthwest(b);
 }
 
 constexpr Bitboard FillNorth(Bitboard b)

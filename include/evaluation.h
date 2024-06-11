@@ -178,8 +178,7 @@ template <Color color> int EvaluateMaterial(const Position &position)
     const Bitboard bishops         = position.bishops_ & friendly_pieces;
     const Bitboard rooks           = position.rooks_ & friendly_pieces;
     const Bitboard queens          = position.queens_ & friendly_pieces;
-    int score = PopCount(pawns) * 100 + PopCount(knights) * 400 + PopCount(bishops) * 400 + PopCount(rooks) * 600 +
-                PopCount(queens) * 1200;
+    int score = PopCount(pawns) * 100 + PopCount(knights) * 400 + PopCount(bishops) * 400 + PopCount(rooks) * 600 + PopCount(queens) * 1200;
     /* Bonus for the bishop pair. */
     if ((bishops & WHITE_SQUARES) && (bishops & BLACK_SQUARES))
     {
@@ -270,8 +269,7 @@ template <Color color> int EvaluateKing(const Position &position)
     (2 x N + 2 x B + 2 x R + 1 x Q)
     */
     const int enemy_material = 3 * PopCount((position.knights_ | position.bishops_) & enemy_pieces) +
-                               5 * PopCount(position.rooks_ & enemy_pieces) +
-                               9 * PopCount(position.queens_ & enemy_pieces);
+                               5 * PopCount(position.rooks_ & enemy_pieces) + 9 * PopCount(position.queens_ & enemy_pieces);
     int piece_square_score;
     /* First do piece square table */
     if (enemy_material > 12)
