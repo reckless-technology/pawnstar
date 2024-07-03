@@ -1,9 +1,9 @@
-#include "position.h"
 #include "debug_hashtable.h"
-#include "transposition_table.h"
 #include "function_prototypes.h"
-#include "search.h"
 #include "game.h"
+#include "position.h"
+#include "search.h"
+#include "transposition_table.h"
 
 /**
  * @brief Search a single move and return its alpha beta score.
@@ -17,21 +17,11 @@
  * @param move_index Move number (0 is first move)
  * @return score for this move
  */
-int 
-SearchSingleMove(Game&      game, 
-                 int        depth, 
-                 int        ply, 
-                 int        alpha, 
-                 int        beta, 
-                 Move       move,
-                 Variation& pv,
-                 int        move_index)
+int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index)
 {
     game.PlayMove(move);
     int score;
-    if (beta > alpha + 1    && 
-        move_index > 0      && 
-        !(game.position_->flags_ & IS_CHECK))
+    if (beta > alpha + 1 && move_index > 0 && !game.position_->IsInCheck())
     {
         INCREMENT("pvs attempts");
         score = -Search(game, depth - 1, ply + 1, -alpha - 1, -alpha, pv);

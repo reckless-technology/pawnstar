@@ -1,9 +1,9 @@
-#include "position.h"
 #include "debug_hashtable.h"
-#include "transposition_table.h"
 #include "function_prototypes.h"
 #include "game.h"
+#include "position.h"
 #include "search.h"
+#include "transposition_table.h"
 
 /**
  * @brief Alpha beta quiescence (capture only) search.
@@ -14,11 +14,7 @@
  * @param beta parent ceiling value
  * @return score The score for this position
  */
-int SearchQuiescent(Game &game,
-                    int depth,
-                    int ply,
-                    int alpha,
-                    int beta)
+int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
 {
     INCREMENT("quiescent calls");
     if (ply == MAX_PLY)
@@ -26,7 +22,7 @@ int SearchQuiescent(Game &game,
         INCREMENT("quiescent max ply");
         return EvaluatePosition(*game.position_, alpha, beta);
     }
-    if (game.position_->flags_ & IS_CHECK)
+    if (game.position_->IsInCheck())
     {
         INCREMENT("quiescent checks");
         Variation dummy{};
@@ -43,7 +39,7 @@ int SearchQuiescent(Game &game,
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
-    int best_score = score;
+    int      best_score = score;
     MoveList move_list{game.position_->GeneratePseudoLegalCaptures()};
     ScoreAndSortMoves(*game.position_, move_list, ply, depth);
     for (Move move : move_list)

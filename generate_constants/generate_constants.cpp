@@ -1,36 +1,36 @@
 /**
  * @file Precomputes at compile time, constants used by the main Pawnstar program.
-*/
-#include <cstdio>
-#include <cstdbool>
-#include <cinttypes>
-#include <cstring>
+ */
 #include <algorithm>
+#include <cinttypes>
+#include <cstdbool>
+#include <cstdio>
+#include <cstring>
 
 #ifndef DO_EXTRA_PAWN_EVAL
-#define DO_EXTRA_PAWN_EVAL  1
+#define DO_EXTRA_PAWN_EVAL 1
 #endif
 
 /* Fixed square definitions */
-#define MASK_EAST_1         0x7F7F7F7F7F7F7F7Full       /**< Mask off the H file to prevent wraparound when shifting east. */
-#define MASK_WEST_1         0xFEFEFEFEFEFEFEFEull       /**< Mask off the A file to prevent wraparound when shifting west. */ 
-#define NO_SQUARES          0x0000000000000000ull
+#define MASK_EAST_1 0x7F7F7F7F7F7F7F7Full /**< Mask off the H file to prevent wraparound when shifting east. */
+#define MASK_WEST_1 0xFEFEFEFEFEFEFEFEull /**< Mask off the A file to prevent wraparound when shifting west. */
+#define NO_SQUARES  0x0000000000000000ull
 
 /* Function like macros */
-#define FileOf(locn)       ((locn) & 7)                /**< Convert square index to file. */
-#define RankOf(locn)       ((locn) >> 3)               /**< Convert square index to rank. */
-#define FileChar(locn)     (char)('a' + FileOf(locn))  /**< Convert square index to file character. */
-#define RankChar(locn)     (char)('1' + RankOf(locn))  /**< Convert square index to rank character. */
-#define BITBOARD(locn)     (1ull << (locn))            /**< Convert square index to Bitboard. */
-#define BITBOARD_XY(x,y)   (1ull << ((x) + 8 * (y)))   /**< Convert square (file,rank) co-ords to Bitboard. */
-#define ShiftNorth(b)      ((b) << 8)                  /**< Shift a Bitboard one square to the north. */
-#define ShiftNortheast(b)  (((b) & MASK_EAST_1) << 9)  /**< Shift a Bitboard one square to the northeast. */
-#define ShiftEast(b)       (((b) & MASK_EAST_1) << 1)  /**< Shift a Bitboard one square to the east. */
-#define ShiftSoutheast(b)  (((b) & MASK_EAST_1) >> 7)  /**< Shift a Bitboard one square to the southeast. */
-#define ShiftSouth(b)      ((b) >> 8)                  /**< Shift a Bitboard one square to the south. */
-#define ShiftSouthwest(b)  (((b) & MASK_WEST_1) >> 9)  /**< Shift a Bitboard one square to the southwest. */
-#define ShiftWest(b)       (((b) & MASK_WEST_1) >> 1)  /**< Shift a Bitboard one square to the west. */
-#define ShiftNorthwest(b)  (((b) & MASK_WEST_1) << 7)  /**< Shift a Bitboard one square to the northwest. */
+#define FileOf(locn)      ((locn) & 7)               /**< Convert square index to file. */
+#define RankOf(locn)      ((locn) >> 3)              /**< Convert square index to rank. */
+#define FileChar(locn)    (char)('a' + FileOf(locn)) /**< Convert square index to file character. */
+#define RankChar(locn)    (char)('1' + RankOf(locn)) /**< Convert square index to rank character. */
+#define BITBOARD(locn)    (1ull << (locn))           /**< Convert square index to Bitboard. */
+#define BITBOARD_XY(x, y) (1ull << ((x) + 8 * (y)))  /**< Convert square (file,rank) co-ords to Bitboard. */
+#define ShiftNorth(b)     ((b) << 8)                 /**< Shift a Bitboard one square to the north. */
+#define ShiftNortheast(b) (((b) & MASK_EAST_1) << 9) /**< Shift a Bitboard one square to the northeast. */
+#define ShiftEast(b)      (((b) & MASK_EAST_1) << 1) /**< Shift a Bitboard one square to the east. */
+#define ShiftSoutheast(b) (((b) & MASK_EAST_1) >> 7) /**< Shift a Bitboard one square to the southeast. */
+#define ShiftSouth(b)     ((b) >> 8)                 /**< Shift a Bitboard one square to the south. */
+#define ShiftSouthwest(b) (((b) & MASK_WEST_1) >> 9) /**< Shift a Bitboard one square to the southwest. */
+#define ShiftWest(b)      (((b) & MASK_WEST_1) >> 1) /**< Shift a Bitboard one square to the west. */
+#define ShiftNorthwest(b) (((b) & MASK_WEST_1) << 7) /**< Shift a Bitboard one square to the northwest. */
 
 /**
  * @brief Chess piece types.
@@ -73,16 +73,10 @@ typedef struct DirectionVector
 /**
  * @brief Each of the directions on the compass.
  */
-static const DirectionVector direction_vectors[8] =
-{
-    [DIR_NORTH]     = { .dx =  0, .dy =  1 },
-    [DIR_NORTHEAST] = { .dx =  1, .dy =  1 },
-    [DIR_EAST]      = { .dx =  1, .dy =  0 },
-    [DIR_SOUTHEAST] = { .dx =  1, .dy = -1 },
-    [DIR_SOUTH]     = { .dx =  0, .dy = -1 },
-    [DIR_SOUTHWEST] = { .dx = -1, .dy = -1 },
-    [DIR_WEST]      = { .dx = -1, .dy =  0 },
-    [DIR_NORTHWEST] = { .dx = -1, .dy =  1 },
+static const DirectionVector direction_vectors[8] = {
+    [DIR_NORTH] = {.dx = 0, .dy = 1},      [DIR_NORTHEAST] = {.dx = 1, .dy = 1},  [DIR_EAST] = {.dx = 1, .dy = 0},
+    [DIR_SOUTHEAST] = {.dx = 1, .dy = -1}, [DIR_SOUTH] = {.dx = 0, .dy = -1},     [DIR_SOUTHWEST] = {.dx = -1, .dy = -1},
+    [DIR_WEST] = {.dx = -1, .dy = 0},      [DIR_NORTHWEST] = {.dx = -1, .dy = 1},
 };
 
 /**
@@ -90,8 +84,7 @@ static const DirectionVector direction_vectors[8] =
  * @param x Input value.
  * @return Number of 1 bits in x.
  */
-static int
-PopCount(uint64_t x)
+static int PopCount(uint64_t x)
 {
     int count = 0;
     while (x)
@@ -107,8 +100,7 @@ PopCount(uint64_t x)
  * @param x Input value.
  * @return Index of least significant 1 bit in x.
  */
-static int
-Lsb(uint64_t x)
+static int Lsb(uint64_t x)
 {
     int result = 0;
     while (!(x & 1))
@@ -124,12 +116,11 @@ Lsb(uint64_t x)
  * @param x Pointer to input value. On return has its Lsb cleared.
  * @return Index of bit which was cleared in x.
  */
-static int
-FindAndClearLsb(uint64_t* x)
+static int FindAndClearLsb(uint64_t *x)
 {
-    const uint64_t y = *x;
-    const int result = Lsb(y);
-    *x = y & (y - 1);
+    const uint64_t y      = *x;
+    const int      result = Lsb(y);
+    *x                    = y & (y - 1);
     return result;
 }
 
@@ -137,13 +128,12 @@ FindAndClearLsb(uint64_t* x)
  * @brief RC4 stream PRNG
  * @return next byte in stream
  */
-static uint8_t 
-RC4()
+static uint8_t RC4()
 {
     static uint8_t S[256];
     static uint8_t i;
     static uint8_t j;
-    static bool is_initialized;
+    static bool    is_initialized;
     if (!is_initialized)
     {
         is_initialized = true;
@@ -168,8 +158,7 @@ RC4()
  * @brief 64 bit PRNG used to create Zobrist hash keys
  * @return next 64 bit value
  */
-static uint64_t 
-PseudoRandom64()
+static uint64_t PseudoRandom64()
 {
     uint64_t result = 0;
     for (int i = 0; i != 8; ++i)
@@ -187,11 +176,9 @@ PseudoRandom64()
  */
 static uint64_t VectorFrom(uint8_t location, int direction)
 {
-    uint64_t result = NO_SQUARES;
-    const DirectionVector* dv = &direction_vectors[direction];
-    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy;
-         x >= 0 && x < 8 && y >= 0 && y < 8;
-         x += dv->dx, y += dv->dy)
+    uint64_t               result = NO_SQUARES;
+    const DirectionVector *dv     = &direction_vectors[direction];
+    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy; x >= 0 && x < 8 && y >= 0 && y < 8; x += dv->dx, y += dv->dy)
     {
         result |= BITBOARD_XY(x, y);
     }
@@ -291,10 +278,7 @@ static uint64_t KnightAttacks(uint8_t location)
  */
 static uint64_t BishopAttacks(uint8_t location)
 {
-    return NortheastOf(location) | 
-           NorthwestOf(location) | 
-           SoutheastOf(location) | 
-           SouthwestOf(location);
+    return NortheastOf(location) | NorthwestOf(location) | SoutheastOf(location) | SouthwestOf(location);
 }
 
 /**
@@ -304,10 +288,7 @@ static uint64_t BishopAttacks(uint8_t location)
  */
 static uint64_t RookAttacks(uint8_t location)
 {
-    return NorthOf(location) | 
-           SouthOf(location) | 
-           EastOf(location)  | 
-           WestOf(location);
+    return NorthOf(location) | SouthOf(location) | EastOf(location) | WestOf(location);
 }
 
 /**
@@ -327,13 +308,7 @@ static uint64_t QueenAttacks(uint8_t location)
  */
 static uint64_t KingFill(uint64_t b)
 {
-    return ShiftNorth(b)       |
-           ShiftNortheast(b)   |
-           ShiftEast(b)        |
-           ShiftSoutheast(b)   |
-           ShiftSouth(b)       |
-           ShiftSouthwest(b)   |
-           ShiftWest(b)        |
+    return ShiftNorth(b) | ShiftNortheast(b) | ShiftEast(b) | ShiftSoutheast(b) | ShiftSouth(b) | ShiftSouthwest(b) | ShiftWest(b) |
            ShiftNorthwest(b);
 }
 
@@ -373,9 +348,9 @@ static uint64_t KingPawnShelterBlack(uint8_t location)
  */
 static uint64_t PassedPawnMaskWhite(uint8_t location)
 {
-    uint64_t result     = NO_SQUARES;
-    const int locn_x    = FileOf(location);
-    const int locn_y    = RankOf(location);
+    uint64_t  result = NO_SQUARES;
+    const int locn_x = FileOf(location);
+    const int locn_y = RankOf(location);
     for (int x = locn_x - 1; x <= locn_x + 1; ++x)
     {
         if (x < 0 || x > 7)
@@ -397,9 +372,9 @@ static uint64_t PassedPawnMaskWhite(uint8_t location)
  */
 static uint64_t PassedPawnMaskBlack(uint8_t location)
 {
-    uint64_t result     = NO_SQUARES;
-    const int locn_x    = FileOf(location);
-    const int locn_y    = RankOf(location);
+    uint64_t  result = NO_SQUARES;
+    const int locn_x = FileOf(location);
+    const int locn_y = RankOf(location);
     for (int x = locn_x - 1; x <= locn_x + 1; ++x)
     {
         if (x < 0 || x > 7)
@@ -421,8 +396,8 @@ static uint64_t PassedPawnMaskBlack(uint8_t location)
  */
 static uint64_t IsolatedPawnMaskWhite(uint8_t location)
 {
-    uint64_t result     = NO_SQUARES;
-    const int locn_x    = FileOf(location);
+    uint64_t  result = NO_SQUARES;
+    const int locn_x = FileOf(location);
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
     {
         if (x < 0 || x > 7)
@@ -454,9 +429,10 @@ static uint64_t IsolatedPawnMaskBlack(uint8_t location)
  */
 static uint64_t SupportedPawnMaskWhite(uint8_t location)
 {
-    uint64_t result     = NO_SQUARES;
-    const int locn_x    = FileOf(location);
-    const int locn_y    = RankOf(location);;
+    uint64_t  result = NO_SQUARES;
+    const int locn_x = FileOf(location);
+    const int locn_y = RankOf(location);
+    ;
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
     {
         if (x < 0 || x > 7)
@@ -478,7 +454,7 @@ static uint64_t SupportedPawnMaskWhite(uint8_t location)
  */
 static uint64_t SupportedPawnMaskBlack(uint8_t location)
 {
-    uint64_t result  = NO_SQUARES;
+    uint64_t  result = NO_SQUARES;
     const int locn_x = FileOf(location);
     const int locn_y = RankOf(location);
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
@@ -537,8 +513,8 @@ static uint64_t InterveningSquares(int from, int to)
 }
 
 /**
- * @brief Occupancy mask vector for a single direction. 
- * Occupancy masks exclude the final end square of the ray 
+ * @brief Occupancy mask vector for a single direction.
+ * Occupancy masks exclude the final end square of the ray
  * as this does not affect slider move targets.
  * @param location Square index.
  * @param direction Compass direction.
@@ -546,11 +522,10 @@ static uint64_t InterveningSquares(int from, int to)
  */
 static uint64_t OccupancyMaskVector(uint8_t location, int direction)
 {
-    uint64_t result = NO_SQUARES;
-    const DirectionVector* dv = &direction_vectors[direction];
+    uint64_t               result = NO_SQUARES;
+    const DirectionVector *dv     = &direction_vectors[direction];
     for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy;
-         x + dv->dx >= 0 && x + dv->dx < 8 && y + dv->dy >= 0 && y + dv->dy < 8;
-         x += dv->dx, y += dv->dy)
+         x + dv->dx >= 0 && x + dv->dx < 8 && y + dv->dy >= 0 && y + dv->dy < 8; x += dv->dx, y += dv->dy)
     {
         result |= BITBOARD_XY(x, y);
     }
@@ -562,13 +537,10 @@ static uint64_t OccupancyMaskVector(uint8_t location, int direction)
  * @param location Square index.
  * @return Bishop sliding move occupancy mask for source square location.
  */
-static uint64_t
-BishopOccupancyMask(uint8_t location)
+static uint64_t BishopOccupancyMask(uint8_t location)
 {
-    return OccupancyMaskVector(location, DIR_NORTHEAST) |
-           OccupancyMaskVector(location, DIR_NORTHWEST) |
-           OccupancyMaskVector(location, DIR_SOUTHEAST) |
-           OccupancyMaskVector(location, DIR_SOUTHWEST);
+    return OccupancyMaskVector(location, DIR_NORTHEAST) | OccupancyMaskVector(location, DIR_NORTHWEST) |
+           OccupancyMaskVector(location, DIR_SOUTHEAST) | OccupancyMaskVector(location, DIR_SOUTHWEST);
 }
 
 /**
@@ -576,12 +548,9 @@ BishopOccupancyMask(uint8_t location)
  * @param location Square index.
  * @return Rook sliding move occupancy mask for source square location.
  */
-static uint64_t
-RookOccupancyMask(uint8_t location)
+static uint64_t RookOccupancyMask(uint8_t location)
 {
-    return OccupancyMaskVector(location, DIR_NORTH) |
-           OccupancyMaskVector(location, DIR_SOUTH) |
-           OccupancyMaskVector(location, DIR_EAST)  |
+    return OccupancyMaskVector(location, DIR_NORTH) | OccupancyMaskVector(location, DIR_SOUTH) | OccupancyMaskVector(location, DIR_EAST) |
            OccupancyMaskVector(location, DIR_WEST);
 }
 
@@ -592,16 +561,11 @@ RookOccupancyMask(uint8_t location)
  * @param direction Compass rose direction.
  * @return Set of sliding move squares in the specified direction.
  */
-static uint64_t
-VectorMoveTargets(uint64_t occupied_squares,
-                  int      location,
-                  int      direction)
+static uint64_t VectorMoveTargets(uint64_t occupied_squares, int location, int direction)
 {
-    uint64_t result = NO_SQUARES;
-    const DirectionVector* dv = &direction_vectors[direction];
-    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy;
-         x >= 0 && x < 8 && y >= 0 && y < 8;
-         x += dv->dx, y += dv->dy)
+    uint64_t               result = NO_SQUARES;
+    const DirectionVector *dv     = &direction_vectors[direction];
+    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy; x >= 0 && x < 8 && y >= 0 && y < 8; x += dv->dx, y += dv->dy)
     {
         result |= BITBOARD_XY(x, y);
         if (BITBOARD_XY(x, y) & occupied_squares)
@@ -618,14 +582,10 @@ VectorMoveTargets(uint64_t occupied_squares,
  * @param location Source square index.
  * @return Squares to which a bishop on location can slide to.
  */
-static uint64_t
-BishopMoveTargets(uint64_t occupied_squares, 
-                  uint8_t  location)
+static uint64_t BishopMoveTargets(uint64_t occupied_squares, uint8_t location)
 {
-    return VectorMoveTargets(occupied_squares, location, DIR_NORTHEAST) |
-           VectorMoveTargets(occupied_squares, location, DIR_SOUTHEAST) |
-           VectorMoveTargets(occupied_squares, location, DIR_SOUTHWEST) |
-           VectorMoveTargets(occupied_squares, location, DIR_NORTHWEST);
+    return VectorMoveTargets(occupied_squares, location, DIR_NORTHEAST) | VectorMoveTargets(occupied_squares, location, DIR_SOUTHEAST) |
+           VectorMoveTargets(occupied_squares, location, DIR_SOUTHWEST) | VectorMoveTargets(occupied_squares, location, DIR_NORTHWEST);
 }
 
 /**
@@ -634,30 +594,24 @@ BishopMoveTargets(uint64_t occupied_squares,
  * @param location Source square index.
  * @return Squares to which a rook on location can slide to.
  */
-static uint64_t
-RookMoveTargets(uint64_t occupied_squares, 
-                uint8_t  location)
+static uint64_t RookMoveTargets(uint64_t occupied_squares, uint8_t location)
 {
-    return VectorMoveTargets(occupied_squares, location, DIR_NORTH) |
-           VectorMoveTargets(occupied_squares, location, DIR_SOUTH) |
-           VectorMoveTargets(occupied_squares, location, DIR_EAST)  |
-           VectorMoveTargets(occupied_squares, location, DIR_WEST);
+    return VectorMoveTargets(occupied_squares, location, DIR_NORTH) | VectorMoveTargets(occupied_squares, location, DIR_SOUTH) |
+           VectorMoveTargets(occupied_squares, location, DIR_EAST) | VectorMoveTargets(occupied_squares, location, DIR_WEST);
 }
 
 /**
- * @brief Given a bit mask, enumerate all the possible combinations 
+ * @brief Given a bit mask, enumerate all the possible combinations
  * of bits set from that mask.
  * @param mask The mask value.
  * @param values Array to store the combination bitset values.
  * @return Number of combinations generated.
  */
-static int
-EnumerateMaskCombinations(uint64_t mask,
-                          uint64_t values[])
+static int EnumerateMaskCombinations(uint64_t mask, uint64_t values[])
 {
-    int bit_indices[64] = { 0 };
-    int* bi = bit_indices;
-    uint64_t b = mask;
+    int      bit_indices[64] = {0};
+    int     *bi              = bit_indices;
+    uint64_t b               = mask;
     while (b)
     {
         *bi++ = FindAndClearLsb(&b);
@@ -667,7 +621,7 @@ EnumerateMaskCombinations(uint64_t mask,
     for (int i = 0; i != num_combinations; ++i)
     {
         uint64_t value = NO_SQUARES;
-        b = i;
+        b              = i;
         while (b)
         {
             value |= BITBOARD(bit_indices[FindAndClearLsb(&b)]);
@@ -677,8 +631,8 @@ EnumerateMaskCombinations(uint64_t mask,
     return num_combinations;
 }
 
-typedef uint64_t(*OccupancyFn)   (uint8_t location);
-typedef uint64_t(*MoveTargetFn)  (uint64_t occupied_squares, uint8_t location);
+typedef uint64_t (*OccupancyFn)(uint8_t location);
+typedef uint64_t (*MoveTargetFn)(uint64_t occupied_squares, uint8_t location);
 #define MAX_ATTACK_SET_SIZE 4096 /* Rooks have a 12 bit occupancy mask. */
 
 /**
@@ -686,29 +640,27 @@ typedef uint64_t(*MoveTargetFn)  (uint64_t occupied_squares, uint8_t location);
  */
 typedef struct Magic
 {
-    MoveTargetFn    move_target_fn;                 /**< Move target function for actual moves available. */
-    OccupancyFn     occupancy_mask_fn;              /**< Occupancy mask function. */
-    uint64_t        magic;                          /**< The magic multiplicand. */
-    uint64_t        mask;                           /**< Occupancy mask. */
-    int             shift;                          /**< Number of bits to right shift to get indices. */
-    int             num_discrete_attacks;           /**< Number of separate discrete attack vectors generated. */
-    uint64_t        attacks[MAX_ATTACK_SET_SIZE];   /**< The discrete attack vectors. */
-    uint8_t         indices[MAX_ATTACK_SET_SIZE];   /**< Indices into the discrete attack vector array. */
+    MoveTargetFn move_target_fn;               /**< Move target function for actual moves available. */
+    OccupancyFn  occupancy_mask_fn;            /**< Occupancy mask function. */
+    uint64_t     magic;                        /**< The magic multiplicand. */
+    uint64_t     mask;                         /**< Occupancy mask. */
+    int          shift;                        /**< Number of bits to right shift to get indices. */
+    int          num_discrete_attacks;         /**< Number of separate discrete attack vectors generated. */
+    uint64_t     attacks[MAX_ATTACK_SET_SIZE]; /**< The discrete attack vectors. */
+    uint8_t      indices[MAX_ATTACK_SET_SIZE]; /**< Indices into the discrete attack vector array. */
 } Magic;
 
 /**
  * @brief Trial and error search for a magic Bitboard entry.
  * @param location Square index.
- * @param magic Where to store the found magic values. 
+ * @param magic Where to store the found magic values.
  *              Has functions populated on entry.
  */
-static void
-FindMagic(int    location,
-          Magic* magic)
+static void FindMagic(int location, Magic *magic)
 {
     uint64_t occupancies[MAX_ATTACK_SET_SIZE];
     uint64_t actual_attacks[MAX_ATTACK_SET_SIZE];
-    magic->mask = magic->occupancy_mask_fn(location);
+    magic->mask  = magic->occupancy_mask_fn(location);
     magic->shift = 64 - PopCount(magic->mask);
     /*
     Enumerate all possible occupancy values and compute what the actual
@@ -723,7 +675,7 @@ FindMagic(int    location,
     /*
     Try a random magic multiplicand and test it for success.
     */
-    for (; ; )
+    for (;;)
     {
         bool is_hash_collision = false;
         /* Magics are typically fairly sparse, so AND a few random numbers together. */
@@ -747,14 +699,14 @@ FindMagic(int    location,
         }
         if (!is_hash_collision)
         {
-            /* 
-            Compress the actual attacks set down to a set of indices 
+            /*
+            Compress the actual attacks set down to a set of indices
             and unique attack vectors. Since the indices are 1 byte each
             and the vectors are 8 bytes each this saves a lot of space in the
             final magic move entry tables, which helps with cache pressure.
             */
             uint64_t discrete_attacks[MAX_ATTACK_SET_SIZE];
-            int num_discrete_attacks = 0;
+            int      num_discrete_attacks = 0;
             for (int i = 0; i != num_values; ++i)
             {
                 bool has_found_attack = false;
@@ -763,19 +715,19 @@ FindMagic(int    location,
                     if (discrete_attacks[j] == magic->attacks[i])
                     {
                         magic->indices[i] = j;
-                        has_found_attack = true;
+                        has_found_attack  = true;
                         break;
                     }
                 }
                 if (!has_found_attack)
                 {
                     discrete_attacks[num_discrete_attacks] = magic->attacks[i];
-                    magic->indices[i] = num_discrete_attacks;
+                    magic->indices[i]                      = num_discrete_attacks;
                     ++num_discrete_attacks;
                 }
             }
             magic->num_discrete_attacks = num_discrete_attacks;
-            magic->magic = trial_magic;
+            magic->magic                = trial_magic;
             memcpy(magic->attacks, discrete_attacks, num_discrete_attacks * sizeof(uint64_t));
             return;
         }
@@ -787,17 +739,13 @@ FindMagic(int    location,
  */
 typedef struct MagicVector
 {
-    const char*     name;               /**< Piece name (bishop or rook). */
-    MoveTargetFn    move_target_fn;     /**< Function pointer to actual move generation. */
-    OccupancyFn     occupancy_mask_fn;  /**< Function pointer to occupancy mask. */
+    const char  *name;              /**< Piece name (bishop or rook). */
+    MoveTargetFn move_target_fn;    /**< Function pointer to actual move generation. */
+    OccupancyFn  occupancy_mask_fn; /**< Function pointer to occupancy mask. */
 } MagicVector;
 
-static const MagicVector magic_vectors[] = 
-{
-    { "BISHOP", BishopMoveTargets,  BishopOccupancyMask },
-    { "ROOK",   RookMoveTargets,    RookOccupancyMask   },
-    { NULL,     NULL,               NULL                }
-};
+static const MagicVector magic_vectors[] = {
+    {"BISHOP", BishopMoveTargets, BishopOccupancyMask}, {"ROOK", RookMoveTargets, RookOccupancyMask}, {NULL, NULL, NULL}};
 
 /**
  * @brief Magics for each of the 64 squares on the chess board.
@@ -808,27 +756,26 @@ static Magic magics[64];
 /**
  * @brief Generate magic bitboards.
  */
-static void
-GenerateMagics(void)
+static void GenerateMagics(void)
 {
-    for (const MagicVector* v = magic_vectors; v->name; ++v)
+    for (const MagicVector *v = magic_vectors; v->name; ++v)
     {
         /* Find magic values for each square on the board. */
         for (int i = 0; i != 64; ++i)
         {
             magics[i].occupancy_mask_fn = v->occupancy_mask_fn;
-            magics[i].move_target_fn = v->move_target_fn;
+            magics[i].move_target_fn    = v->move_target_fn;
             FindMagic(i, &magics[i]);
         }
         /* First print the arrays for the discrete attacks and the attack indices. */
         for (int i = 0; i != 64; ++i)
         {
-            char square_name[3] = { (char)('A' + FileOf(i)), RankChar(i), 0 };
-            const int num_attacks = 1 << (64 - magics[i].shift);
+            char      square_name[3] = {(char)('A' + FileOf(i)), RankChar(i), 0};
+            const int num_attacks    = 1 << (64 - magics[i].shift);
             printf("static const uint8_t %s_MAGIC_INDICES_%s[%d] = \n{", v->name, square_name, num_attacks);
             for (int j = 0; j != num_attacks; ++j)
             {
-                if (j % 32 == 0)
+                if (j % 16 == 0)
                 {
                     printf("\n    ");
                 }
@@ -845,13 +792,12 @@ GenerateMagics(void)
                 printf("0x%016" PRIX64 "ull, ", magics[i].attacks[j]);
             }
             printf("\n};\n");
-           
         }
-         /* Next print the MagicMoveEntry for this piece / square combination. */
+        /* Next print the MagicMoveEntry for this piece / square combination. */
         printf("extern const MagicMoveEntry %s_MAGICS[64] = \n{\n", v->name);
         for (int i = 0; i != 64; ++i)
         {
-            char square_name[3] = { (char)('A' + FileOf(i)), RankChar(i), 0 };
+            char square_name[3] = {(char)('A' + FileOf(i)), RankChar(i), 0};
             printf("    {\n");
             printf("        .magic          = 0x%016" PRIX64 "ull,\n", magics[i].magic);
             printf("        .occupancy_mask = 0x%016" PRIX64 "ull,\n", magics[i].mask);
@@ -865,69 +811,89 @@ GenerateMagics(void)
 }
 
 /**
- * @brief Function pointer for a Bitboard generator function, 
+ * @brief Function pointer for a Bitboard generator function,
  * i.e. a function which converts a square location into a Bitboard
  * based on some property.
-*/
-typedef uint64_t(*BitboardFn)(uint8_t location);
+ */
+typedef uint64_t (*BitboardFn)(uint8_t location);
 
 /**
  * @brief Bitboard generator.
  */
 typedef struct BitboardGen
 {
-    const char* name;       /**< Name of generated output.      */
-    BitboardFn  function;   /**< Function to generate output.   */
+    const char *name;     /**< Name of generated output.      */
+    BitboardFn  function; /**< Function to generate output.   */
 } BitboardGen;
 
 /**
  * @brief Generators for the main precomputed Bitboard arrays.
  */
-static const BitboardGen ray_generators[] = 
-{
-    { "north",                      NorthOf                 },
-    { "northeast",                  NortheastOf             },
-    { "east",                       EastOf                  },
-    { "southeast",                  SoutheastOf             },
-    { "south",                      SouthOf                 },
-    { "southwest",                  SouthwestOf             },
-    { "west",                       WestOf                  },
-    { "northwest",                  NorthwestOf             },
-    { "pawn_attacks_white",         PawnAttacksWhite        },
-    { "pawn_attacks_black",         PawnAttacksBlack        },
-    { "knight_attacks",             KnightAttacks           },
-    { "bishop_attacks",             BishopAttacks           },
-    { "rook_attacks",               RookAttacks             },
-    { "queen_attacks",              QueenAttacks            },
-    { "king_attacks",               KingAttacks             },
-    { "king_attacks2",              KingAttacks2            },
-    { "king_pawn_shelter_white",    KingPawnShelterWhite    },
-    { "king_pawn_shelter_black",    KingPawnShelterBlack    },
-    { NULL,                         NULL                    },
+static const BitboardGen ray_generators[] = {
+    {"north", NorthOf},
+    {"northeast", NortheastOf},
+    {"east", EastOf},
+    {"southeast", SoutheastOf},
+    {"south", SouthOf},
+    {"southwest", SouthwestOf},
+    {"west", WestOf},
+    {"northwest", NorthwestOf},
+    {"pawn_attacks_white", PawnAttacksWhite},
+    {"pawn_attacks_black", PawnAttacksBlack},
+    {"knight_attacks", KnightAttacks},
+    {"bishop_attacks", BishopAttacks},
+    {"rook_attacks", RookAttacks},
+    {"queen_attacks", QueenAttacks},
+    {"king_attacks", KingAttacks},
+    {"king_attacks2", KingAttacks2},
+    {"king_pawn_shelter_white", KingPawnShelterWhite},
+    {"king_pawn_shelter_black", KingPawnShelterBlack},
+    {NULL, NULL},
 };
 
 #if DO_EXTRA_PAWN_EVAL
 
-static const BitboardGen pawn_generators_white[] =
-{
-    { "passed_pawn_mask",       PassedPawnMaskWhite,    },
-    { "isolated_pawn_mask",     IsolatedPawnMaskWhite,  },
-    { "supported_pawn_mask",    SupportedPawnMaskWhite, },
-    { "doubled_pawn_mask",      DoubledPawnMaskWhite,   },
-    { NULL,                     NULL                    },
+static const BitboardGen pawn_generators_white[] = {
+    {
+        "passed_pawn_mask",
+        PassedPawnMaskWhite,
+    },
+    {
+        "isolated_pawn_mask",
+        IsolatedPawnMaskWhite,
+    },
+    {
+        "supported_pawn_mask",
+        SupportedPawnMaskWhite,
+    },
+    {
+        "doubled_pawn_mask",
+        DoubledPawnMaskWhite,
+    },
+    {NULL, NULL},
 };
 
-static const BitboardGen pawn_generators_black[] =
-{
-    { "passed_pawn_mask",       PassedPawnMaskBlack,    },
-    { "isolated_pawn_mask",     IsolatedPawnMaskBlack,  },
-    { "supported_pawn_mask",    SupportedPawnMaskBlack, },
-    { "doubled_pawn_mask",      DoubledPawnMaskBlack,   },
-    { NULL,                     NULL                    },
+static const BitboardGen pawn_generators_black[] = {
+    {
+        "passed_pawn_mask",
+        PassedPawnMaskBlack,
+    },
+    {
+        "isolated_pawn_mask",
+        IsolatedPawnMaskBlack,
+    },
+    {
+        "supported_pawn_mask",
+        SupportedPawnMaskBlack,
+    },
+    {
+        "doubled_pawn_mask",
+        DoubledPawnMaskBlack,
+    },
+    {NULL, NULL},
 };
 
-static const BitboardGen* pawn_generators[] =
-{
+static const BitboardGen *pawn_generators[] = {
     pawn_generators_white,
     pawn_generators_black,
 };
@@ -937,25 +903,12 @@ static const BitboardGen* pawn_generators[] =
 /**
  * @brief Piece names.
  */
-static const char* const piece_names[7] = 
-{
-    "none",
-    "pawn",
-    "knight",
-    "bishop",
-    "rook",
-    "queen",
-    "king"
-};
+static const char *const piece_names[7] = {"none", "pawn", "knight", "bishop", "rook", "queen", "king"};
 
 /**
  * @brief Color names.
  */
-static const char* const color_names[2] = 
-{
-    "white",
-    "black"
-};
+static const char *const color_names[2] = {"white", "black"};
 
 /**
  * @brief Main entry point. Prints to stdout which gets redirected in the Makefile to create
@@ -970,13 +923,10 @@ int main()
     for (uint8_t location = 0; location != 64; ++location)
     {
         printf("\n    { /* square %c%c */", FileChar(location), RankChar(location));
-        for (const BitboardGen* generator = ray_generators; generator->name; ++generator)
+        for (const BitboardGen *generator = ray_generators; generator->name; ++generator)
         {
             const uint64_t b = generator->function(location);
-            printf("\n        .%-25s = 0x%016" PRIX64 "ull, /* popcnt %2d */",
-                generator->name,
-                b,
-                PopCount(b));
+            printf("\n        .%-25s = 0x%016" PRIX64 "ull, /* popcnt %2d */", generator->name, b, PopCount(b));
         }
         printf("\n    },");
     }
@@ -991,15 +941,10 @@ int main()
         for (uint8_t location = 0; location != 64; ++location)
         {
             printf("\n        { /* %s square %c%c */", color_names[color], FileChar(location), RankChar(location));
-            for (const BitboardGen* generator = pawn_generators[color];
-                 generator->name; 
-                ++generator)
+            for (const BitboardGen *generator = pawn_generators[color]; generator->name; ++generator)
             {
                 const uint64_t b = generator->function(location);
-                printf("\n            .%-28s = 0x%016" PRIX64 "ull, /* popcnt %2d */",
-                    generator->name,
-                    b,
-                    PopCount(b));
+                printf("\n            .%-28s = 0x%016" PRIX64 "ull, /* popcnt %2d */", generator->name, b, PopCount(b));
             }
             printf("\n        },");
         }

@@ -191,7 +191,7 @@ Position::Position(const Position &previous, Move move)
     king_location_[BLACK] = Lsb(kings_ & black_pieces_);
     if (IsAttacked(king_location_[color], EnemyOf(color)))
     {
-        flags_ |= IS_MOVED_INTO_CHECK;
+        flags_ |= HAS_MOVED_INTO_CHECK;
     }
     else
     {
@@ -705,7 +705,7 @@ MoveList Position::GenerateLegalMoves() const
     for (auto move : pseudo_legal_moves)
     {
         Position position{*this, move};
-        if (!(position.flags_ & IS_MOVED_INTO_CHECK))
+        if (!(position.flags_ & HAS_MOVED_INTO_CHECK))
         {
             result.push_back(move);
         }

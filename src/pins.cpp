@@ -1,32 +1,32 @@
-#include "position.h"
-#include "debug_hashtable.h"
-#include "transposition_table.h"
-#include "function_prototypes.h"
 #include "pins.h"
+#include "debug_hashtable.h"
+#include "function_prototypes.h"
+#include "position.h"
+#include "transposition_table.h"
 /**
  * @brief Determine any pinned pieces and their corresponding allowed target squares
  * Note: The contents of pins.allowed_squares[x] for non-pinned pieces is garbage
  * (whatever happened to be there before we were called)
  * @param position Position to operate on.
  * @param pins Pointer where to store result.
-*/
-void DeterminePins(const Position& position, Pins& pins)
+ */
+void DeterminePins(const Position &position, Pins &pins)
 {
-    pins.pinned_pieces              = NO_SQUARES;
-    const Color color               = position.ColorToMove();
-    const Bitboard occupied_squares = position.white_pieces_ | position.black_pieces_;
-    const Bitboard friendly_pieces  = position.pieces_of_color_[color];
-    const uint8_t king_location     = position.king_location_[color];
-    const Bitboard* intervening     = &INTERVENING_SQUARES[king_location][0];
-    Bitboard enemy_sliding_pieces   = 
-        ((SETS[king_location].bishop_attacks & (position.bishops_ | position.queens_)) | 
-        ( SETS[king_location].rook_attacks   & (position.rooks_   | position.queens_))) & ~friendly_pieces;
+    pins.pinned_pieces                   = NO_SQUARES;
+    const Color     color                = position.ColorToMove();
+    const Bitboard  occupied_squares     = position.OccupiedSquares();
+    const Bitboard  friendly_pieces      = position.PiecesOfColor(color);
+    const uint8_t   king_location        = position.KingLocation(color);
+    const Bitboard *intervening          = &INTERVENING_SQUARES[king_location][0];
+    Bitboard        enemy_sliding_pieces = ((SETS[king_location].bishop_attacks & (position.Bishops() | position.Queens())) |
+                                     (SETS[king_location].rook_attacks & (position.Rooks() | position.Queens()))) &
+                                    ~friendly_pieces;
     while (enemy_sliding_pieces)
     {
-        const Square   slider_location              = FindAndClearLsb(enemy_sliding_pieces);
-        const Bitboard intervening_squares          = intervening[slider_location];
-        const Bitboard intervening_pieces           = intervening_squares & occupied_squares;
-        const Bitboard intervening_friendly_piece   = intervening_pieces & friendly_pieces;
+        const Square   slider_location            = FindAndClearLsb(enemy_sliding_pieces);
+        const Bitboard intervening_squares        = intervening[slider_location];
+        const Bitboard intervening_pieces         = intervening_squares & occupied_squares;
+        const Bitboard intervening_friendly_piece = intervening_pieces & friendly_pieces;
         if (intervening_friendly_piece && PopCount(intervening_pieces) == 1)
         {
             pins.pinned_pieces |= intervening_friendly_piece;
