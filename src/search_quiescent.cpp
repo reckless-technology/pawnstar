@@ -1,6 +1,7 @@
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 #include "game.h"
+#include "move_generation.h"
 #include "position.h"
 #include "search.h"
 #include "transposition_table.h"
@@ -40,7 +41,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         alpha = score;
     }
     int      best_score = score;
-    MoveList move_list{game.position_->GeneratePseudoLegalCaptures()};
+    MoveList move_list{GeneratePseudoLegalCaptures(*game.position_)};
     ScoreAndSortMoves(*game.position_, move_list, ply, depth);
     for (Move move : move_list)
     {

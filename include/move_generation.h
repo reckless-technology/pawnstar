@@ -7,14 +7,14 @@
  * @brief Generate pseudo legal moves for the side to move.
  * @return List of moves
  */
-template <bool do_all_moves> MoveList Position::GenerateMoves() const
+template <bool do_all_moves> MoveList GenerateMoves(const Position &position)
 {
     MoveList moves{};
     moves.reserve(64);
-    const Color    color            = ColorToMove();
-    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
+    const Color    color            = position.ColorToMove();
+    const Bitboard occupied_squares = position.OccupiedSquares();
     const Bitboard vacant_squares   = ~occupied_squares;
-    const Bitboard friendly_pieces  = pieces_of_color_[color];
+    const Bitboard friendly_pieces  = position.PiecesOfColor(color);
     const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
     /*
     Pawn move variables
@@ -36,12 +36,12 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     */
     if (color == WHITE)
     {
-        pawns              = pawns_ & white_pieces_;
+        pawns              = position.Pawns() & position.WhitePieces();
         single_pushes      = ShiftNorth(pawns) & vacant_squares;
         double_pushes      = ShiftNorth(single_pushes) & vacant_squares & RANK_4;
-        captures_west      = ShiftNorthwest(pawns) & black_pieces_;
-        captures_east      = ShiftNortheast(pawns) & black_pieces_;
-        en_passant_sources = en_passant_index_ ? SETS[en_passant_index_].pawn_attacks_black & pawns : NO_SQUARES;
+        captures_west      = ShiftNorthwest(pawns) & position.BlackPieces();
+        captures_east      = ShiftNortheast(pawns) & position.BlackPieces();
+        en_passant_sources = position.EnPassantIndex() ? SETS[position.EnPassantIndex()].pawn_attacks_black & pawns : NO_SQUARES;
         promotions         = single_pushes & RANK_8;
         promotions_west    = captures_west & RANK_8;
         promotions_east    = captures_east & RANK_8;
@@ -51,12 +51,12 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     }
     else
     {
-        pawns              = pawns_ & black_pieces_;
+        pawns              = position.Pawns() & position.BlackPieces();
         single_pushes      = ShiftSouth(pawns) & vacant_squares;
         double_pushes      = ShiftSouth(single_pushes) & vacant_squares & RANK_5;
-        captures_west      = ShiftSouthwest(pawns) & white_pieces_;
-        captures_east      = ShiftSoutheast(pawns) & white_pieces_;
-        en_passant_sources = en_passant_index_ ? SETS[en_passant_index_].pawn_attacks_white & pawns : NO_SQUARES;
+        captures_west      = ShiftSouthwest(pawns) & position.WhitePieces();
+        captures_east      = ShiftSoutheast(pawns) & position.WhitePieces();
+        en_passant_sources = position.EnPassantIndex() ? SETS[position.EnPassantIndex()].pawn_attacks_white & pawns : NO_SQUARES;
         promotions         = single_pushes & RANK_1;
         promotions_west    = captures_west & RANK_1;
         promotions_east    = captures_east & RANK_1;
@@ -71,7 +71,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     {
         const Square to       = FindAndClearLsb(promotions_west);
         const Square from     = (Square)(to - west_delta);
-        const Piece  captured = PieceAt(to);
+        const Piece  captured = position.PieceAt(to);
         moves.push_back(PromotionMove(from, to, captured, QUEEN));
         moves.push_back(PromotionMove(from, to, captured, ROOK));
         moves.push_back(PromotionMove(from, to, captured, BISHOP));
@@ -81,7 +81,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     {
         const Square to       = FindAndClearLsb(promotions_east);
         const Square from     = (Square)(to - east_delta);
-        const Piece  captured = PieceAt(to);
+        const Piece  captured = position.PieceAt(to);
         moves.push_back(PromotionMove(from, to, captured, QUEEN));
         moves.push_back(PromotionMove(from, to, captured, ROOK));
         moves.push_back(PromotionMove(from, to, captured, BISHOP));
@@ -100,19 +100,19 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     {
         const Square to   = FindAndClearLsb(captures_west);
         const Square from = (Square)(to - west_delta);
-        moves.push_back(CaptureMove(from, to, PAWN, PieceAt(to)));
+        moves.push_back(CaptureMove(from, to, PAWN, position.PieceAt(to)));
     }
     while (captures_east)
     {
         const Square to   = FindAndClearLsb(captures_east);
         const Square from = (Square)(to - east_delta);
-        moves.push_back(CaptureMove(from, to, PAWN, PieceAt(to)));
+        moves.push_back(CaptureMove(from, to, PAWN, position.PieceAt(to)));
         ;
     }
     while (en_passant_sources)
     {
         const Square from = FindAndClearLsb(en_passant_sources);
-        moves.push_back(EpCaptureMove(from, en_passant_index_));
+        moves.push_back(EpCaptureMove(from, position.EnPassantIndex()));
     }
     if constexpr (do_all_moves)
     {
@@ -134,7 +134,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     /*
     Generate knight moves
     */
-    Bitboard knights = knights_ & friendly_pieces;
+    Bitboard knights = position.Knights() & friendly_pieces;
     while (knights)
     {
         const Square   from            = FindAndClearLsb(knights);
@@ -143,7 +143,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
         while (capture_targets)
         {
             const Square to = FindAndClearLsb(capture_targets);
-            moves.push_back(CaptureMove(from, to, KNIGHT, PieceAt(to)));
+            moves.push_back(CaptureMove(from, to, KNIGHT, position.PieceAt(to)));
         }
         if constexpr (do_all_moves)
         {
@@ -157,7 +157,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     /*
     Generate bishop sliding moves
     */
-    Bitboard bishops = bishops_ & friendly_pieces;
+    Bitboard bishops = position.Bishops() & friendly_pieces;
     while (bishops)
     {
         const Square   from            = FindAndClearLsb(bishops);
@@ -166,7 +166,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
         while (capture_targets)
         {
             const Square to = FindAndClearLsb(capture_targets);
-            moves.push_back(CaptureMove(from, to, BISHOP, PieceAt(to)));
+            moves.push_back(CaptureMove(from, to, BISHOP, position.PieceAt(to)));
         }
         if constexpr (do_all_moves)
         {
@@ -180,7 +180,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     /*
     Generate rook sliding moves
     */
-    Bitboard rooks = rooks_ & friendly_pieces;
+    Bitboard rooks = position.Rooks() & friendly_pieces;
     while (rooks)
     {
         const Square   from            = FindAndClearLsb(rooks);
@@ -189,7 +189,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
         while (capture_targets)
         {
             const Square to = FindAndClearLsb(capture_targets);
-            moves.push_back(CaptureMove(from, to, ROOK, PieceAt(to)));
+            moves.push_back(CaptureMove(from, to, ROOK, position.PieceAt(to)));
         }
         if constexpr (do_all_moves)
         {
@@ -203,7 +203,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     /*
     Generate Queen sliding moves
     */
-    Bitboard queens = queens_ & friendly_pieces;
+    Bitboard queens = position.Queens() & friendly_pieces;
     while (queens)
     {
         const Square   from            = FindAndClearLsb(queens);
@@ -212,7 +212,7 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
         while (capture_targets)
         {
             const Square to = FindAndClearLsb(capture_targets);
-            moves.push_back(CaptureMove(from, to, QUEEN, PieceAt(to)));
+            moves.push_back(CaptureMove(from, to, QUEEN, position.PieceAt(to)));
         }
         if constexpr (do_all_moves)
         {
@@ -226,13 +226,13 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
     /*
     Generate King Moves
     */
-    const Square   king_location   = king_location_[color];
+    const Square   king_location   = position.KingLocation(color);
     const Bitboard targets         = SETS[king_location].king_attacks;
     Bitboard       capture_targets = targets & enemy_pieces;
     while (capture_targets)
     {
         const Square to = FindAndClearLsb(capture_targets);
-        moves.push_back(CaptureMove(king_location, to, KING, PieceAt(to)));
+        moves.push_back(CaptureMove(king_location, to, KING, position.PieceAt(to)));
     }
     if constexpr (do_all_moves)
     {
@@ -241,8 +241,9 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
         {
             moves.push_back(NonCaptureMove(king_location, FindAndClearLsb(non_capture_targets), KING));
         }
-        if (!(flags_ & IS_CHECK))
+        if (!position.IsInCheck())
         {
+            const uint8_t castle_flags = position.CastleFlags();
             /*
             Generate castling moves
             */
@@ -255,26 +256,26 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
                 - f1 is not attacked by black AND
                 - the king's destination is not attacked by black
                 */
-                if ((flags_ & MAY_WHITE_CASTLE_KINGSIDE) && !(occupied_squares & (BITBOARD(F1) | BITBOARD(G1))) && !IsAttacked(F1, BLACK) &&
-                    !IsAttacked(G1, BLACK))
+                if ((castle_flags & MAY_WHITE_CASTLE_KINGSIDE) && !(occupied_squares & (BITBOARD(F1) | BITBOARD(G1))) &&
+                    !position.IsAttacked(F1, BLACK) && !position.IsAttacked(G1, BLACK))
                 {
                     moves.push_back(CastlingMove(E1, G1));
                 }
-                if ((flags_ & MAY_WHITE_CASTLE_QUEENSIDE) && !(occupied_squares & (BITBOARD(B1) | BITBOARD(C1) | BITBOARD(D1))) &&
-                    !IsAttacked(D1, BLACK) && !IsAttacked(C1, BLACK))
+                if ((castle_flags & MAY_WHITE_CASTLE_QUEENSIDE) && !(occupied_squares & (BITBOARD(B1) | BITBOARD(C1) | BITBOARD(D1))) &&
+                    !position.IsAttacked(D1, BLACK) && !position.IsAttacked(C1, BLACK))
                 {
                     moves.push_back(CastlingMove(E1, C1));
                 }
             }
             else
             {
-                if ((flags_ & MAY_BLACK_CASTLE_KINGSIDE) && !(occupied_squares & (BITBOARD(F8) | BITBOARD(G8))) && !IsAttacked(F8, WHITE) &&
-                    !IsAttacked(G8, WHITE))
+                if ((castle_flags & MAY_BLACK_CASTLE_KINGSIDE) && !(occupied_squares & (BITBOARD(F8) | BITBOARD(G8))) &&
+                    !position.IsAttacked(F8, WHITE) && !position.IsAttacked(G8, WHITE))
                 {
                     moves.push_back(CastlingMove(E8, G8));
                 }
-                if ((flags_ & MAY_BLACK_CASTLE_QUEENSIDE) && !(occupied_squares & (BITBOARD(B8) | BITBOARD(C8) | BITBOARD(D8))) &&
-                    !IsAttacked(D8, WHITE) && !IsAttacked(C8, WHITE))
+                if ((castle_flags & MAY_BLACK_CASTLE_QUEENSIDE) && !(occupied_squares & (BITBOARD(B8) | BITBOARD(C8) | BITBOARD(D8))) &&
+                    !position.IsAttacked(D8, WHITE) && !position.IsAttacked(C8, WHITE))
                 {
                     moves.push_back(CastlingMove(E8, C8));
                 }
@@ -282,4 +283,29 @@ template <bool do_all_moves> MoveList Position::GenerateMoves() const
         }
     }
     return moves;
+}
+
+static inline MoveList GeneratePseudoLegalMoves(const Position &position)
+{
+    return GenerateMoves<true>(position);
+}
+
+static inline MoveList GeneratePseudoLegalCaptures(const Position &position)
+{
+    return GenerateMoves<false>(position);
+}
+
+static inline MoveList GenerateLegalMoves(const Position &position)
+{
+    MoveList pseudo_legal_moves = GeneratePseudoLegalMoves(position);
+    MoveList result;
+    for (auto move : pseudo_legal_moves)
+    {
+        Position dst_position{position, move};
+        if (!dst_position.HasMovedIntoCheck())
+        {
+            result.push_back(move);
+        }
+    }
+    return result;
 }

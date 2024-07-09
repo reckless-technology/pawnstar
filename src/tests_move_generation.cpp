@@ -8,6 +8,7 @@ using std::string_view;
 
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
+#include "move_generation.h"
 #include "position.h"
 #include "transposition_table.h"
 
@@ -161,7 +162,7 @@ http://chessprogramming.wikispaces.com/Perft+Results
 static void Perft(const Position &src_position, int depth, Color color, PerftCounts &counts)
 {
     static uint32_t call_count = 0;
-    MoveList        move_list  = src_position.GeneratePseudoLegalMoves();
+    MoveList        move_list  = GeneratePseudoLegalMoves(src_position);
     if (!(++call_count & 0x3FFFF))
     {
         printf("\rpositions processed %10" PRIu64, counts.legal_moves);

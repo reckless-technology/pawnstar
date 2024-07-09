@@ -50,12 +50,8 @@ struct Position
     bool        IsDrawByRepetition(bool is_search) const;            /**< Is this position a draw by repetition. */
     bool        IsStalemate() const;                                 /**< Is this position stalemate. */
     uint64_t    ComputeHash() const;                                 /**< Compute the Zobrist hash from scratch. */
-    MoveList    GenerateLegalMoves() const;                          /**< Generate all legal moves (slow). */
-    MoveList    GeneratePseudoLegalCaptures() const;                 /**< Generate pseudo legal captures and promotions. */
-    MoveList    GeneratePseudoLegalMoves() const;                    /**< Generate all pseudo legal moves. */
     std::string MoveToString(Move move) const;                       /**< Generate the SAN string for a specific legal move. */
     std::string VariationToString(const Variation &variation) const; /**< Generate SAN strings for a legal sequence of moves. */
-    int         EvaluateSwapOff(Square location, Color color, Piece piece_on_square);
 
     constexpr Piece PieceAt(Square location) const
     {
@@ -67,6 +63,11 @@ struct Position
                : (square & queens_)  ? QUEEN
                : (square & kings_)   ? KING
                                      : NO_PIECE;
+    }
+
+    constexpr uint8_t CastleFlags() const
+    {
+        return flags_ & CASTLING_RIGHTS_MASK;
     }
 
     constexpr Bitboard Pawns() const
@@ -112,6 +113,11 @@ struct Position
     constexpr Bitboard OccupiedSquares() const
     {
         return white_pieces_ | black_pieces_;
+    }
+
+    constexpr Bitboard VacantSquares() const
+    {
+        return ~(white_pieces_ | black_pieces_);
     }
 
     constexpr Bitboard PiecesOfColor(Color color) const
@@ -162,6 +168,11 @@ struct Position
     constexpr uint8_t MoveCount() const
     {
         return full_move_count_;
+    }
+
+    constexpr Square EnPassantIndex() const
+    {
+        return en_passant_index_;
     }
 
   private:

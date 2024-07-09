@@ -1,6 +1,7 @@
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 #include "game.h"
+#include "move_generation.h"
 #include "opening_book.h"
 #include "position.h"
 #include "search.h"
@@ -22,7 +23,7 @@ Move SearchRootNode(Game &game)
     {
         return book_move;
     }
-    MoveList move_list = game.position_->GenerateLegalMoves();
+    MoveList move_list = GenerateLegalMoves(*game.position_);
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (move_list.size() == 0)
     {

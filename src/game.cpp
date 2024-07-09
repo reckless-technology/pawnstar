@@ -4,26 +4,21 @@
 using std::string;
 using std::string_view;
 
-#include "position.h"
 #include "debug_hashtable.h"
-#include "transposition_table.h"
 #include "function_prototypes.h"
 #include "game.h"
+#include "move_generation.h"
+#include "position.h"
 #include "search.h"
+#include "transposition_table.h"
 
-static constexpr string_view move_suffixes[6] = 
-{
-    "+",
-    "#",
-    "ep",
-    "e.p.",
-    "!",
-    "?",
+static constexpr string_view move_suffixes[6] = {
+    "+", "#", "ep", "e.p.", "!", "?",
 };
 
-static void RemoveMoveSuffixes(string& move_str)
+static void RemoveMoveSuffixes(string &move_str)
 {
-    for (const string_view& sv : move_suffixes)
+    for (const string_view &sv : move_suffixes)
     {
         auto locn = move_str.find(sv);
         if (locn != string::npos)
@@ -35,19 +30,21 @@ static void RemoveMoveSuffixes(string& move_str)
 
 Game::Game(std::string_view fen_string)
 {
-   time_control_.hard_stop_search_ms              = 0;
-   time_control_.clock_type                       = CLOCK_STANDARD;
-   time_control_.standard.milliseconds_per_period = 5 * 60 * 1000; // 5 minutes
-   time_control_.standard.moves_per_period        = 40;            // 40 moves in 5 mins
-   time_control_.standard.milliseconds_remaining  = 5 * 60 * 1000;
-   node_count_                                    = 0;
-   engine_color_                                  = NEITHER_COLOR;
-   do_show_thinking_                              = true;
-   position_                                      = &stack_[0];
-   *position_                                     = Position { fen_string };
+    time_control_.hard_stop_search_ms              = 0;
+    time_control_.clock_type                       = CLOCK_STANDARD;
+    time_control_.standard.milliseconds_per_period = 5 * 60 * 1000; // 5 minutes
+    time_control_.standard.moves_per_period        = 40;            // 40 moves in 5 mins
+    time_control_.standard.milliseconds_remaining  = 5 * 60 * 1000;
+    node_count_                                    = 0;
+    engine_color_                                  = NEITHER_COLOR;
+    do_show_thinking_                              = true;
+    position_                                      = &stack_[0];
+    *position_                                     = Position{fen_string};
 }
 
-Game::Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1") {}
+Game::Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+{
+}
 
 /*
 Make a move and update the game end status flags
@@ -70,7 +67,7 @@ void Game::MakeNullMove()
 }
 
 /*
-Play a move from the given move string in either standard algebraic or XBoard 
+Play a move from the given move string in either standard algebraic or XBoard
 format, and update game state_flags accordingly
 
 returns the move if a legal move was played
@@ -78,13 +75,13 @@ returns zero if the move was illegal or the game is over
 */
 Move Game::PlayMove(std::string_view move_str)
 {
-    string candidate { move_str };
+    string candidate{move_str};
     RemoveMoveSuffixes(candidate);
-    MoveList move_list = position_->GenerateLegalMoves();
-    for (const Move& move : move_list)
+    MoveList move_list = GenerateLegalMoves(*position_);
+    for (const Move &move : move_list)
     {
-        string san_move_str { position_->MoveToString(move) };
-        string algebraic_move_str { MoveString(move) };
+        string san_move_str{position_->MoveToString(move)};
+        string algebraic_move_str{MoveString(move)};
         RemoveMoveSuffixes(san_move_str);
         if (san_move_str == candidate || algebraic_move_str == candidate)
         {
@@ -94,7 +91,6 @@ Move Game::PlayMove(std::string_view move_str)
     }
     return 0;
 }
-
 
 /**
  * @brief Check to see if the game is over. Display the result and return true if so.
@@ -140,11 +136,11 @@ void Game::SearchThreadEntry()
     Move move = SearchRootNode(*this);
     if (move)
     {
-        std::string move_string { position_->MoveToString(move) };
+        std::string move_string{position_->MoveToString(move)};
         PlayMove(move);
         printf("move %s\n", move_string.c_str());
         IsGameOver();
-    }  
+    }
 }
 
 void Game::StopThinking()
@@ -163,5 +159,5 @@ void Game::StopThinking()
 void Game::StartThinking()
 {
     StopThinking();
-    worker_thread = std::thread( [this] { this->SearchThreadEntry(); } );
+    worker_thread = std::thread([this] { this->SearchThreadEntry(); });
 }

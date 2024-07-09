@@ -1,6 +1,7 @@
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 #include "game.h"
+#include "move_generation.h"
 #include "position.h"
 #include "search.h"
 #include "transposition_table.h"
@@ -227,7 +228,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     We didn't get a cutoff from the transposition table so proceed
     with generating and searching moves.
     */
-    MoveList move_list{position.GeneratePseudoLegalMoves()};
+    MoveList move_list{GeneratePseudoLegalMoves(position)};
     ScoreAndSortMoves(position, move_list, ply, depth);
     /*
     Start of the main loop.

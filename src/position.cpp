@@ -11,8 +11,8 @@ using std::vector;
 
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
+#include "move_generation.h"
 #include "position.h"
-#include "position_move_generation.h"
 #include "transposition_table.h"
 
 #define A1M (uint16_t)(~MAY_WHITE_CASTLE_QUEENSIDE)
@@ -653,14 +653,14 @@ Determine if the current position represents stalemate
 */
 bool Position::IsStalemate() const
 {
-    return !(flags_ & IS_CHECK) && GenerateLegalMoves().size() == 0;
+    return !(flags_ & IS_CHECK) && GenerateLegalMoves(*this).size() == 0;
 }
 /*
 Determine if the current position represents checkmate
 */
 bool Position::IsCheckmate() const
 {
-    return (flags_ & IS_CHECK) && GenerateLegalMoves().size() == 0;
+    return (flags_ & IS_CHECK) && GenerateLegalMoves(*this).size() == 0;
 }
 
 /**
@@ -686,31 +686,6 @@ uint64_t Position::ComputeHash() const
         }
     }
     return hash;
-}
-
-MoveList Position::GeneratePseudoLegalMoves() const
-{
-    return GenerateMoves<true>();
-}
-
-MoveList Position::GeneratePseudoLegalCaptures() const
-{
-    return GenerateMoves<false>();
-}
-
-MoveList Position::GenerateLegalMoves() const
-{
-    MoveList pseudo_legal_moves = GeneratePseudoLegalMoves();
-    MoveList result;
-    for (auto move : pseudo_legal_moves)
-    {
-        Position position{*this, move};
-        if (!(position.flags_ & HAS_MOVED_INTO_CHECK))
-        {
-            result.push_back(move);
-        }
-    }
-    return result;
 }
 
 /**
@@ -760,7 +735,7 @@ string Position::MoveToString(Move move) const
     Determine if there is more than one piece of the same type which is capable
     of moving to the target square, and will require further disambiguation
     */
-    MoveList legal_moves = GenerateLegalMoves();
+    MoveList legal_moves = GenerateLegalMoves(*this);
     for (const Move &m : legal_moves)
     {
         if (::MovePiece(m) == ::MovePiece(move) && MoveTo(m) == MoveTo(move) && MoveFrom(m) != MoveFrom(move))
@@ -863,7 +838,7 @@ string Position::MoveToString(Move move) const
     {
         result << '#';
     }
-    else if (dst_position.flags_ & IS_CHECK)
+    else if (dst_position.IsInCheck())
     {
         result << "+";
     }
