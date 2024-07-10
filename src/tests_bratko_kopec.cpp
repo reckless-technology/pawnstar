@@ -50,7 +50,7 @@ void RunPositionTests(int depth)
         game.time_control_.clock_type        = CLOCK_FIXED_DEPTH;
         game.time_control_.fixed_depth.depth = depth;
         game.do_show_thinking_               = true;
-        printf("\n%s\n", game.CurrentPosition().operator std::string().c_str());
+        printf("\n%s\n", game.CurrentPosition().ToString().c_str());
         DEBUG_STATEMENT(DebugXClear());
         SearchRootNode(game);
         DEBUG_STATEMENT(DebugXWrite());

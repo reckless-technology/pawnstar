@@ -147,7 +147,7 @@ static void handle_setboard(Game &game, span<string> args)
 
 static void handle_getboard(Game &game, span<string>)
 {
-    std::string fen_string = game.CurrentPosition().operator std::string();
+    std::string fen_string = game.CurrentPosition().ToString();
     printf("%s\n", fen_string.c_str());
 }
 

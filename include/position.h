@@ -37,19 +37,19 @@ struct Position
   public:
     Position() {};
     Position(std::string_view fen_string);                           /**< Construct a position from a FEN string. */
-    operator std::string() const;                                    /**< Return the FEN string for this position. */
-    Position    MakeMove(Move move) const;                           /**< Construct a position from its predecessor and a move. */
-    Position    MakeNullMove() const;                                /**< Construct a position from this one making a null move. */
+    Position    MakeMove(Move move) const;                           /**< Construct a position from this one by making a move. */
+    Position    MakeNullMove() const;                                /**< Construct a position from this one by making a null move. */
     void        AddPiece(Color color, Piece piece, Square to);       /**< Place a piece on the board. */
     Bitboard    AttacksTo(Square location, Color color) const;       /**< The set of attackers to a location on the board. */
     bool        IsAttacked(Square location, Color color) const;      /**< Determine if location is attacked by color. */
     bool        IsLegal() const;                                     /**< Is this a legal chess position. */
     bool        IsCheckmate() const;                                 /**< Is this position checkmate. */
-    bool        IsDrawByFiftyMoves() const;                          /**< Is this position a dfraw by the 50 move rule. */
+    bool        IsStalemate() const;                                 /**< Is this position stalemate. */
+    bool        IsDrawByFiftyMoves() const;                          /**< Is this position a draw by the 50 move rule. */
     bool        IsDrawByMaterial() const;                            /**< Is this position a draw by insufficient material. */
     bool        IsDrawByRepetition(bool is_search) const;            /**< Is this position a draw by repetition. */
-    bool        IsStalemate() const;                                 /**< Is this position stalemate. */
     uint64_t    ComputeHash() const;                                 /**< Compute the Zobrist hash from scratch. */
+    std::string ToString() const;                                    /**< Return the FEN string for this position. */
     std::string MoveToString(Move move) const;                       /**< Generate the SAN string for a specific legal move. */
     std::string VariationToString(const Variation &variation) const; /**< Generate SAN strings for a legal sequence of moves. */
 

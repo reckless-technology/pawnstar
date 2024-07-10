@@ -378,7 +378,7 @@ Position::Position(std::string_view fen_string)
     }
 }
 
-Position::operator std::string() const
+std::string Position::ToString() const
 {
     stringstream ss;
     /* Pieces on the board */

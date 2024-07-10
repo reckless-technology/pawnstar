@@ -195,7 +195,7 @@ void RunPerftTests(void)
     for (const PerftTest &test : perft_tests)
     {
         Position position{test.position};
-        string   pos_string{position};
+        string   pos_string{position.ToString()};
         printf("\n%s\n", pos_string.c_str());
         PerftCounts counts{0, 0, 0, 0, 0, 0};
         total_nodes += test.counts.legal_moves;
