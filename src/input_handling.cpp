@@ -1,3 +1,5 @@
+#include <cstring>
+#include <iterator>
 #include <span>
 #include <sstream>
 #include <string>

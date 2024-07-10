@@ -40,7 +40,7 @@ static bool InitializeOpeningBookFromStream(istream &ss);
  */
 bool InitializeOpeningBookFromFile(string_view filename)
 {
-    ifstream file{filename};
+    ifstream file{string(filename)};
     if (!file)
     {
         return false;
