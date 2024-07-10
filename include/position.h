@@ -37,9 +37,9 @@ struct Position
   public:
     Position() {};
     Position(std::string_view fen_string);                           /**< Construct a position from a FEN string. */
-    Position(const Position &previous, Move move);                   /**< Construct a position from its predecessor and a move. */
     operator std::string() const;                                    /**< Return the FEN string for this position. */
-    void        MakeNullMove(Position &dst_position) const;          /**< Construct a position from this one making a null move. */
+    Position    MakeMove(Move move) const;                           /**< Construct a position from its predecessor and a move. */
+    Position    MakeNullMove() const;                                /**< Construct a position from this one making a null move. */
     void        AddPiece(Color color, Piece piece, Square to);       /**< Place a piece on the board. */
     Bitboard    AttacksTo(Square location, Color color) const;       /**< The set of attackers to a location on the board. */
     bool        IsAttacked(Square location, Color color) const;      /**< Determine if location is attacked by color. */

@@ -29,7 +29,7 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
 
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
-    Position &position = *game.position_;
+    const Position &position = game.CurrentPosition();
     if (!(position.IsNullMove()) && !(position.IsInCheck()) && beta == alpha + 1 &&
         (position.Knights() | position.Bishops() | position.Rooks() | position.Queens()) && EvaluatePosition(position, alpha, beta) >= beta)
     {
@@ -99,7 +99,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         game.is_cancel_pending_ = true;
         return SEARCH_CANCELLED_SCORE;
     }
-    const Position &position = *game.position_;
+    const Position &position = game.CurrentPosition();
     if (position.IsDrawByMaterial() || position.IsDrawByFiftyMoves() || position.IsDrawByRepetition(true))
     {
         return DRAW_SCORE;
@@ -247,7 +247,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         {
             game.PlayMove(move);
             INCREMENT("late move reductions");
-            game.position_->Reduce();
+            game.CurrentPosition().Reduce();
             score = -Search(game, depth - 2, ply + 1, -beta, -alpha, pv);
             game.UndoMove();
         }

@@ -32,7 +32,7 @@ int main()
         "(C) Jonny Reckless 2009 - 2024                         \n"
         "Compiled: " __DATE__ " " __TIME__ "\n");
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
-    if (!InitializeOpeningBookFromFile("pawnstar.book"))
+    if (!InitializeOpeningBookFromFile("doc/pawnstar.book"))
     {
         printf("NOTE: unable to open book file\n");
     }

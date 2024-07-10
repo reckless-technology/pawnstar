@@ -21,7 +21,7 @@ int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move m
 {
     game.PlayMove(move);
     int score;
-    if (beta > alpha + 1 && move_index > 0 && !game.position_->IsInCheck())
+    if (beta > alpha + 1 && move_index > 0 && !game.CurrentPosition().IsInCheck())
     {
         INCREMENT("pvs attempts");
         score = -Search(game, depth - 1, ply + 1, -alpha - 1, -alpha, pv);

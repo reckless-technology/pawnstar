@@ -301,7 +301,7 @@ static inline MoveList GenerateLegalMoves(const Position &position)
     MoveList result;
     for (auto move : pseudo_legal_moves)
     {
-        Position dst_position{position, move};
+        Position dst_position{position.MakeMove(move)};
         if (!dst_position.HasMovedIntoCheck())
         {
             result.push_back(move);

@@ -83,11 +83,11 @@ constexpr Move      ScoredCheckingMove(Move m, int score)   { return (m & 0x00FF
 typedef std::vector<Move> Variation;
 typedef std::vector<Move> MoveList;
 
-constexpr void 
-CopyVariation(Variation& dst, const Variation& src, Move best_move)
+/* clang-format on */
+
+constexpr void CopyVariation(Variation &dst, const Variation &src, Move best_move)
 {
     dst.clear();
     dst.push_back(best_move);
     dst.insert(dst.end(), src.begin(), src.end());
 }
-/* clang-format on */

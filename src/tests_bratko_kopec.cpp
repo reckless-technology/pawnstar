@@ -1,9 +1,9 @@
-#include "position.h"
 #include "debug_hashtable.h"
-#include "transposition_table.h"
 #include "function_prototypes.h"
 #include "game.h"
+#include "position.h"
 #include "search.h"
+#include "transposition_table.h"
 
 #include <string_view>
 using std::string_view;
@@ -46,11 +46,11 @@ void RunPositionTests(int depth)
     const int start_ms = GetMilliseconds();
     for (string_view test_pos : POSITION_TESTS)
     {
-        Game game { test_pos };
-        game.time_control_.clock_type = CLOCK_FIXED_DEPTH;
+        Game game{test_pos};
+        game.time_control_.clock_type        = CLOCK_FIXED_DEPTH;
         game.time_control_.fixed_depth.depth = depth;
-        game.do_show_thinking_ = true;
-        printf("\n%s\n", game.position_->operator std::string().c_str());
+        game.do_show_thinking_               = true;
+        printf("\n%s\n", game.CurrentPosition().operator std::string().c_str());
         DEBUG_STATEMENT(DebugXClear());
         SearchRootNode(game);
         DEBUG_STATEMENT(DebugXWrite());

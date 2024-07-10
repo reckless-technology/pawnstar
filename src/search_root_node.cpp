@@ -18,12 +18,12 @@ using std::string;
 Move SearchRootNode(Game &game)
 {
     /* If there is a book move for this position, do not bother with search. */
-    Move book_move = GetBookMove(game.position_->Hash());
+    Move book_move = GetBookMove(game.CurrentPosition().Hash());
     if (book_move)
     {
         return book_move;
     }
-    MoveList move_list = GenerateLegalMoves(*game.position_);
+    MoveList move_list = GenerateLegalMoves(game.CurrentPosition());
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (move_list.size() == 0)
     {
@@ -41,8 +41,8 @@ Move SearchRootNode(Game &game)
     {
     case CLOCK_STANDARD:
     default:
-        moves_to_go =
-            game.time_control_.standard.moves_per_period - (game.position_->MoveCount() % game.time_control_.standard.moves_per_period);
+        moves_to_go = game.time_control_.standard.moves_per_period -
+                      (game.CurrentPosition().MoveCount() % game.time_control_.standard.moves_per_period);
         ms_allocated                           = game.time_control_.standard.milliseconds_remaining / moves_to_go;
         timeout_ms                             = max(100, min(ms_allocated * 2, game.time_control_.standard.milliseconds_remaining - 3000));
         game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
@@ -113,7 +113,7 @@ Move SearchRootNode(Game &game)
                 CopyVariation(principal_variation, child_pv, best_move);
                 if (game.do_show_thinking_)
                 {
-                    const string move_string{game.position_->VariationToString(principal_variation)};
+                    const string move_string{game.CurrentPosition().VariationToString(principal_variation)};
                     printf("%2u %5d %4u %8u %s\n", depth, MoveScore(best_moves[depth]), (GetMilliseconds() - start_ms) / 10,
                            game.node_count_, move_string.c_str());
                 }

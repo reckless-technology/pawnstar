@@ -64,7 +64,7 @@ static void handle_xboard(Game &, span<string>)
 
 static void handle_bookmoves(Game &game, span<string>)
 {
-    DisplayAvailableBookMoves(*game.position_);
+    DisplayAvailableBookMoves(game.CurrentPosition());
 }
 
 static void handle_freebook(Game &, span<string>)
@@ -105,13 +105,13 @@ static void handle_force(Game &game, span<string>)
 
 static void handle_go(Game &game, span<string>)
 {
-    game.engine_color_ = game.position_->ColorToMove();
+    game.engine_color_ = game.CurrentPosition().ColorToMove();
     game.StartThinking();
 }
 
 static void handle_playother(Game &game, span<string>)
 {
-    game.engine_color_ = EnemyOf(game.position_->ColorToMove());
+    game.engine_color_ = EnemyOf(game.CurrentPosition().ColorToMove());
 }
 
 static void handle_usermove(Game &game, span<string> args)
@@ -128,7 +128,7 @@ static void handle_usermove(Game &game, span<string> args)
     }
     if (!game.IsGameOver())
     {
-        if (game.engine_color_ == game.position_->ColorToMove())
+        if (game.engine_color_ == game.CurrentPosition().ColorToMove())
         {
             game.StartThinking();
         }
@@ -142,13 +142,12 @@ static void handle_setboard(Game &game, span<string> args)
     {
         ss << args[i] << ' ';
     }
-    game.position_  = game.stack_;
-    *game.position_ = Position{ss.str()};
+    game = Game(ss.str());
 }
 
 static void handle_getboard(Game &game, span<string>)
 {
-    std::string fen_string = game.position_->operator std::string();
+    std::string fen_string = game.CurrentPosition().operator std::string();
     printf("%s\n", fen_string.c_str());
 }
 
@@ -282,7 +281,7 @@ static void handle_showtime(Game &game, span<string>)
 
 static void handle_eval(Game &game, span<string>)
 {
-    printf("evaluation %5d\n", EvaluatePosition(*game.position_, ALPHA, BETA));
+    printf("evaluation %5d\n", EvaluatePosition(game.CurrentPosition(), ALPHA, BETA));
 }
 
 #if DEBUGX
@@ -299,18 +298,13 @@ static void handle_dbgclear(Game &, span<string>)
 
 static void handle_undo(Game &game, span<string>)
 {
-    if (game.position_ != game.stack_)
-    {
-        --game.position_;
-    }
+    game.UndoMove();
 }
 
 static void handle_remove(Game &game, span<string>)
 {
-    if (game.position_ - game.stack_ >= 2)
-    {
-        game.position_ -= 2;
-    }
+    game.UndoMove();
+    game.UndoMove();
 }
 
 static void handle_seetests(Game &, span<string>)

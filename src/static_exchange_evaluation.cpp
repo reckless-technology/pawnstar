@@ -39,7 +39,7 @@ Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
 */
 int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_checking)
 {
-    Position position{src_position, move};
+    Position position{src_position.MakeMove(move)};
     if (position.HasMovedIntoCheck())
     {
         return MOVED_INTO_CHECK_SCORE;
@@ -62,7 +62,7 @@ int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_che
 }
 
 /**
- * @brief Determine the swap off value for a capture on a square
+ * @brief Determine the swap off value for a capture on a square.
  *
  * @param bb set of bitboards of piece locations on the board
  * @param location target square

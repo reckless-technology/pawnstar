@@ -21,15 +21,15 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     if (ply == MAX_PLY)
     {
         INCREMENT("quiescent max ply");
-        return EvaluatePosition(*game.position_, alpha, beta);
+        return EvaluatePosition(game.CurrentPosition(), alpha, beta);
     }
-    if (game.position_->IsInCheck())
+    if (game.CurrentPosition().IsInCheck())
     {
         INCREMENT("quiescent checks");
         Variation dummy{};
         return Search(game, depth, ply, alpha, beta, dummy);
     }
-    int score = EvaluatePosition(*game.position_, alpha, beta);
+    int score = EvaluatePosition(game.CurrentPosition(), alpha, beta);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
@@ -41,8 +41,8 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         alpha = score;
     }
     int      best_score = score;
-    MoveList move_list{GeneratePseudoLegalCaptures(*game.position_)};
-    ScoreAndSortMoves(*game.position_, move_list, ply, depth);
+    MoveList move_list{GeneratePseudoLegalCaptures(game.CurrentPosition())};
+    ScoreAndSortMoves(game.CurrentPosition(), move_list, ply, depth);
     for (Move move : move_list)
     {
         if (MoveScore(move) < 0)

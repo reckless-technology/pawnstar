@@ -121,7 +121,7 @@ static bool ParseLineOfPlay(std::string_view line)
         {
             return true; /* Done with this line. */
         }
-        const uint64_t hash = game.position_->Hash();
+        const uint64_t hash = game.CurrentPosition().Hash();
         const Move     move = game.PlayMove(move_string);
         if (move == 0)
         {

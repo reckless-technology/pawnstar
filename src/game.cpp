@@ -38,8 +38,8 @@ Game::Game(std::string_view fen_string)
     node_count_                                    = 0;
     engine_color_                                  = NEITHER_COLOR;
     do_show_thinking_                              = true;
-    position_                                      = &stack_[0];
-    *position_                                     = Position{fen_string};
+    positions_.clear();
+    positions_.push_back(Position{fen_string});
 }
 
 Game::Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
@@ -51,19 +51,20 @@ Make a move and update the game end status flags
 */
 void Game::PlayMove(Move move)
 {
-    position_[1] = Position(position_[0], move);
-    ++position_;
+    positions_.push_back(CurrentPosition().MakeMove(move));
 }
 
 void Game::UndoMove()
 {
-    --position_;
+    if (positions_.size() > 1)
+    {
+        positions_.pop_back();
+    }
 }
 
 void Game::MakeNullMove()
 {
-    position_->MakeNullMove(position_[1]);
-    ++position_;
+    positions_.push_back(CurrentPosition().MakeNullMove());
 }
 
 /*
@@ -77,10 +78,10 @@ Move Game::PlayMove(std::string_view move_str)
 {
     string candidate{move_str};
     RemoveMoveSuffixes(candidate);
-    MoveList move_list = GenerateLegalMoves(*position_);
+    MoveList move_list = GenerateLegalMoves(positions_.back());
     for (const Move &move : move_list)
     {
-        string san_move_str{position_->MoveToString(move)};
+        string san_move_str{CurrentPosition().MoveToString(move)};
         string algebraic_move_str{MoveString(move)};
         RemoveMoveSuffixes(san_move_str);
         if (san_move_str == candidate || algebraic_move_str == candidate)
@@ -99,27 +100,27 @@ Move Game::PlayMove(std::string_view move_str)
  */
 bool Game::IsGameOver() const
 {
-    if (position_->IsCheckmate())
+    if (CurrentPosition().IsCheckmate())
     {
-        printf(position_->ColorToMove() == BLACK ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
+        printf(CurrentPosition().ColorToMove() == BLACK ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
         return true;
     }
-    if (position_->IsStalemate())
+    if (CurrentPosition().IsStalemate())
     {
         printf("1/2-1/2 {stalemate}\n");
         return true;
     }
-    if (position_->IsDrawByRepetition(false))
+    if (CurrentPosition().IsDrawByRepetition(false))
     {
         printf("1/2-1/2 {draw by repetition}\n");
         return true;
     }
-    if (position_->IsDrawByMaterial())
+    if (CurrentPosition().IsDrawByMaterial())
     {
         printf("1/2-1/2 {draw by insufficient material}\n");
         return true;
     }
-    if (position_->IsDrawByFiftyMoves())
+    if (CurrentPosition().IsDrawByFiftyMoves())
     {
         printf("1/2-1/2 {draw by 50 reversible moves}\n");
         return true;
@@ -136,7 +137,7 @@ void Game::SearchThreadEntry()
     Move move = SearchRootNode(*this);
     if (move)
     {
-        std::string move_string{position_->MoveToString(move)};
+        std::string move_string{CurrentPosition().MoveToString(move)};
         PlayMove(move);
         printf("move %s\n", move_string.c_str());
         IsGameOver();
