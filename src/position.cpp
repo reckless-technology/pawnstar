@@ -464,10 +464,8 @@ std::string Position::ToString() const
  */
 bool Position::IsAttacked(Square location, Color color) const
 {
-    const Sets           &sets                = SETS[location];
-    const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard        attacking_pieces    = pieces_of_color_[color];
-    const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
+    const Sets    &sets             = SETS[location];
+    const Bitboard attacking_pieces = pieces_of_color_[color];
     /*
     Pawn, knight and king attacks can be done by direct lookup since blockers
     do not affect their attack set.
@@ -476,6 +474,9 @@ bool Position::IsAttacked(Square location, Color color) const
     {
         return true;
     }
+    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
+#if 0 /* Faster on older architectures. */
+    const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
     /*
     Rook and queen horizontal and vertical sliding attacks
     */
@@ -498,6 +499,24 @@ bool Position::IsAttacked(Square location, Color color) const
             return true;
         }
     }
+#else /* Faster on modern architectures and Apple M1 silicon. */
+    if (sets.rook_attacks & attacking_pieces & (queens_ | rooks_))
+    {
+        const Bitboard rook_attacks = RookAttacks(occupied_squares, location) & attacking_pieces;
+        if (rook_attacks & (queens_ | rooks_))
+        {
+            return true;
+        }
+    }
+    if (sets.bishop_attacks & attacking_pieces & (queens_ | bishops_))
+    {
+        const Bitboard bishop_attacks = BishopAttacks(occupied_squares, location) & attacking_pieces;
+        if (bishop_attacks & (queens_ | bishops_))
+        {
+            return true;
+        }
+    }
+#endif
     return false;
 }
 
@@ -512,8 +531,8 @@ Bitboard Position::AttacksTo(Square location, Color color) const
 {
     const Sets           &sets                = SETS[location];
     const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard        attacking_pieces    = pieces_of_color_[color];
-    const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
+    const Bitboard        attacking_pieces    = this->PiecesOfColor(color);
+    const Bitboard        occupied_squares    = this->OccupiedSquares();
     /*
     Pawn, knight and king attacks can be done by direct lookup since blockers
     do not affect their attack set.

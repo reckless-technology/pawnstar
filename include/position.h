@@ -35,7 +35,7 @@ struct Position
 {
 
   public:
-    Position() {};
+    Position(){};
     Position(std::string_view fen_string);                           /**< Construct a position from a FEN string. */
     Position    MakeMove(Move move) const;                           /**< Construct a position from this one by making a move. */
     Position    MakeNullMove() const;                                /**< Construct a position from this one by making a null move. */

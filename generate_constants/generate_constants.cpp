@@ -610,11 +610,10 @@ static uint64_t RookMoveTargets(uint64_t occupied_squares, uint8_t location)
 static int EnumerateMaskCombinations(uint64_t mask, uint64_t values[])
 {
     int      bit_indices[64] = {0};
-    int     *bi              = bit_indices;
     uint64_t b               = mask;
-    while (b)
+    for (int i = 0; b != 0; ++i)
     {
-        *bi++ = FindAndClearLsb(&b);
+        bit_indices[i] = FindAndClearLsb(&b);
     }
     const int num_bits_in_mask = PopCount(mask);
     const int num_combinations = 1 << num_bits_in_mask;
