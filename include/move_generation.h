@@ -243,7 +243,6 @@ template <bool do_all_moves> MoveList GenerateMoves(const Position &position)
         }
         if (!position.IsInCheck())
         {
-            const uint8_t castle_flags = position.CastleFlags();
             /*
             Generate castling moves
             */
@@ -256,12 +255,12 @@ template <bool do_all_moves> MoveList GenerateMoves(const Position &position)
                 - f1 is not attacked by black AND
                 - the king's destination is not attacked by black
                 */
-                if ((castle_flags & MAY_WHITE_CASTLE_KINGSIDE) && !(occupied_squares & (BITBOARD(F1) | BITBOARD(G1))) &&
+                if (position.MayWhiteCastleKingside() && !(occupied_squares & (BITBOARD(F1) | BITBOARD(G1))) &&
                     !position.IsAttacked(F1, BLACK) && !position.IsAttacked(G1, BLACK))
                 {
                     moves.push_back(CastlingMove(E1, G1));
                 }
-                if ((castle_flags & MAY_WHITE_CASTLE_QUEENSIDE) && !(occupied_squares & (BITBOARD(B1) | BITBOARD(C1) | BITBOARD(D1))) &&
+                if (position.MayWhiteCastleQueenside() && !(occupied_squares & (BITBOARD(B1) | BITBOARD(C1) | BITBOARD(D1))) &&
                     !position.IsAttacked(D1, BLACK) && !position.IsAttacked(C1, BLACK))
                 {
                     moves.push_back(CastlingMove(E1, C1));
@@ -269,12 +268,12 @@ template <bool do_all_moves> MoveList GenerateMoves(const Position &position)
             }
             else
             {
-                if ((castle_flags & MAY_BLACK_CASTLE_KINGSIDE) && !(occupied_squares & (BITBOARD(F8) | BITBOARD(G8))) &&
+                if (position.MayBlackCastleKingside() && !(occupied_squares & (BITBOARD(F8) | BITBOARD(G8))) &&
                     !position.IsAttacked(F8, WHITE) && !position.IsAttacked(G8, WHITE))
                 {
                     moves.push_back(CastlingMove(E8, G8));
                 }
-                if ((castle_flags & MAY_BLACK_CASTLE_QUEENSIDE) && !(occupied_squares & (BITBOARD(B8) | BITBOARD(C8) | BITBOARD(D8))) &&
+                if (position.MayBlackCastleQueenside() && !(occupied_squares & (BITBOARD(B8) | BITBOARD(C8) | BITBOARD(D8))) &&
                     !position.IsAttacked(D8, WHITE) && !position.IsAttacked(C8, WHITE))
                 {
                     moves.push_back(CastlingMove(E8, C8));

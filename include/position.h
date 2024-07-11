@@ -8,31 +8,32 @@
 #include "move.h"
 
 /**
- * @brief Bitset of position state flags.
- */
-enum StateFlags : uint16_t
-{
-    MAY_WHITE_CASTLE_KINGSIDE  = 1 << 0, /**< white has the right to castle king side                                 */
-    MAY_WHITE_CASTLE_QUEENSIDE = 1 << 1, /**< white has the right to castle queen side                                */
-    MAY_BLACK_CASTLE_KINGSIDE  = 1 << 2, /**< black has the right to castle king side                                 */
-    MAY_BLACK_CASTLE_QUEENSIDE = 1 << 3, /**< black has the right to castle queen side                                */
-    IS_BLACK_TO_MOVE           = 1 << 4, /**< it is black's turn to move                                              */
-    IS_CHECK                   = 1 << 5, /**< is the side to move in check                                            */
-    HAS_MOVED_INTO_CHECK       = 1 << 6, /**< is the side not to move in check (illegal position)                     */
-    IS_NULL_MOVE               = 1 << 7, /**< position was the result of a null move                                  */
-    HAS_BEEN_REDUCED           = 1 << 8, /**< has late move reduction been applied in this position or its ancestors  */
-    CASTLING_RIGHTS_MASK =
-        (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE),
-};
-
-/**
  * @brief A chess position.
  * The position comprises the pieces on the board, whose turn it is to
  * move, castling rights for each side, whether en passant capture is possible,
  * and the number of consecutive reversible half-moves.
  */
-struct Position
+class Position
 {
+
+  private:
+    /**
+     * @brief Bitset of position state flags.
+     */
+    enum StateFlags : uint16_t
+    {
+        MAY_WHITE_CASTLE_KINGSIDE  = 1 << 0, /**< white has the right to castle king side                                 */
+        MAY_WHITE_CASTLE_QUEENSIDE = 1 << 1, /**< white has the right to castle queen side                                */
+        MAY_BLACK_CASTLE_KINGSIDE  = 1 << 2, /**< black has the right to castle king side                                 */
+        MAY_BLACK_CASTLE_QUEENSIDE = 1 << 3, /**< black has the right to castle queen side                                */
+        IS_BLACK_TO_MOVE           = 1 << 4, /**< it is black's turn to move                                              */
+        IS_CHECK                   = 1 << 5, /**< is the side to move in check                                            */
+        HAS_MOVED_INTO_CHECK       = 1 << 6, /**< is the side not to move in check (illegal position)                     */
+        IS_NULL_MOVE               = 1 << 7, /**< position was the result of a null move                                  */
+        HAS_BEEN_REDUCED           = 1 << 8, /**< has late move reduction been applied in this position or its ancestors  */
+        CASTLING_RIGHTS_MASK =
+            (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE),
+    };
 
   public:
     Position(){};
@@ -65,9 +66,24 @@ struct Position
                                      : NO_PIECE;
     }
 
-    constexpr uint8_t CastleFlags() const
+    constexpr bool MayWhiteCastleKingside() const
     {
-        return flags_ & CASTLING_RIGHTS_MASK;
+        return !!(flags_ & MAY_WHITE_CASTLE_KINGSIDE);
+    }
+
+    constexpr bool MayWhiteCastleQueenside() const
+    {
+        return !!(flags_ & MAY_WHITE_CASTLE_QUEENSIDE);
+    }
+
+    constexpr bool MayBlackCastleKingside() const
+    {
+        return !!(flags_ & MAY_BLACK_CASTLE_KINGSIDE);
+    }
+
+    constexpr bool MayBlackCastleQueenside() const
+    {
+        return !!(flags_ & MAY_BLACK_CASTLE_QUEENSIDE);
     }
 
     constexpr Bitboard Pawns() const
@@ -200,11 +216,12 @@ struct Position
             Bitboard black_pieces_; /**< squares with a black piece on them */
         };
     };
-    uint64_t        hash_;                  /**< Zobrist hash of this position, maintained incrementally    */
-    const Position *previous_;              /**< position immediately prior to this in the line of play     */
-    uint16_t        flags_;                 /**< game state-machine flags                                   */
-    Square          king_location_[2];      /**< square index of white and black kings                      */
-    Square          en_passant_index_;      /**< en passant capture availability square (0 if none)         */
-    uint8_t         reversible_move_count_; /**< number of consecutive reversible half-moves (plies)        */
-    uint8_t         full_move_count_;       /**< number of full moves (zero indexed)                        */
+    uint64_t              hash_;                     /**< Zobrist hash of this position, maintained incrementally    */
+    const Position       *previous_;                 /**< position immediately prior to this in the line of play     */
+    uint16_t              flags_;                    /**< game state-machine flags                                   */
+    Square                king_location_[2];         /**< square index of white and black kings                      */
+    Square                en_passant_index_;         /**< en passant capture availability square (0 if none)         */
+    uint8_t               reversible_move_count_;    /**< number of consecutive reversible half-moves (plies)        */
+    uint8_t               full_move_count_;          /**< number of full moves (zero indexed)                        */
+    static const uint16_t CASTLING_RIGHTS_MASKS[64]; /**< ANDed with move source and dest to compute new rights      */
 };

@@ -15,12 +15,12 @@ using std::vector;
 #include "position.h"
 #include "transposition_table.h"
 
-#define A1M (uint16_t)(~MAY_WHITE_CASTLE_QUEENSIDE)
-#define E1M (uint16_t)(~(MAY_WHITE_CASTLE_QUEENSIDE | MAY_WHITE_CASTLE_KINGSIDE))
-#define H1M (uint16_t)(~MAY_WHITE_CASTLE_KINGSIDE)
-#define A8M (uint16_t)(~MAY_BLACK_CASTLE_QUEENSIDE)
-#define E8M (uint16_t)(~(MAY_BLACK_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE))
-#define H8M (uint16_t)(~MAY_BLACK_CASTLE_KINGSIDE)
+#define A1M (uint16_t)(~Position::MAY_WHITE_CASTLE_QUEENSIDE)
+#define E1M (uint16_t)(~(Position::MAY_WHITE_CASTLE_QUEENSIDE | Position::MAY_WHITE_CASTLE_KINGSIDE))
+#define H1M (uint16_t)(~Position::MAY_WHITE_CASTLE_KINGSIDE)
+#define A8M (uint16_t)(~Position::MAY_BLACK_CASTLE_QUEENSIDE)
+#define E8M (uint16_t)(~(Position::MAY_BLACK_CASTLE_QUEENSIDE | Position::MAY_BLACK_CASTLE_KINGSIDE))
+#define H8M (uint16_t)(~Position::MAY_BLACK_CASTLE_KINGSIDE)
 #define OK  0xFFFF
 
 /**
@@ -28,7 +28,7 @@ using std::vector;
  * Moves to and from king and rook squares invalidate castling rights.
  */
 
-static const uint16_t CASTLING_RIGHTS_MASKS[64] = {
+constexpr uint16_t Position::CASTLING_RIGHTS_MASKS[64] = {
     /* clang-format off */
     A1M, OK, OK, OK,E1M, OK, OK,H1M, 
      OK, OK, OK, OK, OK, OK, OK, OK, 
