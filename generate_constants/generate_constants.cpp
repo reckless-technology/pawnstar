@@ -3,41 +3,40 @@
  */
 #include <algorithm>
 #include <cinttypes>
-#include <cstdbool>
 #include <cstdio>
 #include <cstring>
-
-#ifndef DO_EXTRA_PAWN_EVAL
-#define DO_EXTRA_PAWN_EVAL 1
-#endif
+#include <map>
+#include <set>
+#include <vector>
 
 /* Fixed square definitions */
-#define MASK_EAST_1 0x7F7F7F7F7F7F7F7Full /**< Mask off the H file to prevent wraparound when shifting east. */
-#define MASK_WEST_1 0xFEFEFEFEFEFEFEFEull /**< Mask off the A file to prevent wraparound when shifting west. */
-#define NO_SQUARES  0x0000000000000000ull
+constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7Full; /**< Mask off the H file to prevent wraparound when shifting east. */
+constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEull; /**< Mask off the A file to prevent wraparound when shifting west. */
+constexpr uint64_t NO_SQUARES = 0x0000000000000000ull;
 
-/* Function like macros */
-#define FileOf(locn)      ((locn) & 7)               /**< Convert square index to file. */
-#define RankOf(locn)      ((locn) >> 3)              /**< Convert square index to rank. */
-#define FileChar(locn)    (char)('a' + FileOf(locn)) /**< Convert square index to file character. */
-#define RankChar(locn)    (char)('1' + RankOf(locn)) /**< Convert square index to rank character. */
-#define BITBOARD(locn)    (1ull << (locn))           /**< Convert square index to Bitboard. */
-#define BITBOARD_XY(x, y) (1ull << ((x) + 8 * (y)))  /**< Convert square (file,rank) co-ords to Bitboard. */
-#define ShiftNorth(b)     ((b) << 8)                 /**< Shift a Bitboard one square to the north. */
-#define ShiftNortheast(b) (((b) & MASK_EAST_1) << 9) /**< Shift a Bitboard one square to the northeast. */
-#define ShiftEast(b)      (((b) & MASK_EAST_1) << 1) /**< Shift a Bitboard one square to the east. */
-#define ShiftSoutheast(b) (((b) & MASK_EAST_1) >> 7) /**< Shift a Bitboard one square to the southeast. */
-#define ShiftSouth(b)     ((b) >> 8)                 /**< Shift a Bitboard one square to the south. */
-#define ShiftSouthwest(b) (((b) & MASK_WEST_1) >> 9) /**< Shift a Bitboard one square to the southwest. */
-#define ShiftWest(b)      (((b) & MASK_WEST_1) >> 1) /**< Shift a Bitboard one square to the west. */
-#define ShiftNorthwest(b) (((b) & MASK_WEST_1) << 7) /**< Shift a Bitboard one square to the northwest. */
+/* clang-format off */
+constexpr uint8_t   FileOf(int locn)            { return (uint8_t)locn & 7          ; } /**< Convert square index to file. */
+constexpr uint8_t   RankOf(int locn)            { return (uint8_t)locn >> 3         ; } /**< Convert square index to rank. */
+constexpr char      FileChar(int locn)          { return (char)('a' + FileOf(locn)) ; } /**< Convert square index to file character. */
+constexpr char      RankChar(int locn)          { return (char)('1' + RankOf(locn)) ; } /**< Convert square index to rank character. */
+constexpr uint64_t  Bitboard(uint8_t locn)      { return 1ull << locn               ; } /**< Convert square index to Bitboard. */
+constexpr uint64_t  Bitboard(int x, int y)      { return 1ull << (x + 8 * y)        ; } /**< Convert square (file,rank) co-ords to Bitboard. */
+constexpr uint64_t  ShiftNorth(uint64_t b)      { return b << 8                     ; } /**< Shift a Bitboard one square to the north. */
+constexpr uint64_t  ShiftNortheast(uint64_t b)  { return (b & NOT_H_FILE) << 9      ; } /**< Shift a Bitboard one square to the northeast. */
+constexpr uint64_t  ShiftEast(uint64_t b)       { return (b & NOT_H_FILE) << 1      ; } /**< Shift a Bitboard one square to the east. */
+constexpr uint64_t  ShiftSoutheast(uint64_t b)  { return (b & NOT_H_FILE) >> 7      ; } /**< Shift a Bitboard one square to the southeast. */
+constexpr uint64_t  ShiftSouth(uint64_t b)      { return b >> 8                     ; } /**< Shift a Bitboard one square to the south. */
+constexpr uint64_t  ShiftSouthwest(uint64_t b)  { return (b & NOT_A_FILE) >> 9      ; } /**< Shift a Bitboard one square to the southwest. */
+constexpr uint64_t  ShiftWest(uint64_t b)       { return (b & NOT_A_FILE) >> 1      ; } /**< Shift a Bitboard one square to the west. */
+constexpr uint64_t  ShiftNorthwest(uint64_t b)  { return (b & NOT_A_FILE) << 7      ; } /**< Shift a Bitboard one square to the northwest. */
+/* clang-format on */
 
 /**
  * @brief Chess piece types.
  */
 enum Piece
 {
-    NO_PIECE,
+    NONE,
     PAWN,
     KNIGHT,
     BISHOP,
@@ -51,33 +50,41 @@ enum Piece
  */
 enum Direction
 {
-    DIR_NORTH,
-    DIR_NORTHEAST,
-    DIR_EAST,
-    DIR_SOUTHEAST,
-    DIR_SOUTH,
-    DIR_SOUTHWEST,
-    DIR_WEST,
-    DIR_NORTHWEST,
+    NORTH,
+    NORTHEAST,
+    EAST,
+    SOUTHEAST,
+    SOUTH,
+    SOUTHWEST,
+    WEST,
+    NORTHWEST,
 };
 
 /**
  * @brief X and Y deltas for a compass rose direction.
  */
-typedef struct DirectionVector
+struct DirectionVector
 {
     int dx;
     int dy;
-} DirectionVector;
+};
 
 /**
  * @brief Each of the directions on the compass.
  */
-static const DirectionVector direction_vectors[8] = {
-    [DIR_NORTH] = {.dx = 0, .dy = 1},      [DIR_NORTHEAST] = {.dx = 1, .dy = 1},  [DIR_EAST] = {.dx = 1, .dy = 0},
-    [DIR_SOUTHEAST] = {.dx = 1, .dy = -1}, [DIR_SOUTH] = {.dx = 0, .dy = -1},     [DIR_SOUTHWEST] = {.dx = -1, .dy = -1},
-    [DIR_WEST] = {.dx = -1, .dy = 0},      [DIR_NORTHWEST] = {.dx = -1, .dy = 1},
+/* clang-format off */
+constexpr DirectionVector direction_vectors[8] = 
+{
+    [NORTH]     = { .dx =  0, .dy =  1 },
+    [NORTHEAST] = { .dx =  1, .dy =  1 },
+    [EAST]      = { .dx =  1, .dy =  0 },
+    [SOUTHEAST] = { .dx =  1, .dy = -1 },
+    [SOUTH]     = { .dx =  0, .dy = -1 },
+    [SOUTHWEST] = { .dx = -1, .dy = -1 },
+    [WEST]      = { .dx = -1, .dy =  0 },
+    [NORTHWEST] = { .dx = -1, .dy =  1 },
 };
+/* clang-format on */
 
 /**
  * @brief Population count (number of bits set).
@@ -116,56 +123,62 @@ static int Lsb(uint64_t x)
  * @param x Pointer to input value. On return has its Lsb cleared.
  * @return Index of bit which was cleared in x.
  */
-static int FindAndClearLsb(uint64_t *x)
+static int FindAndClearLsb(uint64_t &x)
 {
-    const uint64_t y      = *x;
-    const int      result = Lsb(y);
-    *x                    = y & (y - 1);
+    const int result = Lsb(x);
+    x &= x - 1;
     return result;
 }
 
 /**
- * @brief RC4 stream PRNG
- * @return next byte in stream
+ * @brief RC4 random byte stream generator.
  */
-static uint8_t RC4()
+class RC4
 {
-    static uint8_t S[256];
-    static uint8_t i;
-    static uint8_t j;
-    static bool    is_initialized;
-    if (!is_initialized)
+    uint8_t state[256];
+    uint8_t x;
+    uint8_t y;
+    bool    is_initialized;
+
+  public:
+    RC4() : x(0), y(0), is_initialized(false)
     {
-        is_initialized = true;
-        for (int i = 0; i != 256; ++i)
-        {
-            S[i] = i ^ 0x55;
-        }
-        /* Stir up the state to get some randomness going */
-        for (int i = 0; i != 1013; ++i)
-        {
-            RC4();
-        }
     }
-    ++i;
-    j += S[i];
-    std::swap(S[i], S[j]);
-    const uint8_t k = S[i] + S[j];
-    return S[k];
-}
+
+    uint8_t next()
+    {
+        if (!is_initialized)
+        {
+            is_initialized = true;
+            for (int i = 0; i != 256; ++i)
+            {
+                state[i] = i ^ 0x55;
+            }
+            /* Stir up the state to get some randomness going */
+            for (int i = 0; i != 1013; ++i)
+            {
+                this->next();
+            }
+        }
+        ++x;
+        y += state[x];
+        std::swap(state[x], state[y]);
+        const uint8_t z = state[x] + state[y];
+        return state[z];
+    }
+};
 
 /**
- * @brief 64 bit PRNG used to create Zobrist hash keys
- * @return next 64 bit value
+ * @brief Generate a pseudo random number.
+ * @return 64 bit next value in sequence.
  */
 static uint64_t PseudoRandom64()
 {
-    uint64_t result = 0;
-    for (int i = 0; i != 8; ++i)
-    {
-        result = (result << 8) | RC4();
-    }
-    return result;
+    static uint64_t x = 1;
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    return x * 0x2545F4914F6CDD1Dull;
 }
 
 /**
@@ -177,52 +190,52 @@ static uint64_t PseudoRandom64()
 static uint64_t VectorFrom(uint8_t location, int direction)
 {
     uint64_t               result = NO_SQUARES;
-    const DirectionVector *dv     = &direction_vectors[direction];
-    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy; x >= 0 && x < 8 && y >= 0 && y < 8; x += dv->dx, y += dv->dy)
+    const DirectionVector &dv     = direction_vectors[direction];
+    for (int x = FileOf(location) + dv.dx, y = RankOf(location) + dv.dy; x >= 0 && x < 8 && y >= 0 && y < 8; x += dv.dx, y += dv.dy)
     {
-        result |= BITBOARD_XY(x, y);
+        result |= Bitboard(x, y);
     }
     return result;
 }
 
 static uint64_t NorthOf(uint8_t location)
 {
-    return VectorFrom(location, DIR_NORTH);
+    return VectorFrom(location, NORTH);
 }
 
 static uint64_t NortheastOf(uint8_t location)
 {
-    return VectorFrom(location, DIR_NORTHEAST);
+    return VectorFrom(location, NORTHEAST);
 }
 
 static uint64_t EastOf(uint8_t location)
 {
-    return VectorFrom(location, DIR_EAST);
+    return VectorFrom(location, EAST);
 }
 
 static uint64_t SoutheastOf(uint8_t location)
 {
-    return VectorFrom(location, DIR_SOUTHEAST);
+    return VectorFrom(location, SOUTHEAST);
 }
 
 static uint64_t SouthOf(uint8_t location)
 {
-    return VectorFrom(location, DIR_SOUTH);
+    return VectorFrom(location, SOUTH);
 }
 
 static uint64_t SouthwestOf(uint8_t location)
 {
-    return VectorFrom(location, DIR_SOUTHWEST);
+    return VectorFrom(location, SOUTHWEST);
 }
 
 static uint64_t WestOf(uint8_t location)
 {
-    return VectorFrom(location, DIR_WEST);
+    return VectorFrom(location, WEST);
 }
 
 static uint64_t NorthwestOf(uint8_t location)
 {
-    return VectorFrom(location, DIR_NORTHWEST);
+    return VectorFrom(location, NORTHWEST);
 }
 
 /**
@@ -232,7 +245,7 @@ static uint64_t NorthwestOf(uint8_t location)
  */
 static uint64_t PawnAttacksWhite(uint8_t location)
 {
-    return ShiftNorthwest(BITBOARD(location)) | ShiftNortheast(BITBOARD(location));
+    return ShiftNorthwest(Bitboard(location)) | ShiftNortheast(Bitboard(location));
 }
 
 /**
@@ -242,7 +255,7 @@ static uint64_t PawnAttacksWhite(uint8_t location)
  */
 static uint64_t PawnAttacksBlack(uint8_t location)
 {
-    return ShiftSouthwest(BITBOARD(location)) | ShiftSoutheast(BITBOARD(location));
+    return ShiftSouthwest(Bitboard(location)) | ShiftSoutheast(Bitboard(location));
 }
 
 /**
@@ -268,7 +281,7 @@ static uint64_t KnightFill(uint64_t b)
  */
 static uint64_t KnightAttacks(uint8_t location)
 {
-    return KnightFill(BITBOARD(location));
+    return KnightFill(Bitboard(location));
 }
 
 /**
@@ -319,27 +332,25 @@ static uint64_t KingFill(uint64_t b)
  */
 static uint64_t KingAttacks(uint8_t location)
 {
-    return KingFill(BITBOARD(location));
+    return KingFill(Bitboard(location));
 }
 
 static uint64_t KingAttacks2(uint8_t location)
 {
-    return KingFill(KingFill(BITBOARD(location)));
+    return KingFill(KingFill(Bitboard(location)));
 }
 
 static uint64_t KingPawnShelterWhite(uint8_t location)
 {
-    const uint64_t b = BITBOARD(location);
+    const uint64_t b = Bitboard(location);
     return ShiftNorthwest(b) | ShiftNorth(b) | ShiftNortheast(b);
 }
 
 static uint64_t KingPawnShelterBlack(uint8_t location)
 {
-    const uint64_t b = BITBOARD(location);
+    const uint64_t b = Bitboard(location);
     return ShiftSouthwest(b) | ShiftSouth(b) | ShiftSoutheast(b);
 }
-
-#if DO_EXTRA_PAWN_EVAL
 
 /**
  * @brief Passed pawn mask for white.
@@ -359,7 +370,7 @@ static uint64_t PassedPawnMaskWhite(uint8_t location)
         }
         for (int y = locn_y + 1; y < 8; ++y)
         {
-            result |= BITBOARD_XY(x, y);
+            result |= Bitboard(x, y);
         }
     }
     return result;
@@ -383,7 +394,7 @@ static uint64_t PassedPawnMaskBlack(uint8_t location)
         }
         for (int y = locn_y - 1; y >= 0; --y)
         {
-            result |= BITBOARD_XY(x, y);
+            result |= Bitboard(x, y);
         }
     }
     return result;
@@ -406,7 +417,7 @@ static uint64_t IsolatedPawnMaskWhite(uint8_t location)
         }
         for (int y = 0; y < 8; ++y)
         {
-            result |= BITBOARD_XY(x, y);
+            result |= Bitboard(x, y);
         }
     }
     return result;
@@ -441,7 +452,7 @@ static uint64_t SupportedPawnMaskWhite(uint8_t location)
         }
         for (int y = locn_y; y >= 0; --y)
         {
-            result |= BITBOARD_XY(x, y);
+            result |= Bitboard(x, y);
         }
     }
     return result;
@@ -465,7 +476,7 @@ static uint64_t SupportedPawnMaskBlack(uint8_t location)
         }
         for (int y = locn_y; y < 8; ++y)
         {
-            result |= BITBOARD_XY(x, y);
+            result |= Bitboard(x, y);
         }
     }
     return result;
@@ -491,8 +502,6 @@ static uint64_t DoubledPawnMaskBlack(uint8_t location)
     return SouthOf(location);
 }
 
-#endif /* DO_EXTRA_PAWN_EVAL */
-
 /**
  * @brief Intervening squares on colinear ray.
  * @param from Source square index.
@@ -501,12 +510,12 @@ static uint64_t DoubledPawnMaskBlack(uint8_t location)
  */
 static uint64_t InterveningSquares(int from, int to)
 {
-    for (int dir = DIR_NORTH; dir <= DIR_NORTHWEST; ++dir)
+    for (int dir = NORTH; dir <= NORTHWEST; ++dir)
     {
         const uint64_t vector_from = VectorFrom(from, dir);
-        if (vector_from & BITBOARD(to))
+        if (vector_from & Bitboard(to))
         {
-            return vector_from ^ VectorFrom(to, dir) ^ BITBOARD(to);
+            return vector_from ^ VectorFrom(to, dir) ^ Bitboard(to);
         }
     }
     return NO_SQUARES;
@@ -523,11 +532,11 @@ static uint64_t InterveningSquares(int from, int to)
 static uint64_t OccupancyMaskVector(uint8_t location, int direction)
 {
     uint64_t               result = NO_SQUARES;
-    const DirectionVector *dv     = &direction_vectors[direction];
-    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy;
-         x + dv->dx >= 0 && x + dv->dx < 8 && y + dv->dy >= 0 && y + dv->dy < 8; x += dv->dx, y += dv->dy)
+    const DirectionVector &dv     = direction_vectors[direction];
+    for (int x = FileOf(location) + dv.dx, y = RankOf(location) + dv.dy; x + dv.dx >= 0 && x + dv.dx < 8 && y + dv.dy >= 0 && y + dv.dy < 8;
+         x += dv.dx, y += dv.dy)
     {
-        result |= BITBOARD_XY(x, y);
+        result |= Bitboard(x, y);
     }
     return result;
 }
@@ -539,8 +548,8 @@ static uint64_t OccupancyMaskVector(uint8_t location, int direction)
  */
 static uint64_t BishopOccupancyMask(uint8_t location)
 {
-    return OccupancyMaskVector(location, DIR_NORTHEAST) | OccupancyMaskVector(location, DIR_NORTHWEST) |
-           OccupancyMaskVector(location, DIR_SOUTHEAST) | OccupancyMaskVector(location, DIR_SOUTHWEST);
+    return OccupancyMaskVector(location, NORTHEAST) | OccupancyMaskVector(location, NORTHWEST) | OccupancyMaskVector(location, SOUTHEAST) |
+           OccupancyMaskVector(location, SOUTHWEST);
 }
 
 /**
@@ -550,8 +559,8 @@ static uint64_t BishopOccupancyMask(uint8_t location)
  */
 static uint64_t RookOccupancyMask(uint8_t location)
 {
-    return OccupancyMaskVector(location, DIR_NORTH) | OccupancyMaskVector(location, DIR_SOUTH) | OccupancyMaskVector(location, DIR_EAST) |
-           OccupancyMaskVector(location, DIR_WEST);
+    return OccupancyMaskVector(location, NORTH) | OccupancyMaskVector(location, SOUTH) | OccupancyMaskVector(location, EAST) |
+           OccupancyMaskVector(location, WEST);
 }
 
 /**
@@ -564,11 +573,11 @@ static uint64_t RookOccupancyMask(uint8_t location)
 static uint64_t VectorMoveTargets(uint64_t occupied_squares, int location, int direction)
 {
     uint64_t               result = NO_SQUARES;
-    const DirectionVector *dv     = &direction_vectors[direction];
-    for (int x = FileOf(location) + dv->dx, y = RankOf(location) + dv->dy; x >= 0 && x < 8 && y >= 0 && y < 8; x += dv->dx, y += dv->dy)
+    const DirectionVector &dv     = direction_vectors[direction];
+    for (int x = FileOf(location) + dv.dx, y = RankOf(location) + dv.dy; x >= 0 && x < 8 && y >= 0 && y < 8; x += dv.dx, y += dv.dy)
     {
-        result |= BITBOARD_XY(x, y);
-        if (BITBOARD_XY(x, y) & occupied_squares)
+        result |= Bitboard(x, y);
+        if (Bitboard(x, y) & occupied_squares)
         {
             break;
         }
@@ -584,8 +593,8 @@ static uint64_t VectorMoveTargets(uint64_t occupied_squares, int location, int d
  */
 static uint64_t BishopMoveTargets(uint64_t occupied_squares, uint8_t location)
 {
-    return VectorMoveTargets(occupied_squares, location, DIR_NORTHEAST) | VectorMoveTargets(occupied_squares, location, DIR_SOUTHEAST) |
-           VectorMoveTargets(occupied_squares, location, DIR_SOUTHWEST) | VectorMoveTargets(occupied_squares, location, DIR_NORTHWEST);
+    return VectorMoveTargets(occupied_squares, location, NORTHEAST) | VectorMoveTargets(occupied_squares, location, SOUTHEAST) |
+           VectorMoveTargets(occupied_squares, location, SOUTHWEST) | VectorMoveTargets(occupied_squares, location, NORTHWEST);
 }
 
 /**
@@ -596,8 +605,8 @@ static uint64_t BishopMoveTargets(uint64_t occupied_squares, uint8_t location)
  */
 static uint64_t RookMoveTargets(uint64_t occupied_squares, uint8_t location)
 {
-    return VectorMoveTargets(occupied_squares, location, DIR_NORTH) | VectorMoveTargets(occupied_squares, location, DIR_SOUTH) |
-           VectorMoveTargets(occupied_squares, location, DIR_EAST) | VectorMoveTargets(occupied_squares, location, DIR_WEST);
+    return VectorMoveTargets(occupied_squares, location, NORTH) | VectorMoveTargets(occupied_squares, location, SOUTH) |
+           VectorMoveTargets(occupied_squares, location, EAST) | VectorMoveTargets(occupied_squares, location, WEST);
 }
 
 /**
@@ -613,7 +622,7 @@ static int EnumerateMaskCombinations(uint64_t mask, uint64_t values[])
     uint64_t b               = mask;
     for (int i = 0; b != 0; ++i)
     {
-        bit_indices[i] = FindAndClearLsb(&b);
+        bit_indices[i] = FindAndClearLsb(b);
     }
     const int num_bits_in_mask = PopCount(mask);
     const int num_combinations = 1 << num_bits_in_mask;
@@ -623,7 +632,7 @@ static int EnumerateMaskCombinations(uint64_t mask, uint64_t values[])
         b              = i;
         while (b)
         {
-            value |= BITBOARD(bit_indices[FindAndClearLsb(&b)]);
+            value |= Bitboard(bit_indices[FindAndClearLsb(b)]);
         }
         values[i] = value;
     }
@@ -850,8 +859,6 @@ static const BitboardGen ray_generators[] = {
     {NULL, NULL},
 };
 
-#if DO_EXTRA_PAWN_EVAL
-
 static const BitboardGen pawn_generators_white[] = {
     {
         "passed_pawn_mask",
@@ -897,8 +904,6 @@ static const BitboardGen *pawn_generators[] = {
     pawn_generators_black,
 };
 
-#endif
-
 /**
  * @brief Piece names.
  */
@@ -931,8 +936,6 @@ int main()
     }
     printf("\n};\n");
 
-#if DO_EXTRA_PAWN_EVAL
-
     printf("extern const PawnSets PAWN_SETS[2][64] = \n{");
     for (int color = 0; color != 2; ++color)
     {
@@ -950,8 +953,6 @@ int main()
         printf("\n    },");
     }
     printf("\n};\n");
-
-#endif
 
     printf("extern const Bitboard INTERVENING_SQUARES[64][64] = \n{");
     for (int i = 0; i != 64; ++i)
