@@ -7,9 +7,9 @@
 using std::map;
 using std::string_view;
 
+#include "constants.h"
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
-#include "options.h"
 
 #if DEBUGX
 

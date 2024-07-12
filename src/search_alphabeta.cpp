@@ -100,7 +100,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         return SEARCH_CANCELLED_SCORE;
     }
     const Position &position = game.CurrentPosition();
-    if (position.IsDrawByMaterial() || position.IsDrawByFiftyMoves() || position.IsDrawByRepetition(true))
+    if (position.IsDrawByMaterial() || game.IsDrawByFiftyMoves() || game.IsDrawByRepetition(true))
     {
         return DRAW_SCORE;
     }

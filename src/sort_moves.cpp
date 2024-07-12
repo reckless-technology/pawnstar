@@ -1,24 +1,22 @@
 #include <algorithm>
+#include <cinttypes>
 #include <cstring>
 #include <vector>
-#include <cinttypes>
 
-#include "move.h"
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
+#include "move.h"
 
 /*                   indexed by      ply   pce from  to */
 static uint32_t killer_move_counts[MAX_PLY][8 * 64 * 64];
 
-void
-RecordKillerMove(int ply, Move move)
+void RecordKillerMove(int ply, Move move)
 {
     /* Mask all except piece, from, to (lower 15 bits) */
     ++killer_move_counts[ply][move & 0x7FFF];
 }
 
-void 
-ResetKillerCounts()
+void ResetKillerCounts()
 {
     memset(killer_move_counts, 0, sizeof(killer_move_counts));
 }
@@ -32,23 +30,19 @@ ResetKillerCounts()
  * @param moves list of moves to be sorted
  * @param ply distance from root node
  * @param depth remaining search depth (unused)
-*/
-void 
-ScoreAndSortMoves(const Position&   position,
-                  MoveList&         moves, 
-                  int               ply,
-                  int               depth)
-{   
-    MoveList legal_moves {};
+ */
+void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int depth)
+{
+    MoveList legal_moves{};
     legal_moves.reserve(64);
-    const uint32_t* const counts = &killer_move_counts[ply][0];
+    const uint32_t *const counts = &killer_move_counts[ply][0];
     for (Move move : moves)
     {
-        /* 
+        /*
         Assign provisional scores based on static exchange evaluation
         and how many cutoffs this move has caused in the search history.
         */
-        bool is_checking;
+        bool      is_checking;
         const int see_score = EvaluateStaticExchange(position, move, is_checking);
         if (see_score == MOVED_INTO_CHECK_SCORE)
         {
@@ -73,19 +67,14 @@ ScoreAndSortMoves(const Position&   position,
  * @param moves Moves to be sorted
  * @param is_stable_sort true for slower stable sort (required at root node search only)
  */
-void
-SortMoves(MoveList& moves, bool is_stable_sort)
+void SortMoves(MoveList &moves, bool is_stable_sort)
 {
     if (is_stable_sort)
     {
-       std::stable_sort 
-            (moves.rbegin(), moves.rend(), 
-            [](const Move& a, const Move& b){ return MoveScore(a) < MoveScore(b); } );
+        std::stable_sort(moves.rbegin(), moves.rend(), [](const Move &a, const Move &b) { return MoveScore(a) < MoveScore(b); });
     }
     else
     {
-        std::sort 
-            (moves.rbegin(), moves.rend(), 
-            [](const Move& a, const Move& b){ return MoveScore(a) < MoveScore(b); } );
+        std::sort(moves.rbegin(), moves.rend(), [](const Move &a, const Move &b) { return MoveScore(a) < MoveScore(b); });
     }
 }

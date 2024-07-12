@@ -52,7 +52,6 @@ constexpr uint16_t Position::CASTLING_RIGHTS_MASKS[64] = {
 Position Position::MakeNullMove() const
 {
     Position dst_position{*this};
-    dst_position.previous_ = this;
     dst_position.flags_ |= IS_NULL_MOVE;
     dst_position.flags_ ^= IS_BLACK_TO_MOVE;
     dst_position.hash_ ^= EN_PASSANT_HASHES[dst_position.en_passant_index_];
@@ -95,7 +94,6 @@ Position Position::MakeMove(Move move) const
     const Piece  captured = MoveCaptured(move);
 
     Position position{*this};
-    position.previous_ = this;
     position.flags_ &= ~IS_NULL_MOVE;
     position.flags_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
     position.hash_ ^=
@@ -225,7 +223,6 @@ Position::Position(std::string_view fen_string)
     stringstream                 ss;
     ss << fen_string;
     std::memset(this, 0, sizeof(Position));
-    previous_ = this;
     /* Pieces on the board */
     string pieces;
     ss >> pieces;
@@ -520,98 +517,6 @@ bool Position::IsAttacked(Square location, Color color) const
     return false;
 }
 
-/**
- * @brief Determine attacks to a square by a color.
- * @param position Board position.
- * @param location Square index.
- * @param color Attacking color.
- * @return Set of squares of color containing a piece attacking location.
- */
-Bitboard Position::AttacksTo(Square location, Color color) const
-{
-    const Sets           &sets                = SETS[location];
-    const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard        attacking_pieces    = this->PiecesOfColor(color);
-    const Bitboard        occupied_squares    = this->OccupiedSquares();
-    /*
-    Pawn, knight and king attacks can be done by direct lookup since blockers
-    do not affect their attack set.
-    */
-    Bitboard result = (attacking_pieces &
-                       ((sets.pawn_attacks[EnemyOf(color)] & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)));
-    /*
-    Rook and queen horizontal and vertical sliding attacks
-    */
-    Bitboard sliding_attackers = (rooks_ | queens_) & sets.rook_attacks & attacking_pieces;
-    while (sliding_attackers)
-    {
-        const Square locn = FindAndClearLsb(sliding_attackers);
-        if (!(intervening_squares[locn] & occupied_squares))
-        {
-            result |= BITBOARD(locn);
-        }
-    }
-    /*
-    Bishop and queen diagonal and antidiagonal sliding attacks
-    */
-    sliding_attackers = (bishops_ | queens_) & sets.bishop_attacks & attacking_pieces;
-    while (sliding_attackers)
-    {
-        const Square locn = FindAndClearLsb(sliding_attackers);
-        if (!(intervening_squares[locn] & occupied_squares))
-        {
-            result |= BITBOARD(locn);
-        }
-    }
-    return result;
-}
-
-/**
- * @brief Determine if the current position state is a legal chess position:
- * a) each side shall have strictly 1 king
- * b) kings shall not be adjacent
- * c) the side not on move shall not be in check
- */
-bool Position::IsLegal() const
-{
-    const Color    color      = ColorToMove();
-    const Bitboard white_king = kings_ & white_pieces_;
-    const Bitboard black_king = kings_ & black_pieces_;
-    return PopCount(white_king) == 1 && PopCount(black_king) == 1 && white_king != black_king &&
-           !(SETS[Lsb(white_king)].king_attacks & black_king) && !IsAttacked(king_location_[EnemyOf(color)], color);
-}
-
-/*
-Determine if the current position represents a draw by repetition.
-*/
-bool Position::IsDrawByRepetition(bool is_search) const
-{
-    const Position *position    = this;
-    const uint64_t  hash        = hash_;
-    int             repetitions = is_search ? 1 : 2;
-    for (position = position->previous_; position->reversible_move_count_ != 0; position = position->previous_)
-    {
-        if (position->hash_ == hash && --repetitions == 0)
-        {
-            INCREMENT("draws by repetition");
-            return true;
-        }
-    }
-    return false;
-}
-/*
-Determine if the current position represents a draw by the 50 move rule
-(50 consecutive reversible moves by each player is a drawn game)
-*/
-bool Position::IsDrawByFiftyMoves() const
-{
-    if (reversible_move_count_ >= 100)
-    {
-        INCREMENT("draws by 50 moves");
-        return true;
-    }
-    return false;
-}
 /*
 Determine if the current position represents a draw by insufficient material
 
@@ -666,19 +571,20 @@ bool Position::IsDrawByMaterial() const
         return false;
     }
 }
-/*
-Determine if the current position represents stalemate
-*/
-bool Position::IsStalemate() const
+
+/**
+ * @brief Determine if the current position state is a legal chess position:
+ * a) each side shall have strictly 1 king
+ * b) kings shall not be adjacent
+ * c) the side not on move shall not be in check
+ */
+bool Position::IsLegal() const
 {
-    return !IsInCheck() && GenerateLegalMoves(*this).size() == 0;
-}
-/*
-Determine if the current position represents checkmate
-*/
-bool Position::IsCheckmate() const
-{
-    return IsInCheck() && GenerateLegalMoves(*this).size() == 0;
+    const Color    color      = ColorToMove();
+    const Bitboard white_king = kings_ & white_pieces_;
+    const Bitboard black_king = kings_ & black_pieces_;
+    return PopCount(white_king) == 1 && PopCount(black_king) == 1 && white_king != black_king &&
+           !(SETS[Lsb(white_king)].king_attacks & black_king) && !IsAttacked(king_location_[EnemyOf(color)], color);
 }
 
 /**
@@ -730,6 +636,21 @@ string Position::VariationToString(const Variation &variation) const
         is_first_move = false;
     }
     return ss.str();
+}
+
+/*
+Determine if the current position represents stalemate
+*/
+bool Position::IsStalemate() const
+{
+    return IsInCheck() && GenerateLegalMoves(*this).size() == 0;
+}
+/*
+Determine if the current position represents checkmate
+*/
+bool Position::IsCheckmate() const
+{
+    return IsInCheck() && GenerateLegalMoves(*this).size() == 0;
 }
 
 /**

@@ -1,56 +1,60 @@
 PROGRAM             = pawnstar
-CXX                 = g++
-CXXFLAGS            = -I include -Wall -Wextra -std=c++20 -Wno-class-memaccess
+CXX                 = clang++
+CPPFLAGS            = -I include -D DEBUGX=1 -D DO_NULL_MOVE_PRUNING=1 -D DO_LATE_MOVE_REDUCTION=1
+CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -std=c++20
 
-GENERATED_DATA      = generated_data.cpp
-GENERATED_DATA_SRC  = generate_constants/generate_constants.cpp
-GENERATED_DATA_EXE  = generate_constants/gen_constants
+DEBUG_DIR           = debug
+RELEASE_DIR         = release
 
-HDRS                = $(notdir $(wildcard include/*.h))
-SRCS                = $(notdir $(wildcard src/*.cpp)) $(GENERATED_DATA)
+GENERATED_DATA_CPP  = generated_data.cpp
+GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
+GENERATOR_EXE       = generate_constants/gen_constants
 
-OBJS                = $(SRCS:.cpp=.o)
+HEADERS             = $(notdir $(wildcard include/*.h))
+SOURCES             = $(notdir $(wildcard src/*.cpp)) $(GENERATED_DATA_CPP)
 
-DBGDIR              = debug
-DBGEXE              = $(DBGDIR)/$(PROGRAM)
-DBGOBJS             = $(addprefix $(DBGDIR)/,$(OBJS))
-DBGFLAGS            = -g -O0 -DDEBUG
+OBJECTS             = $(SOURCES:.cpp=.o)
 
-RELDIR              = release
-RELEXE              = $(RELDIR)/$(PROGRAM)
-RELOBJS             = $(addprefix $(RELDIR)/, $(OBJS))
-RELFLAGS            = -O3 -DNDEBUG
+DEBUG_EXE           = $(DEBUG_DIR)/$(PROGRAM)
+DEBUG_OBJECTS       = $(addprefix $(DEBUG_DIR)/,$(OBJECTS))
+DEBUG_FLAGS         = -g -O0 -DDEBUG
+
+RELEASE_EXE         = $(RELEASE_DIR)/$(PROGRAM)
+RELEASE_OBJECTS     = $(addprefix $(RELEASE_DIR)/, $(OBJECTS))
+RELEASE_FLAGS       = -O3 -DNDEBUG
 
 .PHONY: all clean debug prep release remake
 
 all: debug release
 
-debug: prep $(DBGEXE)
+debug: prep $(DEBUG_EXE)
 
-$(DBGEXE): $(DBGOBJS)
-	$(CXX) $(CXXFLAGS) $(DBGFLAGS) -o $(DBGEXE) $^
+$(DEBUG_EXE): $(DEBUG_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(DEBUG_EXE) $(DEBUG_OBJECTS)
 
-$(DBGDIR)/%.o: src/%.cpp $(addprefix include/, $(HDRS))
-	$(CXX) -c $(CXXFLAGS) $(DBGFLAGS) -o $@ $<
+# Compile a debug object from source
+$(DEBUG_DIR)/%.o: src/%.cpp $(addprefix include/, $(HEADERS))
+	$(CXX) -c $(CXXFLAGS) $(DEBUG_FLAGS) -o $@ $<
 
-release: prep $(RELEXE)
+release: prep $(RELEASE_EXE)
 
-$(RELEXE): $(RELOBJS)
-	$(CXX) $(CXXFLAGS) $(RELFLAGS) -o $(RELEXE) $^
+$(RELEASE_EXE): $(RELEASE_OBJECTS)
+	$(CXX) $(CXXFLAGS) $(RELEASE_FLAGS) -o $(RELEASE_EXE) $(RELEASE_OBJECTS)
 
-$(RELDIR)/%.o: src/%.cpp $(addprefix include/, $(HDRS))
-	$(CXX) -c $(CXXFLAGS) $(RELFLAGS) -o $@ $<
+# Compile a release object from source
+$(RELEASE_DIR)/%.o: src/%.cpp $(addprefix include/, $(HEADERS))
+	$(CXX) -c $(CXXFLAGS) $(RELEASE_FLAGS) -o $@ $<
 
-src/$(GENERATED_DATA) : $(GENERATED_DATA_EXE)
-	$(GENERATED_DATA_EXE) > $@
+src/$(GENERATED_DATA_CPP) : $(GENERATOR_EXE)
+	$(GENERATOR_EXE) > src/$(GENERATED_DATA_CPP)
 
-$(GENERATED_DATA_EXE) : $(GENERATED_DATA_SRC)
-	$(CXX) $(CXXFLAGS) $(DBGFLAGS) -o $(GENERATED_DATA_EXE) $(GENERATED_DATA_SRC)  
+$(GENERATOR_EXE) : $(GENERATOR_SOURCE)
+	$(CXX) -g -O0 -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
 	
 prep:
-	mkdir -p $(DBGDIR) $(RELDIR)
+	mkdir -p $(DEBUG_DIR) $(RELEASE_DIR)
 
 remake: clean all
 
 clean:
-	rm -f $(RELEXE) $(RELOBJS) $(DBGEXE) $(DBGOBJS) src/$(GENERATED_DATA) $(GENERATED_DATA_EXE)
+	rm -f $(RELEASE_EXE) $(RELEASE_OBJECTS) $(DEBUG_EXE) $(DEBUG_OBJECTS) src/$(GENERATED_DATA_CPP) $(GENERATOR_EXE)

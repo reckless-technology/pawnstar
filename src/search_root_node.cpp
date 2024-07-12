@@ -66,7 +66,7 @@ Move SearchRootNode(Game &game)
         game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
         break;
     }
-    DEBUG_STATEMENT(DebugXClear());
+    DebugXClear();
     int start_ms            = GetMilliseconds();
     game.is_cancel_pending_ = false;
     /*
@@ -79,7 +79,7 @@ Move SearchRootNode(Game &game)
     AgeTranspositionTable();
     Variation principal_variation{};
     Move      best_moves[MAX_PLY]; /* Best move found at each ply of search. */
-    for (size_t i = 0; i != move_list.size(); ++i)
+    for (std::size_t i = 0; i != move_list.size(); ++i)
     {
         const int score = SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i], principal_variation, i);
         move_list[i]    = ScoredMove(move_list[i], score);
@@ -97,7 +97,7 @@ Move SearchRootNode(Game &game)
         Variation child_pv{};
         int       alpha  = ALPHA;
         game.node_count_ = 0;
-        for (size_t i = 0; i != move_list.size(); ++i)
+        for (std::size_t i = 0; i != move_list.size(); ++i)
         {
             const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list[i], child_pv, i);
             move_list[i]    = ScoredMove(move_list[i], score);

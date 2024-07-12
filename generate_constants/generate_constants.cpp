@@ -75,14 +75,14 @@ struct DirectionVector
 /* clang-format off */
 constexpr DirectionVector direction_vectors[8] = 
 {
-    [NORTH]     = { .dx =  0, .dy =  1 },
-    [NORTHEAST] = { .dx =  1, .dy =  1 },
-    [EAST]      = { .dx =  1, .dy =  0 },
-    [SOUTHEAST] = { .dx =  1, .dy = -1 },
-    [SOUTH]     = { .dx =  0, .dy = -1 },
-    [SOUTHWEST] = { .dx = -1, .dy = -1 },
-    [WEST]      = { .dx = -1, .dy =  0 },
-    [NORTHWEST] = { .dx = -1, .dy =  1 },
+    { .dx =  0, .dy =  1 }, // North
+    { .dx =  1, .dy =  1 }, // Northeast
+    { .dx =  1, .dy =  0 }, // East
+    { .dx =  1, .dy = -1 }, // Southeast
+    { .dx =  0, .dy = -1 }, // South
+    { .dx = -1, .dy = -1 }, // Southwest
+    { .dx = -1, .dy =  0 }, // West
+    { .dx = -1, .dy =  1 }, // Northwest
 };
 /* clang-format on */
 
@@ -101,72 +101,6 @@ static int PopCount(uint64_t x)
     }
     return count;
 }
-
-/**
- * @brief Find the index of the least significant bit.
- * @param x Input value.
- * @return Index of least significant 1 bit in x.
- */
-static int Lsb(uint64_t x)
-{
-    int result = 0;
-    while (!(x & 1))
-    {
-        ++result;
-        x >>= 1;
-    }
-    return result;
-}
-
-/**
- * @brief Find and clear the Lsb.
- * @param x Pointer to input value. On return has its Lsb cleared.
- * @return Index of bit which was cleared in x.
- */
-static int FindAndClearLsb(uint64_t &x)
-{
-    const int result = Lsb(x);
-    x &= x - 1;
-    return result;
-}
-
-/**
- * @brief RC4 random byte stream generator.
- */
-class RC4
-{
-    uint8_t state[256];
-    uint8_t x;
-    uint8_t y;
-    bool    is_initialized;
-
-  public:
-    RC4() : x(0), y(0), is_initialized(false)
-    {
-    }
-
-    uint8_t next()
-    {
-        if (!is_initialized)
-        {
-            is_initialized = true;
-            for (int i = 0; i != 256; ++i)
-            {
-                state[i] = i ^ 0x55;
-            }
-            /* Stir up the state to get some randomness going */
-            for (int i = 0; i != 1013; ++i)
-            {
-                this->next();
-            }
-        }
-        ++x;
-        y += state[x];
-        std::swap(state[x], state[y]);
-        const uint8_t z = state[x] + state[y];
-        return state[z];
-    }
-};
 
 /**
  * @brief Generate a pseudo random number.
@@ -610,33 +544,20 @@ static uint64_t RookMoveTargets(uint64_t occupied_squares, uint8_t location)
 }
 
 /**
- * @brief Given a bit mask, enumerate all the possible combinations
- * of bits set from that mask.
+ * @brief Given a bit mask, enumerate all the possible combinations of bits set from that mask.
  * @param mask The mask value.
- * @param values Array to store the combination bitset values.
- * @return Number of combinations generated.
+ * @return Combinational subsets of mask.
  */
-static int EnumerateMaskCombinations(uint64_t mask, uint64_t values[])
+static std::vector<uint64_t> EnumerateMaskCombinations(uint64_t mask)
 {
-    uint8_t  bit_indices[64] = {0};
-    uint64_t b               = mask;
-    for (int i = 0; b != 0; ++i)
+    std::vector<uint64_t> result;
+    uint64_t              n = 0;
+    do
     {
-        bit_indices[i] = FindAndClearLsb(b);
-    }
-    const int num_bits_in_mask = PopCount(mask);
-    const int num_combinations = 1 << num_bits_in_mask;
-    for (int i = 0; i != num_combinations; ++i)
-    {
-        uint64_t value = NO_SQUARES;
-        b              = i;
-        while (b)
-        {
-            value |= Bitboard(bit_indices[FindAndClearLsb(b)]);
-        }
-        values[i] = value;
-    }
-    return num_combinations;
+        result.push_back(n);
+        n = (n - mask) & mask;
+    } while (n);
+    return result;
 }
 
 typedef uint64_t (*OccupancyFn)(uint8_t location);
@@ -648,14 +569,13 @@ typedef uint64_t (*MoveTargetFn)(uint64_t occupied_squares, uint8_t location);
  */
 typedef struct Magic
 {
-    MoveTargetFn move_target_fn;               /**< Move target function for actual moves available. */
-    OccupancyFn  occupancy_mask_fn;            /**< Occupancy mask function. */
-    uint64_t     magic;                        /**< The magic multiplicand. */
-    uint64_t     mask;                         /**< Occupancy mask. */
-    int          shift;                        /**< Number of bits to right shift to get indices. */
-    int          num_discrete_attacks;         /**< Number of separate discrete attack vectors generated. */
-    uint64_t     attacks[MAX_ATTACK_SET_SIZE]; /**< The discrete attack vectors. */
-    uint8_t      indices[MAX_ATTACK_SET_SIZE]; /**< Indices into the discrete attack vector array. */
+    MoveTargetFn          move_target_fn;    /**< Move target function for actual moves available. */
+    OccupancyFn           occupancy_mask_fn; /**< Occupancy mask function. */
+    uint64_t              magic;             /**< The magic multiplicand. */
+    uint64_t              mask;              /**< Occupancy mask. */
+    int                   shift;             /**< Number of bits to right shift to get indices. */
+    std::vector<uint64_t> attacks;           /**< The discrete attack vectors. */
+    std::vector<uint8_t>  indices;           /**< Indices into the discrete attack vector array. */
 } Magic;
 
 /**
@@ -664,21 +584,21 @@ typedef struct Magic
  * @param magic Where to store the found magic values.
  *              Has functions populated on entry.
  */
-static void FindMagic(int location, Magic *magic)
+static void FindMagic(int location, Magic &magic)
 {
-    uint64_t occupancies[MAX_ATTACK_SET_SIZE];
-    uint64_t actual_attacks[MAX_ATTACK_SET_SIZE];
-    magic->mask  = magic->occupancy_mask_fn(location);
-    magic->shift = 64 - PopCount(magic->mask);
+    magic.mask  = magic.occupancy_mask_fn(location);
+    magic.shift = 64 - PopCount(magic.mask);
     /*
     Enumerate all possible occupancy values and compute what the actual
     attack sets for each occupancy are, so we can check to see if a trial
     magic value works.
     */
-    const int num_values = EnumerateMaskCombinations(magic->mask, occupancies);
+    auto                  occupancies = EnumerateMaskCombinations(magic.mask);
+    const int             num_values  = occupancies.size();
+    std::vector<uint64_t> actual_attacks;
     for (int i = 0; i != num_values; ++i)
     {
-        actual_attacks[i] = magic->move_target_fn(occupancies[i], location);
+        actual_attacks.push_back(magic.move_target_fn(occupancies[i], location));
     }
     /*
     Try a random magic multiplicand and test it for success.
@@ -690,17 +610,16 @@ static void FindMagic(int location, Magic *magic)
         is_hash_collision = false;
         /* Magics are typically fairly sparse, so AND a few random numbers together. */
         trial_magic = PseudoRandom64() & PseudoRandom64() & PseudoRandom64();
-        memset(magic->attacks, 0xFF, sizeof(magic->attacks));
-        memset(magic->indices, 0xFF, sizeof(magic->indices));
+        magic.attacks.assign(num_values, ~NO_SQUARES);
         for (int i = 0; i != num_values; ++i)
         {
-            const unsigned int index = (unsigned int)((occupancies[i] * trial_magic) >> magic->shift);
-            if (magic->attacks[index] == ~NO_SQUARES)
+            const unsigned int index = (unsigned int)((occupancies[i] * trial_magic) >> magic.shift);
+            if (magic.attacks[index] == ~NO_SQUARES)
             {
                 /* Nothing here yet so store the attack. */
-                magic->attacks[index] = actual_attacks[i];
+                magic.attacks[index] = actual_attacks[i];
             }
-            if (magic->attacks[index] != actual_attacks[i])
+            if (magic.attacks[index] != actual_attacks[i])
             {
                 /* A previous entry clashes with this entry - this trial magic is no good. */
                 is_hash_collision = true;
@@ -715,31 +634,23 @@ static void FindMagic(int location, Magic *magic)
     and the vectors are 8 bytes each this saves a lot of space in the
     final magic move entry tables, which helps with cache pressure.
     */
-    uint64_t discrete_attacks[MAX_ATTACK_SET_SIZE];
-    int      num_discrete_attacks = 0;
+    std::vector<uint64_t> discrete_attacks;
+    magic.indices.assign(num_values, 0);
     for (int i = 0; i != num_values; ++i)
     {
-        bool has_found_attack = false;
-        for (int j = 0; j != num_discrete_attacks; ++j)
+        const auto j = std::find(discrete_attacks.begin(), discrete_attacks.end(), magic.attacks[i]);
+        if (j != discrete_attacks.end())
         {
-            if (discrete_attacks[j] == magic->attacks[i])
-            {
-                magic->indices[i] = j;
-                has_found_attack  = true;
-                break;
-            }
+            magic.indices[i] = j - discrete_attacks.begin();
         }
-        if (!has_found_attack)
+        else
         {
-            discrete_attacks[num_discrete_attacks] = magic->attacks[i];
-            magic->indices[i]                      = num_discrete_attacks;
-            ++num_discrete_attacks;
+            magic.indices[i] = discrete_attacks.size();
+            discrete_attacks.push_back(magic.attacks[i]);
         }
     }
-    magic->num_discrete_attacks = num_discrete_attacks;
-    magic->magic                = trial_magic;
-    memcpy(magic->attacks, discrete_attacks, num_discrete_attacks * sizeof(uint64_t));
-    return;
+    magic.magic   = trial_magic;
+    magic.attacks = discrete_attacks;
 }
 
 /**
@@ -773,7 +684,7 @@ static void GenerateMagics(void)
         {
             magics[i].occupancy_mask_fn = v->occupancy_mask_fn;
             magics[i].move_target_fn    = v->move_target_fn;
-            FindMagic(i, &magics[i]);
+            FindMagic(i, magics[i]);
         }
         /* First print the arrays for the discrete attacks and the attack indices. */
         for (int i = 0; i != 64; ++i)
@@ -790,8 +701,8 @@ static void GenerateMagics(void)
                 printf("0x%02X, ", magics[i].indices[j]);
             }
             printf("\n};\n");
-            printf("static const uint64_t %s_MAGIC_ATTACKS_%s[%d] = \n{", v->name, square_name, magics[i].num_discrete_attacks);
-            for (int j = 0; j != magics[i].num_discrete_attacks; ++j)
+            printf("static const uint64_t %s_MAGIC_ATTACKS_%s[%zu] = \n{", v->name, square_name, magics[i].attacks.size());
+            for (std::size_t j = 0; j != magics[i].attacks.size(); ++j)
             {
                 if (j % 8 == 0)
                 {

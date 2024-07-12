@@ -140,7 +140,7 @@ static void handle_usermove(Game &game, span<string> args)
 static void handle_setboard(Game &game, span<string> args)
 {
     stringstream ss;
-    for (size_t i = 1; i < args.size(); ++i)
+    for (std::size_t i = 1; i < args.size(); ++i)
     {
         ss << args[i] << ' ';
     }

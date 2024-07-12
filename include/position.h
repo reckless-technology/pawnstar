@@ -41,14 +41,11 @@ class Position
     Position    MakeMove(Move move) const;                           /**< Construct a position from this one by making a move. */
     Position    MakeNullMove() const;                                /**< Construct a position from this one by making a null move. */
     void        AddPiece(Color color, Piece piece, Square to);       /**< Place a piece on the board. */
-    Bitboard    AttacksTo(Square location, Color color) const;       /**< The set of attackers to a location on the board. */
     bool        IsAttacked(Square location, Color color) const;      /**< Determine if location is attacked by color. */
     bool        IsLegal() const;                                     /**< Is this a legal chess position. */
-    bool        IsCheckmate() const;                                 /**< Is this position checkmate. */
+    bool        IsCheckmate() const;                                 /**< Is this position checkmate.  */
     bool        IsStalemate() const;                                 /**< Is this position stalemate. */
-    bool        IsDrawByFiftyMoves() const;                          /**< Is this position a draw by the 50 move rule. */
     bool        IsDrawByMaterial() const;                            /**< Is this position a draw by insufficient material. */
-    bool        IsDrawByRepetition(bool is_search) const;            /**< Is this position a draw by repetition. */
     uint64_t    ComputeHash() const;                                 /**< Compute the Zobrist hash from scratch. */
     std::string ToString() const;                                    /**< Return the FEN string for this position. */
     std::string MoveToString(Move move) const;                       /**< Generate the SAN string for a specific legal move. */
@@ -186,6 +183,11 @@ class Position
         return full_move_count_;
     }
 
+    constexpr uint8_t ReversibleMoveCount() const
+    {
+        return reversible_move_count_;
+    }
+
     constexpr Square EnPassantIndex() const
     {
         return en_passant_index_;
@@ -217,7 +219,6 @@ class Position
         };
     };
     uint64_t              hash_;                     /**< Zobrist hash of this position, maintained incrementally    */
-    const Position       *previous_;                 /**< position immediately prior to this in the line of play     */
     uint16_t              flags_;                    /**< game state-machine flags                                   */
     Square                king_location_[2];         /**< square index of white and black kings                      */
     Square                en_passant_index_;         /**< en passant capture availability square (0 if none)         */

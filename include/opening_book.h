@@ -4,7 +4,7 @@
 
 #include "move.h"
 
-struct Position;
+class Position;
 
 bool    InitializeOpeningBookFromFile(std::string_view filename);
 void    DisplayAvailableBookMoves(const Position& position);

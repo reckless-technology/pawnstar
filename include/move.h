@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "options.h"
+#include "constants.h"
 /**
  * @file Functions for constructing and using chess moves.
  *

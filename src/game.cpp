@@ -60,6 +60,46 @@ void Game::UndoMove()
     {
         positions_.pop_back();
     }
+    else
+    {
+        printf("ERROR: undo a non existent move!\n");
+    }
+}
+
+/*
+Determine if the current position represents a draw by the 50 move rule
+(50 consecutive reversible moves by each player is a drawn game)
+*/
+bool Game::IsDrawByFiftyMoves() const
+{
+    if (CurrentPosition().ReversibleMoveCount() >= 100)
+    {
+        INCREMENT("draws by 50 moves");
+        return true;
+    }
+    return false;
+}
+
+/*
+Determine if the current position represents a draw by repetition.
+*/
+bool Game::IsDrawByRepetition(bool is_search) const
+{
+    int            repetitions = is_search ? 1 : 2;
+    const uint64_t hash        = CurrentPosition().Hash();
+    for (int i = positions_.size() - 2; i >= 0; --i)
+    {
+        if (positions_[i].Hash() == hash && --repetitions == 0)
+        {
+            INCREMENT("draws by repetition");
+            return true;
+        }
+        if (positions_[i].ReversibleMoveCount() == 0)
+        {
+            return false;
+        }
+    }
+    return false;
 }
 
 void Game::MakeNullMove()
@@ -110,7 +150,7 @@ bool Game::IsGameOver() const
         printf("1/2-1/2 {stalemate}\n");
         return true;
     }
-    if (CurrentPosition().IsDrawByRepetition(false))
+    if (IsDrawByRepetition(false))
     {
         printf("1/2-1/2 {draw by repetition}\n");
         return true;
@@ -120,7 +160,7 @@ bool Game::IsGameOver() const
         printf("1/2-1/2 {draw by insufficient material}\n");
         return true;
     }
-    if (CurrentPosition().IsDrawByFiftyMoves())
+    if (IsDrawByFiftyMoves())
     {
         printf("1/2-1/2 {draw by 50 reversible moves}\n");
         return true;

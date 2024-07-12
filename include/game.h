@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "chess_clock.h"
-#include "options.h"
+#include "constants.h"
 #include "position.h"
 
 /**
@@ -28,6 +28,8 @@ struct Game
     void      StartThinking();
     void      StopThinking();
     bool      IsGameOver() const;
+    bool      IsDrawByRepetition(bool is_search) const;
+    bool      IsDrawByFiftyMoves() const;
     Position &CurrentPosition()
     {
         return positions_.back();

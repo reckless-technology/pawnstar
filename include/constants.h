@@ -1,17 +1,5 @@
 #pragma once
 
-#ifndef DEBUGX
-#define DEBUGX 1
-#endif
-
-#ifndef DO_NULL_MOVE_PRUNING
-#define DO_NULL_MOVE_PRUNING 1
-#endif
-
-#ifndef DO_LATE_MOVE_REDUCTION
-#define DO_LATE_MOVE_REDUCTION 1
-#endif
-
 constexpr int HASHTABLE_MEGABYTES         = 512;       ///< default transposition table size in MB
 constexpr int MAX_MOVES_PER_POSITION      = 256;       ///< maximum possible number of pseudo-legal moves for a chess position
 constexpr int BETA                        = 11000;     ///< greater than any possible evaluation score including checkmate

@@ -1,24 +1,23 @@
-#include <vector>
 #include <algorithm>
+#include <vector>
 
-#include "position.h"
 #include "debug_hashtable.h"
-#include "transposition_table.h"
 #include "function_prototypes.h"
+#include "position.h"
+#include "transposition_table.h"
 
-static bool IsPrime(size_t x);
+static bool IsPrime(std::size_t x);
 
 /**
  * Transposition table is just a vector of Transpositions, which
  * we index by using the Zobrist hash of the position.
-*/
+ */
 static std::vector<Transposition> table;
 
 /**
  * @brief Delete the transposition table.
  */
-void 
-FreeTranspositionTable()
+void FreeTranspositionTable()
 {
     table.clear();
 }
@@ -28,10 +27,9 @@ FreeTranspositionTable()
  * @param megabytes Approx max size of the table in megabytes. May be slightly smaller (table is prime size).
  * @return true on success
  */
-void 
-InitializeTranspositionTable(size_t megabytes)
+void InitializeTranspositionTable(std::size_t megabytes)
 {
-    size_t num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
+    std::size_t num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
     /* Find the next smallest prime number and make the table that size */
     if ((num_entries & 1) == 0)
     {
@@ -51,11 +49,9 @@ InitializeTranspositionTable(size_t megabytes)
  * @param transposition Reference to transposition to assign if found
  * @return true on success
  */
-bool 
-FindTransposition(uint64_t       hash, 
-                  Transposition& transposition)
+bool FindTransposition(uint64_t hash, Transposition &transposition)
 {
-    const Transposition& t = table[hash % table.size()];
+    const Transposition &t = table[hash % table.size()];
     if (t.hash == hash)
     {
         transposition = t;
@@ -72,14 +68,9 @@ FindTransposition(uint64_t       hash,
  * @param move Best move found.
  * @param node_type Node type.
  */
-void 
-RecordTransposition(uint64_t hash, 
-                    int      depth, 
-                    int      score, 
-                    Move     move, 
-                    int      node_type)
-{   
-    Transposition& t = table[hash % table.size()];
+void RecordTransposition(uint64_t hash, int depth, int score, Move move, int node_type)
+{
+    Transposition &t = table[hash % table.size()];
     if (t.hash == 0 || t.is_old || t.depth < depth)
     {
         t.hash      = hash;
@@ -91,20 +82,15 @@ RecordTransposition(uint64_t hash,
     }
 }
 
-void
-ShowTableUsage()
+void ShowTableUsage()
 {
-    const size_t count = std::ranges::count_if(table, [](const Transposition& t) { return t.hash != 0; });
-    printf("Transposition table %zu%% full (used %zu of %zu entries)\n", 
-        (count * 100) / table.size(),
-        count, 
-        table.size());
+    const std::size_t count = std::ranges::count_if(table, [](const Transposition &t) { return t.hash != 0; });
+    printf("Transposition table %zu%% full (used %zu of %zu entries)\n", (count * 100) / table.size(), count, table.size());
 }
 
-void
-AgeTranspositionTable()
+void AgeTranspositionTable()
 {
-    std::ranges::for_each(table, [](Transposition& t) { t.is_old = true; });
+    std::ranges::for_each(table, [](Transposition &t) { t.is_old = true; });
 }
 
 /**
@@ -112,14 +98,14 @@ AgeTranspositionTable()
  * We get marginally better hash dispersion when the hashtable size is a prime number
  * @param x candidate
  * @return true if x is prime
-*/
-static bool IsPrime(size_t x)
+ */
+static bool IsPrime(std::size_t x)
 {
     if (x < 3)
     {
         return false;
     }
-    for (size_t i = 2; i * i <= x; ++i)
+    for (std::size_t i = 2; i * i <= x; ++i)
     {
         if (x % i == 0)
         {

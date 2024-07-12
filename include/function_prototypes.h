@@ -7,7 +7,7 @@
 #include "generated_data.h"
 #include "move.h"
 
-struct Position;
+class Position;
 struct Game;
 
 constexpr uint8_t FileOf(Square locn)
