@@ -609,7 +609,7 @@ static uint64_t RookMoveTargets(uint64_t occupied_squares, uint8_t location)
  */
 static int EnumerateMaskCombinations(uint64_t mask, uint64_t values[])
 {
-    int      bit_indices[64] = {0};
+    uint8_t  bit_indices[64] = {0};
     uint64_t b               = mask;
     for (int i = 0; b != 0; ++i)
     {
@@ -674,11 +674,13 @@ static void FindMagic(int location, Magic *magic)
     /*
     Try a random magic multiplicand and test it for success.
     */
-    for (;;)
+    bool     is_hash_collision = false;
+    uint64_t trial_magic;
+    do
     {
-        bool is_hash_collision = false;
+        is_hash_collision = false;
         /* Magics are typically fairly sparse, so AND a few random numbers together. */
-        const uint64_t trial_magic = PseudoRandom64() & PseudoRandom64() & PseudoRandom64();
+        trial_magic = PseudoRandom64() & PseudoRandom64() & PseudoRandom64();
         memset(magic->attacks, 0xFF, sizeof(magic->attacks));
         memset(magic->indices, 0xFF, sizeof(magic->indices));
         for (int i = 0; i != num_values; ++i)
@@ -696,41 +698,39 @@ static void FindMagic(int location, Magic *magic)
                 break;
             }
         }
-        if (!is_hash_collision)
+    } while (is_hash_collision);
+
+    /*
+    Compress the actual attacks set down to a set of indices
+    and unique attack vectors. Since the indices are 1 byte each
+    and the vectors are 8 bytes each this saves a lot of space in the
+    final magic move entry tables, which helps with cache pressure.
+    */
+    uint64_t discrete_attacks[MAX_ATTACK_SET_SIZE];
+    int      num_discrete_attacks = 0;
+    for (int i = 0; i != num_values; ++i)
+    {
+        bool has_found_attack = false;
+        for (int j = 0; j != num_discrete_attacks; ++j)
         {
-            /*
-            Compress the actual attacks set down to a set of indices
-            and unique attack vectors. Since the indices are 1 byte each
-            and the vectors are 8 bytes each this saves a lot of space in the
-            final magic move entry tables, which helps with cache pressure.
-            */
-            uint64_t discrete_attacks[MAX_ATTACK_SET_SIZE];
-            int      num_discrete_attacks = 0;
-            for (int i = 0; i != num_values; ++i)
+            if (discrete_attacks[j] == magic->attacks[i])
             {
-                bool has_found_attack = false;
-                for (int j = 0; j != num_discrete_attacks; ++j)
-                {
-                    if (discrete_attacks[j] == magic->attacks[i])
-                    {
-                        magic->indices[i] = j;
-                        has_found_attack  = true;
-                        break;
-                    }
-                }
-                if (!has_found_attack)
-                {
-                    discrete_attacks[num_discrete_attacks] = magic->attacks[i];
-                    magic->indices[i]                      = num_discrete_attacks;
-                    ++num_discrete_attacks;
-                }
+                magic->indices[i] = j;
+                has_found_attack  = true;
+                break;
             }
-            magic->num_discrete_attacks = num_discrete_attacks;
-            magic->magic                = trial_magic;
-            memcpy(magic->attacks, discrete_attacks, num_discrete_attacks * sizeof(uint64_t));
-            return;
+        }
+        if (!has_found_attack)
+        {
+            discrete_attacks[num_discrete_attacks] = magic->attacks[i];
+            magic->indices[i]                      = num_discrete_attacks;
+            ++num_discrete_attacks;
         }
     }
+    magic->num_discrete_attacks = num_discrete_attacks;
+    magic->magic                = trial_magic;
+    memcpy(magic->attacks, discrete_attacks, num_discrete_attacks * sizeof(uint64_t));
+    return;
 }
 
 /**

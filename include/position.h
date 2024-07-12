@@ -63,7 +63,7 @@ class Position
                : (square & rooks_)   ? ROOK
                : (square & queens_)  ? QUEEN
                : (square & kings_)   ? KING
-                                     : NO_PIECE;
+                                     : NONE;
     }
 
     constexpr bool MayWhiteCastleKingside() const

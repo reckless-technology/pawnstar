@@ -48,10 +48,10 @@ constexpr Bitboard FILE_G = 0x4040404040404040ull;
 constexpr Bitboard FILE_H = 0x8080808080808080ull;
 
 /* Used to mask files to prevent wrap when bit shifting. */
-constexpr Bitboard MASK_EAST_1 = 0x7F7F7F7F7F7F7F7Full;
+constexpr Bitboard NOT_H_FILE  = 0x7F7F7F7F7F7F7F7Full;
 constexpr Bitboard MASK_EAST_2 = 0x3F3F3F3F3F3F3F3Full;
 constexpr Bitboard MASK_EAST_4 = 0x0F0F0F0F0F0F0F0Full;
-constexpr Bitboard MASK_WEST_1 = 0xFEFEFEFEFEFEFEFEull;
+constexpr Bitboard NOT_A_FILE  = 0xFEFEFEFEFEFEFEFEull;
 constexpr Bitboard MASK_WEST_2 = 0xFCFCFCFCFCFCFCFCull;
 constexpr Bitboard MASK_WEST_4 = 0xF0F0F0F0F0F0F0F0ull;
 
@@ -91,15 +91,15 @@ constexpr Bitboard ShiftNorth(Bitboard b)
 }
 constexpr Bitboard ShiftNortheast(Bitboard b)
 {
-    return (b & MASK_EAST_1) << 9;
+    return (b & NOT_H_FILE) << 9;
 }
 constexpr Bitboard ShiftEast(Bitboard b)
 {
-    return (b & MASK_EAST_1) << 1;
+    return (b & NOT_H_FILE) << 1;
 }
 constexpr Bitboard ShiftSoutheast(Bitboard b)
 {
-    return (b & MASK_EAST_1) >> 7;
+    return (b & NOT_H_FILE) >> 7;
 }
 constexpr Bitboard ShiftSouth(Bitboard b)
 {
@@ -107,15 +107,15 @@ constexpr Bitboard ShiftSouth(Bitboard b)
 }
 constexpr Bitboard ShiftSouthwest(Bitboard b)
 {
-    return (b & MASK_WEST_1) >> 9;
+    return (b & NOT_A_FILE) >> 9;
 }
 constexpr Bitboard ShiftWest(Bitboard b)
 {
-    return (b & MASK_WEST_1) >> 1;
+    return (b & NOT_A_FILE) >> 1;
 }
 constexpr Bitboard ShiftNorthwest(Bitboard b)
 {
-    return (b & MASK_WEST_1) << 7;
+    return (b & NOT_A_FILE) << 7;
 }
 
 constexpr Square FindAndClearLsb(Bitboard &x)
@@ -152,7 +152,7 @@ constexpr Bitboard FillNorth(Bitboard b)
 
 constexpr Bitboard FillNorthEast(Bitboard b)
 {
-    b |= (b & MASK_EAST_1) << 9;
+    b |= (b & NOT_H_FILE) << 9;
     b |= (b & MASK_EAST_2) << 18;
     b |= (b & MASK_EAST_4) << 36;
     return b;
@@ -160,7 +160,7 @@ constexpr Bitboard FillNorthEast(Bitboard b)
 
 constexpr Bitboard FillEast(Bitboard b)
 {
-    b |= (b & MASK_EAST_1) << 1;
+    b |= (b & NOT_H_FILE) << 1;
     b |= (b & MASK_EAST_2) << 2;
     b |= (b & MASK_EAST_4) << 4;
     return b;
@@ -168,7 +168,7 @@ constexpr Bitboard FillEast(Bitboard b)
 
 constexpr Bitboard FillSouthEast(Bitboard b)
 {
-    b |= (b & MASK_EAST_1) >> 7;
+    b |= (b & NOT_H_FILE) >> 7;
     b |= (b & MASK_EAST_2) >> 14;
     b |= (b & MASK_EAST_4) >> 28;
     return b;
@@ -184,7 +184,7 @@ constexpr Bitboard FillSouth(Bitboard b)
 
 constexpr Bitboard FillSouthWest(Bitboard b)
 {
-    b |= (b & MASK_WEST_1) >> 9;
+    b |= (b & NOT_A_FILE) >> 9;
     b |= (b & MASK_WEST_2) >> 18;
     b |= (b & MASK_WEST_4) >> 36;
     return b;
@@ -192,7 +192,7 @@ constexpr Bitboard FillSouthWest(Bitboard b)
 
 constexpr Bitboard FillWest(Bitboard b)
 {
-    b |= (b & MASK_WEST_1) >> 1;
+    b |= (b & NOT_A_FILE) >> 1;
     b |= (b & MASK_WEST_2) >> 2;
     b |= (b & MASK_WEST_4) >> 4;
     return b;
@@ -200,7 +200,7 @@ constexpr Bitboard FillWest(Bitboard b)
 
 constexpr Bitboard FillNorthWest(Bitboard b)
 {
-    b |= (b & MASK_WEST_1) << 7;
+    b |= (b & NOT_A_FILE) << 7;
     b |= (b & MASK_WEST_2) << 14;
     b |= (b & MASK_WEST_4) << 28;
     return b;

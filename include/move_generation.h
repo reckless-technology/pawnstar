@@ -91,10 +91,10 @@ template <bool do_all_moves> MoveList GenerateMoves(const Position &position)
     {
         const Square to   = FindAndClearLsb(promotions);
         const Square from = (Square)(to - push_delta);
-        moves.push_back(PromotionMove(from, to, NO_PIECE, QUEEN));
-        moves.push_back(PromotionMove(from, to, NO_PIECE, ROOK));
-        moves.push_back(PromotionMove(from, to, NO_PIECE, BISHOP));
-        moves.push_back(PromotionMove(from, to, NO_PIECE, KNIGHT));
+        moves.push_back(PromotionMove(from, to, NONE, QUEEN));
+        moves.push_back(PromotionMove(from, to, NONE, ROOK));
+        moves.push_back(PromotionMove(from, to, NONE, BISHOP));
+        moves.push_back(PromotionMove(from, to, NONE, KNIGHT));
     }
     while (captures_west)
     {

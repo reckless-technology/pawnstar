@@ -30,7 +30,7 @@ typedef int64_t Move;
 
 enum Piece : uint8_t
 {
-    NO_PIECE,
+    NONE,
     PAWN,
     KNIGHT,
     BISHOP,
