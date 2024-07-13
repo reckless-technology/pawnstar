@@ -1,6 +1,9 @@
 /**
- * @file Precomputes at compile time, constants used by the main Pawnstar program.
+ * @file Precomputes at compile time, constants used by pawnstar.
+ * This program is compiled and then executed by the Makefile to create the "generated_data.cpp" source file which
+ * is then used in compilation of the main program.
  */
+#include <array>
 #include <cinttypes>
 #include <cstdio>
 #include <functional>
@@ -8,25 +11,26 @@
 #include <vector>
 
 /* Fixed square definitions */
-constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7Full; /**< Mask off the H file to prevent wraparound when shifting east. */
-constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEull; /**< Mask off the A file to prevent wraparound when shifting west. */
+constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7Full; /**< Mask off the h file to prevent wraparound when shifting east. */
+constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEull; /**< Mask off the a file to prevent wraparound when shifting west. */
 constexpr uint64_t NO_SQUARES = 0ull;
 
 /* clang-format off */
-constexpr uint8_t   FileOf(int locn)            { return (uint8_t)locn & 7          ; } /**< Convert square index to file. */
-constexpr uint8_t   RankOf(int locn)            { return (uint8_t)locn >> 3         ; } /**< Convert square index to rank. */
-constexpr char      FileChar(int locn)          { return (char)('a' + FileOf(locn)) ; } /**< Convert square index to file character. */
-constexpr char      RankChar(int locn)          { return (char)('1' + RankOf(locn)) ; } /**< Convert square index to rank character. */
-constexpr uint64_t  Bitboard(uint8_t locn)      { return 1ull << locn               ; } /**< Convert square index to Bitboard. */
-constexpr uint64_t  Bitboard(int x, int y)      { return 1ull << (x + 8 * y)        ; } /**< Convert square (file,rank) co-ords to Bitboard. */
-constexpr uint64_t  ShiftNorth(uint64_t b)      { return b << 8                     ; } /**< Shift a Bitboard one square to the north. */
-constexpr uint64_t  ShiftNortheast(uint64_t b)  { return (b & NOT_H_FILE) << 9      ; } /**< Shift a Bitboard one square to the northeast. */
-constexpr uint64_t  ShiftEast(uint64_t b)       { return (b & NOT_H_FILE) << 1      ; } /**< Shift a Bitboard one square to the east. */
-constexpr uint64_t  ShiftSoutheast(uint64_t b)  { return (b & NOT_H_FILE) >> 7      ; } /**< Shift a Bitboard one square to the southeast. */
-constexpr uint64_t  ShiftSouth(uint64_t b)      { return b >> 8                     ; } /**< Shift a Bitboard one square to the south. */
-constexpr uint64_t  ShiftSouthwest(uint64_t b)  { return (b & NOT_A_FILE) >> 9      ; } /**< Shift a Bitboard one square to the southwest. */
-constexpr uint64_t  ShiftWest(uint64_t b)       { return (b & NOT_A_FILE) >> 1      ; } /**< Shift a Bitboard one square to the west. */
-constexpr uint64_t  ShiftNorthwest(uint64_t b)  { return (b & NOT_A_FILE) << 7      ; } /**< Shift a Bitboard one square to the northwest. */
+constexpr uint8_t   FileOf(int locn)            { return (uint8_t)locn  & 7; }                  /**< Convert square index to file. */
+constexpr uint8_t   RankOf(int locn)            { return (uint8_t)locn >> 3; }                  /**< Convert square index to rank. */
+constexpr char      FileChar(int locn)          { return (char)('a' + FileOf(locn)); }          /**< Convert square index to file character. */
+constexpr char      RankChar(int locn)          { return (char)('1' + RankOf(locn)); }          /**< Convert square index to rank character. */
+constexpr uint64_t  Bitboard(uint8_t locn)      { return 1ull << locn; }                        /**< Convert square index to Bitboard. */
+constexpr uint64_t  Bitboard(int x, int y)      { return 1ull << (x + 8 * y); }                 /**< Convert square (file,rank) co-ords to Bitboard. */
+constexpr uint64_t  ShiftNorth(uint64_t b)      { return b << 8; }                              /**< Shift a Bitboard one square to the north. */
+constexpr uint64_t  ShiftNortheast(uint64_t b)  { return (b & NOT_H_FILE) << 9; }               /**< Shift a Bitboard one square to the northeast. */
+constexpr uint64_t  ShiftEast(uint64_t b)       { return (b & NOT_H_FILE) << 1; }               /**< Shift a Bitboard one square to the east. */
+constexpr uint64_t  ShiftSoutheast(uint64_t b)  { return (b & NOT_H_FILE) >> 7; }               /**< Shift a Bitboard one square to the southeast. */
+constexpr uint64_t  ShiftSouth(uint64_t b)      { return b >> 8; }                              /**< Shift a Bitboard one square to the south. */
+constexpr uint64_t  ShiftSouthwest(uint64_t b)  { return (b & NOT_A_FILE) >> 9; }               /**< Shift a Bitboard one square to the southwest. */
+constexpr uint64_t  ShiftWest(uint64_t b)       { return (b & NOT_A_FILE) >> 1; }               /**< Shift a Bitboard one square to the west. */
+constexpr uint64_t  ShiftNorthwest(uint64_t b)  { return (b & NOT_A_FILE) << 7; }               /**< Shift a Bitboard one square to the northwest. */
+constexpr bool      IsInBoard(int x, int y)     { return x >= 0 && x < 8 && y >= 0 && y < 8; }  /**< Is this square on the board. */
 /* clang-format on */
 
 /**
@@ -43,18 +47,11 @@ enum Piece
     KING,
 };
 
-/**
- * @brief Piece names.
- */
-static const char *const piece_names[7] = {"none", "pawn", "knight", "bishop", "rook", "queen", "king"};
+static const char *const PIECE_NAMES[7] = {"none", "pawn", "knight", "bishop", "rook", "queen", "king"};
+static const char *const COLOR_NAMES[2] = {"white", "black"};
 
 /**
- * @brief Color names.
- */
-static const char *const color_names[2] = {"white", "black"};
-
-/**
- * @brief Compass rose directions from white's perspective.
+ * @brief Compass rose directions from white's perspective, i.e. north is "forward" for white.
  */
 enum Direction
 {
@@ -81,7 +78,7 @@ struct DirectionVector
  * @brief Each of the directions on the compass.
  */
 /* clang-format off */
-constexpr DirectionVector direction_vectors[] = 
+constexpr DirectionVector DIRECTION_VECTORS[] = 
 {
     { .dx =  0, .dy =  1 }, // North
     { .dx =  1, .dy =  1 }, // Northeast
@@ -111,12 +108,12 @@ static int PopCount(uint64_t x)
 }
 
 /**
- * @brief Generate a pseudo random number.
- * @return 64 bit next value in sequence.
+ * @brief Generate a 64 bit pseudo random number Zobrist hash key.
+ * @return Next value in sequence.
  */
-static uint64_t PseudoRandom64()
+static uint64_t NextRandomKey()
 {
-    static uint64_t x = 1;
+    static uint64_t x = 0xAA55AA55AA55AA55ull;
     x ^= x >> 12;
     x ^= x << 25;
     x ^= x >> 27;
@@ -125,15 +122,15 @@ static uint64_t PseudoRandom64()
 
 /**
  * @brief Generate a ray (vector) from a square in a single compass direction.
- * @param location Source square index.
+ * @param locn Source square index.
  * @param direction Compass direction.
- * @return Vector from location in direction specified, excluding source square.
+ * @return Vector from locn in direction specified, excluding source square.
  */
-static uint64_t VectorFrom(uint8_t location, Direction direction)
+static uint64_t RayFrom(uint8_t locn, Direction direction)
 {
     uint64_t               result = NO_SQUARES;
-    const DirectionVector &dv     = direction_vectors[direction];
-    for (int x = FileOf(location) + dv.dx, y = RankOf(location) + dv.dy; x >= 0 && x < 8 && y >= 0 && y < 8; x += dv.dx, y += dv.dy)
+    const DirectionVector &dv     = DIRECTION_VECTORS[direction];
+    for (int x = FileOf(locn) + dv.dx, y = RankOf(locn) + dv.dy; IsInBoard(x, y); x += dv.dx, y += dv.dy)
     {
         result |= Bitboard(x, y);
     }
@@ -141,21 +138,23 @@ static uint64_t VectorFrom(uint8_t location, Direction direction)
 }
 
 /**
- * @brief Knight attacks from square location.
- * @param location Square index.
- * @return Squares attacked by a knight standing on location.
+ * @brief Knight attacks from square locn.
+ * @param locn Square index.
+ * @return Squares attacked by a knight standing on locn.
  */
 static uint64_t KnightAttacks(uint8_t locn)
 {
-    uint64_t                      result   = NO_SQUARES;
-    auto                          src_x    = FileOf(locn);
-    auto                          src_y    = RankOf(locn);
     constexpr std::pair<int, int> deltas[] = {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}};
-    for (auto &[dx, dy] : deltas)
+
+    uint64_t  result = NO_SQUARES;
+    const int locn_x = FileOf(locn);
+    const int locn_y = RankOf(locn);
+
+    for (const auto &[dx, dy] : deltas)
     {
-        auto x = src_x + dx;
-        auto y = src_y + dy;
-        if (x >= 0 && x < 8 && y >= 0 && y < 8)
+        int x = locn_x + dx;
+        int y = locn_y + dy;
+        if (IsInBoard(x, y))
         {
             result |= Bitboard(x, y);
         }
@@ -164,34 +163,33 @@ static uint64_t KnightAttacks(uint8_t locn)
 }
 
 /**
- * @brief Bishop attacks.
- * @param location Square index.
+ * @brief Bishop rays.
+ * @param locn Square index.
  * @return Bishop attacks on an otherwise empty board.
  */
-static uint64_t BishopAttacks(uint8_t location)
+static uint64_t BishopAttacksOnEmptyBoard(uint8_t locn)
 {
-    return VectorFrom(location, NORTHEAST) | VectorFrom(location, NORTHWEST) | VectorFrom(location, SOUTHEAST) |
-           VectorFrom(location, SOUTHWEST);
+    return RayFrom(locn, NORTHEAST) | RayFrom(locn, NORTHWEST) | RayFrom(locn, SOUTHEAST) | RayFrom(locn, SOUTHWEST);
 }
 
 /**
- * @brief Rook attacks.
- * @param location Square index.
+ * @brief Rook rays.
+ * @param locn Square index.
  * @return Rook attacks on an otherwise empty board.
  */
-static uint64_t RookAttacks(uint8_t location)
+static uint64_t RookAttacksOnEmptyBoard(uint8_t locn)
 {
-    return VectorFrom(location, NORTH) | VectorFrom(location, SOUTH) | VectorFrom(location, EAST) | VectorFrom(location, WEST);
+    return RayFrom(locn, NORTH) | RayFrom(locn, SOUTH) | RayFrom(locn, EAST) | RayFrom(locn, WEST);
 }
 
 /**
- * @brief Queen attacks.
- * @param location Square index.
+ * @brief Queen rays.
+ * @param locn Square index.
  * @return Queen attacks on an otherwise empty board.
  */
-static uint64_t QueenAttacks(uint8_t location)
+static uint64_t QueenAttacksOnEmptyBoard(uint8_t locn)
 {
-    return BishopAttacks(location) | RookAttacks(location);
+    return BishopAttacksOnEmptyBoard(locn) | RookAttacksOnEmptyBoard(locn);
 }
 
 /**
@@ -207,41 +205,56 @@ static uint64_t KingFill(uint64_t b)
 
 /**
  * @brief King attacks.
- * @param location Square index.
- * @return King attacks by a king standing on location.
+ * @param locn Square index.
+ * @return King attacks by a king standing on locn.
  */
-static uint64_t KingAttacks(uint8_t location)
+static uint64_t KingAttacks(uint8_t locn)
 {
-    return KingFill(Bitboard(location));
+    return KingFill(Bitboard(locn));
 }
 
-static uint64_t KingAttacks2(uint8_t location)
+/**
+ * @brief King attacks 2.
+ * @param locn Square index.
+ * @return Squares reachable by a King in 2 moves.
+ */
+static uint64_t KingAttacks2(uint8_t locn)
 {
-    return KingFill(KingFill(Bitboard(location)));
+    return KingFill(KingFill(Bitboard(locn)));
 }
 
-static uint64_t KingPawnShelterWhite(uint8_t location)
+/**
+ * @brief King pawn shelter white.
+ * @param locn King square index.
+ * @return Pawns in front of the King.
+ */
+static uint64_t KingPawnShelterWhite(uint8_t locn)
 {
-    const uint64_t b = Bitboard(location);
+    const uint64_t b = Bitboard(locn);
     return ShiftNorthwest(b) | ShiftNorth(b) | ShiftNortheast(b);
 }
 
-static uint64_t KingPawnShelterBlack(uint8_t location)
+/**
+ * @brief King pawn shelter black.
+ * @param locn King square index.
+ * @return Pawns in front of the King.
+ */
+static uint64_t KingPawnShelterBlack(uint8_t locn)
 {
-    const uint64_t b = Bitboard(location);
+    const uint64_t b = Bitboard(locn);
     return ShiftSouthwest(b) | ShiftSouth(b) | ShiftSoutheast(b);
 }
 
 /**
  * @brief Passed pawn mask for white.
- * @param location Square index.
- * @return Squares which must be free of black pawns for a white pawn on location to be passed.
+ * @param locn Square index.
+ * @return Squares which must be free of black pawns for a white pawn on locn to be passed.
  */
-static uint64_t PassedPawnMaskWhite(uint8_t location)
+static uint64_t PassedPawnMaskWhite(uint8_t locn)
 {
     uint64_t  result = NO_SQUARES;
-    const int locn_x = FileOf(location);
-    const int locn_y = RankOf(location);
+    const int locn_x = FileOf(locn);
+    const int locn_y = RankOf(locn);
     for (int x = locn_x - 1; x <= locn_x + 1; ++x)
     {
         if (x < 0 || x > 7)
@@ -258,14 +271,14 @@ static uint64_t PassedPawnMaskWhite(uint8_t location)
 
 /**
  * @brief Passed pawn mask for black.
- * @param location Square index.
- * @return Squares which must be free of white pawns for a black pawn on location to be passed.
+ * @param locn Square index.
+ * @return Squares which must be free of white pawns for a black pawn on locn to be passed.
  */
-static uint64_t PassedPawnMaskBlack(uint8_t location)
+static uint64_t PassedPawnMaskBlack(uint8_t locn)
 {
     uint64_t  result = NO_SQUARES;
-    const int locn_x = FileOf(location);
-    const int locn_y = RankOf(location);
+    const int locn_x = FileOf(locn);
+    const int locn_y = RankOf(locn);
     for (int x = locn_x - 1; x <= locn_x + 1; ++x)
     {
         if (x < 0 || x > 7)
@@ -282,13 +295,13 @@ static uint64_t PassedPawnMaskBlack(uint8_t location)
 
 /**
  * @brief Isolated pawn mask for white.
- * @param location Square index.
- * @return Squares which must contain at least one white pawn else the pawn on location is isolated.
+ * @param locn Square index.
+ * @return Squares which must contain at least one white pawn else the pawn on locn is isolated.
  */
-static uint64_t IsolatedPawnMaskWhite(uint8_t location)
+static uint64_t IsolatedPawnMaskWhite(uint8_t locn)
 {
     uint64_t  result = NO_SQUARES;
-    const int locn_x = FileOf(location);
+    const int locn_x = FileOf(locn);
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
     {
         if (x < 0 || x > 7)
@@ -305,24 +318,24 @@ static uint64_t IsolatedPawnMaskWhite(uint8_t location)
 
 /**
  * @brief Isolated pawn mask for black.
- * @param location Square index.
- * @return Squares which must contain at least one black pawn else the pawn on location is isolated.
+ * @param locn Square index.
+ * @return Squares which must contain at least one black pawn else the pawn on locn is isolated.
  */
-static uint64_t IsolatedPawnMaskBlack(uint8_t location)
+static uint64_t IsolatedPawnMaskBlack(uint8_t locn)
 {
-    return IsolatedPawnMaskWhite(location); /* files are symmetrical */
+    return IsolatedPawnMaskWhite(locn); /* files are symmetrical */
 }
 
 /**
  * @brief Supported pawn mask white.
- * @param location Square index.
- * @return Squares which if containing a friendly pawn can potentially defend the pawn on location.
+ * @param locn Square index.
+ * @return Squares which if containing a friendly pawn can potentially defend the pawn on locn.
  */
-static uint64_t SupportedPawnMaskWhite(uint8_t location)
+static uint64_t SupportedPawnMaskWhite(uint8_t locn)
 {
     uint64_t  result = NO_SQUARES;
-    const int locn_x = FileOf(location);
-    const int locn_y = RankOf(location);
+    const int locn_x = FileOf(locn);
+    const int locn_y = RankOf(locn);
     ;
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
     {
@@ -340,14 +353,14 @@ static uint64_t SupportedPawnMaskWhite(uint8_t location)
 
 /**
  * @brief Supported pawn mask black.
- * @param location Square index.
- * @return Squares which if containing a friendly pawn can potentially defend the pawn on location.
+ * @param locn Square index.
+ * @return Squares which if containing a friendly pawn can potentially defend the pawn on locn.
  */
-static uint64_t SupportedPawnMaskBlack(uint8_t location)
+static uint64_t SupportedPawnMaskBlack(uint8_t locn)
 {
     uint64_t  result = NO_SQUARES;
-    const int locn_x = FileOf(location);
-    const int locn_y = RankOf(location);
+    const int locn_x = FileOf(locn);
+    const int locn_y = RankOf(locn);
     for (int x = locn_x - 1; x <= locn_x + 1; x += 2)
     {
         if (x < 0 || x > 7)
@@ -364,22 +377,22 @@ static uint64_t SupportedPawnMaskBlack(uint8_t location)
 
 /**
  * @brief Doubled pawn mask white.
- * @param location Square index.
- * @return Squares which if containing a friendly pawn, make the pawn on location doubled.
+ * @param locn Square index.
+ * @return Squares which if containing a friendly pawn, make the pawn on locn doubled.
  */
-static uint64_t DoubledPawnMaskWhite(uint8_t location)
+static uint64_t DoubledPawnMaskWhite(uint8_t locn)
 {
-    return VectorFrom(location, NORTH);
+    return RayFrom(locn, NORTH);
 }
 
 /**
  * @brief Doubled pawn mask black.
- * @param location Square index.
- * @return Squares which if containing a friendly pawn, make the pawn on location doubled.
+ * @param locn Square index.
+ * @return Squares which if containing a friendly pawn, make the pawn on locn doubled.
  */
-static uint64_t DoubledPawnMaskBlack(uint8_t location)
+static uint64_t DoubledPawnMaskBlack(uint8_t locn)
 {
-    return VectorFrom(location, SOUTH);
+    return RayFrom(locn, SOUTH);
 }
 
 /**
@@ -393,29 +406,28 @@ static uint64_t InterveningSquares(int from, int to)
     constexpr Direction directions[] = {NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST, NORTHWEST};
     for (auto dir : directions)
     {
-        const uint64_t vector_from = VectorFrom(from, dir);
+        const uint64_t vector_from = RayFrom(from, dir);
         if (vector_from & Bitboard(to))
         {
-            return vector_from ^ VectorFrom(to, dir) ^ Bitboard(to);
+            return vector_from ^ RayFrom(to, dir) ^ Bitboard(to);
         }
     }
     return NO_SQUARES;
 }
 
 /**
- * @brief Occupancy mask vector for a single direction.
+ * @brief Occupancy mask for a single direction.
  * Occupancy masks exclude the final end square of the ray
  * as this does not affect slider move targets.
- * @param location Square index.
+ * @param locn Square index.
  * @param direction Compass direction.
- * @return Occupancy mask for that location and direction.
+ * @return Occupancy mask for that locn and direction.
  */
-static uint64_t OccupancyMaskVector(uint8_t location, Direction direction)
+static uint64_t RayOccupancyMask(uint8_t locn, Direction direction)
 {
     uint64_t               result = NO_SQUARES;
-    const DirectionVector &dv     = direction_vectors[direction];
-    for (int x = FileOf(location) + dv.dx, y = RankOf(location) + dv.dy; x + dv.dx >= 0 && x + dv.dx < 8 && y + dv.dy >= 0 && y + dv.dy < 8;
-         x += dv.dx, y += dv.dy)
+    const DirectionVector &dv     = DIRECTION_VECTORS[direction];
+    for (int x = FileOf(locn) + dv.dx, y = RankOf(locn) + dv.dy; IsInBoard(x + dv.dx, y + dv.dy); x += dv.dx, y += dv.dy)
     {
         result |= Bitboard(x, y);
     }
@@ -424,38 +436,37 @@ static uint64_t OccupancyMaskVector(uint8_t location, Direction direction)
 
 /**
  * @brief Bishop occupancy mask.
- * @param location Square index.
- * @return Bishop sliding move occupancy mask for source square location.
+ * @param locn Square index.
+ * @return Bishop sliding move occupancy mask for source square locn.
  */
-static uint64_t BishopOccupancyMask(uint8_t location)
+static uint64_t BishopOccupancyMask(uint8_t locn)
 {
-    return OccupancyMaskVector(location, NORTHEAST) | OccupancyMaskVector(location, NORTHWEST) | OccupancyMaskVector(location, SOUTHEAST) |
-           OccupancyMaskVector(location, SOUTHWEST);
+    return RayOccupancyMask(locn, NORTHEAST) | RayOccupancyMask(locn, NORTHWEST) | RayOccupancyMask(locn, SOUTHEAST) |
+           RayOccupancyMask(locn, SOUTHWEST);
 }
 
 /**
  * @brief Rook occupancy mask.
- * @param location Square index.
- * @return Rook sliding move occupancy mask for source square location.
+ * @param locn Square index.
+ * @return Rook sliding move occupancy mask for source square locn.
  */
-static uint64_t RookOccupancyMask(uint8_t location)
+static uint64_t RookOccupancyMask(uint8_t locn)
 {
-    return OccupancyMaskVector(location, NORTH) | OccupancyMaskVector(location, SOUTH) | OccupancyMaskVector(location, EAST) |
-           OccupancyMaskVector(location, WEST);
+    return RayOccupancyMask(locn, NORTH) | RayOccupancyMask(locn, SOUTH) | RayOccupancyMask(locn, EAST) | RayOccupancyMask(locn, WEST);
 }
 
 /**
- * @brief Vector move targets for sliding pieces considering occupancy.
+ * @brief Move targets in one direction for sliding pieces considering occupancy.
  * @param occupied_squares Set of squares with a piece on them.
- * @param location Source square index.
+ * @param locn Source square index.
  * @param direction Compass rose direction.
- * @return Set of sliding move squares in the specified direction.
+ * @return Set of squares attacked in the specified direction.
  */
-static uint64_t VectorMoveTargets(uint64_t occupied_squares, int location, Direction direction)
+static uint64_t RayAttacks(uint64_t occupied_squares, int locn, Direction direction)
 {
     uint64_t               result = NO_SQUARES;
-    const DirectionVector &dv     = direction_vectors[direction];
-    for (int x = FileOf(location) + dv.dx, y = RankOf(location) + dv.dy; x >= 0 && x < 8 && y >= 0 && y < 8; x += dv.dx, y += dv.dy)
+    const DirectionVector &dv     = DIRECTION_VECTORS[direction];
+    for (int x = FileOf(locn) + dv.dx, y = RankOf(locn) + dv.dy; IsInBoard(x, y); x += dv.dx, y += dv.dy)
     {
         result |= Bitboard(x, y);
         if (Bitboard(x, y) & occupied_squares)
@@ -469,25 +480,25 @@ static uint64_t VectorMoveTargets(uint64_t occupied_squares, int location, Direc
 /**
  * @brief Bishop move targets
  * @param occupied_squares Set of squares occupied by a piece.
- * @param location Source square index.
- * @return Squares to which a bishop on location can slide to.
+ * @param locn Source square index.
+ * @return Squares to which a bishop on locn can slide to.
  */
-static uint64_t BishopMoveTargets(uint64_t occupied_squares, uint8_t location)
+static uint64_t BishopAttacks(uint64_t occupied_squares, uint8_t locn)
 {
-    return VectorMoveTargets(occupied_squares, location, NORTHEAST) | VectorMoveTargets(occupied_squares, location, SOUTHEAST) |
-           VectorMoveTargets(occupied_squares, location, SOUTHWEST) | VectorMoveTargets(occupied_squares, location, NORTHWEST);
+    return RayAttacks(occupied_squares, locn, NORTHEAST) | RayAttacks(occupied_squares, locn, SOUTHEAST) |
+           RayAttacks(occupied_squares, locn, SOUTHWEST) | RayAttacks(occupied_squares, locn, NORTHWEST);
 }
 
 /**
  * @brief Rook move targets
  * @param occupied_squares Set of squares occupied by a piece.
- * @param location Source square index.
- * @return Squares to which a rook on location can slide to.
+ * @param locn Source square index.
+ * @return Squares to which a rook on locn can slide to.
  */
-static uint64_t RookMoveTargets(uint64_t occupied_squares, uint8_t location)
+static uint64_t RookAttacks(uint64_t occupied_squares, uint8_t locn)
 {
-    return VectorMoveTargets(occupied_squares, location, NORTH) | VectorMoveTargets(occupied_squares, location, EAST) |
-           VectorMoveTargets(occupied_squares, location, SOUTH) | VectorMoveTargets(occupied_squares, location, WEST);
+    return RayAttacks(occupied_squares, locn, NORTH) | RayAttacks(occupied_squares, locn, EAST) |
+           RayAttacks(occupied_squares, locn, SOUTH) | RayAttacks(occupied_squares, locn, WEST);
 }
 
 /**
@@ -512,24 +523,24 @@ static std::vector<uint64_t> EnumerateMaskCombinations(uint64_t mask)
  */
 struct Magic
 {
-    std::function<uint64_t(uint8_t locn)>                    occupancy_mask_fn; /**< Maps square to occupancy mask.  */
-    std::function<uint64_t(uint64_t occupied, uint8_t locn)> move_target_fn;    /**< Maps square and occupancy to move targets. */
-    uint64_t                                                 magic;             /**< The magic multiplicand. */
-    uint64_t                                                 mask;              /**< Occupancy mask. */
-    int                                                      shift;             /**< Number of bits to right shift to get indices. */
-    std::vector<uint64_t>                                    attacks;           /**< The discrete attack vectors. */
-    std::vector<uint8_t>                                     indices;           /**< Indices into the discrete attack vector array. */
+    std::function<uint64_t(uint8_t locn)>                    mask_fn;   /**< Maps square to occupancy mask.  */
+    std::function<uint64_t(uint64_t occupied, uint8_t locn)> attack_fn; /**< Maps square and occupancy to move targets. */
+    uint64_t                                                 magic;     /**< The magic multiplicand. */
+    uint64_t                                                 mask;      /**< Occupancy mask. */
+    int                                                      shift;     /**< Number of bits to right shift to get indices. */
+    std::vector<uint64_t>                                    attacks;   /**< The discrete attack vectors. */
+    std::vector<uint8_t>                                     indices;   /**< Indices into the discrete attack vector array. */
 };
 
 /**
  * @brief Trial and error search for a magic Bitboard entry.
- * @param location Square index.
+ * @param locn Square index.
  * @param magic Where to store the found magic values.
- *              Has functions populated on entry.
+ *              Requires functions populated on entry.
  */
-static void FindMagic(uint8_t location, Magic &magic)
+static void FindMagic(uint8_t locn, Magic &magic)
 {
-    magic.mask  = magic.occupancy_mask_fn(location);
+    magic.mask  = magic.mask_fn(locn);
     magic.shift = 64 - PopCount(magic.mask);
     /*
     Enumerate all possible occupancy values and compute what the actual
@@ -538,10 +549,10 @@ static void FindMagic(uint8_t location, Magic &magic)
     */
     auto                  occupancies = EnumerateMaskCombinations(magic.mask);
     const int             num_values  = occupancies.size();
-    std::vector<uint64_t> actual_attacks;
+    std::vector<uint64_t> attacks;
     for (auto occupancy : occupancies)
     {
-        actual_attacks.push_back(magic.move_target_fn(occupancy, location));
+        attacks.push_back(magic.attack_fn(occupancy, locn));
     }
     /*
     Try a random magic multiplicand and test it for success.
@@ -552,18 +563,19 @@ static void FindMagic(uint8_t location, Magic &magic)
     {
         is_hash_collision = false;
         /* Magics are typically fairly sparse, so AND a few random numbers together. */
-        trial_magic = PseudoRandom64() & PseudoRandom64() & PseudoRandom64();
+        trial_magic = NextRandomKey() & NextRandomKey() & NextRandomKey();
+        /* Reset the attacks for each trial run. */
         magic.attacks.assign(num_values, ~NO_SQUARES);
         for (int i = 0; i != num_values; ++i)
         {
-            const auto index = ((occupancies[i] * trial_magic) >> magic.shift);
+            const auto index = (occupancies[i] * trial_magic) >> magic.shift;
             if (magic.attacks[index] == ~NO_SQUARES)
             {
                 /* Nothing here yet so store the attack. */
-                magic.attacks[index] = actual_attacks[i];
+                magic.attacks[index] = attacks[i];
                 continue;
             }
-            if (magic.attacks[index] != actual_attacks[i])
+            if (magic.attacks[index] != attacks[i])
             {
                 /* A previous entry clashes with this entry - this trial magic is no good. */
                 is_hash_collision = true;
@@ -573,19 +585,18 @@ static void FindMagic(uint8_t location, Magic &magic)
     } while (is_hash_collision);
     /*
     Compress the actual attacks set down to a set of indices
-    into unique attack vectors. Since the indices are 1 byte each
+    into unique attacks. Since the indices are only 1 byte each
     and the attacks are 8 bytes each, this saves a lot of space in the
     final magic move entry tables, which helps with cache pressure at the
-    expense of one extra indirection. "Uniqueify" attack values by
-    converting to a std::set and back again.
+    expense of one extra indirection.
     */
-    std::set<uint64_t>    discrete_attacks_set{magic.attacks.begin(), magic.attacks.end()};
+    std::set<uint64_t>    discrete_attacks_set{magic.attacks.begin(), magic.attacks.end()}; // Make unique.
     std::vector<uint64_t> discrete_attacks{discrete_attacks_set.begin(), discrete_attacks_set.end()};
-    magic.indices.assign(num_values, 0);
-    for (int i = 0; i != num_values; ++i)
+    magic.indices.clear();
+    for (auto attack : magic.attacks)
     {
-        const auto j     = std::find(discrete_attacks.begin(), discrete_attacks.end(), magic.attacks[i]);
-        magic.indices[i] = j - discrete_attacks.begin();
+        const auto j = std::find(discrete_attacks.begin(), discrete_attacks.end(), attack);
+        magic.indices.push_back(j - discrete_attacks.begin());
     }
     magic.magic   = trial_magic;
     magic.attacks = discrete_attacks;
@@ -594,19 +605,18 @@ static void FindMagic(uint8_t location, Magic &magic)
 /**
  * @brief A magic Bitboard search vector entry.
  */
-typedef struct MagicVector
+struct MagicVector
 {
     const char                                              *name; /**< Piece name (bishop or rook). */
-    std::function<uint64_t(uint64_t occupied, uint8_t locn)> move_target_fn;
-    std::function<uint64_t(uint8_t mask)>                    occupancy_mask_fn;
-
-} MagicVector;
+    std::function<uint64_t(uint64_t occupied, uint8_t locn)> attack_fn;
+    std::function<uint64_t(uint8_t mask)>                    mask_fn;
+};
 
 /* clang-format off */
-static const MagicVector magic_vectors[] = 
+static const MagicVector MAGIC_VECTORS[] = 
 {
-    { "BISHOP", BishopMoveTargets, BishopOccupancyMask }, 
-    { "ROOK",   RookMoveTargets,   RookOccupancyMask   },
+    { "BISHOP", BishopAttacks, BishopOccupancyMask }, 
+    { "ROOK",   RookAttacks,   RookOccupancyMask   },
 };
 /* clang-format on */
 
@@ -623,22 +633,22 @@ typedef struct Generator
 /**
  * @brief Generators for the main precomputed Bitboard arrays.
  */
-static const Generator set_generators[] = {
+static const Generator SET_GENERATORS[] = {
     /* clang-format off */
-    {"north",                   [](uint8_t locn){ return VectorFrom(locn, NORTH);                                           }   },
-    {"northeast",               [](uint8_t locn){ return VectorFrom(locn, NORTHEAST);                                       }   },
-    {"east",                    [](uint8_t locn){ return VectorFrom(locn, EAST);                                            }   },
-    {"southeast",               [](uint8_t locn){ return VectorFrom(locn, SOUTHEAST);                                       }   },
-    {"south",                   [](uint8_t locn){ return VectorFrom(locn, SOUTH);                                           }   },
-    {"southwest",               [](uint8_t locn){ return VectorFrom(locn, SOUTHWEST);                                       }   },
-    {"west",                    [](uint8_t locn){ return VectorFrom(locn, WEST);                                            }   },
-    {"northwest",               [](uint8_t locn){ return VectorFrom(locn, NORTHWEST);                                       }   },
+    {"north",                   [](uint8_t locn){ return RayFrom(locn, NORTH);                                              }   },
+    {"northeast",               [](uint8_t locn){ return RayFrom(locn, NORTHEAST);                                          }   },
+    {"east",                    [](uint8_t locn){ return RayFrom(locn, EAST);                                               }   },
+    {"southeast",               [](uint8_t locn){ return RayFrom(locn, SOUTHEAST);                                          }   },
+    {"south",                   [](uint8_t locn){ return RayFrom(locn, SOUTH);                                              }   },
+    {"southwest",               [](uint8_t locn){ return RayFrom(locn, SOUTHWEST);                                          }   },
+    {"west",                    [](uint8_t locn){ return RayFrom(locn, WEST);                                               }   },
+    {"northwest",               [](uint8_t locn){ return RayFrom(locn, NORTHWEST);                                          }   },
     {"pawn_attacks_white",      [](uint8_t locn){ return ShiftNorthwest(Bitboard(locn)) | ShiftNortheast(Bitboard(locn));   },  },
     {"pawn_attacks_black",      [](uint8_t locn){ return ShiftSouthwest(Bitboard(locn)) | ShiftSoutheast(Bitboard(locn));   },  },
     {"knight_attacks",          KnightAttacks                                                                                   },
-    {"bishop_attacks",          BishopAttacks                                                                                   },
-    {"rook_attacks",            RookAttacks                                                                                     },
-    {"queen_attacks",           QueenAttacks                                                                                    },
+    {"bishop_attacks",          BishopAttacksOnEmptyBoard                                                                       },
+    {"rook_attacks",            RookAttacksOnEmptyBoard                                                                         },
+    {"queen_attacks",           QueenAttacksOnEmptyBoard                                                                        },
     {"king_attacks",            KingAttacks                                                                                     },
     {"king_attacks2",           KingAttacks2                                                                                    },
     {"king_pawn_shelter_white", KingPawnShelterWhite                                                                            },
@@ -649,46 +659,26 @@ static const Generator set_generators[] = {
 /**
  * @brief Generators for white pawn structure squares.
  */
-static const Generator pawn_generators_white[] = {
-    {
-        "passed_pawn_mask",
-        PassedPawnMaskWhite,
-    },
-    {
-        "isolated_pawn_mask",
-        IsolatedPawnMaskWhite,
-    },
-    {
-        "supported_pawn_mask",
-        SupportedPawnMaskWhite,
-    },
-    {
-        "doubled_pawn_mask",
-        DoubledPawnMaskWhite,
-    },
+/* clang-format off */
+static const Generator PAWN_GENERATORS_WHITE[] = {
+    {"passed_pawn_mask",        PassedPawnMaskWhite,    },
+    {"isolated_pawn_mask",      IsolatedPawnMaskWhite,  },
+    {"supported_pawn_mask",     SupportedPawnMaskWhite, },
+    {"doubled_pawn_mask",       DoubledPawnMaskWhite,   },
 };
+/* clang-format on */
 
 /**
  * @brief Generators for black pawn structure squares.
  */
-static const Generator pawn_generators_black[] = {
-    {
-        "passed_pawn_mask",
-        PassedPawnMaskBlack,
-    },
-    {
-        "isolated_pawn_mask",
-        IsolatedPawnMaskBlack,
-    },
-    {
-        "supported_pawn_mask",
-        SupportedPawnMaskBlack,
-    },
-    {
-        "doubled_pawn_mask",
-        DoubledPawnMaskBlack,
-    },
+/* clang-format off */
+static const Generator PAWN_GENERATORS_BLACK[] = {
+    {"passed_pawn_mask",        PassedPawnMaskBlack,    },
+    {"isolated_pawn_mask",      IsolatedPawnMaskBlack,  },
+    {"supported_pawn_mask",     SupportedPawnMaskBlack, },
+    {"doubled_pawn_mask",       DoubledPawnMaskBlack,   },
 };
+/* clang-format on */
 
 /**
  * @brief Generate the generic sets for each square.
@@ -696,12 +686,12 @@ static const Generator pawn_generators_black[] = {
 static void GenerateSets()
 {
     printf("extern const Sets SETS[64] = \n{");
-    for (uint8_t location = 0; location != 64; ++location)
+    for (uint8_t locn = 0; locn != 64; ++locn)
     {
-        printf("\n    { /* square %c%c */", FileChar(location), RankChar(location));
-        for (const auto &generator : set_generators)
+        printf("\n    { /* square %c%c */", FileChar(locn), RankChar(locn));
+        for (const auto &generator : SET_GENERATORS)
         {
-            const uint64_t b = generator.function(location);
+            const uint64_t b = generator.function(locn);
             printf("\n        .%-25s = 0x%016" PRIX64 "ull, /* popcnt %2d */", generator.name, b, PopCount(b));
         }
         printf("\n    },");
@@ -718,12 +708,13 @@ static void GeneratePawnSets()
     for (int color = 0; color != 2; ++color)
     {
         printf("\n    {");
-        for (uint8_t location = 0; location != 64; ++location)
+        for (uint8_t locn = 0; locn != 64; ++locn)
         {
-            printf("\n        { /* %s square %c%c */", color_names[color], FileChar(location), RankChar(location));
-            for (const auto &generator : (color == 0 ? pawn_generators_white : pawn_generators_black))
+            printf("\n        { /* %s square %c%c */", COLOR_NAMES[color], FileChar(locn), RankChar(locn));
+            auto &generators = color == 0 ? PAWN_GENERATORS_WHITE : PAWN_GENERATORS_BLACK;
+            for (const auto &generator : generators)
             {
-                const uint64_t b = generator.function(location);
+                const uint64_t b = generator.function(locn);
                 printf("\n            .%-28s = 0x%016" PRIX64 "ull, /* popcnt %2d */", generator.name, b, PopCount(b));
             }
             printf("\n        },");
@@ -760,14 +751,14 @@ static void GenerateHashes()
         printf("\n    {");
         for (int piece = PAWN; piece <= KING; ++piece)
         {
-            printf("\n        {   /* %s %s */", color_names[color], piece_names[piece]);
+            printf("\n        {   /* %s %s */", COLOR_NAMES[color], PIECE_NAMES[piece]);
             for (int i = 0; i != 64; ++i)
             {
                 if ((i & 7) == 0)
                 {
                     printf("\n            ");
                 }
-                printf("0x%016" PRIX64 "ull,", PseudoRandom64());
+                printf("0x%016" PRIX64 "ull,", NextRandomKey());
             }
             printf("\n        },");
         }
@@ -781,7 +772,7 @@ static void GenerateHashes()
         {
             printf("\n    ");
         }
-        printf("0x%016" PRIX64 "ull,", PseudoRandom64());
+        printf("0x%016" PRIX64 "ull,", NextRandomKey());
     }
     printf("\n};\n");
     printf("extern const uint64_t EN_PASSANT_HASHES[64] = \n{");
@@ -792,7 +783,7 @@ static void GenerateHashes()
             printf("\n    ");
         }
         const int rank = RankOf(i);
-        printf("0x%016" PRIX64 "ull,", rank == 2 || rank == 5 ? PseudoRandom64() : 0);
+        printf("0x%016" PRIX64 "ull,", rank == 2 || rank == 5 ? NextRandomKey() : 0);
     }
     printf("\n};\n");
 }
@@ -803,13 +794,13 @@ static void GenerateHashes()
 static void GenerateMagics(void)
 {
     std::vector<Magic> magics(64);
-    for (const MagicVector &v : magic_vectors)
+    for (const MagicVector &v : MAGIC_VECTORS)
     {
         /* Find magic values for each square on the board. */
         for (uint8_t locn = 0; locn != 64; ++locn)
         {
-            magics[locn].occupancy_mask_fn = v.occupancy_mask_fn;
-            magics[locn].move_target_fn    = v.move_target_fn;
+            magics[locn].mask_fn   = v.mask_fn;
+            magics[locn].attack_fn = v.attack_fn;
             FindMagic(locn, magics[locn]);
         }
         /* First print the arrays for the discrete attacks and the attack indices. */

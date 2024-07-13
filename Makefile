@@ -23,9 +23,11 @@ RELEASE_EXE         = $(RELEASE_DIR)/$(PROGRAM)
 RELEASE_OBJECTS     = $(addprefix $(RELEASE_DIR)/, $(OBJECTS))
 RELEASE_FLAGS       = -O3 -DNDEBUG
 
-.PHONY: all clean debug prep release remake
+.PHONY: all clean debug prep release remake gen
 
 all: debug release
+
+gen: $(GENERATOR_EXE)
 
 debug: prep $(DEBUG_EXE)
 
@@ -49,7 +51,7 @@ src/$(GENERATED_DATA_CPP) : $(GENERATOR_EXE)
 	$(GENERATOR_EXE) > src/$(GENERATED_DATA_CPP)
 
 $(GENERATOR_EXE) : $(GENERATOR_SOURCE)
-	$(CXX) -g -Og -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
+	$(CXX) -g -Og $(CXXFLAGS) -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
 	
 prep:
 	mkdir -p $(DEBUG_DIR) $(RELEASE_DIR)
