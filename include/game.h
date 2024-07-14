@@ -11,8 +11,9 @@
 /**
  * @brief A chess game.
  */
-struct Game
+class Game
 {
+  public:
     TimeControl time_control_;     /**< Clock controls for the current game            */
     int         node_count_;       /**< Number of nodes (positions) during search      */
     Color       engine_color_;     /**< The color which pawnstar is playing            */

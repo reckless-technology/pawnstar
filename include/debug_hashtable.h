@@ -3,8 +3,6 @@
 #include <string_view>
 #include <unordered_map>
 
-#include "constants.h"
-
 #if DEBUGX
 
 typedef std::unordered_map<std::string_view, uint32_t> DebugTable;

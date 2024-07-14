@@ -9,12 +9,8 @@
 /**
  * @brief Pawn structure for one color.
  * A passed pawn has no enemy pawns in front of it either on its file or on adjacent files.
- *
  * An isolated pawn has no friendly pawns on either adjacent file.
- *
- * A backward pawn has no pawns to support it and its forward square is
- * attacked by an enemy pawn.
- *
+ * A backward pawn has no pawns to support it and its forward square is attacked by an enemy pawn.
  * A doubled pawn has a friendly pawn in front of it on the same file.
  */
 struct PawnStructure
@@ -24,6 +20,7 @@ struct PawnStructure
     Bitboard backward_pawns;
     Bitboard doubled_pawns;
 };
+
 /* clang-format off */
 constexpr int PAWN_SQUARE[64] =
 {

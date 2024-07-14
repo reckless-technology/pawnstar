@@ -8,7 +8,7 @@
 #include "move.h"
 
 class Position;
-struct Game;
+class Game;
 
 constexpr uint8_t FileOf(Square locn)
 {
@@ -56,7 +56,7 @@ constexpr Bitboard QueenAttacks(Bitboard occupied_squares, Square location)
     return BishopAttacks(occupied_squares, location) | RookAttacks(occupied_squares, location);
 }
 
-static inline std::string MoveString(Move m)
+constexpr std::string MoveString(Move m)
 {
     std::string result;
     result += FileChar(MoveFrom(m));
