@@ -11,7 +11,11 @@ GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
 GENERATOR_EXE       = generate_constants/gen_constants
 
 HEADERS             = $(notdir $(wildcard include/*.h))
-SOURCES             = $(notdir $(wildcard src/*.cpp)) $(GENERATED_DATA_CPP)
+
+SOURCES             = debug_hashtable.cpp evaluation.cpp game.cpp input_handling.cpp main.cpp opening_book.cpp pins.cpp position.cpp \
+					  random.cpp search_alphabeta.cpp search_quiescent.cpp search_root_node.cpp search_single_move.cpp sort_moves.cpp \
+					  static_exchange_evaluation.cpp tests_bratko_kopec.cpp tests_merge_sort.cpp tests_move_generation.cpp \
+					  tests_static_exchange.cpp timer.cpp transposition_table.cpp $(GENERATED_DATA_CPP)
 
 OBJECTS             = $(SOURCES:.cpp=.o)
 

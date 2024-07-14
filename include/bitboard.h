@@ -55,15 +55,14 @@ constexpr Bitboard NOT_A_FILE  = 0xFEFEFEFEFEFEFEFEull;
 constexpr Bitboard MASK_WEST_2 = 0xFCFCFCFCFCFCFCFCull;
 constexpr Bitboard MASK_WEST_4 = 0xF0F0F0F0F0F0F0F0ull;
 
-constexpr Bitboard ALL_SQUARES     = 0xFFFFFFFFFFFFFFFFull;
-constexpr Bitboard NO_SQUARES      = 0x0000000000000000ull;
-constexpr Bitboard WHITE_SQUARES   = 0x55AA55AA55AA55AAull;
-constexpr Bitboard BLACK_SQUARES   = 0xAA55AA55AA55AA55ull;
-constexpr Bitboard CORNER_SQUARES  = 0x8100000000000081ull;
-constexpr Bitboard BORDER_SQUARES  = 0xFF818181818181FFull;
-constexpr Bitboard CTR_16_SQUARES  = 0x00003C3C3C3C0000ull;
-constexpr Bitboard CTR_4_SQUARES   = 0x0000001818000000ull;
-constexpr Bitboard BLACK_MOVE_HASH = 0xB92B78FCCF92F8CDull;
+constexpr Bitboard ALL_SQUARES    = 0xFFFFFFFFFFFFFFFFull;
+constexpr Bitboard NO_SQUARES     = 0x0000000000000000ull;
+constexpr Bitboard WHITE_SQUARES  = 0x55AA55AA55AA55AAull;
+constexpr Bitboard BLACK_SQUARES  = 0xAA55AA55AA55AA55ull;
+constexpr Bitboard CORNER_SQUARES = 0x8100000000000081ull;
+constexpr Bitboard BORDER_SQUARES = 0xFF818181818181FFull;
+constexpr Bitboard CTR_16_SQUARES = 0x00003C3C3C3C0000ull;
+constexpr Bitboard CTR_4_SQUARES  = 0x0000001818000000ull;
 
 constexpr Bitboard BITBOARD(Square location)
 {
