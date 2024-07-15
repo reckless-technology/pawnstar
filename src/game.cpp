@@ -7,7 +7,6 @@ using std::string_view;
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 #include "game.h"
-#include "move_generation.h"
 #include "position.h"
 #include "search.h"
 #include "transposition_table.h"
@@ -28,7 +27,7 @@ static void RemoveMoveSuffixes(string &move_str)
     }
 }
 
-Game::Game(std::string_view fen_string)
+Game::Game(std::string_view fen_string) : position_(positions_)
 {
     time_control_.hard_stop_search_ms              = 0;
     time_control_.clock_type                       = CLOCK_STANDARD;
@@ -38,8 +37,8 @@ Game::Game(std::string_view fen_string)
     node_count_                                    = 0;
     engine_color_                                  = NEITHER_COLOR;
     do_show_thinking_                              = true;
-    positions_.clear();
-    positions_.push_back(Position{fen_string});
+    position_                                      = positions_;
+    *position_                                     = Position{fen_string};
 }
 
 Game::Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
@@ -51,14 +50,15 @@ Make a move and update the game end status flags
 */
 void Game::PlayMove(Move move)
 {
-    positions_.push_back(CurrentPosition().MakeMove(move));
+    position_[1] = position_->MakeMove(move);
+    ++position_;
 }
 
 void Game::UndoMove()
 {
-    if (positions_.size() > 1)
+    if (position_ > positions_)
     {
-        positions_.pop_back();
+        --position_;
     }
     else
     {
@@ -87,14 +87,14 @@ bool Game::IsDrawByRepetition(bool is_search) const
 {
     int            repetitions = is_search ? 1 : 2;
     const uint64_t hash        = CurrentPosition().Hash();
-    for (int i = positions_.size() - 2; i >= 0; --i)
+    for (const Position *i = position_ - 2; i >= positions_; --i)
     {
-        if (positions_[i].Hash() == hash && --repetitions == 0)
+        if (i->Hash() == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");
             return true;
         }
-        if (positions_[i].ReversibleMoveCount() == 0)
+        if (i->ReversibleMoveCount() == 0)
         {
             return false;
         }
@@ -104,7 +104,8 @@ bool Game::IsDrawByRepetition(bool is_search) const
 
 void Game::MakeNullMove()
 {
-    positions_.push_back(CurrentPosition().MakeNullMove());
+    position_[1] = position_->MakeNullMove();
+    ++position_;
 }
 
 /*
@@ -118,7 +119,7 @@ Move Game::PlayMove(std::string_view move_str)
 {
     string candidate{move_str};
     RemoveMoveSuffixes(candidate);
-    MoveList move_list = GenerateLegalMoves(positions_.back());
+    MoveList move_list = position_->GenerateLegalMoves();
     for (const Move &move : move_list)
     {
         string san_move_str{CurrentPosition().MoveToString(move)};
@@ -130,7 +131,7 @@ Move Game::PlayMove(std::string_view move_str)
             return move;
         }
     }
-    return 0;
+    return Move::NoMove();
 }
 
 /**
@@ -187,9 +188,9 @@ void Game::SearchThreadEntry()
 void Game::StopThinking()
 {
     is_cancel_pending_ = true;
-    if (worker_thread.joinable())
+    if (worker_thread_.joinable())
     {
-        worker_thread.join();
+        worker_thread_.join();
     }
 }
 
@@ -200,5 +201,5 @@ void Game::StopThinking()
 void Game::StartThinking()
 {
     StopThinking();
-    worker_thread = std::thread([this] { this->SearchThreadEntry(); });
+    worker_thread_ = std::thread([this] { this->SearchThreadEntry(); });
 }

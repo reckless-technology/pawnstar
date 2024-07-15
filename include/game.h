@@ -33,15 +33,16 @@ class Game
     bool      IsDrawByFiftyMoves() const;
     Position &CurrentPosition()
     {
-        return positions_.back();
+        return *position_;
     }
     const Position &CurrentPosition() const
     {
-        return positions_.back();
+        return *position_;
     }
 
   private:
-    void                  SearchThreadEntry();
-    std::thread           worker_thread;
-    std::vector<Position> positions_;
+    void        SearchThreadEntry();
+    std::thread worker_thread_;
+    Position   *position_;
+    Position    positions_[256] __attribute__((aligned(16)));
 };

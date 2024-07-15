@@ -3,6 +3,8 @@
 #include "position.h"
 #include "transposition_table.h"
 
+#include <algorithm>
+
 /*
 Use nominal 1-3-3-5-9 material values for SEE
 */
@@ -37,28 +39,24 @@ static int EvaluateSwapOff(Bitboards &bb, Square location, Color color, Piece pi
 Determine the SEE (static exchange evaluation) for a move.
 Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
 */
-int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_checking)
+int EvaluateStaticExchange(const Position &src_position, Move move, int &is_checking)
 {
-    Position position{src_position.MakeMove(move)};
-    if (position.HasMovedIntoCheck())
+    Position dst_position{src_position.MakeMove(move)};
+    is_checking = dst_position.IsInCheck();
+    Bitboards bb{.pawns        = dst_position.Pawns(),
+                 .knights      = dst_position.Knights(),
+                 .bishops      = dst_position.Bishops(),
+                 .rooks        = dst_position.Rooks(),
+                 .queens       = dst_position.Queens(),
+                 .kings        = dst_position.Kings(),
+                 .white_pieces = dst_position.WhitePieces(),
+                 .black_pieces = dst_position.BlackPieces()};
+    if (move.promoted() != NONE)
     {
-        return MOVED_INTO_CHECK_SCORE;
+        return piece_values[move.captured()] + piece_values[move.promoted()] - piece_values[PAWN] -
+               EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.promoted());
     }
-    is_checking = position.IsInCheck();
-    Bitboards bb{.pawns        = position.Pawns(),
-                 .knights      = position.Knights(),
-                 .bishops      = position.Bishops(),
-                 .rooks        = position.Rooks(),
-                 .queens       = position.Queens(),
-                 .kings        = position.Kings(),
-                 .white_pieces = position.WhitePieces(),
-                 .black_pieces = position.BlackPieces()};
-    if (MovePromoted(move))
-    {
-        return piece_values[MoveCaptured(move)] + piece_values[MovePromoted(move)] - piece_values[PAWN] -
-               EvaluateSwapOff(bb, MoveTo(move), position.ColorToMove(), MovePromoted(move));
-    }
-    return piece_values[MoveCaptured(move)] - EvaluateSwapOff(bb, MoveTo(move), position.ColorToMove(), MovePiece(move));
+    return piece_values[move.captured()] - EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.piece());
 }
 
 /**

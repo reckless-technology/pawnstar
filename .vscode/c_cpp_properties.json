@@ -1,13 +1,17 @@
 {
     "configurations": [
         {
-            "name": "Win32",
+            "name": "default",
             "includePath": [
                 "${workspaceFolder}/include"
             ],
-            "windowsSdkVersion": "10.0.22000.0",
             "cStandard": "c17",
-            "cppStandard": "c++20"
+            "cppStandard": "c++20",
+            "defines": [
+                "DEBUGX=1",
+                "DO_NULL_MOVE_PRUNING=1",
+                "DO_LATE_MOVE_REDUCTION=1"
+            ]
         }
     ],
     "version": 4

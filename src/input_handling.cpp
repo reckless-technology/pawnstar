@@ -35,6 +35,11 @@ static void handle_quit(Game &game, span<string>)
     exit(0);
 }
 
+static void handle_perftx(Game &, span<string>)
+{
+    RunPerftTestsExtra();
+}
+
 static void handle_perft(Game &, span<string>)
 {
     RunPerftTests();
@@ -124,7 +129,7 @@ static void handle_usermove(Game &game, span<string> args)
         return;
     }
     Move move = game.PlayMove(args[1]);
-    if (move == 0)
+    if (!move)
     {
         printf("Illegal move: %s\n", args[1].c_str());
     }
@@ -314,12 +319,6 @@ static void handle_seetests(Game &, span<string>)
     RunStaticExchangeTests();
 }
 
-static void handle_mergetest(Game &, span<string>)
-{
-    const bool is_pass = RunMergeSortTests();
-    printf("Merge sort tests: %s\n", is_pass ? "PASS" : "FAIL");
-}
-
 static void handle_help(Game &, span<string>);
 
 #define COMMAND(name) handle_##name, #name
@@ -337,10 +336,10 @@ const InputHandler handlers[] = {
     {COMMAND(go), "assign pawnstar to play the color to move"},
     {COMMAND(help), "display a summary of commands"},
     {COMMAND(level), "set a chess clock: 'level moves min:sec increment'"},
-    {COMMAND(mergetest), "run merge sort tests"},
     {COMMAND(new), "start a new game (pawnstar will play black)"},
     {COMMAND(nopost), "turns off analysis output while thinking"},
-    {COMMAND(perft), "run standard move generation tests"},
+    {COMMAND(perft), "run basic move generation tests"},
+    {COMMAND(perftx), "run extended move generation tests"},
     {COMMAND(ping), "responds with pong <n> (check worker still alive)"},
     {COMMAND(playother), "assign pawnstar to play the color not to move"},
     {COMMAND(post), "turns on analysis output while thinking"},

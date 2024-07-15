@@ -68,7 +68,7 @@ bool FindTransposition(uint64_t hash, Transposition &transposition)
  * @param move Best move found.
  * @param node_type Node type.
  */
-void RecordTransposition(uint64_t hash, int depth, int score, Move move, int node_type)
+void RecordTransposition(uint64_t hash, int depth, int score, Move move, NodeType node_type)
 {
     Transposition &t = table[hash % table.size()];
     if (t.hash == 0 || t.is_old || t.depth < depth)

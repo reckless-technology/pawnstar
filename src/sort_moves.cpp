@@ -33,31 +33,21 @@ void ResetKillerCounts()
  */
 void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int depth)
 {
-    MoveList legal_moves{};
-    legal_moves.reserve(64);
     const uint32_t *const counts = &killer_move_counts[ply][0];
-    for (Move move : moves)
+    for (Move &move : moves)
     {
         /*
         Assign provisional scores based on static exchange evaluation
         and how many cutoffs this move has caused in the search history.
         */
-        bool      is_checking;
+        int       is_checking;
         const int see_score = EvaluateStaticExchange(position, move, is_checking);
-        if (see_score == MOVED_INTO_CHECK_SCORE)
-        {
-            continue;
-        }
+        move.AssignScore(see_score * 1000 + counts[move & 0x7FFF]);
         if (is_checking)
         {
-            legal_moves.push_back(ScoredCheckingMove(move, see_score * 1000 + counts[move & 0x7FFF]));
-        }
-        else
-        {
-            legal_moves.push_back(ScoredMove(move, see_score * 1000 + counts[move & 0x7FFF]));
+            move.GivesCheck();
         }
     }
-    moves.swap(legal_moves);
     SortMoves(moves, false);
     (void)depth;
 }
@@ -71,10 +61,10 @@ void SortMoves(MoveList &moves, bool is_stable_sort)
 {
     if (is_stable_sort)
     {
-        std::stable_sort(moves.rbegin(), moves.rend(), [](const Move &a, const Move &b) { return MoveScore(a) < MoveScore(b); });
+        std::stable_sort(moves.begin(), moves.end(), [](const Move &a, const Move &b) { return -a.score() < -b.score(); });
     }
     else
     {
-        std::sort(moves.rbegin(), moves.rend(), [](const Move &a, const Move &b) { return MoveScore(a) < MoveScore(b); });
+        std::sort(moves.begin(), moves.end(), [](const Move &a, const Move &b) { return -a.score() < -b.score(); });
     }
 }

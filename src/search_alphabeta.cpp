@@ -1,12 +1,44 @@
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 #include "game.h"
-#include "move_generation.h"
 #include "position.h"
 #include "search.h"
 #include "transposition_table.h"
 
-#if DO_NULL_MOVE_PRUNING
+/**
+ * @brief Search a single move and return its alpha beta score.
+ * @param game Game we are searching
+ * @param depth Depth to search to
+ * @param ply Distance from root node
+ * @param alpha Floor value
+ * @param beta Opponents floor value
+ * @param move Move to search
+ * @param pv Parent's principal variation
+ * @param move_index Move number (0 is first move)
+ * @return score for this move
+ */
+int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index)
+{
+    game.PlayMove(move);
+    int score;
+    if (beta > alpha + 1 && move_index > 0 && !game.CurrentPosition().IsInCheck() && !move.IsCheckingMove())
+    {
+        INCREMENT("pvs attempts");
+        score = -Search(game, depth - 1, ply + 1, -alpha - 1, -alpha, pv);
+        if (score > alpha)
+        {
+            INCREMENT("pvs fails");
+            score = -Search(game, depth - 1, ply + 1, -beta, -alpha, pv);
+        }
+    }
+    else
+    {
+        score = -Search(game, depth - 1, ply + 1, -beta, -alpha, pv);
+    }
+    game.UndoMove();
+    return score;
+}
+
 /**
  * @brief Try null move pruning.
  * @param game Current game (position)
@@ -30,7 +62,7 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
     Hopefully this is sufficient to prevent most Zugzwang positions.
     */
     const Position &position = game.CurrentPosition();
-    if (!(position.IsNullMove()) && !(position.IsInCheck()) && beta == alpha + 1 &&
+    if (!position.IsNullMove() && !position.IsInCheck() && beta == alpha + 1 &&
         (position.Knights() | position.Bishops() | position.Rooks() | position.Queens()) && EvaluatePosition(position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
@@ -52,9 +84,7 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
     }
     return alpha;
 }
-#endif
 
-#if DO_LATE_MOVE_REDUCTION
 /**
  * @brief Determine if a (late) move is OK to reduce
  * @param move The move
@@ -63,22 +93,21 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
  */
 static inline bool IsMoveOkToReduce(Move move, Color color)
 {
-    static const uint8_t seventh_rank[2] = {6, 1};
-    if (IsCheckingMove(move))
+    constexpr uint8_t seventh_rank[2] = {6, 1};
+    if (move.IsCheckingMove())
     {
         return false;
     }
-    if (MoveCaptured(move) || MovePromoted(move))
+    if (move.captured() != NONE || move.promoted() != NONE)
     {
         return false;
     }
-    if (MovePiece(move) == PAWN && RankOf(MoveTo(move)) == seventh_rank[color])
+    if (move.piece() == PAWN && RankOf(move.to()) == seventh_rank[color])
     {
         return false;
     }
     return true;
 }
-#endif
 
 /**
  * @brief Alpha beta main search algorithm.
@@ -167,7 +196,6 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     /*
     Try null move pruning.
     */
-#if DO_NULL_MOVE_PRUNING
     int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
     if (game.is_cancel_pending_)
     {
@@ -177,8 +205,6 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     {
         return null_move_score;
     }
-#endif
-
     /*
     Before we generate any moves, try the transposition table move first.
     This might save us the cost of move generation altogether, or provide
@@ -186,7 +212,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     */
     Variation pv;
     int       num_legal_moves  = 0;
-    Move      best_move        = 0;
+    Move      best_move        = Move::NoMove();
     int       best_score       = ALPHA;
     bool      has_raised_alpha = false;
     if (is_transposition && transposition.move)
@@ -228,20 +254,18 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     We didn't get a cutoff from the transposition table so proceed
     with generating and searching moves.
     */
-    MoveList move_list{GeneratePseudoLegalMoves(position)};
+    MoveList move_list{position.GenerateLegalMoves()};
     ScoreAndSortMoves(position, move_list, ply, depth);
     /*
     Start of the main loop.
     */
     for (const auto &move : move_list)
     {
-        if (is_transposition && MoveBits(move) == MoveBits(transposition.move))
+        if (is_transposition && move == transposition.move)
         {
             continue; /* We already searched this move. */
         }
         int score;
-
-#if DO_LATE_MOVE_REDUCTION
         if (!position.IsInCheck() && !position.HasBeenReduced() && beta == alpha + 1 && num_legal_moves > 1 && depth > 2 &&
             IsMoveOkToReduce(move, position.ColorToMove()))
         {
@@ -252,8 +276,6 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             game.UndoMove();
         }
         else
-#endif
-
         {
             score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, num_legal_moves);
         }

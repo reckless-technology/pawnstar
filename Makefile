@@ -1,6 +1,6 @@
 PROGRAM             = pawnstar
-CXX                 = clang++
-CPPFLAGS            = -I include -D DEBUGX=1 -D DO_NULL_MOVE_PRUNING=1 -D DO_LATE_MOVE_REDUCTION=1
+CXX                 = g++
+CPPFLAGS            = -I include -D DEBUGX=1
 CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -std=c++20
 
 DEBUG_DIR           = debug
@@ -12,20 +12,20 @@ GENERATOR_EXE       = generate_constants/gen_constants
 
 HEADERS             = $(notdir $(wildcard include/*.h))
 
-SOURCES             = debug_hashtable.cpp evaluation.cpp game.cpp input_handling.cpp main.cpp opening_book.cpp pins.cpp position.cpp \
-					  random.cpp search_alphabeta.cpp search_quiescent.cpp search_root_node.cpp search_single_move.cpp sort_moves.cpp \
-					  static_exchange_evaluation.cpp tests_bratko_kopec.cpp tests_merge_sort.cpp tests_move_generation.cpp \
+SOURCES             = debug_hashtable.cpp evaluation.cpp game.cpp input_handling.cpp main.cpp opening_book.cpp position.cpp \
+					  random.cpp search_alphabeta.cpp search_quiescent.cpp search_root_node.cpp sort_moves.cpp \
+					  static_exchange_evaluation.cpp tests_bratko_kopec.cpp tests_move_generation.cpp \
 					  tests_static_exchange.cpp timer.cpp transposition_table.cpp $(GENERATED_DATA_CPP)
 
 OBJECTS             = $(SOURCES:.cpp=.o)
 
 DEBUG_EXE           = $(DEBUG_DIR)/$(PROGRAM)
 DEBUG_OBJECTS       = $(addprefix $(DEBUG_DIR)/,$(OBJECTS))
-DEBUG_FLAGS         = -g -O0 -DDEBUG
+DEBUG_FLAGS         = -g -O0 -DDEBUG -fsanitize=undefined -fsanitize=address
 
 RELEASE_EXE         = $(RELEASE_DIR)/$(PROGRAM)
 RELEASE_OBJECTS     = $(addprefix $(RELEASE_DIR)/, $(OBJECTS))
-RELEASE_FLAGS       = -O3 -DNDEBUG
+RELEASE_FLAGS       = -g -O3 
 
 .PHONY: all clean debug prep release remake gen
 

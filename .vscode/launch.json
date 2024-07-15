@@ -64,5 +64,26 @@
                 }
             ]
         },
+        {
+            "name": "(gdb) Attach",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceFolder}/debug/pawnstar",
+            "processId": "${command:pickProcess}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set hex output",
+                    "text": "set output-radix 16",
+                    "ignoreFailures": false
+                }
+            ]
+        }
     ]
 }

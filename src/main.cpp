@@ -5,9 +5,14 @@
 #include "position.h"
 #include "transposition_table.h"
 
+#include <execinfo.h>
 #include <iostream>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string>
 #include <string_view>
+#include <unistd.h>
 
 int main()
 {

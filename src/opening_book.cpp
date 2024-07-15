@@ -62,7 +62,7 @@ Move GetBookMove(uint64_t hash)
         const auto &moves = book[hash];
         return moves[NextRandom() % moves.size()];
     }
-    return 0;
+    return Move::NoMove();
 }
 
 /**
@@ -83,7 +83,7 @@ void DisplayAvailableBookMoves(const Position &position)
     {
         return;
     }
-    unordered_map<Move, int> move_counts;
+    unordered_map<Move, int, Move> move_counts;
     for (const auto &move : book[position.Hash()])
     {
         ++move_counts[move];
@@ -123,7 +123,7 @@ static bool ParseLineOfPlay(std::string_view line)
         }
         const uint64_t hash = game.CurrentPosition().Hash();
         const Move     move = game.PlayMove(move_string);
-        if (move == 0)
+        if (!move)
         {
             std::cout << "ERROR found in book line " << line << " move " << move_string << std::endl;
             return false;

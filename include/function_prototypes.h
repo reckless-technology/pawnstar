@@ -56,22 +56,22 @@ constexpr Bitboard QueenAttacks(Bitboard occupied_squares, Square location)
     return BishopAttacks(occupied_squares, location) | RookAttacks(occupied_squares, location);
 }
 
-constexpr std::string MoveString(Move m)
+static inline const std::string MoveString(Move m)
 {
     std::string result;
-    result += FileChar(MoveFrom(m));
-    result += RankChar(MoveFrom(m));
-    result += FileChar(MoveTo(m));
-    result += RankChar(MoveTo(m));
-    if (MovePromoted(m))
+    result += FileChar(m.from());
+    result += RankChar(m.from());
+    result += FileChar(m.to());
+    result += RankChar(m.to());
+    if (m.promoted() != NONE)
     {
-        result += "  nbrq"[MovePromoted(m)];
+        result += "  nbrq"[m.promoted()];
     }
     return result;
 }
 
 int  GetMilliseconds(void);
-int  EvaluateStaticExchange(const Position &src_position, Move move, bool &is_checking);
+int  EvaluateStaticExchange(const Position &src_position, Move move, int &is_checking);
 void RecordKillerMove(int ply, Move move);
 void ResetKillerCounts();
 void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int depth);
@@ -79,6 +79,8 @@ void SortMoves(MoveList &moves, bool is_stable_sort);
 int  EvaluatePosition(const Position &position, int alpha, int beta);
 bool RunMergeSortTests(void);
 void RunPerftTests(void);
+void RunPerftTestsExtra(void);
+void RunLegalMoveGenTests(void);
 void RunPositionTests(int depth);
 void RunStaticExchangeTests(void);
 int  NextRandom(void);

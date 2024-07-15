@@ -1,7 +1,6 @@
 #include "debug_hashtable.h"
 #include "function_prototypes.h"
 #include "game.h"
-#include "move_generation.h"
 #include "opening_book.h"
 #include "position.h"
 #include "search.h"
@@ -23,11 +22,11 @@ Move SearchRootNode(Game &game)
     {
         return book_move;
     }
-    MoveList move_list = GenerateLegalMoves(game.CurrentPosition());
+    MoveList move_list = game.CurrentPosition().GenerateLegalMoves();
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (move_list.size() == 0)
     {
-        return 0;
+        return Move::NoMove();
     }
     if (move_list.size() == 1)
     {
@@ -82,7 +81,7 @@ Move SearchRootNode(Game &game)
     for (std::size_t i = 0; i != move_list.size(); ++i)
     {
         const int score = SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i], principal_variation, i);
-        move_list[i]    = ScoredMove(move_list[i], score);
+        move_list[i].AssignScore(score);
     }
     SortMoves(move_list, true);
     Move best_move                    = move_list[0];
@@ -100,7 +99,7 @@ Move SearchRootNode(Game &game)
         for (std::size_t i = 0; i != move_list.size(); ++i)
         {
             const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list[i], child_pv, i);
-            move_list[i]    = ScoredMove(move_list[i], score);
+            move_list[i].AssignScore(score);
             if (game.is_cancel_pending_)
             {
                 return best_move;
@@ -114,8 +113,8 @@ Move SearchRootNode(Game &game)
                 if (game.do_show_thinking_)
                 {
                     const string move_string{game.CurrentPosition().VariationToString(principal_variation)};
-                    printf("%2u %5d %4u %8u %s\n", depth, MoveScore(best_moves[depth]), (GetMilliseconds() - start_ms) / 10,
-                           game.node_count_, move_string.c_str());
+                    printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score(), (GetMilliseconds() - start_ms) / 10, game.node_count_,
+                           move_string.c_str());
                 }
             }
         }
@@ -139,11 +138,11 @@ Move SearchRootNode(Game &game)
             bool      is_score_stable         = true;
             for (int i = STARTING_SEARCH_DEPTH; i != depth; ++i)
             {
-                if (MoveBits(best_moves[i]) != MoveBits(best_moves[depth]))
+                if (best_moves[i] != best_moves[depth])
                 {
                     is_best_move_consistent = false;
                 }
-                if (abs(MoveScore(best_moves[i]) - MoveScore(best_moves[depth])) > SCORE_INSTABILITY_THRESHOLD)
+                if (abs(best_moves[i].score() - best_moves[depth].score()) > SCORE_INSTABILITY_THRESHOLD)
                 {
                     is_score_stable = false;
                 }
