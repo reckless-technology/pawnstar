@@ -7,10 +7,11 @@
 #include <vector>
 
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
+#include "evaluation.h"
 #include "game.h"
 #include "opening_book.h"
 #include "position.h"
+#include "tests.h"
 #include "transposition_table.h"
 
 using std::span;

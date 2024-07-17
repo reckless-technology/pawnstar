@@ -11,7 +11,6 @@ using std::stringstream;
 using std::vector;
 
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
 #include "position.h"
 #include "transposition_table.h"
 
@@ -654,7 +653,7 @@ string Position::VariationToString(const Variation &variation) const
     stringstream ss;
     bool         is_first_move = true;
     Position     src_position{*this};
-    for (const auto &move : variation)
+    for (const Move &move : variation)
     {
         if (!is_first_move)
         {
@@ -707,6 +706,7 @@ string Position::MoveToString(const Move &move) const
     MoveList legal_moves = GenerateLegalMoves();
     for (const Move &m : legal_moves)
     {
+
         if (m.piece() == move.piece() && m.to() == move.to() && m.from() != move.from())
         {
             is_source_ambiguous = true;
@@ -741,19 +741,22 @@ string Position::MoveToString(const Move &move) const
     }
     switch (move.piece())
     {
-    RegularMove:
-    default:
-    case KNIGHT:
-    case BISHOP:
-    case ROOK:
-    case QUEEN:
+    case PAWN:
         if (move.captured() != NONE)
         {
-            result << move_piece << disambiguation << 'x' << to_square;
+            result << from_square[0] << 'x' << to_square;
+            if (move.IsEpCaptureMove())
+            {
+                result << "e.p.";
+            }
         }
         else
         {
-            result << move_piece << disambiguation << to_square;
+            result << to_square;
+        }
+        if (move.promoted() != NONE)
+        {
+            result << '=' << "  NBRQ"[move.promoted()];
         }
         break;
 
@@ -773,29 +776,21 @@ string Position::MoveToString(const Move &move) const
             default:
                 break;
             }
+            break;
         }
-        else
-        {
-            goto RegularMove;
-        }
-        break;
-
-    case PAWN:
+        /* FALLTHROUGH */
+    case KNIGHT:
+    case BISHOP:
+    case ROOK:
+    case QUEEN:
+    default:
         if (move.captured() != NONE)
         {
-            result << from_square[0] << 'x' << to_square;
-            if (move.IsEpCaptureMove())
-            {
-                result << "e.p.";
-            }
+            result << move_piece << disambiguation << 'x' << to_square;
         }
         else
         {
-            result << to_square;
-        }
-        if (move.promoted() != NONE)
-        {
-            result << '=' << "  NBRQ"[move.promoted()];
+            result << move_piece << disambiguation << to_square;
         }
         break;
     }

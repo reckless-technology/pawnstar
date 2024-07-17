@@ -1,5 +1,4 @@
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
 #include "game.h"
 #include "opening_book.h"
 #include "position.h"
@@ -13,6 +12,8 @@
 #include <string>
 #include <string_view>
 #include <unistd.h>
+
+void ProcessInput(Game &game, std::string_view line);
 
 int main()
 {

@@ -1,5 +1,5 @@
+#include "static_exchange_evaluation.h"
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
 #include "position.h"
 #include "transposition_table.h"
 

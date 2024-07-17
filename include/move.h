@@ -3,26 +3,9 @@
 #include <vector>
 
 #include "constants.h"
-#include "stack_list.h"
+#include "stack_vector.h"
 /**
  * @file Functions for constructing and using chess moves.
- *
- * Moves are contained within a 64 bit integer.
- *
- *   BITS   INTERPRETATION
- *  0 -  5  To (destination square index)
- *  6 - 11  From (source square index)
- * 12 - 14  Moving piece type
- * 15 - 17  Captured piece type in the case of capture moves
- * 18 - 20  Promoted piece type in the case of pawn promotions
- * 21 - 21  Castling move flag
- * 22 - 22  En passant capture flag
- * 23 - 23  Pawn double push flag
- * 24 - 24  Is checking move flag (move gives check)
- * 32 - 63  Contains the move score (as signed 32 bit int)
- *          after move has been evaluated / sorted
- *
- * A value of 0 terminates a move list.
  */
 
 enum Piece : uint8_t
@@ -43,6 +26,11 @@ enum Color : uint8_t
     NEITHER_COLOR,
 };
 
+constexpr Color EnemyOf(Color color)
+{
+    return color == WHITE ? BLACK : WHITE;
+}
+
 /* clang-format off */
 enum Square : uint8_t
 {
@@ -58,137 +46,173 @@ enum Square : uint8_t
 };
 /* clang-format on */
 
+constexpr uint8_t FileOf(Square locn)
+{
+    return locn & 7;
+}
+constexpr uint8_t RankOf(Square locn)
+{
+    return locn >> 3;
+}
+constexpr char FileChar(Square locn)
+{
+    return 'a' + FileOf(locn);
+}
+constexpr char RankChar(Square locn)
+{
+    return '1' + RankOf(locn);
+}
+
+/**
+ * @brief Class for containing a chess move.
+ * Moves are contained within a 64 bit integer.
+ *
+ *   BITS   INTERPRETATION
+ *  0 -  5  To (destination square index)
+ *  6 - 11  From (source square index)
+ * 12 - 14  Moving piece type
+ * 15 - 17  Captured piece type in the case of capture moves
+ * 18 - 20  Promoted piece type in the case of pawn promotions
+ * 21 - 21  Castling move flag
+ * 22 - 22  En passant capture flag
+ * 23 - 23  Pawn double push flag
+ * 24 - 24  Is checking move flag (move gives check)
+ * 32 - 63  Contains the move score (as signed 32 bit int)
+ *          after move has been evaluated / sorted
+ *
+ * A value of 0 terminates a move list.
+ */
 class Move
 {
   public:
-    Move()
+    constexpr Move()
     {
     }
 
-    Move(const Move &that) : m(that.m)
+    constexpr Move(const Move &that) : m(that.m)
     {
     }
 
-    Move &operator=(const Move &that)
+    constexpr Move &operator=(const Move &that)
     {
         m = that.m;
         return *this;
     }
 
-    bool operator==(const Move &that) const
+    constexpr bool operator==(const Move &that) const
     {
-        return (m & 0xFFFFFFFF) == (that.m & 0xFFFFFFFF);
+        return (m & 0xFFFFFFFF) == (that.m & 0xFFFFFFFF); // Ignore score when comparing moves.
     }
 
-    Piece piece() const
+    constexpr Piece piece() const
     {
         return (Piece)((m >> 12) & 0x07);
     }
 
-    Square from() const
+    constexpr Square from() const
     {
         return (Square)((m >> 6) & 0x3F);
     }
 
-    Square to() const
+    constexpr Square to() const
     {
         return (Square)(m & 0x3F);
     }
 
-    Piece captured() const
+    constexpr Piece captured() const
     {
         return (Piece)((m >> 15) & 0x07);
     }
 
-    Piece promoted() const
+    constexpr Piece promoted() const
     {
         return (Piece)((m >> 18) & 0x07);
     }
 
-    int score() const
+    constexpr int score() const
     {
         return (int)(m >> 32);
     }
 
-    bool IsCastlingMove() const
+    constexpr bool IsCastlingMove() const
     {
         return m & IS_CASTLING;
     }
 
-    bool IsEpCaptureMove() const
+    constexpr bool IsEpCaptureMove() const
     {
         return m & IS_EP_CAPTURE;
     }
 
-    bool IsPawnDoublePushMove() const
+    constexpr bool IsPawnDoublePushMove() const
     {
         return m & IS_DOUBLE_PUSH;
     }
 
-    bool IsCheckingMove() const
+    constexpr bool IsCheckingMove() const
     {
         return m & IS_CHECKING;
     }
 
-    void AssignScore(int score)
+    constexpr void AssignScore(int score)
     {
         m = (m & 0xFFFFFFFF) | ((int64_t)score << 32);
     }
 
-    void GivesCheck()
+    constexpr void GivesCheck()
     {
         m |= IS_CHECKING;
     }
 
-    operator bool() const
+    constexpr operator bool() const
     {
         return m != 0;
     }
 
-    static Move NoMove()
+    constexpr static Move NoMove()
     {
         return Move{0};
     }
 
-    static Move PromotionMove(Square from, Square to, Piece captured, Piece promoted)
+    constexpr static Move PromotionMove(Square from, Square to, Piece captured, Piece promoted)
     {
         return Move{to | (from << 6) | (PAWN << 12) | (captured << 15) | (promoted << 18)};
     }
 
-    static Move CastlingMove(Square from, Square to)
+    constexpr static Move CastlingMove(Square from, Square to)
     {
         return Move{to | (from << 6) | (KING << 12) | IS_CASTLING};
     }
 
-    static Move EpCaptureMove(Square from, Square to)
+    constexpr static Move EpCaptureMove(Square from, Square to)
     {
         return Move{to | (from << 6) | (PAWN << 12) | (PAWN << 15) | IS_EP_CAPTURE};
     }
 
-    static Move DoublePushMove(Square from, Square to)
+    constexpr static Move DoublePushMove(Square from, Square to)
     {
         return Move{to | (from << 6) | (PAWN << 12) | IS_DOUBLE_PUSH};
     }
 
-    static Move CaptureMove(Square from, Square to, Piece piece, Piece captured)
+    constexpr static Move CaptureMove(Square from, Square to, Piece piece, Piece captured)
     {
         return Move{to | (from << 6) | (piece << 12) | (captured << 15)};
     }
 
-    static Move NonCaptureMove(Square from, Square to, Piece piece)
+    constexpr static Move NonCaptureMove(Square from, Square to, Piece piece)
     {
         return Move{to | (from << 6) | (piece << 12)};
     }
 
-    std::size_t operator()(const Move &m) const
+    constexpr std::size_t operator()(const Move &m) const
     {
-        return std::hash<int64_t>()(m.m);
+        return (std::size_t)m; // Used for hashing moves in std containers.
     }
 
   private:
     int64_t m;
 
-    Move(int64_t v) : m(v)
+    constexpr Move(int64_t v) : m(v)
     {
     }
 
@@ -201,12 +225,15 @@ class Move
     };
 };
 
-typedef std::vector<Move>       Variation;
-typedef StackVector<Move, 1024> MoveList;
+typedef StackVector<Move, MAX_PLY>                Variation;
+typedef StackVector<Move, MAX_MOVES_PER_POSITION> MoveList;
 
 static inline void CopyVariation(Variation &dst, const Variation &src, Move best_move)
 {
     dst.clear();
     dst.push_back(best_move);
-    dst.insert(dst.end(), src.begin(), src.end());
+    for (auto move : src)
+    {
+        dst.push_back(move);
+    }
 }

@@ -4,8 +4,8 @@
 #include <string_view>
 #include <vector>
 
+#include "attacks.h"
 #include "bitboard.h"
-#include "function_prototypes.h"
 #include "move.h"
 
 /**

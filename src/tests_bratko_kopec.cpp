@@ -1,8 +1,8 @@
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
 #include "game.h"
 #include "position.h"
 #include "search.h"
+#include "timer.h"
 #include "transposition_table.h"
 
 #include <string_view>

@@ -1,6 +1,7 @@
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
+#include "evaluation.h"
 #include "position.h"
+#include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
 #include <string>

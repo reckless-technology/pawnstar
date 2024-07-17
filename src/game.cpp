@@ -5,19 +5,16 @@ using std::string;
 using std::string_view;
 
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
 #include "game.h"
 #include "position.h"
 #include "search.h"
 #include "transposition_table.h"
 
-static constexpr string_view move_suffixes[6] = {
-    "+", "#", "ep", "e.p.", "!", "?",
-};
+constexpr string_view move_suffixes[] = {"+", "#", "ep", "e.p.", "!", "?"};
 
-static void RemoveMoveSuffixes(string &move_str)
+constexpr void RemoveMoveSuffixes(string &move_str)
 {
-    for (const string_view &sv : move_suffixes)
+    for (const string_view sv : move_suffixes)
     {
         auto locn = move_str.find(sv);
         if (locn != string::npos)
@@ -25,6 +22,20 @@ static void RemoveMoveSuffixes(string &move_str)
             move_str.erase(locn);
         }
     }
+}
+
+constexpr const std::string MoveString(Move m)
+{
+    std::string result;
+    result += FileChar(m.from());
+    result += RankChar(m.from());
+    result += FileChar(m.to());
+    result += RankChar(m.to());
+    if (m.promoted() != NONE)
+    {
+        result += "  nbrq"[m.promoted()];
+    }
+    return result;
 }
 
 Game::Game(std::string_view fen_string) : position_(positions_)

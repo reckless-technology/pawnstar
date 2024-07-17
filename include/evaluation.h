@@ -3,8 +3,9 @@
 #include <cstring>
 
 #include "bitboard.h"
-#include "function_prototypes.h"
 #include "position.h"
+
+int EvaluatePosition(const Position &position, int alpha, int beta);
 
 /**
  * @brief Pawn structure for one color.

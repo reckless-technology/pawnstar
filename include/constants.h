@@ -2,7 +2,7 @@
 #include <cstdint>
 
 constexpr int      HASHTABLE_MEGABYTES         = 512;    ///< default transposition table size in MB
-constexpr int      MAX_MOVES_PER_POSITION      = 256;    ///< maximum possible number of pseudo-legal moves for a chess position
+constexpr int      MAX_MOVES_PER_POSITION      = 512;    ///< maximum possible number of pseudo-legal moves for a chess position
 constexpr int      BETA                        = 11000;  ///< greater than any possible evaluation score including checkmate
 constexpr int      ALPHA                       = -11000; ///< smaller than any possible evaluation score including being checkmated
 constexpr int      CHECKMATED_SCORE            = -10000; ///< score for losing at this ply

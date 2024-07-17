@@ -1,13 +1,23 @@
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
 #include "game.h"
 #include "opening_book.h"
 #include "position.h"
 #include "search.h"
+#include "sort_moves.h"
+#include "timer.h"
 #include "transposition_table.h"
 
 #include <string>
 using std::string;
+
+constexpr int min(int a, int b)
+{
+    return a < b ? a : b;
+}
+constexpr int max(int a, int b)
+{
+    return a > b ? a : b;
+}
 
 /**
  * @brief Search the root node and find the best move
@@ -83,7 +93,7 @@ Move SearchRootNode(Game &game)
         const int score = SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i], principal_variation, i);
         move_list[i].AssignScore(score);
     }
-    SortMoves(move_list, true);
+    SortMoves<true>(move_list);
     Move best_move                    = move_list[0];
     best_moves[STARTING_SEARCH_DEPTH] = best_move;
     for (int depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
@@ -92,7 +102,7 @@ Move SearchRootNode(Game &game)
         {
             break;
         }
-        SortMoves(move_list, true); /* Sort moves from previous iteration depth. */
+        SortMoves<true>(move_list); /* Sort moves from previous iteration depth. */
         Variation child_pv{};
         int       alpha  = ALPHA;
         game.node_count_ = 0;

@@ -1,8 +1,9 @@
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
+#include "evaluation.h"
 #include "game.h"
 #include "position.h"
 #include "search.h"
+#include "sort_moves.h"
 #include "transposition_table.h"
 
 /**

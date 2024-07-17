@@ -4,8 +4,9 @@
 #include <vector>
 
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
 #include "move.h"
+#include "sort_moves.h"
+#include "static_exchange_evaluation.h"
 
 /*                   indexed by      ply   pce from  to */
 static uint32_t killer_move_counts[MAX_PLY][8 * 64 * 64];
@@ -48,23 +49,6 @@ void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int d
             move.GivesCheck();
         }
     }
-    SortMoves(moves, false);
+    SortMoves<false>(moves);
     (void)depth;
-}
-
-/**
- * @brief Sort moves "best first" i.e. in descending score order
- * @param moves Moves to be sorted
- * @param is_stable_sort true for slower stable sort (required at root node search only)
- */
-void SortMoves(MoveList &moves, bool is_stable_sort)
-{
-    if (is_stable_sort)
-    {
-        std::stable_sort(moves.begin(), moves.end(), [](const Move &a, const Move &b) { return -a.score() < -b.score(); });
-    }
-    else
-    {
-        std::sort(moves.begin(), moves.end(), [](const Move &a, const Move &b) { return -a.score() < -b.score(); });
-    }
 }

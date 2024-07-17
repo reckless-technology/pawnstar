@@ -1,12 +1,12 @@
-#include <cstdint>
 #include <chrono>
+#include <cstdint>
 
 using namespace std::chrono;
 
 /**
  * @brief XORshift simple PRNG
  * @return next pseudo random integer
-*/
+ */
 int NextRandom(void)
 {
     static uint64_t x;

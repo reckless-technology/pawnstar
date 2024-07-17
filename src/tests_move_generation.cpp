@@ -8,8 +8,8 @@ using std::string;
 using std::string_view;
 
 #include "debug_hashtable.h"
-#include "function_prototypes.h"
 #include "position.h"
+#include "timer.h"
 #include "transposition_table.h"
 
 struct PerftCounts

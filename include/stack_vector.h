@@ -1,9 +1,9 @@
 #pragma once
-
 /**
- * @brief Fixed size, stack storage "vector" for containing lists of moves.
+ * @brief Fixed size, simple stack storage "vector" for containing lists of moves.
  * Considerably faster than std::vector due to not allocating data on the heap.
- * Perft speed is over 2x faster using this instead of std::vector<Move> for move generation.
+ * More convenient than a std::array for insertion, sorting and iteration.
+ * Perft speed is over 2x faster using this in place of std::vector<Move> for move generation.
  */
 template <typename T, int N> class StackVector
 {
@@ -14,6 +14,10 @@ template <typename T, int N> class StackVector
     void push_back(const T &m)
     {
         *end_++ = m;
+    }
+    void clear()
+    {
+        end_ = data_;
     }
     T &operator[](std::size_t i)
     {
@@ -27,17 +31,20 @@ template <typename T, int N> class StackVector
     {
         return end_ - data_;
     }
-    struct Iterator
+    /**
+     * @brief Iterator class for the simple stack based vector.
+     */
+    template <typename I> struct Iterator
     {
         using iterator_category = std::random_access_iterator_tag;
-        using value_type        = T;
+        using value_type        = I;
         using difference_type   = std::ptrdiff_t;
-        using pointer           = T *;
-        using reference         = T &;
-        Iterator(value_type *m) : ptr(m)
+        using pointer           = I *;
+        using reference         = I &;
+        Iterator(I *m) : ptr(m)
         {
         }
-        value_type &operator*()
+        I &operator*()
         {
             return *ptr;
         }
@@ -82,15 +89,23 @@ template <typename T, int N> class StackVector
         }
 
       private:
-        T *ptr;
+        I *ptr;
     };
-    Iterator begin()
+    Iterator<T> begin()
     {
-        return Iterator(data_);
+        return Iterator<T>(data_);
     }
-    Iterator end()
+    Iterator<T> end()
     {
-        return Iterator(end_);
+        return Iterator<T>(end_);
+    }
+    Iterator<const T> begin() const
+    {
+        return Iterator<const T>(data_);
+    }
+    Iterator<const T> end() const
+    {
+        return Iterator<const T>(end_);
     }
 
   private:
