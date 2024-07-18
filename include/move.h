@@ -147,22 +147,22 @@ class Move
         return m & 0x7FFF; /**< Lower 15 bits contain piece, from, to: index into killer table. */
     }
 
-    constexpr bool IsCastlingMove() const
+    constexpr bool IsCastling() const
     {
         return m & IS_CASTLING;
     }
 
-    constexpr bool IsEpCaptureMove() const
+    constexpr bool IsEpCapture() const
     {
         return m & IS_EP_CAPTURE;
     }
 
-    constexpr bool IsPawnDoublePushMove() const
+    constexpr bool IsPawnDoublePush() const
     {
         return m & IS_DOUBLE_PUSH;
     }
 
-    constexpr bool IsCheckingMove() const
+    constexpr bool IsChecking() const
     {
         return m & IS_CHECKING;
     }
@@ -182,7 +182,7 @@ class Move
         return m != 0;
     }
 
-    constexpr static Move NoMove()
+    constexpr static Move None()
     {
         return Move{0};
     }

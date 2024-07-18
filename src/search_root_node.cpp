@@ -36,7 +36,7 @@ Move SearchRootNode(Game &game)
     /* If there is only 1 legal move available, no point wasting time searching, just play it. */
     if (move_list.size() == 0)
     {
-        return Move::NoMove();
+        return Move::None();
     }
     if (move_list.size() == 1)
     {

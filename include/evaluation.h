@@ -285,7 +285,7 @@ template <Color color> int EvaluateKing(const Position &position)
     int safety_score = 0;
     if (position.KingLocation(color) != king_home_locn)
     {
-        const Bitboard pawn_shelter_1 = SETS[position.KingLocation(color)].king_pawn_shelter[color];
+        const Bitboard pawn_shelter_1 = SETS[position.KingLocation(color)].KingPawnShelter(color);
         Bitboard       pawn_shelter_2;
         Bitboard       pawn_shelter_3;
 

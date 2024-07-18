@@ -61,26 +61,30 @@ Position Position::MakeNullMove() const
 void Position::AddPiece(Color color, Piece piece, Square to)
 {
     const Bitboard to_bb = BITBOARD(to);
-    pieces_[piece - 1] ^= to_bb;
-    pieces_of_color_[color] ^= to_bb;
+    PiecesOfType(piece) ^= to_bb;
+    PiecesOfColor(color) ^= to_bb;
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
+    squares_[to] = piece;
 }
 
 void Position::RemovePiece(Color color, Piece piece, Square from)
 {
     const Bitboard from_bb = BITBOARD(from);
-    pieces_[piece - 1] ^= from_bb;
-    pieces_of_color_[color] ^= from_bb;
+    PiecesOfType(piece) ^= from_bb;
+    PiecesOfColor(color) ^= from_bb;
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
+    squares_[from] = NONE;
 }
 
 void Position::MovePiece(Color color, Piece piece, Square from, Square to)
 {
     const Bitboard        from_to_bb = BITBOARD(from) | BITBOARD(to);
     const uint64_t *const hash       = &PIECE_SQUARE_HASHES[color][piece - 1][0];
-    pieces_[piece - 1] ^= from_to_bb;
-    pieces_of_color_[color] ^= from_to_bb;
+    PiecesOfType(piece) ^= from_to_bb;
+    PiecesOfColor(color) ^= from_to_bb;
     hash_ ^= hash[to] ^ hash[from];
+    squares_[from] = NONE;
+    squares_[to]   = piece;
 }
 
 Position Position::MakeMove(const Move &move) const
@@ -91,8 +95,7 @@ Position Position::MakeMove(const Move &move) const
     const Piece  piece    = move.piece();
     const Piece  captured = move.captured();
 
-    Position position;
-    position = *this;
+    Position position{*this};
     position.flags_ &= ~IS_NULL_MOVE;
     position.flags_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
     position.hash_ ^=
@@ -104,9 +107,9 @@ Position Position::MakeMove(const Move &move) const
     {
     case PAWN:
         position.reversible_move_count_ = 0;
-        if (captured)
+        if (captured != NONE)
         {
-            if (move.IsEpCaptureMove())
+            if (move.IsEpCapture())
             {
                 /* En passant capture: capture location is source rank, destination file. */
                 const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));
@@ -126,7 +129,7 @@ Position Position::MakeMove(const Move &move) const
         else
         {
             position.MovePiece(color, PAWN, from, to);
-            if (move.IsPawnDoublePushMove())
+            if (move.IsPawnDoublePush())
             {
                 /* Pawn double push: affects en passant. */
                 position.en_passant_square_ = (Square)((from + to) >> 1);
@@ -149,7 +152,7 @@ Position Position::MakeMove(const Move &move) const
         break;
 
     case KING:
-        if (!move.IsCastlingMove())
+        if (!move.IsCastling())
         {
             if (captured)
             {
@@ -199,7 +202,7 @@ Position Position::MakeMove(const Move &move) const
         return;                                          \
     }
 
-Position::Position(std::string_view fen_string)
+Position::Position(std::string_view fen_string) : Position()
 {
     static constexpr string_view white_piece_names{"PNBRQK"};
     static constexpr string_view black_piece_names{"pnbrqk"};
@@ -207,12 +210,6 @@ Position::Position(std::string_view fen_string)
     static constexpr string_view ep_ranks{"36"};
     stringstream                 ss;
     ss << fen_string;
-#ifdef __GNUG__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wclass-memaccess"
-    std::memset(this, 0, sizeof(Position));
-#pragma GCC diagnostic pop
-#endif
     /* Pieces on the board */
     string pieces;
     ss >> pieces;
@@ -450,9 +447,9 @@ bool Position::IsAttacked(Square location, Color color) const
 {
     const Sets           &sets                = SETS[location];
     const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard        attacking_pieces    = pieces_of_color_[color];
+    const Bitboard        attacking_pieces    = PiecesOfColor(color);
     const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
-    if (attacking_pieces & ((sets.pawn_attacks[EnemyOf(color)] & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)))
+    if (attacking_pieces & ((sets.PawnAttacks(EnemyOf(color)) & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)))
     {
         return true;
     }
@@ -492,14 +489,14 @@ Bitboard Position::AttacksTo(Square location, Color color) const
 {
     const Sets           &sets                = SETS[location];
     const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard        attacking_pieces    = pieces_of_color_[color];
+    const Bitboard        attacking_pieces    = PiecesOfColor(color);
     const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
     /*
     Pawn, knight and king attacks can be done by direct lookup since blockers
     do not affect their attack set.
     */
     Bitboard result = (attacking_pieces &
-                       ((sets.pawn_attacks[EnemyOf(color)] & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)));
+                       ((sets.PawnAttacks(EnemyOf(color)) & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)));
     /*
     Rook and queen horizontal and vertical sliding attacks
     */
@@ -525,27 +522,6 @@ Bitboard Position::AttacksTo(Square location, Color color) const
         }
     }
     return result;
-}
-
-Bitboard Position::AttacksFrom(Square location) const
-{
-    switch (PieceAt(location))
-    {
-    case PAWN:
-        return SETS[location].pawn_attacks[ColorAt(location)];
-    case KNIGHT:
-        return SETS[location].knight_attacks;
-    case BISHOP:
-        return BishopAttacks(white_pieces_ | black_pieces_, location);
-    case ROOK:
-        return RookAttacks(white_pieces_ | black_pieces_, location);
-    case QUEEN:
-        return QueenAttacks(white_pieces_ | black_pieces_, location);
-    case KING:
-        return SETS[location].king_attacks;
-    default:
-        return NO_SQUARES;
-    }
 }
 
 /*
@@ -627,14 +603,14 @@ uint64_t Position::ComputeHash() const
     uint64_t hash = flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
     hash ^= CASTLING_RIGHTS_HASHES[flags_ & CASTLING_RIGHTS_MASK];
     hash ^= EN_PASSANT_HASHES[en_passant_square_];
-    for (int piece = PAWN - 1; piece <= KING - 1; ++piece)
+    for (Piece piece = PAWN; piece <= KING; piece = (Piece)(piece + 1))
     {
-        Bitboard b = pieces_[piece] & white_pieces_;
+        Bitboard b = PiecesOfType(piece) & white_pieces_;
         while (b)
         {
             hash ^= PIECE_SQUARE_HASHES[WHITE][piece][FindAndClearLsb(b)];
         }
-        b = pieces_[piece] & black_pieces_;
+        b = PiecesOfType(piece) & black_pieces_;
         while (b)
         {
             hash ^= PIECE_SQUARE_HASHES[BLACK][piece][FindAndClearLsb(b)];
@@ -745,7 +721,7 @@ string Position::MoveToString(const Move &move) const
         if (move.captured() != NONE)
         {
             result << from_square[0] << 'x' << to_square;
-            if (move.IsEpCaptureMove())
+            if (move.IsEpCapture())
             {
                 result << "e.p.";
             }
@@ -761,7 +737,7 @@ string Position::MoveToString(const Move &move) const
         break;
 
     case KING:
-        if (move.IsCastlingMove())
+        if (move.IsCastling())
         {
             switch (move.to())
             {

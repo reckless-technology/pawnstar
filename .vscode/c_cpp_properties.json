@@ -9,7 +9,9 @@
             "cppStandard": "c++20",
             "defines": [
                 "DEBUGX=1"
-            ]
+            ],
+            "intelliSenseMode": "linux-gcc-x64",
+            "compilerPath": "/usr/bin/clang"
         }
     ],
     "version": 4

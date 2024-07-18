@@ -1,7 +1,7 @@
 PROGRAM             = pawnstar
-CXX                 = g++
+CXX                 = clang++
 CPPFLAGS            = -I include -D DEBUGX=1
-CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -std=c++20
+CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20
 
 DEBUG_DIR           = debug
 RELEASE_DIR         = release
@@ -21,11 +21,11 @@ OBJECTS             = $(SOURCES:.cpp=.o)
 
 DEBUG_EXE           = $(DEBUG_DIR)/$(PROGRAM)
 DEBUG_OBJECTS       = $(addprefix $(DEBUG_DIR)/,$(OBJECTS))
-DEBUG_FLAGS         = -g -O0 -DDEBUG -fsanitize=undefined -fsanitize=address
+DEBUG_FLAGS         = -g -O0 -D DEBUG -fsanitize=undefined -fsanitize=address
 
 RELEASE_EXE         = $(RELEASE_DIR)/$(PROGRAM)
 RELEASE_OBJECTS     = $(addprefix $(RELEASE_DIR)/, $(OBJECTS))
-RELEASE_FLAGS       = -g -O3 
+RELEASE_FLAGS       = -O3 -D NDEBUG
 
 .PHONY: all clean debug prep release remake gen
 

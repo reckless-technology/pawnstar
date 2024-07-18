@@ -10,32 +10,27 @@ Use nominal 1-3-3-5-9 material values for SEE
 */
 constexpr int piece_values[7] = {0, 100, 300, 300, 500, 900, 10000};
 
-struct Bitboards
+struct SeeBoards
 {
-    union {
-        Bitboard pieces[7];
-        struct
-        {
-            Bitboard dummy; // No piece
-            Bitboard pawns;
-            Bitboard knights;
-            Bitboard bishops;
-            Bitboard rooks;
-            Bitboard queens;
-            Bitboard kings;
-        };
-    };
-    union {
-        Bitboard pieces_of_color[2];
-        struct
-        {
-            Bitboard white_pieces;
-            Bitboard black_pieces;
-        };
-    };
+    Bitboard  pawns;
+    Bitboard  knights;
+    Bitboard  bishops;
+    Bitboard  rooks;
+    Bitboard  queens;
+    Bitboard  kings;
+    Bitboard  white_pieces;
+    Bitboard  black_pieces;
+    Bitboard &PiecesOfType(Piece piece)
+    {
+        return (&pawns)[piece - PAWN];
+    }
+    Bitboard &PiecesOfColor(Color color)
+    {
+        return (&white_pieces)[color];
+    }
 };
 
-static int EvaluateSwapOff(Bitboards &bb, Square location, Color color, Piece piece_on_square);
+static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece piece_on_square);
 /*
 Determine the SEE (static exchange evaluation) for a move.
 Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
@@ -44,8 +39,7 @@ int EvaluateStaticExchange(const Position &src_position, Move move, int &is_chec
 {
     Position dst_position{src_position.MakeMove(move)};
     is_checking = dst_position.IsInCheck();
-    Bitboards bb{.dummy        = 0,
-                 .pawns        = dst_position.Pawns(),
+    SeeBoards bb{.pawns        = dst_position.Pawns(),
                  .knights      = dst_position.Knights(),
                  .bishops      = dst_position.Bishops(),
                  .rooks        = dst_position.Rooks(),
@@ -70,7 +64,7 @@ int EvaluateStaticExchange(const Position &src_position, Move move, int &is_chec
  * @param piece_on_square piece currently standing on the target square
  * @return int swap off (static exchange) score
  */
-static int EvaluateSwapOff(Bitboards &bb, Square location, Color color, Piece piece_on_square)
+static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece piece_on_square)
 {
     const Sets    &sets     = SETS[location];
     const Bitboard square   = BITBOARD(location);
@@ -84,8 +78,8 @@ static int EvaluateSwapOff(Bitboards &bb, Square location, Color color, Piece pi
         Piece          capturing_piece;
         Bitboard       bishop_attacks;
         Bitboard       rook_attacks;
-        const Bitboard attacking_pieces = bb.pieces_of_color[color];
-        Bitboard       attackers        = sets.pawn_attacks[EnemyOf(color)] & attacking_pieces & bb.pawns;
+        const Bitboard attacking_pieces = bb.PiecesOfColor(color);
+        Bitboard       attackers        = sets.PawnAttacks(EnemyOf(color)) & attacking_pieces & bb.pawns;
         if (attackers)
         {
             attackers &= -attackers; /* isolate Lsb in case there is more than 1 pawn attacker */
@@ -134,10 +128,10 @@ static int EvaluateSwapOff(Bitboards &bb, Square location, Color color, Piece pi
         break;
 
     FoundAttacker:
-        bb.pieces[piece_on_square] ^= square;
-        bb.pieces_of_color[EnemyOf(color)] ^= square;
-        bb.pieces[capturing_piece] ^= attackers | square;
-        bb.pieces_of_color[color] ^= attackers | square;
+        bb.PiecesOfType(piece_on_square) ^= square;
+        bb.PiecesOfColor(EnemyOf(color)) ^= square;
+        bb.PiecesOfType(capturing_piece) ^= attackers | square;
+        bb.PiecesOfColor(color) ^= attackers | square;
         occupied ^= attackers;
         scores[ply]     = piece_values[piece_on_square];
         piece_on_square = capturing_piece;

@@ -142,7 +142,7 @@ Move Game::PlayMove(std::string_view move_str)
             return move;
         }
     }
-    return Move::NoMove();
+    return Move::None();
 }
 
 /**

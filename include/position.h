@@ -35,7 +35,7 @@ class Position
     };
 
   public:
-    Position(){};
+    Position()                                = default;
     Position(const Position &that)            = default;
     Position &operator=(const Position &that) = default;
     Position(std::string_view fen_string);                           /**< Construct a position from a FEN string. */
@@ -44,7 +44,6 @@ class Position
     void        AddPiece(Color color, Piece piece, Square to);       /**< Place a piece on the board. */
     bool        IsAttacked(Square location, Color color) const;      /**< Determine if location is attacked by color. */
     Bitboard    AttacksTo(Square location, Color color) const;       /**< Find all attackers to specified square.  */
-    Bitboard    AttacksFrom(Square location) const;                  /**< Squares attacked by piece on location.  */
     bool        IsLegal() const;                                     /**< Is this a legal chess position. */
     bool        IsCheckmate() const;                                 /**< Is this position checkmate.  */
     bool        IsStalemate() const;                                 /**< Is this position stalemate. */
@@ -54,7 +53,6 @@ class Position
     std::string VariationToString(const Variation &variation) const; /**< Generate SAN strings for a legal sequence of moves. */
 
     /* clang-format off */
-    constexpr Color     ColorAt(Square location) const      { const Bitboard s = BITBOARD(location); return (s & white_pieces_) ? WHITE : (s & black_pieces_) ? BLACK : NEITHER_COLOR;}
     constexpr bool      MayWhiteCastleKingside() const      {return !!(flags_ & MAY_WHITE_CASTLE_KINGSIDE);}
     constexpr bool      MayWhiteCastleQueenside() const     {return !!(flags_ & MAY_WHITE_CASTLE_QUEENSIDE);}
     constexpr bool      MayBlackCastleKingside() const      {return !!(flags_ & MAY_BLACK_CASTLE_KINGSIDE);}
@@ -69,8 +67,11 @@ class Position
     constexpr Bitboard  BlackPieces() const                 {return black_pieces_;}
     constexpr Bitboard  OccupiedSquares() const             {return white_pieces_ | black_pieces_;}
     constexpr Bitboard  VacantSquares() const               {return ~(white_pieces_ | black_pieces_);}
-    constexpr Bitboard  PiecesOfColor(Color color) const    {return pieces_of_color_[color];}
-    constexpr Bitboard  PiecesOfType(Piece piece) const     {return pieces_[piece - 1];}
+    constexpr Piece     PieceAt(Square location) const      {return squares_[location];}
+    constexpr Bitboard  PiecesOfColor(Color color) const    {return (&white_pieces_)[color];}
+    constexpr Bitboard& PiecesOfColor(Color color)          {return (&white_pieces_)[color];}
+    constexpr Bitboard  PiecesOfType(Piece piece) const     {return (&pawns_)[piece - PAWN];}
+    constexpr Bitboard& PiecesOfType(Piece piece)           {return (&pawns_)[piece - PAWN];}
     constexpr Color     ColorToMove() const                 {return flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE;}
     constexpr Square    KingLocation(Color color) const     {return king_location_[color];}
     constexpr uint64_t  Hash() const                        {return hash_;}
@@ -82,17 +83,6 @@ class Position
     constexpr uint8_t   ReversibleMoveCount() const         {return reversible_move_count_;}
     constexpr Square    EnPassantIndex() const              {return en_passant_square_;}
     /* clang-format on */
-    constexpr Piece PieceAt(Square location) const
-    {
-        const Bitboard square = BITBOARD(location);
-        return (square & pawns_)     ? PAWN
-               : (square & knights_) ? KNIGHT
-               : (square & bishops_) ? BISHOP
-               : (square & rooks_)   ? ROOK
-               : (square & queens_)  ? QUEEN
-               : (square & kings_)   ? KING
-                                     : NONE;
-    }
 
     MoveList GenerateLegalMoves() const
     {
@@ -110,37 +100,27 @@ class Position
     uint64_t                        ComputeHash() const; /**< Compute the Zobrist hash from scratch. */
     template <Color, bool> MoveList GenMoves() const;    /**< Generate legal moves.  */
 
-    union {
-        Bitboard pieces_[6]; /**< used to index pieces by [piece - 1] */
-        struct
-        {
-            Bitboard pawns_;   /**< squares with a pawn on them        */
-            Bitboard knights_; /**< squares with a knight on them      */
-            Bitboard bishops_; /**< squares with a bishop on them      */
-            Bitboard rooks_;   /**< squares with a rook on them        */
-            Bitboard queens_;  /**< squares with a queen on them       */
-            Bitboard kings_;   /**< squares with a king on them        */
-        };
-    };
-    union {
-        Bitboard pieces_of_color_[2]; /**< used to index pieces by color */
-        struct
-        {
-            Bitboard white_pieces_; /**< squares with a white piece on them */
-            Bitboard black_pieces_; /**< squares with a black piece on them */
-        };
-    };
-    Bitboard              checkers_;                 /**< Set of squares which attack the king */
-    uint64_t              hash_;                     /**< Zobrist hash of this position, maintained incrementally    */
-    uint16_t              flags_;                    /**< game state-machine flags                                   */
-    Square                king_location_[2];         /**< square index of white and black kings                      */
-    Square                en_passant_square_;        /**< en passant capture availability square                     */
-    uint8_t               reversible_move_count_;    /**< number of consecutive reversible half-moves (plies)        */
-    uint8_t               full_move_count_;          /**< number of full moves (zero indexed)                        */
+    Bitboard pawns_;                 /**< squares with a pawn on them              */
+    Bitboard knights_;               /**< squares with a knight on them            */
+    Bitboard bishops_;               /**< squares with a bishop on them            */
+    Bitboard rooks_;                 /**< squares with a rook on them              */
+    Bitboard queens_;                /**< squares with a queen on them             */
+    Bitboard kings_;                 /**< squares with a king on them              */
+    Bitboard white_pieces_;          /**< squares with a white piece on them       */
+    Bitboard black_pieces_;          /**< squares with a black piece on them       */
+    Piece    squares_[64];           /**< Squares array for fast piece lookup. */
+    Bitboard checkers_;              /**< Set of squares which attack the king */
+    uint64_t hash_;                  /**< Zobrist hash of this position, maintained incrementally    */
+    uint16_t flags_;                 /**< game state-machine flags                                   */
+    Square   king_location_[2];      /**< square index of white and black kings                      */
+    Square   en_passant_square_;     /**< en passant capture availability square                     */
+    uint8_t  reversible_move_count_; /**< number of consecutive reversible half-moves (plies)        */
+    uint8_t  full_move_count_;       /**< number of full moves (zero indexed)                        */
+
     static const uint16_t CASTLING_RIGHTS_MASKS[64]; /**< ANDed with move source and dest to compute new rights      */
 };
 
-static_assert(sizeof(Position) == 88);
+static_assert(sizeof(Position) == 152);
 
 #include "pins.h"
 
@@ -154,7 +134,7 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
 {
     constexpr Color enemy_color      = EnemyOf(color);
     const Bitboard  occupied_squares = white_pieces_ | black_pieces_;
-    const Bitboard  friendly_pieces  = pieces_of_color_[color];
+    const Bitboard  friendly_pieces  = PiecesOfColor(color);
     const Bitboard  enemy_pieces     = occupied_squares ^ friendly_pieces;
     const Bitboard  enemy_pawns      = pawns_ & enemy_pieces;
     const Square    king_locn        = king_location_[color];

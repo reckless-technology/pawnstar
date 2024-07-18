@@ -62,7 +62,7 @@ Move GetBookMove(uint64_t hash)
         const auto &moves = book[hash];
         return moves[NextRandom() % moves.size()];
     }
-    return Move::NoMove();
+    return Move::None();
 }
 
 /**

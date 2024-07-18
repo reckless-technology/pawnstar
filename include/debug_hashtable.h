@@ -5,8 +5,8 @@
 
 #if DEBUGX
 
-typedef std::unordered_map<std::string_view, uint32_t> DebugTable;
-extern DebugTable                                      debug_dictionary;
+typedef std::unordered_map<std::string_view, int64_t> DebugTable;
+extern DebugTable                                     debug_dictionary;
 
 void DebugXClear();
 void DebugXWrite();
@@ -22,6 +22,7 @@ void DebugXWrite();
 #else
 
 #define INCREMENT(x)
+#define ASSIGN(x, val)
 #define INCREMENT_IF(b, x)
 #define DebugXClear(x)
 #define DebugXWrite(x)

@@ -82,11 +82,11 @@ static void PerftExtra(const Position &src_position, int depth, Color color, Per
         {
             ++counts.promotions;
         }
-        if (move.IsEpCaptureMove())
+        if (move.IsEpCapture())
         {
             ++counts.ep_captures;
         }
-        if (move.IsCastlingMove())
+        if (move.IsCastling())
         {
             ++counts.castles;
         }

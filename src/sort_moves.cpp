@@ -53,7 +53,7 @@ void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int d
     (void)depth;
 }
 
-int MaxKillerMoveCount(void)
+uint32_t MaxKillerMoveCount(void)
 {
     uint32_t result = 0;
     for (int i = 0; i != 64; ++i)

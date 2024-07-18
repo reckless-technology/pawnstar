@@ -5,21 +5,13 @@
 #include "position.h"
 #include "transposition_table.h"
 
-static bool IsPrime(std::size_t x);
+constexpr static bool IsPrime(std::size_t x);
 
 /**
  * Transposition table is just a vector of Transpositions, which
  * we index by using the Zobrist hash of the position.
  */
 static std::vector<Transposition> table;
-
-/**
- * @brief Delete the transposition table.
- */
-void FreeTranspositionTable()
-{
-    table.clear();
-}
 
 /**
  * @brief Create the transposition table.
@@ -38,8 +30,8 @@ void InitializeTranspositionTable(std::size_t megabytes)
     {
         num_entries -= 2;
     }
-    table.clear();
-    table.resize(num_entries);
+    table.assign(num_entries,
+                 Transposition{.hash = 0, .move = Move::None(), .score = 0, .depth = 0, .node_type = NODE_CUT, .is_old = false});
 }
 
 /**
@@ -70,7 +62,7 @@ bool FindTransposition(uint64_t hash, Transposition &transposition)
 void RecordTransposition(uint64_t hash, int depth, int score, Move move, NodeType node_type)
 {
     Transposition &t = table[hash % table.size()];
-    if (t.hash == 0 || t.is_old || t.depth < depth)
+    if (t.hash == 0 || t.is_old || t.depth <= depth)
     {
         t.hash      = hash;
         t.move      = move;
@@ -81,7 +73,7 @@ void RecordTransposition(uint64_t hash, int depth, int score, Move move, NodeTyp
     }
 }
 
-std::pair<int, int> TranspositionTableUsage()
+std::pair<std::size_t, int> TranspositionTableUsage()
 {
     const std::size_t count = std::ranges::count_if(table, [](const Transposition &t) { return t.hash != 0; });
     return std::pair<int, int>{count, (count * 100) / table.size()};
@@ -98,7 +90,7 @@ void AgeTranspositionTable()
  * @param x candidate
  * @return true if x is prime
  */
-static bool IsPrime(std::size_t x)
+constexpr static bool IsPrime(std::size_t x)
 {
     if (x < 3)
     {

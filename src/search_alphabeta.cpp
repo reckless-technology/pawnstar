@@ -23,7 +23,7 @@ int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move m
 {
     game.PlayMove(move);
     int score;
-    if (beta > alpha + 1 && move_index > 0 && !game.CurrentPosition().IsInCheck() && !move.IsCheckingMove())
+    if (beta > alpha + 1 && move_index > 0 && !game.CurrentPosition().IsInCheck() && !move.IsChecking())
     {
         INCREMENT("pvs attempts");
         score = -Search(game, depth - 1, ply + 1, -alpha - 1, -alpha, pv);
@@ -96,7 +96,7 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
 static inline bool IsMoveOkToReduce(Move move, Color color)
 {
     constexpr uint8_t seventh_rank[2] = {6, 1};
-    if (move.IsCheckingMove())
+    if (move.IsChecking())
     {
         return false;
     }
@@ -214,7 +214,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     */
     Variation pv;
     int       num_legal_moves  = 0;
-    Move      best_move        = Move::NoMove();
+    Move      best_move        = Move::None();
     int       best_score       = ALPHA;
     bool      has_raised_alpha = false;
     if (is_transposition && transposition.move)
