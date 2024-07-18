@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cinttypes>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -14,7 +15,7 @@ static uint32_t killer_move_counts[MAX_PLY][8 * 64 * 64];
 void RecordKillerMove(int ply, Move move)
 {
     /* Mask all except piece, from, to (lower 15 bits) */
-    ++killer_move_counts[ply][move & 0x7FFF];
+    ++killer_move_counts[ply][move.piece_from_to_mask()];
 }
 
 void ResetKillerCounts()
@@ -26,7 +27,6 @@ void ResetKillerCounts()
  * @brief Sort moves "best first".
  * Uses static exchange evaluation (SEE) to provide a provisional
  * score for each move for sorting.
- * Removes moves found to be illegal during the scoring process.
  * @param position position for which the moves were generated
  * @param moves list of moves to be sorted
  * @param ply distance from root node
@@ -43,7 +43,7 @@ void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int d
         */
         int       is_checking;
         const int see_score = EvaluateStaticExchange(position, move, is_checking);
-        move.AssignScore(see_score * 1000 + counts[move & 0x7FFF]);
+        move.AssignScore(see_score * 1000 + counts[move.piece_from_to_mask()]);
         if (is_checking)
         {
             move.GivesCheck();
@@ -51,4 +51,20 @@ void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int d
     }
     SortMoves<false>(moves);
     (void)depth;
+}
+
+int MaxKillerMoveCount(void)
+{
+    uint32_t result = 0;
+    for (int i = 0; i != 64; ++i)
+    {
+        for (int j = 0; j != 32768; ++j)
+        {
+            if (killer_move_counts[i][j] > result)
+            {
+                result = killer_move_counts[i][j];
+            }
+        }
+    }
+    return result;
 }

@@ -1,19 +1,19 @@
 #pragma once
-#include <cstdint>
-
-#include "move.h"
 /**
- * @file Functions and macros to use Bitboards.
+ * @file Constants and functions for using Bitboards.
  *
- * A Bitboard is a set-wise interpretation of a 64-bit unsigned integer, with
- * each bit mapping to a square on the chessboard.
+ * A Bitboard is a set-wise interpretation of a 64-bit unsigned integer,
+ * with each bit mapping to a square on the chessboard.
  *
- * If the bit is 1, then the corresponding square is a member of that set, for example:
+ * For example:
  *
  * The set of squares occupied by pawns
  * The set of squares occupied by a black piece
  * The set of squares to which a knight on e4 may move
  * The set of squares attacked by black queens
+ * The set of squares containing a piece checking the white king
+ *
+ * If the bit is 1, then the corresponding square is a member of that set.
  *
  * Bit  0 maps to square a1 (LSB)
  * Bit  7 maps to square h1
@@ -21,48 +21,40 @@
  * Bit 63 maps to square h8 (MSB)
  *
  * This is commonly referred to as LERF (little endian rank file mapping).
+ *
  * If you treat the board as a 2D array, with square (0,0) being a1 and square
  * (7,7) being h8, then the Bitboard for a given square is just
  *
- * (1ull << (x + 8 * y))
+ * (1 << (x + 8 * y))
  */
+#include <cstdint>
+
+#include "move.h"
 
 typedef uint64_t Bitboard;
 
-constexpr Bitboard RANK_1 = 0x00000000000000FFull;
-constexpr Bitboard RANK_2 = 0x000000000000FF00ull;
-constexpr Bitboard RANK_3 = 0x0000000000FF0000ull;
-constexpr Bitboard RANK_4 = 0x00000000FF000000ull;
-constexpr Bitboard RANK_5 = 0x000000FF00000000ull;
-constexpr Bitboard RANK_6 = 0x0000FF0000000000ull;
-constexpr Bitboard RANK_7 = 0x00FF000000000000ull;
-constexpr Bitboard RANK_8 = 0xFF00000000000000ull;
-
-constexpr Bitboard FILE_A = 0x0101010101010101ull;
-constexpr Bitboard FILE_B = 0x0202020202020202ull;
-constexpr Bitboard FILE_C = 0x0404040404040404ull;
-constexpr Bitboard FILE_D = 0x0808080808080808ull;
-constexpr Bitboard FILE_E = 0x1010101010101010ull;
-constexpr Bitboard FILE_F = 0x2020202020202020ull;
-constexpr Bitboard FILE_G = 0x4040404040404040ull;
-constexpr Bitboard FILE_H = 0x8080808080808080ull;
-
-/* Used to mask files to prevent wrap when bit shifting. */
-constexpr Bitboard NOT_H_FILE  = 0x7F7F7F7F7F7F7F7Full;
-constexpr Bitboard MASK_EAST_2 = 0x3F3F3F3F3F3F3F3Full;
-constexpr Bitboard MASK_EAST_4 = 0x0F0F0F0F0F0F0F0Full;
-constexpr Bitboard NOT_A_FILE  = 0xFEFEFEFEFEFEFEFEull;
-constexpr Bitboard MASK_WEST_2 = 0xFCFCFCFCFCFCFCFCull;
-constexpr Bitboard MASK_WEST_4 = 0xF0F0F0F0F0F0F0F0ull;
-
-constexpr Bitboard ALL_SQUARES    = 0xFFFFFFFFFFFFFFFFull;
-constexpr Bitboard NO_SQUARES     = 0x0000000000000000ull;
-constexpr Bitboard WHITE_SQUARES  = 0x55AA55AA55AA55AAull;
-constexpr Bitboard BLACK_SQUARES  = 0xAA55AA55AA55AA55ull;
-constexpr Bitboard CORNER_SQUARES = 0x8100000000000081ull;
-constexpr Bitboard BORDER_SQUARES = 0xFF818181818181FFull;
-constexpr Bitboard CTR_16_SQUARES = 0x00003C3C3C3C0000ull;
-constexpr Bitboard CTR_4_SQUARES  = 0x0000001818000000ull;
+constexpr Bitboard NO_SQUARES    = 0;
+constexpr Bitboard ALL_SQUARES   = ~NO_SQUARES;
+constexpr Bitboard RANK_1        = 0xFFull;
+constexpr Bitboard RANK_2        = RANK_1 << 8;
+constexpr Bitboard RANK_3        = RANK_2 << 8;
+constexpr Bitboard RANK_4        = RANK_3 << 8;
+constexpr Bitboard RANK_5        = RANK_4 << 8;
+constexpr Bitboard RANK_6        = RANK_5 << 8;
+constexpr Bitboard RANK_7        = RANK_6 << 8;
+constexpr Bitboard RANK_8        = RANK_7 << 8;
+constexpr Bitboard FILE_A        = 0x0101010101010101ull;
+constexpr Bitboard FILE_B        = FILE_A << 1;
+constexpr Bitboard FILE_C        = FILE_B << 1;
+constexpr Bitboard FILE_D        = FILE_C << 1;
+constexpr Bitboard FILE_E        = FILE_D << 1;
+constexpr Bitboard FILE_F        = FILE_E << 1;
+constexpr Bitboard FILE_G        = FILE_F << 1;
+constexpr Bitboard FILE_H        = FILE_G << 1;
+constexpr Bitboard NOT_FILE_H    = ~FILE_H; /**< Used when shifting east to avoid wraparound. */
+constexpr Bitboard NOT_FILE_A    = ~FILE_A; /**< Used when shifting west to avoid wraparound. */
+constexpr Bitboard WHITE_SQUARES = 0x55AA55AA55AA55AAull;
+constexpr Bitboard BLACK_SQUARES = ~WHITE_SQUARES;
 
 constexpr Bitboard BITBOARD(Square location)
 {
@@ -80,9 +72,9 @@ constexpr Square Msb(Bitboard x)
 {
     return (Square)(63 - __builtin_clzll(x));
 }
-constexpr uint8_t PopCount(Bitboard x)
+constexpr int PopCount(Bitboard x)
 {
-    return (uint8_t)__builtin_popcountll(x);
+    return __builtin_popcountll(x);
 }
 constexpr Bitboard ShiftNorth(Bitboard b)
 {
@@ -90,15 +82,15 @@ constexpr Bitboard ShiftNorth(Bitboard b)
 }
 constexpr Bitboard ShiftNortheast(Bitboard b)
 {
-    return (b & NOT_H_FILE) << 9;
+    return (b & NOT_FILE_H) << 9;
 }
 constexpr Bitboard ShiftEast(Bitboard b)
 {
-    return (b & NOT_H_FILE) << 1;
+    return (b & NOT_FILE_H) << 1;
 }
 constexpr Bitboard ShiftSoutheast(Bitboard b)
 {
-    return (b & NOT_H_FILE) >> 7;
+    return (b & NOT_FILE_H) >> 7;
 }
 constexpr Bitboard ShiftSouth(Bitboard b)
 {
@@ -106,109 +98,19 @@ constexpr Bitboard ShiftSouth(Bitboard b)
 }
 constexpr Bitboard ShiftSouthwest(Bitboard b)
 {
-    return (b & NOT_A_FILE) >> 9;
+    return (b & NOT_FILE_A) >> 9;
 }
 constexpr Bitboard ShiftWest(Bitboard b)
 {
-    return (b & NOT_A_FILE) >> 1;
+    return (b & NOT_FILE_A) >> 1;
 }
 constexpr Bitboard ShiftNorthwest(Bitboard b)
 {
-    return (b & NOT_A_FILE) << 7;
+    return (b & NOT_FILE_A) << 7;
 }
-
 constexpr Square FindAndClearLsb(Bitboard &x)
 {
     const Square lsb = (Square)__builtin_ctzll(x);
     x &= (x - 1);
     return lsb;
-}
-
-constexpr Bitboard KnightFill(Bitboard b)
-{
-    const Bitboard west1     = ShiftWest(b);
-    const Bitboard west2     = ShiftWest(west1);
-    const Bitboard east1     = ShiftEast(b);
-    const Bitboard east2     = ShiftEast(east1);
-    const Bitboard eastwest1 = west1 | east1;
-    const Bitboard eastwest2 = west2 | east2;
-    return (eastwest1 << 16) | (eastwest1 >> 16) | (eastwest2 << 8) | (eastwest2 >> 8);
-}
-
-constexpr Bitboard KingFill(Bitboard b)
-{
-    return ShiftNorth(b) | ShiftNortheast(b) | ShiftEast(b) | ShiftSoutheast(b) | ShiftSouth(b) | ShiftSouthwest(b) | ShiftWest(b) |
-           ShiftNorthwest(b);
-}
-
-constexpr Bitboard FillNorth(Bitboard b)
-{
-    b |= b << 8;
-    b |= b << 16;
-    b |= b << 32;
-    return b;
-}
-
-constexpr Bitboard FillNorthEast(Bitboard b)
-{
-    b |= (b & NOT_H_FILE) << 9;
-    b |= (b & MASK_EAST_2) << 18;
-    b |= (b & MASK_EAST_4) << 36;
-    return b;
-}
-
-constexpr Bitboard FillEast(Bitboard b)
-{
-    b |= (b & NOT_H_FILE) << 1;
-    b |= (b & MASK_EAST_2) << 2;
-    b |= (b & MASK_EAST_4) << 4;
-    return b;
-}
-
-constexpr Bitboard FillSouthEast(Bitboard b)
-{
-    b |= (b & NOT_H_FILE) >> 7;
-    b |= (b & MASK_EAST_2) >> 14;
-    b |= (b & MASK_EAST_4) >> 28;
-    return b;
-}
-
-constexpr Bitboard FillSouth(Bitboard b)
-{
-    b |= b >> 8;
-    b |= b >> 16;
-    b |= b >> 32;
-    return b;
-}
-
-constexpr Bitboard FillSouthWest(Bitboard b)
-{
-    b |= (b & NOT_A_FILE) >> 9;
-    b |= (b & MASK_WEST_2) >> 18;
-    b |= (b & MASK_WEST_4) >> 36;
-    return b;
-}
-
-constexpr Bitboard FillWest(Bitboard b)
-{
-    b |= (b & NOT_A_FILE) >> 1;
-    b |= (b & MASK_WEST_2) >> 2;
-    b |= (b & MASK_WEST_4) >> 4;
-    return b;
-}
-
-constexpr Bitboard FillNorthWest(Bitboard b)
-{
-    b |= (b & NOT_A_FILE) << 7;
-    b |= (b & MASK_WEST_2) << 14;
-    b |= (b & MASK_WEST_4) << 28;
-    return b;
-}
-
-constexpr Bitboard FillNorthAndSouth(Bitboard b)
-{
-    b |= (b << 8) | (b >> 8);
-    b |= (b << 16) | (b >> 16);
-    b |= (b << 32) | (b >> 32);
-    return b;
 }

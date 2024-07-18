@@ -119,6 +119,7 @@ constexpr int PASSED_PAWN_SQUARE[64] =
      0,  0,  0,  0,  0,  0,  0,  0,
 };
 /* clang-format on */
+
 constexpr Bitboard FILE_BITBOARDS[8] = {FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H};
 
 template <Color color> void DeterminePawnStructure(const Position &position, PawnStructure &s)
@@ -188,7 +189,7 @@ template <Color color> int EvaluateMaterial(const Position &position)
     {
         score -= 50;
     }
-    /* Bonus for knights based on number of friendly pawns */
+    /* Adjustment for knights based on number of friendly pawns */
     score += PopCount(knights) * (PopCount(pawns) - 4) * 5;
     return score;
 }

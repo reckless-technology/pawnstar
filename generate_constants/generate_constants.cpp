@@ -11,8 +11,8 @@
 #include <vector>
 
 /* Fixed square definitions */
-constexpr uint64_t NOT_H_FILE = 0x7F7F7F7F7F7F7F7Full; /**< Mask off the h file to prevent wraparound when shifting east. */
-constexpr uint64_t NOT_A_FILE = 0xFEFEFEFEFEFEFEFEull; /**< Mask off the a file to prevent wraparound when shifting west. */
+constexpr uint64_t NOT_FILE_H = 0x7F7F7F7F7F7F7F7Full; /**< Mask off the h file to prevent wraparound when shifting east. */
+constexpr uint64_t NOT_FILE_A = 0xFEFEFEFEFEFEFEFEull; /**< Mask off the a file to prevent wraparound when shifting west. */
 constexpr uint64_t NO_SQUARES = 0ull;
 
 /* clang-format off */
@@ -23,13 +23,13 @@ constexpr char      RankChar(int locn)          { return (char)('1' + RankOf(loc
 constexpr uint64_t  Bitboard(uint8_t locn)      { return 1ull << locn; }                        /**< Convert square index to Bitboard. */
 constexpr uint64_t  Bitboard(int x, int y)      { return 1ull << (x + 8 * y); }                 /**< Convert square (file,rank) co-ords to Bitboard. */
 constexpr uint64_t  ShiftNorth(uint64_t b)      { return b << 8; }                              /**< Shift a Bitboard one square to the north. */
-constexpr uint64_t  ShiftNortheast(uint64_t b)  { return (b & NOT_H_FILE) << 9; }               /**< Shift a Bitboard one square to the northeast. */
-constexpr uint64_t  ShiftEast(uint64_t b)       { return (b & NOT_H_FILE) << 1; }               /**< Shift a Bitboard one square to the east. */
-constexpr uint64_t  ShiftSoutheast(uint64_t b)  { return (b & NOT_H_FILE) >> 7; }               /**< Shift a Bitboard one square to the southeast. */
+constexpr uint64_t  ShiftNortheast(uint64_t b)  { return (b & NOT_FILE_H) << 9; }               /**< Shift a Bitboard one square to the northeast. */
+constexpr uint64_t  ShiftEast(uint64_t b)       { return (b & NOT_FILE_H) << 1; }               /**< Shift a Bitboard one square to the east. */
+constexpr uint64_t  ShiftSoutheast(uint64_t b)  { return (b & NOT_FILE_H) >> 7; }               /**< Shift a Bitboard one square to the southeast. */
 constexpr uint64_t  ShiftSouth(uint64_t b)      { return b >> 8; }                              /**< Shift a Bitboard one square to the south. */
-constexpr uint64_t  ShiftSouthwest(uint64_t b)  { return (b & NOT_A_FILE) >> 9; }               /**< Shift a Bitboard one square to the southwest. */
-constexpr uint64_t  ShiftWest(uint64_t b)       { return (b & NOT_A_FILE) >> 1; }               /**< Shift a Bitboard one square to the west. */
-constexpr uint64_t  ShiftNorthwest(uint64_t b)  { return (b & NOT_A_FILE) << 7; }               /**< Shift a Bitboard one square to the northwest. */
+constexpr uint64_t  ShiftSouthwest(uint64_t b)  { return (b & NOT_FILE_A) >> 9; }               /**< Shift a Bitboard one square to the southwest. */
+constexpr uint64_t  ShiftWest(uint64_t b)       { return (b & NOT_FILE_A) >> 1; }               /**< Shift a Bitboard one square to the west. */
+constexpr uint64_t  ShiftNorthwest(uint64_t b)  { return (b & NOT_FILE_A) << 7; }               /**< Shift a Bitboard one square to the northwest. */
 constexpr bool      IsInBoard(int x, int y)     { return x >= 0 && x < 8 && y >= 0 && y < 8; }  /**< Is this square on the board. */
 /* clang-format on */
 

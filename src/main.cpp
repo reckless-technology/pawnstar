@@ -43,7 +43,7 @@ int main()
         printf("NOTE: unable to open book file\n");
     }
     Game game{};
-    DEBUG_STATEMENT(DebugXClear());
+    DebugXClear();
     for (std::string line; std::getline(std::cin, line);)
     {
         ProcessInput(game, std::string_view(line));

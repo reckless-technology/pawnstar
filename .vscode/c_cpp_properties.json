@@ -8,9 +8,7 @@
             "cStandard": "c17",
             "cppStandard": "c++20",
             "defines": [
-                "DEBUGX=1",
-                "DO_NULL_MOVE_PRUNING=1",
-                "DO_LATE_MOVE_REDUCTION=1"
+                "DEBUGX=1"
             ]
         }
     ],

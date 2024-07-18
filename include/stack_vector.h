@@ -3,7 +3,7 @@
  * @brief Fixed size, simple stack storage "vector" for containing lists of moves.
  * Considerably faster than std::vector due to not allocating data on the heap.
  * More convenient than a std::array for insertion, sorting and iteration.
- * Perft speed is over 2x faster using this in place of std::vector<Move> for move generation.
+ * Perft speed is over 2x faster using this in place of std::vector<Move> for move generation!
  */
 template <typename T, int N> class StackVector
 {

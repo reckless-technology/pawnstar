@@ -1,10 +1,10 @@
+#include "chess_clock.h"
 #include "debug_hashtable.h"
 #include "evaluation.h"
 #include "game.h"
 #include "position.h"
 #include "search.h"
 #include "sort_moves.h"
-#include "timer.h"
 #include "transposition_table.h"
 
 /**
@@ -43,6 +43,17 @@ int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move m
 
 /**
  * @brief Try null move pruning.
+ *
+ * Try null move pruning if ALL of the following are true:
+ *
+ * 1) the previous move was not a null move
+ * 2) we are not in check
+ * 3) this is not a PV node
+ * 4) we are not down to king and pawns
+ * 5) static eval is at least beta
+ *
+ * Hopefully this is sufficient to prevent most Zugzwang positions.
+ *
  * @param game Current game (position)
  * @param depth Current search depth
  * @param ply Distance from root node
@@ -52,26 +63,14 @@ int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move m
  */
 static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int beta)
 {
-    /*
-    Try null move pruning if ALL of the following are true:
-
-    - the previous move was not a null move
-    - we are not in check
-    - this is not a PV node
-    - we are not down to king and pawns
-    - static eval is at least beta
-
-    Hopefully this is sufficient to prevent most Zugzwang positions.
-    */
     const Position &position = game.CurrentPosition();
     if (!position.IsNullMove() && !position.IsInCheck() && beta == alpha + 1 &&
         (position.Knights() | position.Bishops() | position.Rooks() | position.Queens()) && EvaluatePosition(position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
-        game.MakeNullMove();
         Variation dummy{};
-        int       score =
-            depth > 3 ? -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy) : -SearchQuiescent(game, depth - 3, ply + 1, -beta, -alpha);
+        game.MakeNullMove();
+        int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
         game.UndoMove();
         if (game.is_cancel_pending_)
         {
@@ -88,7 +87,8 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
 }
 
 /**
- * @brief Determine if a (late) move is OK to reduce
+ * @brief Determine if a (late) move is OK to reduce.
+ * We do not reduce checking moves, captures, promotions, or pushes of pawns to 7th rank.
  * @param move The move
  * @param color Color to move
  * @return true if OK to reduce
@@ -125,7 +125,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
 {
     INCREMENT("alpha beta calls");
     if ((++game.node_count_ & 0xFFFF) == 0 && game.time_control_.hard_stop_search_ms != 0 &&
-        GetMilliseconds() >= game.time_control_.hard_stop_search_ms)
+        ElapsedMilliseconds() >= game.time_control_.hard_stop_search_ms)
     {
         game.is_cancel_pending_ = true;
         return SEARCH_CANCELLED_SCORE;
@@ -198,7 +198,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     /*
     Try null move pruning.
     */
-    int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
+    const int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
     if (game.is_cancel_pending_)
     {
         return SEARCH_CANCELLED_SCORE;
@@ -234,22 +234,19 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             RecordKillerMove(ply, transposition.move);
             return score;
         }
-        if (score > best_score)
+        best_score = score;
+        if (score > alpha)
         {
-            best_score = score;
-            if (score > alpha)
-            {
-                INCREMENT("table move raised alpha");
-                alpha            = score;
-                has_raised_alpha = true;
-                /*
-                Provisionally store this move as a CUT node - it
-                may later turn out to be a PV but we don't know that yet
-                until we have searched every move.
-                */
-                RecordTransposition(position.Hash(), depth, score, transposition.move, NODE_CUT);
-                RecordKillerMove(ply, transposition.move);
-            }
+            INCREMENT("table move raised alpha");
+            alpha            = score;
+            has_raised_alpha = true;
+            /*
+            Provisionally store this move as a CUT node - it
+            may later turn out to be a PV but we don't know that yet
+            until we have searched every move.
+            */
+            RecordTransposition(position.Hash(), depth, score, transposition.move, NODE_CUT);
+            RecordKillerMove(ply, transposition.move);
         }
     }
     /*
@@ -308,7 +305,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
                 for sure yet until we have searched every move.
                 */
                 RecordTransposition(position.Hash(), depth, score, move, NODE_CUT);
-                RecordKillerMove(ply, transposition.move);
+                RecordKillerMove(ply, move);
             }
         }
     }

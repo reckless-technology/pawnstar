@@ -1,3 +1,5 @@
 #pragma once
+#include <cstdint>
 
-int NextRandom(void);
+void RandomSeed(uint64_t seed);
+int  NextRandom(void);

@@ -388,10 +388,10 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
             const Square from     = (Square)(to - delta);
             if (pins.AllowedSquares(from) & BITBOARD(to))
             {
-                moves.push_back(Move::PromotionMove(from, to, captured, QUEEN));
-                moves.push_back(Move::PromotionMove(from, to, captured, ROOK));
-                moves.push_back(Move::PromotionMove(from, to, captured, BISHOP));
-                moves.push_back(Move::PromotionMove(from, to, captured, KNIGHT));
+                moves.push_back(Move::PromotionCaptureMove(from, to, captured, QUEEN));
+                moves.push_back(Move::PromotionCaptureMove(from, to, captured, ROOK));
+                moves.push_back(Move::PromotionCaptureMove(from, to, captured, BISHOP));
+                moves.push_back(Move::PromotionCaptureMove(from, to, captured, KNIGHT));
             }
         }
     }
@@ -402,10 +402,10 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
         const Square from = (Square)(to - pmv.push_delta);
         if (pins.AllowedSquares(from) & BITBOARD(to))
         {
-            moves.push_back(Move::PromotionMove(from, to, NONE, QUEEN));
-            moves.push_back(Move::PromotionMove(from, to, NONE, ROOK));
-            moves.push_back(Move::PromotionMove(from, to, NONE, BISHOP));
-            moves.push_back(Move::PromotionMove(from, to, NONE, KNIGHT));
+            moves.push_back(Move::PromotionCaptureMove(from, to, NONE, QUEEN));
+            moves.push_back(Move::PromotionCaptureMove(from, to, NONE, ROOK));
+            moves.push_back(Move::PromotionCaptureMove(from, to, NONE, BISHOP));
+            moves.push_back(Move::PromotionCaptureMove(from, to, NONE, KNIGHT));
         }
     }
     const std::pair<Bitboard, int8_t> captures[] = {{pmv.captures_west, pmv.west_delta}, {pmv.captures_east, pmv.east_delta}};

@@ -3,7 +3,6 @@
  * @file Sliding piece magic bitboard attacks.
  */
 
-#include "bitboard.h"
 #include "generated_data.h"
 
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)

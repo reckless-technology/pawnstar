@@ -5,7 +5,7 @@ using namespace std::chrono;
 static system_clock::time_point start_time;
 static bool                     has_been_called;
 
-int GetMilliseconds()
+int ElapsedMilliseconds()
 {
     if (!has_been_called)
     {
@@ -15,5 +15,6 @@ int GetMilliseconds()
     }
     const auto now_time = system_clock::now();
     const auto delta    = now_time - start_time;
-    return duration_cast<milliseconds>(delta).count();
+    const auto ms       = duration_cast<milliseconds>(delta);
+    return ms.count();
 }

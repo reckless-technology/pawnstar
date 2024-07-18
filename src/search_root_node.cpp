@@ -1,10 +1,10 @@
+#include "chess_clock.h"
 #include "debug_hashtable.h"
 #include "game.h"
 #include "opening_book.h"
 #include "position.h"
 #include "search.h"
 #include "sort_moves.h"
-#include "timer.h"
 #include "transposition_table.h"
 
 #include <string>
@@ -54,7 +54,7 @@ Move SearchRootNode(Game &game)
                       (game.CurrentPosition().MoveCount() % game.time_control_.standard.moves_per_period);
         ms_allocated                           = game.time_control_.standard.milliseconds_remaining / moves_to_go;
         timeout_ms                             = max(100, min(ms_allocated * 2, game.time_control_.standard.milliseconds_remaining - 3000));
-        game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
+        game.time_control_.hard_stop_search_ms = ElapsedMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
         break;
 
     case CLOCK_FIXED_DEPTH:
@@ -65,18 +65,18 @@ Move SearchRootNode(Game &game)
 
     case CLOCK_FIXED_TIME:
         timeout_ms                             = game.time_control_.fixed_time.milliseconds;
-        game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        game.time_control_.hard_stop_search_ms = ElapsedMilliseconds() + timeout_ms;
         ms_allocated                           = 0;
         break;
 
     case CLOCK_INCREMENTAL:
         ms_allocated = game.time_control_.incremental.increment_milliseconds + (game.time_control_.incremental.milliseconds_remaining / 30);
         timeout_ms   = max(100, min(ms_allocated * 2, game.time_control_.incremental.milliseconds_remaining - 3000));
-        game.time_control_.hard_stop_search_ms = GetMilliseconds() + timeout_ms;
+        game.time_control_.hard_stop_search_ms = ElapsedMilliseconds() + timeout_ms;
         break;
     }
     DebugXClear();
-    int start_ms            = GetMilliseconds();
+    int start_ms            = ElapsedMilliseconds();
     game.is_cancel_pending_ = false;
     /*
     For first pass move ordering before we do any search, just use a shallow
@@ -123,12 +123,12 @@ Move SearchRootNode(Game &game)
                 if (game.do_show_thinking_)
                 {
                     const string move_string{game.CurrentPosition().VariationToString(principal_variation)};
-                    printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score(), (GetMilliseconds() - start_ms) / 10, game.node_count_,
-                           move_string.c_str());
+                    printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score(), (ElapsedMilliseconds() - start_ms) / 10,
+                           game.node_count_, move_string.c_str());
                 }
             }
         }
-        int stop_ms = GetMilliseconds();
+        int stop_ms = ElapsedMilliseconds();
         if (alpha > WIN_THRESHOLD || alpha < LOSE_THRESHOLD)
         {
             break;

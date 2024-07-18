@@ -8,6 +8,7 @@ class Position;
 void RecordKillerMove(int ply, Move move);
 void ResetKillerCounts();
 void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int depth);
+int  MaxKillerMoveCount(void);
 
 /**
  * @brief Sort moves "best first" i.e. in descending score order

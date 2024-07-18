@@ -7,9 +7,9 @@
 using std::string;
 using std::string_view;
 
+#include "chess_clock.h"
 #include "debug_hashtable.h"
 #include "position.h"
-#include "timer.h"
 #include "transposition_table.h"
 
 struct PerftCounts
@@ -118,7 +118,7 @@ void RunPerftTests(void)
     int      start, first_start, stop = 0;
     bool     is_good     = true;
     uint64_t total_nodes = 0;
-    first_start          = GetMilliseconds();
+    first_start          = ElapsedMilliseconds();
     for (const PerftTest &test : perft_tests)
     {
         Position position{test.position};
@@ -126,9 +126,9 @@ void RunPerftTests(void)
         printf("\n%s\n", pos_string.c_str());
         uint64_t num_moves = 0;
         total_nodes += test.counts.legal_moves;
-        start = GetMilliseconds();
+        start = ElapsedMilliseconds();
         Perft(position, test.depth, position.ColorToMove(), num_moves);
-        stop = GetMilliseconds();
+        stop = ElapsedMilliseconds();
         if (stop == start)
         {
             stop = start + 1; // avoid divide by zero error in positions per second for short tests
@@ -161,7 +161,7 @@ void RunPerftTestsExtra(void)
     int      start, first_start, stop = 0;
     bool     is_good     = true;
     uint64_t total_nodes = 0;
-    first_start          = GetMilliseconds();
+    first_start          = ElapsedMilliseconds();
     for (const PerftTest &test : perft_tests)
     {
         Position position{test.position};
@@ -169,9 +169,9 @@ void RunPerftTestsExtra(void)
         printf("\n%s\n", pos_string.c_str());
         PerftCounts counts{0, 0, 0, 0, 0, 0};
         total_nodes += test.counts.legal_moves;
-        start = GetMilliseconds();
+        start = ElapsedMilliseconds();
         PerftExtra(position, test.depth, position.ColorToMove(), counts);
-        stop = GetMilliseconds();
+        stop = ElapsedMilliseconds();
         if (stop == start)
         {
             stop = start + 1; // avoid divide by zero error in positions per second for short tests

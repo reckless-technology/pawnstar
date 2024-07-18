@@ -81,10 +81,10 @@ void RecordTransposition(uint64_t hash, int depth, int score, Move move, NodeTyp
     }
 }
 
-void ShowTableUsage()
+std::pair<int, int> TranspositionTableUsage()
 {
     const std::size_t count = std::ranges::count_if(table, [](const Transposition &t) { return t.hash != 0; });
-    printf("Transposition table %zu%% full (used %zu of %zu entries)\n", (count * 100) / table.size(), count, table.size());
+    return std::pair<int, int>{count, (count * 100) / table.size()};
 }
 
 void AgeTranspositionTable()

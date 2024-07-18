@@ -11,8 +11,8 @@ extern DebugTable                                      debug_dictionary;
 void DebugXClear();
 void DebugXWrite();
 
-#define DEBUG_STATEMENT(x) x
-#define INCREMENT(x)       ++debug_dictionary[x];
+#define INCREMENT(x)   ++debug_dictionary[x]
+#define ASSIGN(x, val) debug_dictionary[x] = val
 #define INCREMENT_IF(b, x)     \
     if (b)                     \
     {                          \
@@ -21,7 +21,6 @@ void DebugXWrite();
 
 #else
 
-#define DEBUG_STATEMENT(x)
 #define INCREMENT(x)
 #define INCREMENT_IF(b, x)
 #define DebugXClear(x)

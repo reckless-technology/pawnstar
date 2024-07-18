@@ -1,13 +1,16 @@
 #pragma once
+/**
+ * @file Functions for constructing and using chess moves.
+ */
 #include <cstdint>
 #include <vector>
 
 #include "constants.h"
 #include "stack_vector.h"
-/**
- * @file Functions for constructing and using chess moves.
- */
 
+/**
+ * Chess piece types.
+ */
 enum Piece : uint8_t
 {
     NONE,
@@ -19,6 +22,9 @@ enum Piece : uint8_t
     KING,
 };
 
+/**
+ * Chess piece colors.
+ */
 enum Color : uint8_t
 {
     WHITE,
@@ -32,6 +38,9 @@ constexpr Color EnemyOf(Color color)
 }
 
 /* clang-format off */
+/**
+ * Chess board squares.
+ */
 enum Square : uint8_t
 {
     A1, B1, C1, D1, E1, F1, G1, H1,
@@ -64,7 +73,7 @@ constexpr char RankChar(Square locn)
 }
 
 /**
- * @brief Class for containing a chess move.
+ * @brief Class for representing a chess move.
  * Moves are contained within a 64 bit integer.
  *
  *   BITS   INTERPRETATION
@@ -77,8 +86,7 @@ constexpr char RankChar(Square locn)
  * 22 - 22  En passant capture flag
  * 23 - 23  Pawn double push flag
  * 24 - 24  Is checking move flag (move gives check)
- * 32 - 63  Contains the move score (as signed 32 bit int)
- *          after move has been evaluated / sorted
+ * 32 - 63  Contains the move score (as signed int) after move has been evaluated / sorted
  *
  * A value of 0 terminates a move list.
  */
@@ -134,6 +142,11 @@ class Move
         return (int)(m >> 32);
     }
 
+    constexpr int piece_from_to_mask() const
+    {
+        return m & 0x7FFF; /**< Lower 15 bits contain piece, from, to: index into killer table. */
+    }
+
     constexpr bool IsCastlingMove() const
     {
         return m & IS_CASTLING;
@@ -174,9 +187,14 @@ class Move
         return Move{0};
     }
 
-    constexpr static Move PromotionMove(Square from, Square to, Piece captured, Piece promoted)
+    constexpr static Move PromotionCaptureMove(Square from, Square to, Piece captured, Piece promoted)
     {
         return Move{to | (from << 6) | (PAWN << 12) | (captured << 15) | (promoted << 18)};
+    }
+
+    constexpr static Move PromotionMove(Square from, Square to, Piece promoted)
+    {
+        return Move{to | (from << 6) | (PAWN << 12) | (promoted << 18)};
     }
 
     constexpr static Move CastlingMove(Square from, Square to)

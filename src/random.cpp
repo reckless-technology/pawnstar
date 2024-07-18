@@ -3,13 +3,19 @@
 
 using namespace std::chrono;
 
+static uint64_t x;
+
+void RandomSeed(uint64_t seed)
+{
+    x = seed;
+}
+
 /**
  * @brief XORshift simple PRNG
  * @return next pseudo random integer
  */
 int NextRandom(void)
 {
-    static uint64_t x;
     if (x == 0)
     {
         x = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();

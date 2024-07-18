@@ -98,14 +98,14 @@ bool Game::IsDrawByRepetition(bool is_search) const
 {
     int            repetitions = is_search ? 1 : 2;
     const uint64_t hash        = CurrentPosition().Hash();
-    for (const Position *i = position_ - 2; i >= positions_; --i)
+    for (const Position *p = position_ - 2; p >= positions_; --p)
     {
-        if (i->Hash() == hash && --repetitions == 0)
+        if (p->Hash() == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");
             return true;
         }
-        if (i->ReversibleMoveCount() == 0)
+        if (p->ReversibleMoveCount() == 0)
         {
             return false;
         }

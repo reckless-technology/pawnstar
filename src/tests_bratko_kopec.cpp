@@ -1,8 +1,9 @@
+#include "chess_clock.h"
 #include "debug_hashtable.h"
 #include "game.h"
 #include "position.h"
 #include "search.h"
-#include "timer.h"
+#include "sort_moves.h"
 #include "transposition_table.h"
 
 #include <string_view>
@@ -43,7 +44,7 @@ Run the standard Bratko-Kopec test suite at fixed search depth
 */
 void RunPositionTests(int depth)
 {
-    const int start_ms = GetMilliseconds();
+    const int start_ms = ElapsedMilliseconds();
     for (string_view test_pos : POSITION_TESTS)
     {
         Game game{test_pos};
@@ -51,10 +52,16 @@ void RunPositionTests(int depth)
         game.time_control_.fixed_depth.depth = depth;
         game.do_show_thinking_               = true;
         printf("\n%s\n", game.CurrentPosition().ToString().c_str());
-        DEBUG_STATEMENT(DebugXClear());
+        DebugXClear();
         SearchRootNode(game);
-        DEBUG_STATEMENT(DebugXWrite());
-        ShowTableUsage();
+#if DEBUGX
+        auto [count, percent] = TranspositionTableUsage();
+        auto killer_max_count = MaxKillerMoveCount();
+        ASSIGN("killer move max count", killer_max_count);
+        ASSIGN("table usage count", count);
+        ASSIGN("table usage percent", percent);
+#endif
+        DebugXWrite();
     }
-    printf("total elapsed milliseconds                        %10d\n", GetMilliseconds() - start_ms);
+    printf("total elapsed milliseconds                        %10d\n", ElapsedMilliseconds() - start_ms);
 }
