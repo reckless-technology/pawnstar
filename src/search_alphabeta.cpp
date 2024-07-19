@@ -65,7 +65,8 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
 {
     const Position &position = game.CurrentPosition();
     if (!position.IsNullMove() && !position.IsInCheck() && beta == alpha + 1 &&
-        (position.Knights() | position.Bishops() | position.Rooks() | position.Queens()) && EvaluatePosition(position, alpha, beta) >= beta)
+        (position.Knights() | position.Bishops() | position.Rooks() | position.Queens()) &&
+        EvaluatePosition(position, alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");
         Variation dummy{};
@@ -144,13 +145,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     {
         return SearchQuiescent(game, depth, ply, alpha, beta);
     }
-
-    /*
-    Determine if there is an entry in the transposition table
-    for this position. If so, see if it is sufficient for us
-    to avoid the search entirely.
-    */
-
+    // Determine if there is an entry in the transposition table for this position. If so, see if it is sufficient for
+    // us to avoid the search entirely.
     Transposition transposition;
     const bool    is_transposition = FindTransposition(position.Hash(), transposition);
     if (is_transposition && transposition.depth >= depth)
@@ -158,10 +154,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         switch (transposition.node_type)
         {
         case NODE_CUT:
-            /*
-            We don't know the exact score of the best move from this
-            position, but we do know it is at least transposition.score
-            */
+            // We don't know the exact score of the best move from this position, but we do know it is at least
+            // transposition.score
             INCREMENT("table hit cut node");
             if (transposition.score >= beta)
             {
@@ -171,10 +165,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             break;
 
         case NODE_ALL:
-            /*
-            We don't know the exact score of the best move from this
-            position, but we do know it is at most transposition.score
-            */
+            // We don't know the exact score of the best move from this position, but we do know it is at most
+            // transposition.score
             INCREMENT("table hit all node");
             if (transposition.score <= alpha)
             {
@@ -184,36 +176,30 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             break;
 
         case NODE_PV:
-            /*
-            We know the exact score and the best move from this position.
-            However, do the full search to get the PV. The extra time
-            searching these few principal variation nodes is trivial.
-            */
+            // We know the exact score and the best move from this position. However, do the full search to get the PV.
+            // The extra time searching these few principal variation nodes is trivial.
             INCREMENT("table hit pv node");
-            ++depth;
             break;
         }
     }
 
-    /*
-    Try null move pruning.
-    */
-    const int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
-    if (game.is_cancel_pending_)
+    // Try null move pruning.
+    if (!is_transposition || transposition.node_type == NODE_CUT)
     {
-        return SEARCH_CANCELLED_SCORE;
+        const int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
+        if (game.is_cancel_pending_)
+        {
+            return SEARCH_CANCELLED_SCORE;
+        }
+        if (null_move_score >= beta)
+        {
+            return null_move_score;
+        }
     }
-    if (null_move_score >= beta)
-    {
-        return null_move_score;
-    }
-    /*
-    Before we generate any moves, try the transposition table move first.
-    This might save us the cost of move generation altogether, or provide
-    better alpha beta bounds for the main search.
-    */
+    // Before we generate any moves, try the transposition table move first. This might save us the cost of move
+    // generation altogether, or provide better alpha beta bounds for the main search.
     Variation pv;
-    int       num_legal_moves  = 0;
+    int       move_index       = 0;
     Move      best_move        = Move::None();
     int       best_score       = ALPHA;
     bool      has_raised_alpha = false;
@@ -221,8 +207,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     {
         INCREMENT("table move");
         best_move = transposition.move;
-        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, num_legal_moves);
-        ++num_legal_moves;
+        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, move_index);
+        ++move_index;
         if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
@@ -240,32 +226,38 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             INCREMENT("table move raised alpha");
             alpha            = score;
             has_raised_alpha = true;
-            /*
-            Provisionally store this move as a CUT node - it
-            may later turn out to be a PV but we don't know that yet
-            until we have searched every move.
-            */
+            // Provisionally store this move as a CUT node - it may later turn out to be a PV but we don't know that yet
+            // until we have searched every move.
             RecordTransposition(position.Hash(), depth, score, transposition.move, NODE_CUT);
             RecordKillerMove(ply, transposition.move);
         }
     }
-    /*
-    We didn't get a cutoff from the transposition table so proceed
-    with generating and searching moves.
-    */
+    // We didn't get a cutoff from the transposition table so proceed with generating and searching moves.
     MoveList move_list{position.GenerateLegalMoves()};
+    if (move_list.size() == 0)
+    {
+        // We failed to find any strictly legal moves from this position. The position therefore represents either
+        // checkmate or stalemate depending on whether we are presently in check. If we are in checkmate, add the ply
+        // (distance from the root node) to the losing score, so that the search algorithm chooses the shortest path to
+        // checkmate when multiple possible checkmates exist in the tree.
+        if (position.IsInCheck())
+        {
+            INCREMENT("checkmates");
+            return CHECKMATED_SCORE + ply;
+        }
+        INCREMENT("stalemates");
+        return DRAW_SCORE;
+    }
+    // Start of the main loop.
     ScoreAndSortMoves(position, move_list, ply, depth);
-    /*
-    Start of the main loop.
-    */
     for (const auto &move : move_list)
     {
         if (is_transposition && move == transposition.move)
         {
-            continue; /* We already searched this move. */
+            continue; // We already searched this move.
         }
         int score;
-        if (!position.IsInCheck() && !position.HasBeenReduced() && beta == alpha + 1 && num_legal_moves > 1 && depth > 2 &&
+        if (!position.IsInCheck() && !position.HasBeenReduced() && beta == alpha + 1 && move_index > 1 && depth > 2 &&
             IsMoveOkToReduce(move, position.ColorToMove()))
         {
             game.PlayMove(move);
@@ -276,13 +268,13 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         }
         else
         {
-            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, num_legal_moves);
+            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index);
         }
         if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
         }
-        ++num_legal_moves;
+        ++move_index;
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
@@ -292,6 +284,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         }
         if (score > best_score)
         {
+            INCREMENT("best score changed");
             best_score = score;
             best_move  = move;
             if (score > alpha)
@@ -299,55 +292,26 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
                 INCREMENT("pv changed");
                 alpha            = score;
                 has_raised_alpha = true;
-                /*
-                Provisionally store this move as a CUT node - it
-                may later turn out to be a PV but we don't know that
-                for sure yet until we have searched every move.
-                */
+                // Provisionally store this move as a CUT node - it may later turn out to be a PV but we don't know that
+                // for sure yet until we have searched every move.
                 RecordTransposition(position.Hash(), depth, score, move, NODE_CUT);
                 RecordKillerMove(ply, move);
             }
         }
     }
-    /*
-    End of the main loop.
-    We searched all moves and did not get a beta cutoff.
-    */
-    if (num_legal_moves == 0)
-    {
-        /*
-        We failed to find any strictly legal moves from this position.
-        The position therefore represents either checkmate or stalemate
-        depending on whether we are presently in check.
-        If we are in checkmate, add the ply (distance from the root node) to
-        the losing score, so that the search algorithm chooses the shortest
-        path to checkmate when multiple possible checkmates exist in the tree.
-        */
-        if (position.IsInCheck())
-        {
-            INCREMENT("checkmates");
-            return CHECKMATED_SCORE + ply;
-        }
-        INCREMENT("stalemates");
-        return DRAW_SCORE;
-    }
+    // End of the main loop. We searched all moves and did not get a beta cutoff.
     if (has_raised_alpha)
     {
-        /*
-        We raised alpha but did not cutoff; this was a
-        PV node (these are rare) so copy the PV up the
-        tree to our parent node.
-        */
+        // We raised alpha but did not cutoff; this was a PV node (these are rare) so copy the PV up the tree to our
+        // parent node.
         INCREMENT("pv nodes");
         RecordTransposition(position.Hash(), depth, alpha, best_move, NODE_PV);
         RecordKillerMove(ply, best_move);
-        CopyVariation(parent_pv, pv, best_move);
+        CopyVariation(parent_pv, pv, position.MoveToString(best_move, &move_list));
     }
     else
     {
-        /*
-        We tried every move but did not raise alpha; this was an all node
-        */
+        // We tried every move but did not raise alpha; this was an all node.
         INCREMENT("all nodes");
         RecordTransposition(position.Hash(), depth, best_score, best_move, NODE_ALL);
     }

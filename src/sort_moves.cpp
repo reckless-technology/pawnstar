@@ -41,7 +41,7 @@ void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int d
         Assign provisional scores based on static exchange evaluation
         and how many cutoffs this move has caused in the search history.
         */
-        int       is_checking;
+        bool      is_checking;
         const int see_score = EvaluateStaticExchange(position, move, is_checking);
         move.AssignScore(see_score * 1000 + counts[move.piece_from_to_mask()]);
         if (is_checking)

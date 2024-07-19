@@ -12,6 +12,8 @@ using std::string_view;
 
 constexpr string_view move_suffixes[] = {"+", "#", "ep", "e.p.", "!", "?"};
 
+/// @brief Remove ambiguous or extraneous suffices from the SAN move.
+/// @param move_str Move string to process.
 constexpr void RemoveMoveSuffixes(string &move_str)
 {
     for (const string_view sv : move_suffixes)
@@ -24,20 +26,8 @@ constexpr void RemoveMoveSuffixes(string &move_str)
     }
 }
 
-constexpr const std::string MoveString(Move m)
-{
-    std::string result;
-    result += FileChar(m.from());
-    result += RankChar(m.from());
-    result += FileChar(m.to());
-    result += RankChar(m.to());
-    if (m.promoted() != NONE)
-    {
-        result += "  nbrq"[m.promoted()];
-    }
-    return result;
-}
-
+/// @brief Construct a game from a FEN (Forsyth Edwards) position string.
+/// @param fen_string Initial position.
 Game::Game(std::string_view fen_string) : position_(positions_)
 {
     time_control_.hard_stop_search_ms              = 0;
@@ -52,19 +42,20 @@ Game::Game(std::string_view fen_string) : position_(positions_)
     *position_                                     = Position{fen_string};
 }
 
+/// @brief Construct a game from the default starting position.
 Game::Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 {
 }
 
-/*
-Make a move and update the game end status flags
-*/
+/// @brief Play a move and update state. Move must be legal for the current position.
+/// @param move The move to be played.
 void Game::PlayMove(Move move)
 {
     position_[1] = position_->MakeMove(move);
     ++position_;
 }
 
+/// @brief Undo the last move played.
 void Game::UndoMove()
 {
     if (position_ > positions_)
@@ -77,10 +68,8 @@ void Game::UndoMove()
     }
 }
 
-/*
-Determine if the current position represents a draw by the 50 move rule
-(50 consecutive reversible moves by each player is a drawn game)
-*/
+/// @brief Determine if the game is a draw by the 50 move rule.
+/// @return true if 50 move draw.
 bool Game::IsDrawByFiftyMoves() const
 {
     if (CurrentPosition().ReversibleMoveCount() >= 100)
@@ -91,9 +80,9 @@ bool Game::IsDrawByFiftyMoves() const
     return false;
 }
 
-/*
-Determine if the current position represents a draw by repetition.
-*/
+/// @brief Determine if the game is a draw by repetition.
+/// @param is_search true in the main search (single repetition), false for the FIDE rule (double repetition)
+/// @return true if draw by repetition.
 bool Game::IsDrawByRepetition(bool is_search) const
 {
     int            repetitions = is_search ? 1 : 2;
@@ -113,19 +102,17 @@ bool Game::IsDrawByRepetition(bool is_search) const
     return false;
 }
 
+/// @brief Make a null move. Only used during null move heuristic.
 void Game::MakeNullMove()
 {
     position_[1] = position_->MakeNullMove();
     ++position_;
 }
 
-/*
-Play a move from the given move string in either standard algebraic or XBoard
-format, and update game state_flags accordingly
-
-returns the move if a legal move was played
-returns zero if the move was illegal or the game is over
-*/
+/// @brief Play a move from the given move string in either standard algebraic or XBoard format, and update game
+/// state_flags accordingly.
+/// @param move_str The string containing the move to be made.
+/// @return The move which was made, or Move::None in the case the string did not contain a legal move.
 Move Game::PlayMove(std::string_view move_str)
 {
     string candidate{move_str};
@@ -133,8 +120,8 @@ Move Game::PlayMove(std::string_view move_str)
     MoveList move_list = position_->GenerateLegalMoves();
     for (const Move &move : move_list)
     {
-        string san_move_str{CurrentPosition().MoveToString(move)};
-        string algebraic_move_str{MoveString(move)};
+        const string algebraic_move_str{move.ToString()};
+        string       san_move_str{CurrentPosition().MoveToString(move, &move_list)};
         RemoveMoveSuffixes(san_move_str);
         if (san_move_str == candidate || algebraic_move_str == candidate)
         {
@@ -145,11 +132,8 @@ Move Game::PlayMove(std::string_view move_str)
     return Move::None();
 }
 
-/**
- * @brief Check to see if the game is over. Display the result and return true if so.
- * @param game The game
- * @return true in the case of checkmate, stalemate or a draw for insufficient material, 50 moves or repetition.
- */
+/// @brief Check to see for the end of the game.
+/// @return true if the game is over.
 bool Game::IsGameOver() const
 {
     if (CurrentPosition().IsCheckmate())
@@ -180,22 +164,20 @@ bool Game::IsGameOver() const
     return false;
 }
 
-/**
- * @brief Entry point for the search thread.
- * @param game Game to search on.
- */
+/// @brief Entry point for the search worker thread.
 void Game::SearchThreadEntry()
 {
     Move move = SearchRootNode(*this);
     if (move)
     {
-        std::string move_string{CurrentPosition().MoveToString(move)};
+        std::string move_string{CurrentPosition().MoveToString(move, nullptr)};
         PlayMove(move);
         printf("move %s\n", move_string.c_str());
         IsGameOver();
     }
 }
 
+/// @brief If currently thinking, stop immediately.
 void Game::StopThinking()
 {
     is_cancel_pending_ = true;
@@ -205,10 +187,7 @@ void Game::StopThinking()
     }
 }
 
-/**
- * @brief Start thinking on a worker thread.
- * @param game Game to search on.
- */
+/// @brief Start thinking on the worker thread.
 void Game::StartThinking()
 {
     StopThinking();

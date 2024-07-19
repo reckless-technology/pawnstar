@@ -20,14 +20,12 @@ using std::string_view;
 using std::stringstream;
 using std::vector;
 
-/**
- * @brief Handling for input commands (xboard support)
- */
+/// @brief Structure to hold a hander for an input command.
 typedef struct
 {
-    void (*function)(Game &game, span<string> args); /**< function to be called  */
-    string name;                                     /**< command name           */
-    string description;                              /**< command description    */
+    void (*function)(Game &game, span<string> args); ///< Function to be called
+    string name;                                     ///< Command name
+    string description;                              ///< Command description
 } InputHandler;
 
 static void handle_quit(Game &game, span<string>)
@@ -292,7 +290,6 @@ static void handle_eval(Game &game, span<string>)
     printf("evaluation %5d\n", EvaluatePosition(game.CurrentPosition(), ALPHA, BETA));
 }
 
-#if DEBUGX
 static void handle_dbg(Game &, span<string>)
 {
     DebugXWrite();
@@ -302,7 +299,6 @@ static void handle_dbgclear(Game &, span<string>)
 {
     DebugXClear();
 }
-#endif
 
 static void handle_undo(Game &game, span<string>)
 {
@@ -324,56 +320,53 @@ static void handle_help(Game &, span<string>);
 
 #define COMMAND(name) handle_##name, #name
 
-const InputHandler handlers[] = {
-    {COMMAND(bookmoves), "display available book moves for current position"},
-#if DEBUGX
-    {COMMAND(dbg), "display diagnostic counts"},
-    {COMMAND(dbgclear), "reset diagnostic counts"},
-#endif
-    {COMMAND(eval), "display the current static evaluation"},
-    {COMMAND(force), "assign pawnstar to play neither color"},
-    {COMMAND(freebook), "delete the opening book from memory"},
-    {COMMAND(getboard), "get the Forsyth Edwards string for the position"},
-    {COMMAND(go), "assign pawnstar to play the color to move"},
-    {COMMAND(help), "display a summary of commands"},
-    {COMMAND(level), "set a chess clock: 'level moves min:sec increment'"},
-    {COMMAND(new), "start a new game (pawnstar will play black)"},
-    {COMMAND(nopost), "turns off analysis output while thinking"},
-    {COMMAND(perft), "run basic move generation tests"},
-    {COMMAND(perftx), "run extended move generation tests"},
-    {COMMAND(ping), "responds with pong <n> (check worker still alive)"},
-    {COMMAND(playother), "assign pawnstar to play the color not to move"},
-    {COMMAND(post), "turns on analysis output while thinking"},
-    {COMMAND(postests), "search the Bratko Kopec test positions"},
-    {COMMAND(protover), "specify xboard protocol revision (currently 2)"},
-    {COMMAND(quit), "exit the program"},
-    {COMMAND(remove), "undo the last move made by each side"},
-    {COMMAND(sd), "set a fixed search depth regardless of time spent"},
-    {COMMAND(seetests), "perform very simple static exchange tests"},
-    {COMMAND(setboard), "set the current position to a Forsyth Edwards string"},
-    {COMMAND(showtime), "show the current time controls"},
-    {COMMAND(st), "set a fixed search time per move in seconds"},
-    {COMMAND(time), "set the time on pawnstar's clock (centiseconds)"},
-    {COMMAND(undo), "undo the last (half) move made"},
-    {COMMAND(usermove), "enter the user move in algebraic xboard format"},
-    {COMMAND(xboard), "enter xboard protocol"},
-    {handle_cancel, "?", "if thinking, stop now and move immediately"},
-    {NULL, "", ""},
+// clang-format off
+const InputHandler handlers[] = 
+{
+    {COMMAND(bookmoves),    "display available book moves for current position"},
+    {COMMAND(dbg),          "display diagnostic counts"},
+    {COMMAND(dbgclear),     "reset diagnostic counts"},
+    {COMMAND(eval),         "display the current static evaluation"},
+    {COMMAND(force),        "assign pawnstar to play neither color"},
+    {COMMAND(freebook),     "delete the opening book from memory"},
+    {COMMAND(getboard),     "get the Forsyth Edwards string for the position"},
+    {COMMAND(go),           "assign pawnstar to play the color to move"},
+    {COMMAND(help),         "display a summary of commands"},
+    {COMMAND(level),        "set a chess clock: 'level moves min:sec increment'"},
+    {COMMAND(new),          "start a new game (pawnstar will play black)"},
+    {COMMAND(nopost),       "turns off analysis output while thinking"},
+    {COMMAND(perft),        "run basic move generation tests"},
+    {COMMAND(perftx),       "run extended move generation tests"},
+    {COMMAND(ping),         "responds with pong <n> (check worker still alive)"},
+    {COMMAND(playother),    "assign pawnstar to play the color not to move"},
+    {COMMAND(post),         "turns on analysis output while thinking"},
+    {COMMAND(postests),     "search the Bratko Kopec test positions"},
+    {COMMAND(protover),     "specify xboard protocol revision (currently 2)"},
+    {COMMAND(quit),         "exit the program"},
+    {COMMAND(remove),       "undo the last move made by each side"},
+    {COMMAND(sd),           "set a fixed search depth regardless of time spent"},
+    {COMMAND(seetests),     "perform very simple static exchange tests"},
+    {COMMAND(setboard),     "set the current position to a Forsyth Edwards string"},
+    {COMMAND(showtime),     "show the current time controls"},
+    {COMMAND(st),           "set a fixed search time per move in seconds"},
+    {COMMAND(time),         "set the time on pawnstar's clock (centiseconds)"},
+    {COMMAND(undo),         "undo the last (half) move made"},
+    {COMMAND(usermove),     "enter the user move in algebraic xboard format"},
+    {COMMAND(xboard),       "enter xboard protocol"},
+    {handle_cancel, "?",    "if thinking, stop now and move immediately"},
 };
+// clang-format on
 
 static void handle_help(Game &, span<string>)
 {
-    const InputHandler *i;
-    printf("refer to 'engine_protocol.html' for details of the communication\n");
+    printf("Refer to 'engine_protocol.html' for details of the communication\n");
     printf("between an xboard protocol chess engine and a user interface\n\n");
     printf("available commands:\n");
-    for (i = handlers; i->function != NULL; ++i)
+    for (auto &i : handlers)
     {
-        printf("%-12s %s\n", i->name.c_str(), i->description.c_str());
+        printf("%-12s %s\n", i.name.c_str(), i.description.c_str());
     }
 }
-
-#define MAX_NUM_ARGS 8
 
 void ProcessInput(Game &game, string_view line)
 {
@@ -384,11 +377,11 @@ void ProcessInput(Game &game, string_view line)
     {
         return;
     }
-    for (const InputHandler *handler = handlers; handler->function != NULL; ++handler)
+    for (auto &handler : handlers)
     {
-        if (args[0] == handler->name)
+        if (args[0] == handler.name)
         {
-            handler->function(game, args);
+            handler.function(game, args);
             break;
         }
     }

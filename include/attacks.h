@@ -1,7 +1,5 @@
 #pragma once
-/**
- * @file Sliding piece magic bitboard attacks.
- */
+/// @file Sliding piece bitboard attacks.
 
 #include "generated_data.h"
 

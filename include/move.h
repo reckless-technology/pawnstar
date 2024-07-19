@@ -1,16 +1,13 @@
 #pragma once
-/**
- * @file Functions for constructing and using chess moves.
- */
+/// @file Types and functions for constructing and using chess pieces, colors and moves on the board.
+
 #include <cstdint>
-#include <vector>
+#include <string>
 
 #include "constants.h"
 #include "stack_vector.h"
 
-/**
- * Chess piece types.
- */
+/// @brief Chess pieces.
 enum Piece : uint8_t
 {
     NONE,
@@ -22,9 +19,7 @@ enum Piece : uint8_t
     KING,
 };
 
-/**
- * Chess piece colors.
- */
+/// @brief Piece colors.
 enum Color : uint8_t
 {
     WHITE,
@@ -37,10 +32,8 @@ constexpr Color EnemyOf(Color color)
     return color == WHITE ? BLACK : WHITE;
 }
 
-/* clang-format off */
-/**
- * Chess board squares.
- */
+// clang-format off
+/// @brief Square indices.
 enum Square : uint8_t
 {
     A1, B1, C1, D1, E1, F1, G1, H1,
@@ -53,7 +46,7 @@ enum Square : uint8_t
     A8, B8, C8, D8, E8, F8, G8, H8,
     NO_SQUARE = 0,
 };
-/* clang-format on */
+// clang-format on
 
 constexpr uint8_t FileOf(Square locn)
 {
@@ -72,24 +65,20 @@ constexpr char RankChar(Square locn)
     return '1' + RankOf(locn);
 }
 
-/**
- * @brief Class for representing a chess move.
- * Moves are contained within a 64 bit integer.
- *
- *   BITS   INTERPRETATION
- *  0 -  5  To (destination square index)
- *  6 - 11  From (source square index)
- * 12 - 14  Moving piece type
- * 15 - 17  Captured piece type in the case of capture moves
- * 18 - 20  Promoted piece type in the case of pawn promotions
- * 21 - 21  Castling move flag
- * 22 - 22  En passant capture flag
- * 23 - 23  Pawn double push flag
- * 24 - 24  Is checking move flag (move gives check)
- * 32 - 63  Contains the move score (as signed int) after move has been evaluated / sorted
- *
- * A value of 0 terminates a move list.
- */
+///
+/// @brief Class for representing a chess move.
+/// Moves are represented by a 64 bit integer with the following bit fields:
+///   BITS      INTERPRETATION
+///  0 -  5     To (destination square index)
+///  6 - 11     From (source square index)
+/// 12 - 14     Moving piece type
+/// 15 - 17     Captured piece type in the case of capture moves
+/// 18 - 20     Promoted piece type in the case of pawn promotions
+/// 21 - 21     Castling move flag
+/// 22 - 22     En passant capture flag
+/// 23 - 23     Pawn double push flag
+/// 24 - 24     Is checking move flag (this move gives check)
+/// 32 - 63     Contains the move score (as signed int) after move has been evaluated / sorted
 class Move
 {
   public:
@@ -109,7 +98,8 @@ class Move
 
     constexpr bool operator==(const Move &that) const
     {
-        return (m & 0xFFFFFFFF) == (that.m & 0xFFFFFFFF); // Ignore score when comparing moves.
+        // Just consider from, to, piece, captured, promoted fields when testing moves for equality.
+        return (m & 0x1FFFFF) == (that.m & 0x1FFFFF);
     }
 
     constexpr Piece piece() const
@@ -144,7 +134,7 @@ class Move
 
     constexpr int piece_from_to_mask() const
     {
-        return m & 0x7FFF; /**< Lower 15 bits contain piece, from, to: index into killer table. */
+        return m & 0x7FFF; // Lower 15 bits contain (piece, from, to): index into killer move table.
     }
 
     constexpr bool IsCastling() const
@@ -227,6 +217,57 @@ class Move
         return (std::size_t)m; // Used for hashing moves in std containers.
     }
 
+    constexpr const std::string ToString() const
+    {
+        std::string result;
+        result.push_back(FileChar(from()));
+        result.push_back(RankChar(from()));
+        result.push_back(FileChar(to()));
+        result.push_back(RankChar(to()));
+        if (promoted() != NONE)
+        {
+            result.push_back(" pnbrqk"[promoted()]);
+        }
+        return result;
+    }
+
+    constexpr std::string DebugString() const
+    {
+        std::string result;
+        result.push_back(" PNBRQK"[piece()]);
+        result.push_back(FileChar(from()));
+        result.push_back(RankChar(from()));
+        result.push_back(FileChar(to()));
+        result.push_back(RankChar(to()));
+        if (captured())
+        {
+            result.push_back('x');
+            result.push_back(" PNBRQK"[captured()]);
+        }
+        if (promoted())
+        {
+            result.push_back('=');
+            result.push_back(" PNBRQK"[promoted()]);
+        }
+        if (IsCastling())
+        {
+            result += " O-O";
+        }
+        if (IsEpCapture())
+        {
+            result += " e.p.";
+        }
+        if (IsPawnDoublePush())
+        {
+            result += " (dp)";
+        }
+        if (IsChecking())
+        {
+            result.push_back('+');
+        }
+        return result;
+    }
+
   private:
     int64_t m;
 
@@ -243,15 +284,4 @@ class Move
     };
 };
 
-typedef StackVector<Move, MAX_PLY>                Variation;
 typedef StackVector<Move, MAX_MOVES_PER_POSITION> MoveList;
-
-static inline void CopyVariation(Variation &dst, const Variation &src, Move best_move)
-{
-    dst.clear();
-    dst.push_back(best_move);
-    for (auto move : src)
-    {
-        dst.push_back(move);
-    }
-}

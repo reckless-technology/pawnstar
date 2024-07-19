@@ -35,7 +35,7 @@ static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece pi
 Determine the SEE (static exchange evaluation) for a move.
 Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
 */
-int EvaluateStaticExchange(const Position &src_position, Move move, int &is_checking)
+int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_checking)
 {
     Position dst_position{src_position.MakeMove(move)};
     is_checking = dst_position.IsInCheck();

@@ -7,17 +7,11 @@
 #include "sort_moves.h"
 #include "transposition_table.h"
 
+#include <sstream>
 #include <string>
-using std::string;
 
-constexpr int min(int a, int b)
-{
-    return a < b ? a : b;
-}
-constexpr int max(int a, int b)
-{
-    return a > b ? a : b;
-}
+using std::string;
+using std::stringstream;
 
 /**
  * @brief Search the root node and find the best move
@@ -26,14 +20,14 @@ constexpr int max(int a, int b)
  */
 Move SearchRootNode(Game &game)
 {
-    /* If there is a book move for this position, do not bother with search. */
+    // If there is a book move for this position, do not bother with search.
     Move book_move = GetBookMove(game.CurrentPosition().Hash());
     if (book_move)
     {
         return book_move;
     }
     MoveList move_list = game.CurrentPosition().GenerateLegalMoves();
-    /* If there is only 1 legal move available, no point wasting time searching, just play it. */
+    // If there is only 1 legal move available, there is no point wasting time searching it, just play it.
     if (move_list.size() == 0)
     {
         return Move::None();
@@ -42,19 +36,21 @@ Move SearchRootNode(Game &game)
     {
         return move_list[0];
     }
-    /* Plan time usage for this search. */
-    int timeout_ms   = 0; /* cancel search when this time expires             */
-    int ms_allocated = 0; /* soft allocated time for the move                 */
-    int moves_to_go  = 0; /* number of remaining moves in this clock period   */
+    // Plan time usage for this search.
+    int timeout_ms   = 0; // Cancel search when this time expires.
+    int ms_allocated = 0; // Soft allocated time for the move.
+    int moves_to_go  = 0; // Number of remaining moves in this clock period.
     switch (game.time_control_.clock_type)
     {
     case CLOCK_STANDARD:
     default:
         moves_to_go = game.time_control_.standard.moves_per_period -
                       (game.CurrentPosition().MoveCount() % game.time_control_.standard.moves_per_period);
-        ms_allocated                           = game.time_control_.standard.milliseconds_remaining / moves_to_go;
-        timeout_ms                             = max(100, min(ms_allocated * 2, game.time_control_.standard.milliseconds_remaining - 3000));
-        game.time_control_.hard_stop_search_ms = ElapsedMilliseconds() + timeout_ms; /* stop searching regardless when this elapses */
+        ms_allocated = game.time_control_.standard.milliseconds_remaining / moves_to_go;
+        timeout_ms =
+            std::max(100, std::min(ms_allocated * 2, game.time_control_.standard.milliseconds_remaining - 3000));
+        game.time_control_.hard_stop_search_ms =
+            ElapsedMilliseconds() + timeout_ms; // Stop searching regardless when this elapses.
         break;
 
     case CLOCK_FIXED_DEPTH:
@@ -70,27 +66,26 @@ Move SearchRootNode(Game &game)
         break;
 
     case CLOCK_INCREMENTAL:
-        ms_allocated = game.time_control_.incremental.increment_milliseconds + (game.time_control_.incremental.milliseconds_remaining / 30);
-        timeout_ms   = max(100, min(ms_allocated * 2, game.time_control_.incremental.milliseconds_remaining - 3000));
+        ms_allocated = game.time_control_.incremental.increment_milliseconds +
+                       (game.time_control_.incremental.milliseconds_remaining / 30);
+        timeout_ms =
+            std::max(100, std::min(ms_allocated * 2, game.time_control_.incremental.milliseconds_remaining - 3000));
         game.time_control_.hard_stop_search_ms = ElapsedMilliseconds() + timeout_ms;
         break;
     }
     DebugXClear();
     int start_ms            = ElapsedMilliseconds();
     game.is_cancel_pending_ = false;
-    /*
-    For first pass move ordering before we do any search, just use a shallow
-    search with wide open alpha beta window. Subsequent passes will use the
-    results of the previous iteration to sort the moves (the merge sort is
-    stable).
-    */
+    // For first pass move ordering before we do any search, just use a shallow search with wide open alpha beta window.
+    // Subsequent passes will use the results of the previous iteration to sort the moves (the merge sort is stable).
     ResetKillerCounts();
     AgeTranspositionTable();
     Variation principal_variation{};
-    Move      best_moves[MAX_PLY]; /* Best move found at each ply of search. */
+    Move      best_moves[MAX_PLY]; // Best move found at each ply of search.
     for (std::size_t i = 0; i != move_list.size(); ++i)
     {
-        const int score = SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i], principal_variation, i);
+        const int score =
+            SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i], principal_variation, i);
         move_list[i].AssignScore(score);
     }
     SortMoves<true>(move_list);
@@ -102,7 +97,7 @@ Move SearchRootNode(Game &game)
         {
             break;
         }
-        SortMoves<true>(move_list); /* Sort moves from previous iteration depth. */
+        SortMoves<true>(move_list); // Sort moves based on scores from the previous iteration.
         Variation child_pv{};
         int       alpha  = ALPHA;
         game.node_count_ = 0;
@@ -119,12 +114,17 @@ Move SearchRootNode(Game &game)
                 alpha             = score;
                 best_move         = move_list[i];
                 best_moves[depth] = move_list[i];
-                CopyVariation(principal_variation, child_pv, best_move);
                 if (game.do_show_thinking_)
                 {
-                    const string move_string{game.CurrentPosition().VariationToString(principal_variation)};
-                    printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score(), (ElapsedMilliseconds() - start_ms) / 10,
-                           game.node_count_, move_string.c_str());
+                    CopyVariation(principal_variation, child_pv,
+                                  game.CurrentPosition().MoveToString(best_move, &move_list));
+                    stringstream ss;
+                    for (const auto &move : principal_variation)
+                    {
+                        ss << move << ' ';
+                    }
+                    printf("%2u %5d %4u %8u %s\n", depth, best_moves[depth].score(),
+                           (ElapsedMilliseconds() - start_ms) / 10, game.node_count_, ss.str().c_str());
                 }
             }
         }
@@ -135,14 +135,10 @@ Move SearchRootNode(Game &game)
         }
         if (game.time_control_.clock_type == CLOCK_STANDARD || game.time_control_.clock_type == CLOCK_INCREMENTAL)
         {
-            /*
-            Plan our use of the time with some care. If both the score we find
-            and the best move are consistent between successive iterations,
-            we can probably stop searching before our allocated time is elapsed
-            and save some time for other, potentially more difficult positions.
-            Similarly we can save a smaller amount of time if either of these
-            conditions but not both are true.
-            */
+            // Plan our use of the time with some care. If both the score we find and the best move are consistent
+            // between successive iterations, we can probably stop searching before our allocated time is elapsed and
+            // save some time for other, potentially more difficult positions. Similarly we can save a smaller amount of
+            // time if either of these conditions but not both are true.
             const int elapsed_ms              = stop_ms - start_ms;
             bool      is_best_move_consistent = true;
             bool      is_score_stable         = true;
@@ -152,7 +148,7 @@ Move SearchRootNode(Game &game)
                 {
                     is_best_move_consistent = false;
                 }
-                if (abs(best_moves[i].score() - best_moves[depth].score()) > SCORE_INSTABILITY_THRESHOLD)
+                if (std::abs(best_moves[i].score() - best_moves[depth].score()) > SCORE_INSTABILITY_THRESHOLD)
                 {
                     is_score_stable = false;
                 }

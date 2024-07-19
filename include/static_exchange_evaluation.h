@@ -3,4 +3,4 @@
 
 class Position;
 
-int EvaluateStaticExchange(const Position &src_position, Move move, int &is_checking);
+int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_checking);
