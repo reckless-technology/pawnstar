@@ -11,17 +11,15 @@
 
 DebugTable debug_dictionary;
 
-/**
- * @brief Initialize or reset the dictionary
- */
+///
+/// @brief Initialize or reset the dictionary
+///
 void DebugXClear()
 {
     debug_dictionary.clear();
 }
 
-/**
- * @brief Write the debug dictionary out in alphabetic order.
- */
+/// @brief Print the debug dictionary in alphabetic order.
 void DebugXWrite()
 {
     std::map<std::string_view, uint32_t> sorted_entries(debug_dictionary.begin(), debug_dictionary.end());

@@ -30,10 +30,9 @@ class Position
     Position()                                = default;
     Position(const Position &that)            = default;
     Position &operator=(const Position &that) = default;
-    Position(std::string_view fen_string);        ///< Construct a position from a FEN string.
-    Position    MakeMove(const Move &move) const; ///< Create a position from this one by making a regular move.
-    Position    MakeNullMove() const;             ///< Create a position from this one by making a null move.
-    void        AddPiece(Color color, Piece piece, Square to);  ///< Place a piece on the board.
+    Position(std::string_view fen_string);                      ///< Construct a position from a FEN string.
+    Position    MakeMove(const Move &move) const;               ///< Create a position by making a regular move.
+    Position    MakeNullMove() const;                           ///< Create a position by making a null move.
     bool        IsAttacked(Square location, Color color) const; ///< Determine if location is attacked by color.
     Bitboard    AttacksTo(Square location, Color color) const;  ///< Find all attackers to specified square.
     bool        IsLegal() const;                                ///< Is this a legal chess position.
@@ -89,6 +88,7 @@ class Position
     }
 
   private:
+    void     AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
     void     RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board
     void     MovePiece(Color color, Piece piece, Square from, Square to); ///< Move a piece on the board
     uint64_t ComputeHash() const;                                         ///< Compute the Zobrist hash from scratch

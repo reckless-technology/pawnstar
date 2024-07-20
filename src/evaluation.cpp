@@ -3,7 +3,7 @@
 #include "position.h"
 #include "transposition_table.h"
 
-constexpr int EVAL_HASH_SIZE = 100003; /* Prime number */
+constexpr int EVAL_HASH_SIZE = 100003; // Prime number
 
 struct EvalHash
 {
@@ -13,14 +13,11 @@ struct EvalHash
 
 static EvalHash eval_hash_table[EVAL_HASH_SIZE];
 
-/**
- * @brief Evaluate the current position, assuming neither king is in check
-   and the position is quiet.
- * @param position position to evaluate
- * @param alpha current alpha value
- * @param beta current beta value
- * @return score from the perspective of the side to move
-*/
+/// @brief Evaluate the current position, assuming neither king is in check and the position is quiet.
+/// @param position position to evaluate
+/// @param alpha current alpha value
+/// @param beta current beta value
+/// @return score from the perspective of the side to move
 int EvaluatePosition(const Position &position, int alpha, int beta)
 {
     INCREMENT("eval calls");
@@ -37,19 +34,19 @@ int EvaluatePosition(const Position &position, int alpha, int beta)
         return DRAW_SCORE;
     }
     int scores[2];
-    /* Phase 1: Evaluate material values alone. */
+    // Phase 1: Evaluate material values alone.
     scores[WHITE] = EvaluateMaterial<WHITE>(position);
     scores[BLACK] = EvaluateMaterial<BLACK>(position);
-    /* Piece square tables */
+    // Piece square tables
     scores[WHITE] += EvaluatePieceSquare<WHITE>(position);
     scores[BLACK] += EvaluatePieceSquare<BLACK>(position);
-    /* Pawn structure */
+    // Pawn structure
     PawnStructure ps[2];
     DeterminePawnStructure<WHITE>(position, ps[WHITE]);
     DeterminePawnStructure<BLACK>(position, ps[BLACK]);
     scores[WHITE] += EvaluatePawnStructure<WHITE>(ps[WHITE]);
     scores[BLACK] += EvaluatePawnStructure<BLACK>(ps[BLACK]);
-    /* Kings */
+    // Kings
     scores[WHITE] += EvaluateKing<WHITE>(position);
     scores[BLACK] += EvaluateKing<BLACK>(position);
     const int score = position.ColorToMove() == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];

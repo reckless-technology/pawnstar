@@ -1,3 +1,5 @@
+/// @file Tests of static exchange evaluation.
+
 #include "debug_hashtable.h"
 #include "evaluation.h"
 #include "position.h"
@@ -10,18 +12,24 @@
 using std::string;
 using std::string_view;
 
+/// @brief A SEE test vector.
 struct SeeTest
 {
-    string_view fen_string;
-    Move        move;
-    int         see_score;
+    string_view fen_string; ///< Position to test.
+    Move        move;       ///< Move to analyze.
+    int         see_score;  ///< Expected SEE score.
 };
 
-const SeeTest tests[] = {
-    {"1k1r4/1pp4p/p7/4p3/8/P5P1/1PP4P/2K1R3 w - -", Move::CaptureMove(E1, E5, ROOK, PAWN), 100},
-    {"1k1r3q/1ppn3p/p4b2/4p3/8/P2N2P1/1PP1R1BP/2K1Q3 w - -", Move::CaptureMove(D3, E5, KNIGHT, PAWN), -200},
+/// @brief SEE test vectors.
+// clang-format off
+constexpr SeeTest tests[]{
+    // Position                                                 Move to evaluate                        Score
+    {"1k1r4/1pp4p/p7/4p3/8/P5P1/1PP4P/2K1R3 w - -",             Move::CaptureMove(E1, E5, ROOK, PAWN),    100},
+    {"1k1r3q/1ppn3p/p4b2/4p3/8/P2N2P1/1PP1R1BP/2K1Q3 w - -",    Move::CaptureMove(D3, E5, KNIGHT, PAWN), -200},
 };
+// clang-format on
 
+/// @brief Run the set of SEE tests.
 void RunStaticExchangeTests(void)
 {
     bool is_pass = true;

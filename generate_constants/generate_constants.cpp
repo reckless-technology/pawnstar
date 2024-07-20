@@ -11,8 +11,10 @@
 #include <vector>
 
 /* Fixed square definitions */
-constexpr uint64_t NOT_FILE_H = 0x7F7F7F7F7F7F7F7Full; /**< Mask off the h file to prevent wraparound when shifting east. */
-constexpr uint64_t NOT_FILE_A = 0xFEFEFEFEFEFEFEFEull; /**< Mask off the a file to prevent wraparound when shifting west. */
+constexpr uint64_t NOT_FILE_H =
+    0x7F7F7F7F7F7F7F7Full; /**< Mask off the h file to prevent wraparound when shifting east. */
+constexpr uint64_t NOT_FILE_A =
+    0xFEFEFEFEFEFEFEFEull; /**< Mask off the a file to prevent wraparound when shifting west. */
 constexpr uint64_t NO_SQUARES = 0ull;
 
 /* clang-format off */
@@ -199,8 +201,8 @@ constexpr uint64_t QueenAttacksOnEmptyBoard(uint8_t locn)
  */
 constexpr uint64_t KingFill(uint64_t b)
 {
-    return ShiftNorth(b) | ShiftNortheast(b) | ShiftEast(b) | ShiftSoutheast(b) | ShiftSouth(b) | ShiftSouthwest(b) | ShiftWest(b) |
-           ShiftNorthwest(b);
+    return ShiftNorth(b) | ShiftNortheast(b) | ShiftEast(b) | ShiftSoutheast(b) | ShiftSouth(b) | ShiftSouthwest(b) |
+           ShiftWest(b) | ShiftNorthwest(b);
 }
 
 /**
@@ -427,7 +429,8 @@ constexpr uint64_t RayOccupancyMask(uint8_t locn, Direction direction)
 {
     uint64_t               result = NO_SQUARES;
     const DirectionVector &dv     = DIRECTION_VECTORS[direction];
-    for (int x = FileOf(locn) + dv.dx, y = RankOf(locn) + dv.dy; IsInBoard(x + dv.dx, y + dv.dy); x += dv.dx, y += dv.dy)
+    for (int x = FileOf(locn) + dv.dx, y = RankOf(locn) + dv.dy; IsInBoard(x + dv.dx, y + dv.dy);
+         x += dv.dx, y += dv.dy)
     {
         result |= Bitboard(x, y);
     }
@@ -452,7 +455,8 @@ constexpr uint64_t BishopOccupancyMask(uint8_t locn)
  */
 constexpr uint64_t RookOccupancyMask(uint8_t locn)
 {
-    return RayOccupancyMask(locn, NORTH) | RayOccupancyMask(locn, SOUTH) | RayOccupancyMask(locn, EAST) | RayOccupancyMask(locn, WEST);
+    return RayOccupancyMask(locn, NORTH) | RayOccupancyMask(locn, SOUTH) | RayOccupancyMask(locn, EAST) |
+           RayOccupancyMask(locn, WEST);
 }
 
 /**
@@ -519,10 +523,10 @@ constexpr std::vector<uint64_t> EnumerateMaskCombinations(uint64_t mask)
 }
 
 /** Maps location to an occupancy mask for that square. */
-typedef std::function<uint64_t(uint8_t locn)> MaskFn;
+typedef uint64_t (*MaskFn)(uint8_t);
 
 /** Maps occupied squares set and location to attacked targets by a sliding piece. */
-typedef std::function<uint64_t(uint64_t occupied, uint8_t locn)> AttackFn;
+typedef uint64_t (*AttackFn)(uint64_t, uint8_t);
 
 /**
  * @brief Parameters for magic Bitboard search.
@@ -617,7 +621,7 @@ struct MagicVector
 };
 
 /* clang-format off */
-static const MagicVector MAGIC_VECTORS[] = 
+constexpr MagicVector MAGIC_VECTORS[] = 
 {
     { "BISHOP", BishopAttacks, BishopOccupancyMask }, 
     { "ROOK",   RookAttacks,   RookOccupancyMask   },
@@ -825,7 +829,8 @@ static void GenerateMagics(void)
                 printf("0x%02X, ", magics[locn].indices[j]);
             }
             printf("\n};\n");
-            printf("static const uint64_t %s_MAGIC_ATTACKS_%s[%zu] = \n{", mv.name, square_name, magics[locn].attacks.size());
+            printf("static const uint64_t %s_MAGIC_ATTACKS_%s[%zu] = \n{", mv.name, square_name,
+                   magics[locn].attacks.size());
             for (std::size_t j = 0; j != magics[locn].attacks.size(); ++j)
             {
                 if (j % 8 == 0)

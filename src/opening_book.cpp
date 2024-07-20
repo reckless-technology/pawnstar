@@ -21,23 +21,17 @@ using std::stringstream;
 using std::unordered_map;
 using std::vector;
 
-/**
- * @brief The opening book is stored as a map, indexed by the Zobrist
- * hash of the position, containing a vector of Moves which are
- * available from that position. The same move may be in the
- * moves vector multiple times if it appears in several lines of
- * play, i.e. the frequency of occurence of a move in the list
- * is proportional to the liklihood that we want to play it.
- */
+/// @brief The opening book is stored as a map, indexed by the Zobrist hash of the position, containing a vector of
+/// Moves which are available from that position. The same move may be in the moves vector multiple times if it appears
+/// in several lines of play, i.e. the frequency of occurence of a move in the list is proportional to the liklihood
+/// that we want to play it.
 static unordered_map<uint64_t, vector<Move>> book;
 
 static bool InitializeOpeningBookFromStream(istream &ss);
 
-/**
- * @brief Parse the opening book file and create the opening book from it.
- * @param filename Filename of book file.
- * @return true on success.
- */
+/// @brief Parse the opening book file and create the opening book from it.
+/// @param filename Filename of book file.
+/// @return true on success.
 bool InitializeOpeningBookFromFile(string_view filename)
 {
     ifstream file{string(filename)};
@@ -50,11 +44,9 @@ bool InitializeOpeningBookFromFile(string_view filename)
     return is_ok;
 }
 
-/**
- * @brief Pseudo randomly select from available book moves
- * @param hash the position hash
- * @return Move selected from book, or 0 if no move found
- */
+/// @brief Pseudo randomly select from available book moves
+/// @param hash the position hash
+/// @return Move selected from book, or 0 if no move found
 Move GetBookMove(uint64_t hash)
 {
     if (book.count(hash))
@@ -65,18 +57,14 @@ Move GetBookMove(uint64_t hash)
     return Move::None();
 }
 
-/**
- * @brief Free the opening book
- */
+/// @brief Free the opening book
 void FreeOpeningBook()
 {
     book.clear();
 }
 
-/**
- * @brief Print available book moves for a position
- * @param position Position to consider for book moves
- */
+/// @brief Print available book moves for a position
+/// @param position Position to consider for book moves
 void DisplayAvailableBookMoves(const Position &position)
 {
     if (!book.count(position.Hash()))
@@ -97,14 +85,11 @@ void DisplayAvailableBookMoves(const Position &position)
     }
 }
 
-/**
- * @brief Parse a single line of play (PGN line) and add it to the book.
- *        Moves ending with a '?' are bad moves and will not be played by pawnstar.
- *        '#' denotes a comment and the rest of the line will be ignored
- *        Move numbers are ignored (the line is in PGN format).
- * @param line The line of play
- * @return true on success
- */
+/// @brief Parse a single line of play (PGN line) and add it to the book. Moves ending with a '?' are bad moves and will
+/// not be played by pawnstar. '#' denotes a comment and the rest of the line will be ignored. Move numbers are ignored
+/// (the line is in PGN format).
+/// @param line The line of play
+/// @return true on success
 static bool ParseLineOfPlay(std::string_view line)
 {
     Game         game{};
@@ -116,11 +101,11 @@ static bool ParseLineOfPlay(std::string_view line)
         ss >> move_string;
         if (move_string.length() == 0 || isdigit(move_string[0]))
         {
-            continue; /* Ignore move numbers or blanks. */
+            continue; // Ignore move numbers or blanks.
         }
         if (move_string[0] == '#')
         {
-            return true; /* Done with this line. */
+            return true; // Done with this line.
         }
         const uint64_t hash = game.CurrentPosition().Hash();
         const Move     move = game.PlayMove(move_string);
@@ -129,7 +114,7 @@ static bool ParseLineOfPlay(std::string_view line)
             std::cout << "ERROR found in book line " << line << " move " << move_string << std::endl;
             return false;
         }
-        if (move_string.find('?') == string::npos) /* Ignore bad moves */
+        if (move_string.find('?') == string::npos) // Ignore bad moves
         {
             book[hash].push_back(move);
         }
@@ -137,12 +122,9 @@ static bool ParseLineOfPlay(std::string_view line)
     return true;
 }
 
-/**
- * @brief Parse a multiline stringstream containing open book lines of
- *        play and create the opening book from it.
- * @param iss stringstream to be parsed, with one line of play per new line.
- * @return true on success
- */
+/// @brief Parse a multiline stringstream containing open book lines of play and create the opening book from it.
+/// @param iss stringstream to be parsed, with one line of play per new line.
+/// @return true on success
 static bool InitializeOpeningBookFromStream(istream &ss)
 {
     while (ss)

@@ -7,22 +7,9 @@
 
 int EvaluatePosition(const Position &position, int alpha, int beta);
 
-/**
- * @brief Pawn structure for one color.
- * A passed pawn has no enemy pawns in front of it either on its file or on adjacent files.
- * An isolated pawn has no friendly pawns on either adjacent file.
- * A backward pawn has no pawns to support it and its forward square is attacked by an enemy pawn.
- * A doubled pawn has a friendly pawn in front of it on the same file.
- */
-struct PawnStructure
-{
-    Bitboard passed_pawns;
-    Bitboard isolated_pawns;
-    Bitboard backward_pawns;
-    Bitboard doubled_pawns;
-};
+// clang-format off
 
-/* clang-format off */
+/// @brief Piece square table for pawns.
 constexpr int PAWN_SQUARE[64] =
 {
      0,  0,  0,  0,  0,  0,  0,  0,
@@ -35,6 +22,7 @@ constexpr int PAWN_SQUARE[64] =
      0,  0,  0,  0,  0,  0,  0,  0
 };
 
+/// @brief Piece square table for knights.
 constexpr int KNIGHT_SQUARE[64] =
 {
    -50,-40,-30,-30,-30,-30,-40,-50,
@@ -47,6 +35,7 @@ constexpr int KNIGHT_SQUARE[64] =
    -50,-40,-30,-30,-30,-30,-40,-50,
 };
 
+/// @brief Piece square table for bishops.
 constexpr int BISHOP_SQUARE[64] = 
 {
    -20,-10,-10,-10,-10,-10,-10,-20,
@@ -59,6 +48,7 @@ constexpr int BISHOP_SQUARE[64] =
    -20,-10,-10,-10,-10,-10,-10,-20,
 };
 
+/// @brief Piece square table for rooks.
 constexpr int ROOK_SQUARE[64] = 
 {
      0,  0,  0,  0,  0,  0,  0,  0,
@@ -71,6 +61,7 @@ constexpr int ROOK_SQUARE[64] =
     -5,  0,  0,  5,  5,  0,  0, -5,
 };
 
+/// @brief Piece square table for queens.
 constexpr int QUEEN_SQUARE[64] = 
 {
    -20,-10,-10, -5, -5,-10,-10,-20,
@@ -83,6 +74,7 @@ constexpr int QUEEN_SQUARE[64] =
    -20,-10,-10, -5, -5,-10,-10,-20
 };
 
+/// @brief Piece square table for kings in the mid game.
 constexpr int KING_SQUARE_MIDGAME[64] =
 {
    -40,-40,-40,-40,-40,-40,-40,-40,
@@ -95,6 +87,7 @@ constexpr int KING_SQUARE_MIDGAME[64] =
      0, 40, 20,-20,  0,-20, 40, 20
 };
 
+/// @brief Piece square table for kings in the end game.
 constexpr int KING_SQUARE_ENDGAME[64] =
 {
      0, 10, 20, 30, 30, 20, 10,  0,
@@ -107,10 +100,11 @@ constexpr int KING_SQUARE_ENDGAME[64] =
      0, 10, 20, 30, 30, 20, 10,  0
 };
 
+/// @brief Piece square table for passed pawn bonuses./
 constexpr int PASSED_PAWN_SQUARE[64] = 
 {
      0,  0,  0,  0,  0,  0,  0,  0,
-    50, 50, 50, 50, 50, 50, 50, 50, /* all pawns are "passed" at 7th rank */
+    50, 50, 50, 50, 50, 50, 50, 50, // All pawns are "passed" at 7th rank
     50, 50, 50, 50, 50, 50, 50, 50,
     30, 30, 30, 30, 30, 30, 30, 30, 
     20, 20, 20, 20, 20, 20, 20, 20,
@@ -118,10 +112,28 @@ constexpr int PASSED_PAWN_SQUARE[64] =
     10, 10, 10, 10, 10, 10, 10, 10, 
      0,  0,  0,  0,  0,  0,  0,  0,
 };
-/* clang-format on */
+
+// clang-format on
 
 constexpr Bitboard FILE_BITBOARDS[8] = {FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H};
 
+/// @brief Pawn structure for one color.
+/// A passed pawn has no enemy pawns in front of it either on its file or on adjacent files.
+/// An isolated pawn has no friendly pawns on either adjacent file.
+/// A backward pawn has no pawns to support it and its forward square is attacked by an enemy pawn.
+/// A doubled pawn has a friendly pawn in front of it on the same file.
+struct PawnStructure
+{
+    Bitboard passed_pawns;
+    Bitboard isolated_pawns;
+    Bitboard backward_pawns;
+    Bitboard doubled_pawns;
+};
+
+/// @brief Determine the pawn structure
+/// @tparam color color to evaluate
+/// @param position position to evaluate
+/// @param s where to store the result
 template <Color color> void DeterminePawnStructure(const Position &position, PawnStructure &s)
 {
     const Bitboard friendly_pawns = position.Pawns() & position.PiecesOfColor(color);
@@ -166,10 +178,14 @@ template <Color color> void DeterminePawnStructure(const Position &position, Paw
             }
         }
     }
-    /* Doubled pawns are not passed pawns. */
+    // Doubled pawns cannot be passed pawns.
     s.passed_pawns &= ~s.doubled_pawns;
 }
 
+/// @brief Evaluate material on the board.
+/// @tparam color color to evaluate
+/// @param position position to evaluate
+/// @return material score
 template <Color color> int EvaluateMaterial(const Position &position)
 {
     const Bitboard friendly_pieces = position.PiecesOfColor(color);
@@ -178,28 +194,27 @@ template <Color color> int EvaluateMaterial(const Position &position)
     const Bitboard bishops         = position.Bishops() & friendly_pieces;
     const Bitboard rooks           = position.Rooks() & friendly_pieces;
     const Bitboard queens          = position.Queens() & friendly_pieces;
-    int score = PopCount(pawns) * 100 + PopCount(knights) * 400 + PopCount(bishops) * 400 + PopCount(rooks) * 600 + PopCount(queens) * 1200;
-    /* Bonus for the bishop pair. */
+    int score = PopCount(pawns) * 100 + PopCount(knights) * 400 + PopCount(bishops) * 400 + PopCount(rooks) * 600 +
+                PopCount(queens) * 1200;
+    // Bonus for the bishop pair.
     if ((bishops & WHITE_SQUARES) && (bishops & BLACK_SQUARES))
     {
         score += 50;
     }
-    /* Penalty for no pawns */
+    // Penalty for no pawns.
     if (pawns == NO_SQUARES)
     {
         score -= 50;
     }
-    /* Adjustment for knights based on number of friendly pawns */
+    // Adjustment for knights based on number of friendly pawns.
     score += PopCount(knights) * (PopCount(pawns) - 4) * 5;
     return score;
 }
 
-/**
- * @brief Evaluate piece square scores excluding the king.
- * @tparam color Color to evaluate for
- * @param position Position
- * @return
- */
+/// @brief Evaluate piece square scores excluding the king.
+/// @tparam color Color to evaluate for
+/// @param position Position
+/// @return score
 template <Color color> int EvaluatePieceSquare(const Position &position)
 {
     constexpr int  rank_flip       = (color == WHITE ? RANK_FLIP : 0);
@@ -233,6 +248,10 @@ template <Color color> int EvaluatePieceSquare(const Position &position)
     return score;
 }
 
+/// @brief Evaluate pawn structure
+/// @tparam color color tp evaluate
+/// @param ps pawn structure
+/// @return score for ps
 template <Color color> int EvaluatePawnStructure(const PawnStructure &ps)
 {
     constexpr int rank_flip = (color == WHITE ? RANK_FLIP : 0);
@@ -248,12 +267,10 @@ template <Color color> int EvaluatePawnStructure(const PawnStructure &ps)
     return score;
 }
 
-/**
- * @brief Evaluate king score based on positional factors and enemy material.
- * @tparam color Color to evaluate
- * @param position Position
- * @return score
- */
+/// @brief Evaluate king score based on positional factors and enemy material.
+/// @tparam color Color to evaluate
+/// @param position Position
+/// @return score
 template <Color color> int EvaluateKing(const Position &position)
 {
     constexpr uint8_t rank_flip       = (color == WHITE ? RANK_FLIP : 0);
@@ -263,25 +280,23 @@ template <Color color> int EvaluateKing(const Position &position)
     const Bitboard    friendly_pawns  = friendly_pieces & position.Pawns();
     const Bitboard    enemy_pawns     = enemy_pieces & position.Pawns();
 
-    /*
-    Determine enemy non pawn material value.
-    This starts out at the beginning of the game as 31
-    (2 x N + 2 x B + 2 x R + 1 x Q)
-    */
+    // Determine enemy non-pawn material value. This starts out at the beginning of the game as 31
+    // (2 x N + 2 x B + 2 x R + 1 x Q)
     const int enemy_material = 3 * PopCount((position.Knights() | position.Bishops()) & enemy_pieces) +
-                               5 * PopCount(position.Rooks() & enemy_pieces) + 9 * PopCount(position.Queens() & enemy_pieces);
+                               5 * PopCount(position.Rooks() & enemy_pieces) +
+                               9 * PopCount(position.Queens() & enemy_pieces);
     int piece_square_score;
-    /* First do piece square table */
+    // First do piece square table.
     if (enemy_material > 12)
     {
         piece_square_score = KING_SQUARE_MIDGAME[position.KingLocation(color) ^ rank_flip];
     }
     else
     {
-        /* King moves the middle when the enemy has 12 or less in remaining material. */
+        // King moves the middle when the enemy has 12 or less in remaining material.
         piece_square_score = KING_SQUARE_ENDGAME[position.KingLocation(color) ^ rank_flip];
     }
-    /* Consider pawns in front of the king and approaching enemy pawns */
+    // Consider pawns in front of the king and approaching enemy pawns.
     int safety_score = 0;
     if (position.KingLocation(color) != king_home_locn)
     {
@@ -303,7 +318,7 @@ template <Color color> int EvaluateKing(const Position &position)
                        5 * PopCount(friendly_pawns & pawn_shelter_3) - 25 * PopCount(enemy_pawns & pawn_shelter_1) -
                        10 * PopCount(enemy_pawns & pawn_shelter_2) - 5 * PopCount(enemy_pawns & pawn_shelter_3);
     }
-    /* Penalty for open files near our king */
+    // Penalty for open files near our king.
     const Bitboard king_file = FILE_BITBOARDS[FileOf(position.KingLocation(color))];
     if ((king_file & friendly_pawns) == NO_SQUARES)
     {
@@ -319,7 +334,7 @@ template <Color color> int EvaluateKing(const Position &position)
     {
         safety_score -= 20;
     }
-    /* Scale the king safety score according to the enemy's material. */
+    // Scale the king safety score according to the enemy's material.
     safety_score = (safety_score * enemy_material) / 31;
     return piece_square_score + safety_score;
 }

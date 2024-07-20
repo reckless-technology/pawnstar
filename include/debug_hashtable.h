@@ -1,3 +1,5 @@
+/// @file Debugging counts dictionary.
+
 #pragma once
 #include <cstdint>
 #include <string_view>
@@ -5,6 +7,7 @@
 
 #if DEBUGX
 
+/// @brief Maps a literal string to a count value.
 typedef std::unordered_map<std::string_view, int64_t> DebugTable;
 extern DebugTable                                     debug_dictionary;
 

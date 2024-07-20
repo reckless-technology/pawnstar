@@ -5,19 +5,19 @@ using namespace std::chrono;
 
 static uint64_t x;
 
+/// @brief See the PRNG
+/// @param seed the seed value
 void RandomSeed(uint64_t seed)
 {
     x = seed;
 }
 
-/**
- * @brief XORshift simple PRNG
- * @return next pseudo random integer
- */
+/// @brief XORshift simple PRNG
+/// @return next pseudo random integer
 int NextRandom(void)
 {
     if (x == 0)
-    {
+    { // If unseeded, use the time of first invocation as the seed.
         x = duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
         for (int i = 0; i != 1000; ++i)
         {

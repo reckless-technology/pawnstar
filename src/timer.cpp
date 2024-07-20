@@ -5,6 +5,8 @@ using namespace std::chrono;
 static system_clock::time_point start_time;
 static bool                     has_been_called;
 
+/// @brief Get time in ms.
+/// @return number of milliseconds elapsed since first invocation.
 int ElapsedMilliseconds()
 {
     if (!has_been_called)

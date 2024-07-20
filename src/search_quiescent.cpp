@@ -6,15 +6,13 @@
 #include "sort_moves.h"
 #include "transposition_table.h"
 
-/**
- * @brief Alpha beta quiescence (capture only) search.
- * @param game Game we are searching
- * @param depth search depth (<= 0 for quiescence)
- * @param ply distance from root node
- * @param alpha parent floor value
- * @param beta parent ceiling value
- * @return score The score for this position
- */
+/// @brief Alpha beta quiescence (capture only) search.
+/// @param game Game we are searching
+/// @param depth search depth (<= 0 for quiescence)
+/// @param ply distance from root node
+/// @param alpha parent floor value
+/// @param beta parent ceiling value
+/// @return score The score for this position
 int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
 {
     INCREMENT("quiescent calls");

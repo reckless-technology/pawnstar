@@ -9,9 +9,7 @@
 #include <string_view>
 using std::string_view;
 
-/*
-Standard Bratko-Kopec test positions
-*/
+/// @brief Standard Bratko Kopec test positions in FEN format.
 constexpr string_view POSITION_TESTS[] = {
     "1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -",
     "3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - -",
@@ -39,9 +37,8 @@ constexpr string_view POSITION_TESTS[] = {
     "r2qnrnk/p2b2b1/1p1p2pp/2pPpp2/1PP1P3/PRNBB3/3QNPPP/5RK1 w - -",
 };
 
-/*
-Run the standard Bratko-Kopec test suite at fixed search depth
-*/
+/// @brief Run the Bratko Kopec position tests.
+/// @param depth Saerch depth.
 void RunPositionTests(int depth)
 {
     const int start_ms = ElapsedMilliseconds();

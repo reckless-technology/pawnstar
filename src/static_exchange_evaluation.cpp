@@ -5,11 +5,10 @@
 
 #include <algorithm>
 
-/*
-Use nominal 1-3-3-5-9 material values for SEE
-*/
+/// @brief Use nominal 1-3-3-5-9 material values for SEE
 constexpr int piece_values[7] = {0, 100, 300, 300, 500, 900, 10000};
 
+/// @brief Bitboards of piece on the board used for static exchange evaluation.
 struct SeeBoards
 {
     Bitboard  pawns;
@@ -31,10 +30,12 @@ struct SeeBoards
 };
 
 static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece piece_on_square);
-/*
-Determine the SEE (static exchange evaluation) for a move.
-Refer to: http://chessprogramming.wikispaces.com/Static+Exchange+Evaluation
-*/
+
+/// @brief Evaluate the SEE for a move.
+/// @param src_position Position to evaluate.
+/// @param move Move to evaluate.
+/// @param is_checking On exit, set to true if the move gave check.
+/// @return static exchange evaluation score for this move.
 int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_checking)
 {
     Position dst_position{src_position.MakeMove(move)};
@@ -55,15 +56,12 @@ int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_che
     return piece_values[move.captured()] - EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.piece());
 }
 
-/**
- * @brief Determine the swap off value for a capture on a square.
- *
- * @param bb set of bitboards of piece locations on the board
- * @param location target square
- * @param color color to move
- * @param piece_on_square piece currently standing on the target square
- * @return int swap off (static exchange) score
- */
+/// @brief Determine the swap off value for a capture on a square.
+/// @param bb set of bitboards of piece locations on the board
+/// @param location target square
+/// @param color color to move
+/// @param piece_on_square piece currently standing on the target square
+/// @return int swap off (static exchange) score
 static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece piece_on_square)
 {
     const Sets    &sets     = SETS[location];
@@ -71,10 +69,10 @@ static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece pi
     Bitboard       occupied = bb.white_pieces | bb.black_pieces;
     int            scores[32];
     int            ply;
-    /* First pass: perform all the captures onto the square least valuable piece first */
+    // First pass: perform all the captures onto the square least valuable piece first.
     for (ply = 0; ply != 32; ++ply)
     {
-        /* Find the least valuable piece of color which directly attacks location */
+        // Find the least valuable piece of color which directly attacks location.
         Piece          capturing_piece;
         Bitboard       bishop_attacks;
         Bitboard       rook_attacks;
@@ -82,14 +80,14 @@ static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece pi
         Bitboard       attackers        = sets.PawnAttacks(EnemyOf(color)) & attacking_pieces & bb.pawns;
         if (attackers)
         {
-            attackers &= -attackers; /* isolate Lsb in case there is more than 1 pawn attacker */
+            attackers &= -attackers; // Isolate LSB in case there is more than 1 attacker.
             capturing_piece = PAWN;
             goto FoundAttacker;
         }
         attackers = sets.knight_attacks & attacking_pieces & bb.knights;
         if (attackers)
         {
-            attackers &= -attackers; /* isolate Lsb in case there is more than 1 knight attacker */
+            attackers &= -attackers;
             capturing_piece = KNIGHT;
             goto FoundAttacker;
         }
@@ -123,7 +121,7 @@ static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece pi
             goto FoundAttacker;
         }
 
-        /* No more attackers - finished first pass */
+        // No more attackers - finished first pass.
         scores[ply] = 0;
         break;
 
@@ -137,14 +135,13 @@ static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece pi
         piece_on_square = capturing_piece;
         color           = EnemyOf(color);
     }
-    /* Second pass: unwind the capture stack and propagate values
-       back to the top for material winning sequences */
+    // Second pass: unwind the capture stack and propagate values back to the top for material winning sequences.
     for (--ply; ply >= 0; --ply)
     {
         scores[ply] -= scores[ply + 1];
         if (scores[ply] < 0)
         {
-            scores[ply] = 0; /* would not initiate a losing capture sequence */
+            scores[ply] = 0; // Player would not initiate a losing capture sequence.
         }
     }
     return scores[0];

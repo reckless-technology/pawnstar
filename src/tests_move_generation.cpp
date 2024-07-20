@@ -1,3 +1,5 @@
+/// @file Standard perft move generation tests.
+
 #include <algorithm>
 #include <cinttypes>
 #include <cstring>
@@ -12,34 +14,30 @@ using std::string_view;
 #include "position.h"
 #include "transposition_table.h"
 
+/// @brief Structure to hold move type counts for enhanced perft.
 struct PerftCounts
 {
-    uint64_t legal_moves;
-    uint64_t captures;
-    uint64_t ep_captures;
-    uint64_t castles;
-    uint64_t promotions;
-    uint64_t checks;
+    uint64_t legal_moves; ///< Total number of legal moves at leaf nodes
+    uint64_t captures;    ///< Number of capture moves
+    uint64_t ep_captures; ///< Number of en passant captures
+    uint64_t castles;     ///< Number of castling moves
+    uint64_t promotions;  ///< Number of pawn promotions
+    uint64_t checks;      ///< Number of checking moves
 
     bool operator==(const PerftCounts &) const = default;
 };
 
+/// @brief Structure to hold a perft test.
 struct PerftTest
 {
-    string_view position;
-    int         depth;
-    PerftCounts counts;
+    string_view position; ///< FEN string of starting position
+    int         depth;    ///< perft search depth
+    PerftCounts counts;   ///< expected results
 };
 
-/*
-Standard test positions for Perft move generation tests
-Refer to:
-http://chessprogramming.wikispaces.com/Perft
-http://chessprogramming.wikispaces.com/Perft+Results
-*/
-/* clang-format off */
+// clang-format off
 constexpr PerftTest perft_tests[] = {
-    /*    position                                                      depth         nodes     captures        ep     castles  promotions      checks */
+    //    position                                                      depth         nodes     captures        ep     castles  promotions      checks
     {"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",                7, { 3195901860,   108329926,   319617,     883453,          0,   33103848 } },
     {"r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -",    6, { 8031647685,  1558445089,  3577504,  184513607,   56627920,   92238050 } },
     {"8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -",                               8, { 3009794393,   267586558,  8009239,          0,    6578076,  135626805 } },
@@ -47,8 +45,13 @@ constexpr PerftTest perft_tests[] = {
     {"rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ -",               5, {   89941194,    12320378,      140,    1240828,    6655216,    3078299 } },
     {"r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - -", 5, {  164075551,    19528068,      122,          0,          0,    2998608 } },
 };
-/* clang-format on */
+// clang-format on
 
+/// @brief Run enhanced perft test - recursive search.
+/// @param src_position position to search
+/// @param depth search depth
+/// @param color color to move
+/// @param counts where to store categorized move total counts
 static void PerftExtra(const Position &src_position, int depth, Color color, PerftCounts &counts)
 {
     static uint32_t call_count = 0;
@@ -93,6 +96,11 @@ static void PerftExtra(const Position &src_position, int depth, Color color, Per
     }
 }
 
+/// @brief Run standard perft test - recursive search.
+/// @param src_position position to search
+/// @param depth search depth
+/// @param color color to move
+/// @param num_moves total number of moves at terminal / leaf nodes
 static void Perft(const Position &src_position, int depth, Color color, uint64_t &num_moves)
 {
     static uint32_t call_count = 0;
@@ -113,6 +121,7 @@ static void Perft(const Position &src_position, int depth, Color color, uint64_t
     num_moves += move_list.size();
 }
 
+/// @brief Rund the set of perft tests.
 void RunPerftTests(void)
 {
     int      start, first_start, stop = 0;
@@ -156,7 +165,8 @@ void RunPerftTests(void)
     }
 }
 
-void RunPerftTestsExtra(void)
+/// @brief Run the set of enhanced perft tests.
+void RunPerftTestsExtra()
 {
     int      start, first_start, stop = 0;
     bool     is_good     = true;

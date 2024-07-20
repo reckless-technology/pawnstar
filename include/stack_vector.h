@@ -1,11 +1,9 @@
 #pragma once
-/**
- * @brief Fixed size, simple stack storage "vector" for containing lists of moves.
- * Considerably faster than std::vector due to not allocating data on the heap.
- * More convenient than a std::array for insertion, sorting and iteration.
- * Perft speed is over 2x faster using this in place of std::vector<Move> for move generation.
- * NB: There is no buffer overflow protection.
- */
+/// @brief Fixed size, simple stack storage "vector" for containing lists of moves.
+/// Considerably faster than std::vector due to not allocating data on the heap.
+/// More convenient than a std::array for insertion, sorting and iteration.
+/// Perft speed is over 2x faster using this in place of std::vector<Move> for move generation.
+/// NB: There is no buffer overflow protection.
 template <typename T, int N> class StackVector
 {
   public:
@@ -32,9 +30,8 @@ template <typename T, int N> class StackVector
     {
         return end_ - data_;
     }
-    /**
-     * @brief Iterator class for the simple stack based vector.
-     */
+
+    /// @brief Iterator class for the simple stack based vector.
     template <typename I> struct Iterator
     {
         using iterator_category = std::random_access_iterator_tag;

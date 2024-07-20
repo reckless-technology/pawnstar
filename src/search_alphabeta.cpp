@@ -7,18 +7,16 @@
 #include "sort_moves.h"
 #include "transposition_table.h"
 
-/**
- * @brief Search a single move and return its alpha beta score.
- * @param game Game we are searching
- * @param depth Depth to search to
- * @param ply Distance from root node
- * @param alpha Floor value
- * @param beta Opponents floor value
- * @param move Move to search
- * @param pv Parent's principal variation
- * @param move_index Move number (0 is first move)
- * @return score for this move
- */
+/// @brief Search a single move and return its alpha beta score.
+/// @param game Game we are searching
+/// @param depth Depth to search to
+/// @param ply Distance from root node
+/// @param alpha Floor value
+/// @param beta Opponents floor value
+/// @param move Move to search
+/// @param pv Parent's principal variation
+/// @param move_index Move number (0 is first move)
+/// @return score for this move
 int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index)
 {
     game.PlayMove(move);
@@ -41,26 +39,23 @@ int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move m
     return score;
 }
 
-/**
- * @brief Try null move pruning.
- *
- * Try null move pruning if ALL of the following are true:
- *
- * 1) the previous move was not a null move
- * 2) we are not in check
- * 3) this is not a PV node
- * 4) we are not down to king and pawns
- * 5) static eval is at least beta
- *
- * Hopefully this is sufficient to prevent most Zugzwang positions.
- *
- * @param game Current game (position)
- * @param depth Current search depth
- * @param ply Distance from root node
- * @param alpha Score floor
- * @param beta Score ceiling (opponent's floor)
- * @return beta on success, alpha on failure
- */
+/// @brief Try null move pruning.
+/// Try null move pruning if ALL of the following are true:
+///
+/// 1) the previous move was not a null move
+/// 2) we are not in check
+/// 3) this is not a PV node
+/// 4) we are not down to king and pawns
+/// 5) static eval is at least beta
+///
+/// Hopefully this is sufficient to prevent most Zugzwang positions.
+///
+/// @param game Current game (position)
+/// @param depth Current search depth
+/// @param ply Distance from root node
+/// @param alpha Score floor
+/// @param beta Score ceiling (opponent's floor)
+/// @return beta on success, alpha on failure
 static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int beta)
 {
     const Position &position = game.CurrentPosition();
@@ -87,13 +82,11 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
     return alpha;
 }
 
-/**
- * @brief Determine if a (late) move is OK to reduce.
- * We do not reduce checking moves, captures, promotions, or pushes of pawns to 7th rank.
- * @param move The move
- * @param color Color to move
- * @return true if OK to reduce
- */
+/// @brief Determine if a (late) move is OK to reduce.
+/// We do not reduce checking moves, captures, promotions, or pushes of pawns to 7th rank.
+/// @param move The move
+/// @param color Color to move
+/// @return true if OK to reduce
 static inline bool IsMoveOkToReduce(Move move, Color color)
 {
     constexpr uint8_t seventh_rank[2] = {6, 1};
@@ -112,16 +105,14 @@ static inline bool IsMoveOkToReduce(Move move, Color color)
     return true;
 }
 
-/**
- * @brief Alpha beta main search algorithm.
- * @param game position to search
- * @param depth search depth
- * @param ply distance from root node
- * @param alpha score floor at parent node
- * @param beta score ceiling at parent node
- * @param parent_pv principal variation at the parent node
- * @return score for this node
- */
+/// @brief Alpha beta main search algorithm.
+/// @param game position to search
+/// @param depth search depth
+/// @param ply distance from root node
+/// @param alpha score floor at parent node
+/// @param beta score ceiling at parent node
+/// @param parent_pv principal variation at the parent node
+/// @return score for this node
 int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &parent_pv)
 {
     INCREMENT("alpha beta calls");

@@ -13,11 +13,9 @@
 using std::string;
 using std::stringstream;
 
-/**
- * @brief Search the root node and find the best move
- * @param src_position the position to search
- * @return the best move found
- */
+/// @brief Search the root node and find the best move
+/// @param src_position the position to search
+/// @return the best move found
 Move SearchRootNode(Game &game)
 {
     // If there is a book move for this position, do not bother with search.

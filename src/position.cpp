@@ -22,11 +22,8 @@ using std::vector;
 #define H8M (uint8_t)(~Position::MAY_BLACK_CASTLE_KINGSIDE)
 #define OK  0xFF
 
-/**
- * @brief Castling rights flags based on move square from and to index.
- * Moves to and from king and rook squares invalidate castling rights.
- */
-
+/// @brief Castling rights flags which are ANDED with a move source and destination square to form new castling rights
+/// after a move. Only moves affecting a1, e1, h1, a8, e8, h8 will have any effect.
 constexpr uint8_t Position::CASTLING_RIGHTS_MASKS[64] = {
     /* clang-format off */
     A1M, OK, OK, OK,E1M, OK, OK,H1M, 
@@ -40,13 +37,11 @@ constexpr uint8_t Position::CASTLING_RIGHTS_MASKS[64] = {
     /* clang-format on */
 };
 
-/**
- * @brief Make a null move: don't actually move any pieces on the board.
- * # Flip side to move
- * # Clear en passant capture availablity
- * # Set the flag indicating this position is the result of a null move
- * @return new position.
- */
+/// @brief Make a null move: don't actually move any pieces on the board.
+/// # Flip side to move
+/// # Clear en passant capture availablity
+/// # Set the flag indicating this position is the result of a null move
+/// @return new position.
 Position Position::MakeNullMove() const
 {
     Position position{*this};
@@ -58,6 +53,10 @@ Position Position::MakeNullMove() const
     return position;
 }
 
+/// @brief Add a piece to the board.
+/// @param color Piece color
+/// @param piece Piece type
+/// @param to Target square
 void Position::AddPiece(Color color, Piece piece, Square to)
 {
     const Bitboard to_bb = BITBOARD(to);
@@ -67,6 +66,10 @@ void Position::AddPiece(Color color, Piece piece, Square to)
     squares_[to] = piece;
 }
 
+/// @brief Remove a piece from the board.
+/// @param color Piece color
+/// @param piece Piece type
+/// @param from Target square
 void Position::RemovePiece(Color color, Piece piece, Square from)
 {
     const Bitboard from_bb = BITBOARD(from);
@@ -76,6 +79,11 @@ void Position::RemovePiece(Color color, Piece piece, Square from)
     squares_[from] = NONE;
 }
 
+/// @brief Move a piece on the board.
+/// @param color Piece color
+/// @param piece Piece type
+/// @param from Source square
+/// @param to Destination square
 void Position::MovePiece(Color color, Piece piece, Square from, Square to)
 {
     const Bitboard        from_to_bb = BITBOARD(from) | BITBOARD(to);
@@ -87,6 +95,9 @@ void Position::MovePiece(Color color, Piece piece, Square from, Square to)
     squares_[to]   = piece;
 }
 
+/// @brief Make a move
+/// @param move The move
+/// @return new Position following the move.
 Position Position::MakeMove(const Move &move) const
 {
     const Color  color    = ColorToMove();
@@ -111,7 +122,7 @@ Position Position::MakeMove(const Move &move) const
         {
             if (move.IsEpCapture())
             {
-                /* En passant capture: capture location is source rank, destination file. */
+                // En passant capture: capture location is source rank, destination file.
                 const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));
                 position.RemovePiece(EnemyOf(color), PAWN, captured_pawn_locn);
             }
@@ -122,7 +133,7 @@ Position Position::MakeMove(const Move &move) const
         }
         if (move.promoted() != NONE)
         {
-            /* Replace the pawn with the promoted piece. */
+            // Replace the pawn with the promoted piece.
             position.RemovePiece(color, PAWN, from);
             position.AddPiece(color, move.promoted(), to);
         }
@@ -131,7 +142,7 @@ Position Position::MakeMove(const Move &move) const
             position.MovePiece(color, PAWN, from, to);
             if (move.IsPawnDoublePush())
             {
-                /* Pawn double push: affects en passant. */
+                // Pawn double push: affects en passant.
                 position.en_passant_square_ = (Square)((from + to) >> 1);
                 position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
             }
@@ -162,7 +173,7 @@ Position Position::MakeMove(const Move &move) const
             position.MovePiece(color, KING, from, to);
             break;
         }
-        /* Castling move. */
+        // Castling moves.
         switch (to)
         {
         case G1:
@@ -202,15 +213,17 @@ Position Position::MakeMove(const Move &move) const
         return;                                          \
     }
 
+/// @brief Construct a position.
+/// @param fen_string Forsyth Edwards string.
 Position::Position(std::string_view fen_string) : Position()
 {
-    static constexpr string_view white_piece_names{"PNBRQK"};
-    static constexpr string_view black_piece_names{"pnbrqk"};
-    static constexpr string_view ep_files{"abcdefgh"};
-    static constexpr string_view ep_ranks{"36"};
-    stringstream                 ss;
+    constexpr string_view white_piece_names{"PNBRQK"};
+    constexpr string_view black_piece_names{"pnbrqk"};
+    constexpr string_view ep_files{"abcdefgh"};
+    constexpr string_view ep_ranks{"36"};
+    stringstream          ss;
     ss << fen_string;
-    /* Pieces on the board */
+    // Pieces on the board
     string pieces;
     ss >> pieces;
     if (pieces == "")
@@ -264,7 +277,7 @@ Position::Position(std::string_view fen_string) : Position()
     {
         BAD_FEN_STRING;
     }
-    /* Side to move */
+    // Side to move
     string color_to_move;
     ss >> color_to_move;
     if (color_to_move == "")
@@ -281,7 +294,7 @@ Position::Position(std::string_view fen_string) : Position()
     }
     king_location_[WHITE] = Lsb(kings_ & white_pieces_);
     king_location_[BLACK] = Lsb(kings_ & black_pieces_);
-    /* Castling rights */
+    // Castling rights
     string castling_rights;
     ss >> castling_rights;
     if (castling_rights == "")
@@ -315,7 +328,7 @@ Position::Position(std::string_view fen_string) : Position()
             }
         }
     }
-    /* En passant capture square */
+    // En passant capture square
     string ep_square;
     ss >> ep_square;
     if (ep_square == "")
@@ -337,25 +350,24 @@ Position::Position(std::string_view fen_string) : Position()
     }
     if (ss)
     {
-        /* Half move clock - optional */
+        // Half move clock - optional
         int hmc = 0;
         ss >> hmc;
         reversible_move_count_ = (uint8_t)hmc;
     }
     if (ss)
     {
-        /* Full move number - optional */
+        // Full move number - optional
         int fmn = 1;
         ss >> fmn;
         full_move_count_ = (uint8_t)fmn - 1;
     }
     hash_ = ComputeHash();
-    /* Legality of position */
     if (!IsLegal())
     {
         BAD_FEN_STRING;
     }
-    /* Is the position in check? */
+    // Is this position check?
     const Color color = ColorToMove();
     checkers_         = AttacksTo(king_location_[color], EnemyOf(color));
 }
@@ -363,7 +375,7 @@ Position::Position(std::string_view fen_string) : Position()
 std::string Position::ToString() const
 {
     stringstream ss;
-    /* Pieces on the board */
+    // Pieces on the board
     const Bitboard occupied_squares = white_pieces_ | black_pieces_;
     for (int y = 7; y >= 0; --y)
     {
@@ -396,9 +408,9 @@ std::string Position::ToString() const
             ss << '/';
         }
     }
-    /* Side to move */
+    // Side to move
     ss << ' ' << (flags_ & IS_BLACK_TO_MOVE ? 'b' : 'w') << ' ';
-    /* Castling rights */
+    // Castling rights
     if (!(flags_ & CASTLING_RIGHTS_MASK))
     {
         ss << '-';
@@ -423,7 +435,7 @@ std::string Position::ToString() const
         }
     }
     ss << ' ';
-    /* En passant capture availability */
+    // En passant capture availability
     if (en_passant_square_ == 0)
     {
         ss << '-';
@@ -433,17 +445,15 @@ std::string Position::ToString() const
         ss << FileChar(en_passant_square_) << RankChar(en_passant_square_);
     }
     ss << ' ';
-    /* Half move clock and full move number */
+    // Half move clock and full move number
     ss << (int)reversible_move_count_ << ' ' << (int)(full_move_count_ + 1);
     return ss.str();
 }
 
-/**
- * @brief Determine if a square is attacked by a color
- * @param location  location of attacked square
- * @param color attacking color
- * @return true if color attacks location, otherwise false
- */
+/// @brief Determine if a square is attacked by a color
+/// @param location  location of attacked square
+/// @param color attacking color
+/// @return true if color attacks location, otherwise false
 bool Position::IsAttacked(Square location, Color color) const
 {
     const Sets           &sets                = SETS[location];
@@ -455,9 +465,7 @@ bool Position::IsAttacked(Square location, Color color) const
     {
         return true;
     }
-    /*
-    Rook and queen horizontal and vertical sliding attacks
-    */
+    // Rook and queen horizontal and vertical sliding attacks.
     Bitboard sliding_attackers = (rooks_ | queens_) & sets.rook_attacks & attacking_pieces;
     while (sliding_attackers)
     {
@@ -466,9 +474,7 @@ bool Position::IsAttacked(Square location, Color color) const
             return true;
         }
     }
-    /*
-    Bishop and queen diagonal and antidiagonal sliding attacks
-    */
+    // Bishop and queen diagonal and antidiagonal sliding attacks.
     sliding_attackers = (bishops_ | queens_) & sets.bishop_attacks & attacking_pieces;
     while (sliding_attackers)
     {
@@ -480,28 +486,21 @@ bool Position::IsAttacked(Square location, Color color) const
     return false;
 }
 
-/**
- * @brief Determine attacks to a square by a color.
- * @param position Board position.
- * @param location Square index.
- * @param color Attacking color.
- * @return Set of squares of color containing a piece attacking location.
- */
+/// @brief Determine attacks to a square by a color.
+/// @param position Board position.
+/// @param location Square index.
+/// @param color Attacking color.
+/// @return Set of squares of color containing a piece attacking location.
 Bitboard Position::AttacksTo(Square location, Color color) const
 {
     const Sets           &sets                = SETS[location];
     const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
     const Bitboard        attacking_pieces    = PiecesOfColor(color);
     const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
-    /*
-    Pawn, knight and king attacks can be done by direct lookup since blockers
-    do not affect their attack set.
-    */
+    // Pawn, knight and king attacks can be done by direct lookup since blockers do not affect their attack set.
     Bitboard result = (attacking_pieces & ((sets.PawnAttacks(EnemyOf(color)) & pawns_) |
                                            (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)));
-    /*
-    Rook and queen horizontal and vertical sliding attacks
-    */
+    // Rook and queen horizontal and vertical sliding attacks.
     Bitboard sliding_attackers = (rooks_ | queens_) & sets.rook_attacks & attacking_pieces;
     while (sliding_attackers)
     {
@@ -511,9 +510,7 @@ Bitboard Position::AttacksTo(Square location, Color color) const
             result |= BITBOARD(s);
         }
     }
-    /*
-    Bishop and queen diagonal and antidiagonal sliding attacks
-    */
+    // Bishop and queen diagonal and antidiagonal sliding attacks.
     sliding_attackers = (bishops_ | queens_) & sets.bishop_attacks & attacking_pieces;
     while (sliding_attackers)
     {
@@ -526,16 +523,8 @@ Bitboard Position::AttacksTo(Square location, Color color) const
     return result;
 }
 
-/*
-Determine if the current position represents a draw by insufficient material
-
-according to FIDE rules the drawn combinations are:
-
-a) king vs king
-b) king and knight vs king
-c) king and bishop vs king
-d) king and bishop vs king and bishop, with bishops on the same color square
-*/
+/// @brief Determine if the position is draw by insufficient material.
+/// @return true if a material draw
 bool Position::IsDrawByMaterial() const
 {
     const Bitboard occupied_squares = white_pieces_ | black_pieces_;
@@ -546,16 +535,11 @@ bool Position::IsDrawByMaterial() const
         printf("ERROR: too few pieces for play\n");
         return true;
     case 2:
-        /*
-        king vs king
-        */
+        // king vs king
         INCREMENT("draws by material (2)");
         return true;
     case 3:
-        /*
-        king and bishop vs king
-        king and knight vs king
-        */
+        // king and bishop vs king or king and knight vs king
         if (bishops_ | knights_)
         {
             INCREMENT("draws by material (3)");
@@ -563,9 +547,7 @@ bool Position::IsDrawByMaterial() const
         }
         return false;
     case 4:
-        /*
-        king and bishop vs king and bishop with bishops on same color square
-        */
+        // king and bishop vs king and bishop with bishops on same color square
         {
             const Bitboard white_bishops = bishops_ & white_pieces_;
             const Bitboard black_bishops = bishops_ ^ white_bishops;
@@ -582,12 +564,11 @@ bool Position::IsDrawByMaterial() const
     }
 }
 
-/**
- * @brief Determine if the current position state is a legal chess position:
- * a) each side shall have strictly 1 king
- * b) kings shall not be adjacent
- * c) the side not on move shall not be in check
- */
+/// @brief Determine if the current position state is a legal chess position:
+/// a) each side shall have strictly 1 king
+/// b) kings shall not be adjacent
+/// c) the side not on move shall not be in check
+/// @return true if legal
 bool Position::IsLegal() const
 {
     const Color    color      = ColorToMove();
@@ -597,10 +578,8 @@ bool Position::IsLegal() const
            !(SETS[Lsb(white_king)].king_attacks & black_king) && !IsAttacked(king_location_[EnemyOf(color)], color);
 }
 
-/**
- * @brief Compute the Zobrist hash for a chess position.
- * @return the 64 bit hash
- */
+/// @brief Compute the Zobrist hash for a chess position.
+/// @return the 64 bit hash
 uint64_t Position::ComputeHash() const
 {
     uint64_t hash = flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
@@ -622,27 +601,20 @@ uint64_t Position::ComputeHash() const
     return hash;
 }
 
-/*
-Determine if the current position represents stalemate
-*/
 bool Position::IsStalemate() const
 {
     return !IsInCheck() && GenerateLegalMoves().size() == 0;
 }
-/*
-Determine if the current position represents checkmate
-*/
+
 bool Position::IsCheckmate() const
 {
     return IsInCheck() && GenerateLegalMoves().size() == 0;
 }
 
-/**
- * @brief Convert a move to standard algebraic notation string.
- * @param move The move input to be formatted as a string.
- * @param legal_moves Optional pointer to list of legal moves. May be nullptr.
- * @return SAN formatted move string.
- */
+/// @brief Convert a move to standard algebraic notation string.
+/// @param move The move input to be formatted as a string.
+/// @param legal_moves Optional pointer to list of legal moves. May be nullptr (slower).
+/// @return SAN formatted move string.
 string Position::MoveToString(const Move &move, const MoveList *legal_moves) const
 {
     stringstream result;
@@ -653,10 +625,8 @@ string Position::MoveToString(const Move &move, const MoveList *legal_moves) con
     bool         is_file_unique      = true;
     bool         is_rank_unique      = true;
     const char   move_piece          = " PNBRQK"[move.piece()];
-    /*
-    Determine if there is more than one piece of the same type which is capable
-    of moving to the target square, and will require further disambiguation
-    */
+    // Determine if there is more than one piece of the same type which is capable of moving to the target square, and
+    // will require further disambiguation.
     MoveList moves;
     if (legal_moves == nullptr)
     {
@@ -684,10 +654,7 @@ string Position::MoveToString(const Move &move, const MoveList *legal_moves) con
             }
         }
     }
-    /*
-    Determine how to disambiguate source square based on the uniqueness of the
-    source rank and file
-    */
+    // Determine how to disambiguate source square based on the uniqueness of the source rank and file.
     if (is_source_ambiguous)
     {
         if (is_file_unique)
@@ -742,7 +709,7 @@ string Position::MoveToString(const Move &move, const MoveList *legal_moves) con
             }
             break;
         }
-        /* FALLTHROUGH */
+        // FALLTHROUGH
     case KNIGHT:
     case BISHOP:
     case ROOK:
@@ -758,9 +725,7 @@ string Position::MoveToString(const Move &move, const MoveList *legal_moves) con
         }
         break;
     }
-    /*
-    Determine if this move results in check or checkmate
-    */
+    // Determine if this move results in check or checkmate.
     Position dst_position{MakeMove(move)};
     if (dst_position.IsCheckmate())
     {

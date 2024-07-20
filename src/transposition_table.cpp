@@ -1,3 +1,5 @@
+/// @file Functions to implement a transposition table.
+
 #include <algorithm>
 #include <vector>
 
@@ -7,21 +9,15 @@
 
 constexpr static bool IsPrime(std::size_t x);
 
-/**
- * Transposition table is just a vector of Transpositions, which
- * we index by using the Zobrist hash of the position.
- */
+/// @brief The table itself.
 static std::vector<Transposition> table;
 
-/**
- * @brief Create the transposition table.
- * @param megabytes Approx max size of the table in megabytes. May be slightly smaller (table is prime size).
- * @return true on success
- */
+/// @brief Create the transposition table.
+/// @param megabytes Approx max size of the table in megabytes. May be slightly smaller (table is prime size).
 void InitializeTranspositionTable(std::size_t megabytes)
 {
     std::size_t num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
-    /* Find the next smallest prime number and make the table that size */
+    // Find the next smallest prime number and make the table that size.
     if ((num_entries & 1) == 0)
     {
         --num_entries;
@@ -30,16 +26,15 @@ void InitializeTranspositionTable(std::size_t megabytes)
     {
         num_entries -= 2;
     }
-    table.assign(num_entries,
-                 Transposition{.hash = 0, .move = Move::None(), .score = 0, .depth = 0, .node_type = NODE_CUT, .is_old = false});
+    table.assign(
+        num_entries,
+        Transposition{.hash = 0, .move = Move::None(), .score = 0, .depth = 0, .node_type = NODE_CUT, .is_old = false});
 }
 
-/**
- * @brief Find an entry in the TT if one exists for this position.
- * @param hash Zobrist hash of position
- * @param transposition Reference to transposition to assign if found
- * @return true on success
- */
+/// @brief Find an entry in the TT if one exists for this position.
+/// @param hash Zobrist hash of position
+/// @param transposition Reference to transposition to assign if found
+/// @return true if a transposition was found in the table.
 bool FindTransposition(uint64_t hash, Transposition &transposition)
 {
     const Transposition &t = table[hash % table.size()];
@@ -51,18 +46,17 @@ bool FindTransposition(uint64_t hash, Transposition &transposition)
     return false;
 }
 
-/**
- * @brief Insert a new entry into the table.
- * @param hash Zobrist hash of position.
- * @param depth Search depth.
- * @param score Score for this position.
- * @param move Best move found.
- * @param node_type Node type.
- */
+/// @brief Insert a new entry into the table.
+/// @param hash Zobrist hash of position.
+/// @param depth Search depth.
+/// @param score Score for this position.
+/// @param move Best move found.
+/// @param node_type Node type.
 void RecordTransposition(uint64_t hash, int depth, int score, Move move, NodeType node_type)
 {
     Transposition &t = table[hash % table.size()];
-    if (t.hash == 0 || t.is_old || t.depth <= depth)
+    // If the new entry is more valuable than any previous entry then replace it.
+    if (t.hash == 0 || t.is_old || t.depth <= depth || node_type == NODE_PV)
     {
         t.hash      = hash;
         t.move      = move;
@@ -73,23 +67,25 @@ void RecordTransposition(uint64_t hash, int depth, int score, Move move, NodeTyp
     }
 }
 
+/// @brief Show table occupancy.
+/// @return The number of transpositions and percentage full of the table.
 std::pair<std::size_t, int> TranspositionTableUsage()
 {
     const std::size_t count = std::ranges::count_if(table, [](const Transposition &t) { return t.hash != 0; });
     return std::pair<int, int>{count, (count * 100) / table.size()};
 }
 
+/// @brief Age all the transposition entries in the table. An entry is old if it does not pertain to the current search
+/// being performed.
 void AgeTranspositionTable()
 {
     std::ranges::for_each(table, [](Transposition &t) { t.is_old = true; });
 }
 
-/**
- * @brief determine if a number is a prime number.
- * We get marginally better hash dispersion when the hashtable size is a prime number
- * @param x candidate
- * @return true if x is prime
- */
+/// @brief determine if a number is a prime number. We get marginally better hash dispersion when the hashtable size is
+/// a prime number.
+/// @param x candidate
+/// @return true if x is prime
 constexpr static bool IsPrime(std::size_t x)
 {
     if (x < 3)
