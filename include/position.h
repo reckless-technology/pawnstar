@@ -117,11 +117,11 @@ static_assert(sizeof(Position) == 152);
 
 #include "pins.h"
 
-/// @brief Generate legal chess moves for a position.
-/// @param color Color to move.
-/// @param do_non_captures Generate all moves if true, otherwise captures and promotions only.
-/// @return list of legal moves for this position.
-template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
+/// @brief Generate legal moves for this position.
+/// @tparam color color to generate moves for
+/// @tparam do_all_moves if true generate all moves, otherwise captures and promotions only
+/// @return list of moves generated
+template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
 {
     constexpr Color enemy_color      = EnemyOf(color);
     const Bitboard  occupied_squares = white_pieces_ | black_pieces_;
@@ -133,8 +133,8 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
 
     MoveList moves;
 
-    // Determine the squares which our king cannot move to, i.e. any square which is attacked or X-ray attacked by the
-    // enemy.
+    // Determine the squares which our king cannot move to, i.e. any square which is attacked or X-ray attacked by any
+    // enemy piece.
 
     Bitboard forbidden_king_squares = color == WHITE ? ShiftSouthwest(enemy_pawns) | ShiftSoutheast(enemy_pawns)
                                                      : ShiftNorthwest(enemy_pawns) | ShiftNortheast(enemy_pawns);
@@ -144,21 +144,23 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
     {
         forbidden_king_squares |= SETS[FindAndClearLsb(b)].knight_attacks;
     }
+    // Temporarily remove our king to detect X-ray attacks from enemy sliding pieces.
+    const Bitboard occupied_except_king = occupied_squares ^ BITBOARD(king_locn);
+
     b = (bishops_ | queens_) & enemy_pieces;
     while (b)
     {
-        // Temporarily remove our king to detect sliding piece X-ray attacks.
-        forbidden_king_squares |= BishopAttacks(occupied_squares ^ BITBOARD(king_locn), FindAndClearLsb(b));
+        forbidden_king_squares |= BishopAttacks(occupied_except_king, FindAndClearLsb(b));
     }
     b = (rooks_ | queens_) & enemy_pieces;
     while (b)
     {
-        // Temporarily remove our king to detect sliding piece X-ray attacks.
-        forbidden_king_squares |= RookAttacks(occupied_squares ^ BITBOARD(king_locn), FindAndClearLsb(b));
+        forbidden_king_squares |= RookAttacks(occupied_except_king, FindAndClearLsb(b));
     }
+    // King cannot move to squares controlled by the enemy king.
     forbidden_king_squares |= SETS[enemy_king_locn].king_attacks;
 
-    // The king may only move to squares which are not forbidden.
+    // The king may only safely move to squares which are not forbidden.
     const Bitboard king_move_targets = SETS[king_locn].king_attacks & ~forbidden_king_squares;
 
     // Generate King moves.
@@ -168,7 +170,7 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
         const Square to = FindAndClearLsb(king_captures);
         moves.push_back(Move::CaptureMove(king_locn, to, KING, PieceAt(to)));
     }
-    if constexpr (do_non_captures)
+    if constexpr (do_all_moves)
     {
         Bitboard king_non_captures = king_move_targets & ~occupied_squares;
         while (king_non_captures)
@@ -192,70 +194,61 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
         // a) Capture the checking piece, OR
         // b) If checked by a sliding piece, interpose a piece between the checker and our king.
         // NB: This includes an en passant capture if the en passant square is between the king and the sliding checker.
-        const Square checker_locn   = Lsb(checkers_);
-        const Piece  checking_piece = PieceAt(checker_locn);
-        switch (checking_piece)
-        {
-        case PAWN:
-        case KNIGHT:
-            allowed_captures     = checkers_;
-            allowed_non_captures = NO_SQUARES; // Can't block pawn or knight checks.
-            break;
-
-        case BISHOP:
-        case ROOK:
-        case QUEEN:
-            allowed_captures     = checkers_;
-            allowed_non_captures = INTERVENING_SQUARES[king_locn][checker_locn];
-            break;
-
-        default:
-            printf("ERROR in checking piece logic\n");
-            break;
-        }
+        const Square checker_locn = Lsb(checkers_);
+        allowed_captures          = checkers_;
+        allowed_non_captures      = INTERVENING_SQUARES[king_locn][checker_locn];
     }
+
     const Pins pins{*this}; // Determine pinned pieces and their allowed destination squares.
 
     // Generate knight moves.
     b = knights_ & friendly_pieces;
     while (b)
     {
-        const Square from            = FindAndClearLsb(b);
-        Bitboard     capture_targets = SETS[from].knight_attacks & allowed_captures & pins.AllowedSquares(from);
+        const Square   from            = FindAndClearLsb(b);
+        const Bitboard attacks         = SETS[from].knight_attacks & pins.AllowedSquares(from);
+        Bitboard       capture_targets = attacks & allowed_captures;
         while (capture_targets)
         {
             const Square to = FindAndClearLsb(capture_targets);
             moves.push_back(Move::CaptureMove(from, to, KNIGHT, PieceAt(to)));
         }
-        if constexpr (do_non_captures)
+        if constexpr (do_all_moves)
         {
-            Bitboard non_capture_targets = SETS[from].knight_attacks & allowed_non_captures & pins.AllowedSquares(from);
+            Bitboard non_capture_targets = attacks & allowed_non_captures;
             while (non_capture_targets)
             {
                 moves.push_back(Move::NonCaptureMove(from, FindAndClearLsb(non_capture_targets), KNIGHT));
             }
         }
     }
+
     // Generate bishop, rook and queen moves.
     typedef Bitboard (*AttackFn)(Bitboard occupied_squares, Square locn);
-    constexpr std::pair<Piece, AttackFn> SLIDING_ATTACKERS[3] = {
-        {BISHOP, BishopAttacks}, {ROOK, RookAttacks}, {QUEEN, QueenAttacks}};
-    for (const auto &[piece, attack_fn] : SLIDING_ATTACKERS)
+    // clang-format off
+    constexpr std::pair<Piece, AttackFn> SLIDING_ATTACKERS[3] = 
+    {
+        { BISHOP,   BishopAttacks }, 
+        { ROOK,     RookAttacks   }, 
+        { QUEEN,    QueenAttacks  }
+    };
+    // clang-format on
+    for (auto &[piece, attack_fn] : SLIDING_ATTACKERS)
     {
         b = PiecesOfType(piece) & friendly_pieces;
         while (b)
         {
             const Square   from            = FindAndClearLsb(b);
-            const Bitboard attacks         = attack_fn(occupied_squares, from);
-            Bitboard       capture_targets = attacks & allowed_captures & pins.AllowedSquares(from);
+            const Bitboard attacks         = attack_fn(occupied_squares, from) & pins.AllowedSquares(from);
+            Bitboard       capture_targets = attacks & allowed_captures;
             while (capture_targets)
             {
                 const Square to = FindAndClearLsb(capture_targets);
                 moves.push_back(Move::CaptureMove(from, to, piece, PieceAt(to)));
             }
-            if constexpr (do_non_captures)
+            if constexpr (do_all_moves)
             {
-                Bitboard non_capture_targets = attacks & allowed_non_captures & pins.AllowedSquares(from);
+                Bitboard non_capture_targets = attacks & allowed_non_captures;
                 while (non_capture_targets)
                 {
                     moves.push_back(Move::NonCaptureMove(from, FindAndClearLsb(non_capture_targets), piece));
@@ -270,7 +263,7 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
     // 3) King is not in check
     // 4) Squares between King and Rook are vacant
     // 5) Square King passes through is not attacked by the enemy.
-    if constexpr (do_non_captures)
+    if constexpr (do_all_moves)
     {
         if (!IsInCheck())
         {
@@ -304,69 +297,70 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
     }
 
     // Generate pawn moves.
-    struct PawnMoveVars
-    {
-        Bitboard pawns;
-        Bitboard single_pushes;
-        Bitboard double_pushes;
-        Bitboard captures_west;
-        Bitboard captures_east;
-        Bitboard en_passant_sources;
-        Bitboard promotions;
-        Bitboard promotions_west;
-        Bitboard promotions_east;
-        int8_t   push_delta;
-        int8_t   west_delta;
-        int8_t   east_delta;
-    } pmv;
+    Bitboard pawns;              // friendly pawns
+    Bitboard single_pushes;      // single push targets
+    Bitboard double_pushes;      // double push targets
+    Bitboard captures_west;      // capture west targets
+    Bitboard captures_east;      // capture east targets
+    Bitboard en_passant_sources; // pawns which can capture ep
+    Bitboard promotions;         // push promotion targets
+    Bitboard promotions_west;    // promotion capture west targets
+    Bitboard promotions_east;    // promotion capture east targets
+    int8_t   push_delta;         // square index delta for push forward
+    int8_t   west_delta;         // square index delta for capture west
+    int8_t   east_delta;         // square index delta for capture east
+
     if constexpr (color == WHITE)
     {
-        pmv.pawns         = pawns_ & white_pieces_;
-        pmv.single_pushes = ShiftNorth(pmv.pawns) & ~occupied_squares;
-        pmv.double_pushes = ShiftNorth(pmv.single_pushes) & ~occupied_squares & RANK_4;
-        pmv.captures_west = ShiftNorthwest(pmv.pawns) & black_pieces_;
-        pmv.captures_east = ShiftNortheast(pmv.pawns) & black_pieces_;
-        pmv.en_passant_sources =
-            en_passant_square_ ? SETS[en_passant_square_].pawn_attacks_black & pmv.pawns : NO_SQUARES;
-        pmv.promotions      = pmv.single_pushes & RANK_8;
-        pmv.promotions_west = pmv.captures_west & RANK_8;
-        pmv.promotions_east = pmv.captures_east & RANK_8;
-        pmv.push_delta      = 8;
-        pmv.west_delta      = 7;
-        pmv.east_delta      = 9;
+        pawns              = pawns_ & white_pieces_;
+        single_pushes      = ShiftNorth(pawns) & ~occupied_squares;
+        double_pushes      = ShiftNorth(single_pushes) & ~occupied_squares & RANK_4;
+        captures_west      = ShiftNorthwest(pawns) & black_pieces_;
+        captures_east      = ShiftNortheast(pawns) & black_pieces_;
+        en_passant_sources = en_passant_square_ ? SETS[en_passant_square_].pawn_attacks_black & pawns : NO_SQUARES;
+        promotions         = single_pushes & RANK_8;
+        promotions_west    = captures_west & RANK_8;
+        promotions_east    = captures_east & RANK_8;
+        push_delta         = 8;
+        west_delta         = 7;
+        east_delta         = 9;
     }
     else
     {
-        pmv.pawns         = pawns_ & black_pieces_;
-        pmv.single_pushes = ShiftSouth(pmv.pawns) & ~occupied_squares;
-        pmv.double_pushes = ShiftSouth(pmv.single_pushes) & ~occupied_squares & RANK_5;
-        pmv.captures_west = ShiftSouthwest(pmv.pawns) & white_pieces_;
-        pmv.captures_east = ShiftSoutheast(pmv.pawns) & white_pieces_;
-        pmv.en_passant_sources =
-            en_passant_square_ ? SETS[en_passant_square_].pawn_attacks_white & pmv.pawns : NO_SQUARES;
-        pmv.promotions      = pmv.single_pushes & RANK_1;
-        pmv.promotions_west = pmv.captures_west & RANK_1;
-        pmv.promotions_east = pmv.captures_east & RANK_1;
-        pmv.push_delta      = -8;
-        pmv.west_delta      = -9;
-        pmv.east_delta      = -7;
+        pawns              = pawns_ & black_pieces_;
+        single_pushes      = ShiftSouth(pawns) & ~occupied_squares;
+        double_pushes      = ShiftSouth(single_pushes) & ~occupied_squares & RANK_5;
+        captures_west      = ShiftSouthwest(pawns) & white_pieces_;
+        captures_east      = ShiftSoutheast(pawns) & white_pieces_;
+        en_passant_sources = en_passant_square_ ? SETS[en_passant_square_].pawn_attacks_white & pawns : NO_SQUARES;
+        promotions         = single_pushes & RANK_1;
+        promotions_west    = captures_west & RANK_1;
+        promotions_east    = captures_east & RANK_1;
+        push_delta         = -8;
+        west_delta         = -9;
+        east_delta         = -7;
     }
-    pmv.captures_west ^= pmv.promotions_west;
-    pmv.captures_east ^= pmv.promotions_east;
-    pmv.single_pushes ^= pmv.promotions;
+    captures_west ^= promotions_west;
+    captures_east ^= promotions_east;
+    single_pushes ^= promotions;
 
-    const std::pair<Bitboard, int8_t> capture_promotions[] = {{pmv.promotions_west, pmv.west_delta},
-                                                              {pmv.promotions_east, pmv.east_delta}};
+    // clang-format off
+    const std::pair<Bitboard, int8_t> capture_promotions[] = 
+    {
+        {promotions_west, west_delta},
+        {promotions_east, east_delta}
+    };
+    // clang-format on
     for (auto &[bb, delta] : capture_promotions)
     {
         b = bb & allowed_captures;
         while (b)
         {
-            const Square to       = FindAndClearLsb(b);
-            const Piece  captured = PieceAt(to);
-            const Square from     = (Square)(to - delta);
+            const Square to   = FindAndClearLsb(b);
+            const Square from = (Square)(to - delta);
             if (pins.AllowedSquares(from) & BITBOARD(to))
             {
+                const Piece captured = PieceAt(to);
                 moves.push_back(Move::PromotionCaptureMove(from, to, captured, QUEEN));
                 moves.push_back(Move::PromotionCaptureMove(from, to, captured, ROOK));
                 moves.push_back(Move::PromotionCaptureMove(from, to, captured, BISHOP));
@@ -374,52 +368,56 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
             }
         }
     }
-    b = pmv.promotions & allowed_non_captures;
+    b = promotions & allowed_non_captures;
     while (b)
     {
         const Square to   = FindAndClearLsb(b);
-        const Square from = (Square)(to - pmv.push_delta);
+        const Square from = (Square)(to - push_delta);
         if (pins.AllowedSquares(from) & BITBOARD(to))
         {
-            moves.push_back(Move::PromotionCaptureMove(from, to, NONE, QUEEN));
-            moves.push_back(Move::PromotionCaptureMove(from, to, NONE, ROOK));
-            moves.push_back(Move::PromotionCaptureMove(from, to, NONE, BISHOP));
-            moves.push_back(Move::PromotionCaptureMove(from, to, NONE, KNIGHT));
+            moves.push_back(Move::PromotionMove(from, to, QUEEN));
+            moves.push_back(Move::PromotionMove(from, to, ROOK));
+            moves.push_back(Move::PromotionMove(from, to, BISHOP));
+            moves.push_back(Move::PromotionMove(from, to, KNIGHT));
         }
     }
-    const std::pair<Bitboard, int8_t> captures[] = {{pmv.captures_west, pmv.west_delta},
-                                                    {pmv.captures_east, pmv.east_delta}};
+    // clang-format off
+    const std::pair<Bitboard, int8_t> captures[] = 
+    {
+        {captures_west, west_delta}, 
+        {captures_east, east_delta}
+    };
+    // clang-format on
     for (auto &[bb, delta] : captures)
     {
         b = bb & allowed_captures;
         while (b)
         {
-            const Square to       = FindAndClearLsb(b);
-            const Piece  captured = PieceAt(to);
-            const Square from     = (Square)(to - delta);
+            const Square to   = FindAndClearLsb(b);
+            const Square from = (Square)(to - delta);
             if (pins.AllowedSquares(from) & BITBOARD(to))
             {
-                moves.push_back(Move::CaptureMove(from, to, PAWN, captured));
+                moves.push_back(Move::CaptureMove(from, to, PAWN, PieceAt(to)));
             }
         }
     }
-    if constexpr (do_non_captures)
+    if constexpr (do_all_moves)
     {
-        b = pmv.single_pushes & allowed_non_captures;
+        b = single_pushes & allowed_non_captures;
         while (b)
         {
             const Square to   = FindAndClearLsb(b);
-            const Square from = (Square)(to - pmv.push_delta);
+            const Square from = (Square)(to - push_delta);
             if (pins.AllowedSquares(from) & BITBOARD(to))
             {
                 moves.push_back(Move::NonCaptureMove(from, to, PAWN));
             }
         }
-        b = pmv.double_pushes & allowed_non_captures;
+        b = double_pushes & allowed_non_captures;
         while (b)
         {
             const Square to   = FindAndClearLsb(b);
-            const Square from = (Square)(to - pmv.push_delta * 2);
+            const Square from = (Square)(to - push_delta * 2);
             if (pins.AllowedSquares(from) & BITBOARD(to))
             {
                 moves.push_back(Move::DoublePushMove(from, to));
@@ -431,7 +429,7 @@ template <Color color, bool do_non_captures> MoveList Position::GenMoves() const
     //  b) The captured pawn location (capture target) is in the capture mask
     // We also have to test for the special case of "discovered" horizontal check when removing both pawns from the
     // king's rank, if the king is on the same rank as the capturing and captured pawns.
-    b = pmv.en_passant_sources;
+    b = en_passant_sources;
     while (b)
     {
         const Square from               = FindAndClearLsb(b);
