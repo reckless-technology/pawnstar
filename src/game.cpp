@@ -1,3 +1,4 @@
+#include <cstring>
 #include <string>
 #include <string_view>
 
@@ -28,7 +29,7 @@ constexpr void RemoveMoveSuffixes(string &move_str)
 
 /// @brief Construct a game from a FEN (Forsyth Edwards) position string.
 /// @param fen_string Initial position.
-Game::Game(std::string_view fen_string) : position_(positions_)
+Game::Game(std::string_view fen_string)
 {
     time_control_.hard_stop_search_ms              = 0;
     time_control_.clock_type                       = CLOCK_STANDARD;
@@ -38,8 +39,8 @@ Game::Game(std::string_view fen_string) : position_(positions_)
     node_count_                                    = 0;
     engine_color_                                  = NEITHER_COLOR;
     do_show_thinking_                              = true;
-    position_                                      = positions_;
-    *position_                                     = Position{fen_string};
+    index_                                         = 0;
+    positions_[index_]                             = Position{fen_string};
 }
 
 /// @brief Construct a game from the default starting position.
@@ -47,20 +48,27 @@ Game::Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 {
 }
 
+Game &Game::operator=(const Game &that)
+{
+    std::memcpy(positions_, that.positions_, sizeof(positions_));
+    index_ = that.index_;
+    return *this;
+}
+
 /// @brief Play a move and update state. Move must be legal for the current position.
 /// @param move The move to be played.
 void Game::PlayMove(Move move)
 {
-    position_[1] = position_->MakeMove(move);
-    ++position_;
+    positions_[index_ + 1] = positions_[index_].MakeMove(move);
+    ++index_;
 }
 
 /// @brief Undo the last move played.
 void Game::UndoMove()
 {
-    if (position_ > positions_)
+    if (index_ > 0)
     {
-        --position_;
+        --index_;
     }
     else
     {
@@ -87,14 +95,14 @@ bool Game::IsDrawByRepetition(bool is_search) const
 {
     int            repetitions = is_search ? 1 : 2;
     const uint64_t hash        = CurrentPosition().Hash();
-    for (const Position *p = position_ - 2; p >= positions_; --p)
+    for (int i = index_ - 2; i >= 0; --i)
     {
-        if (p->Hash() == hash && --repetitions == 0)
+        if (positions_[i].Hash() == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");
             return true;
         }
-        if (p->ReversibleMoveCount() == 0)
+        if (positions_[i].ReversibleMoveCount() == 0)
         {
             return false;
         }
@@ -105,8 +113,8 @@ bool Game::IsDrawByRepetition(bool is_search) const
 /// @brief Make a null move. Only used during null move heuristic.
 void Game::MakeNullMove()
 {
-    position_[1] = position_->MakeNullMove();
-    ++position_;
+    positions_[index_ + 1] = positions_[index_].MakeNullMove();
+    ++index_;
 }
 
 /// @brief Play a move from the given move string in either standard algebraic or XBoard format, and update game
@@ -117,7 +125,7 @@ Move Game::PlayMove(std::string_view move_str)
 {
     string candidate{move_str};
     RemoveMoveSuffixes(candidate);
-    MoveList move_list = position_->GenerateLegalMoves();
+    MoveList move_list = positions_[index_].GenerateLegalMoves();
     for (const Move &move : move_list)
     {
         const string algebraic_move_str{move.ToString()};

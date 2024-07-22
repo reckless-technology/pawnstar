@@ -101,7 +101,8 @@ static void handle_protover(Game &, span<string> args)
 static void handle_new(Game &game, span<string>)
 {
     game.StopThinking();
-    game = Game();
+    game               = Game();
+    game.engine_color_ = BLACK;
 }
 
 static void handle_force(Game &game, span<string>)

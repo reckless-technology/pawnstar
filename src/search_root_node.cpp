@@ -1,3 +1,4 @@
+/// @file Functions to search for best move.
 #include "chess_clock.h"
 #include "debug_hashtable.h"
 #include "game.h"

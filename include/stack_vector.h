@@ -7,8 +7,20 @@
 template <typename T, int N> class StackVector
 {
   public:
-    StackVector() : end_(data_)
+    StackVector()
     {
+        end_ = data_;
+    }
+    StackVector(const StackVector &that)
+    {
+        std::copy(that.begin(), that.end(), this->begin());
+        end_ = data_ + that.size();
+    }
+    StackVector &operator=(const StackVector &that)
+    {
+        std::copy(that.begin(), that.end(), this->begin());
+        end_ = data_ + that.size();
+        return *this;
     }
     void push_back(const T &m)
     {
@@ -136,6 +148,6 @@ template <typename T, int N> class StackVector
     }
 
   private:
-    T  data_[N];
     T *end_;
+    T  data_[N];
 };

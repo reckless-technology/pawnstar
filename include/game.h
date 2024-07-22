@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -20,6 +21,8 @@ class Game
 
     Game();
     Game(std::string_view fen_string);
+    Game(const Game &that);
+    Game     &operator=(const Game &that);
     Move      PlayMove(std::string_view move_string);
     void      PlayMove(Move move);
     void      MakeNullMove();
@@ -31,16 +34,16 @@ class Game
     bool      IsDrawByFiftyMoves() const;
     Position &CurrentPosition()
     {
-        return *position_;
+        return positions_[index_];
     }
     const Position &CurrentPosition() const
     {
-        return *position_;
+        return positions_[index_];
     }
 
   private:
     void        SearchThreadEntry();
-    std::thread worker_thread_;                               ///< Worker thread for searching moves.
-    Position   *position_;                                    ///< Current position.
-    Position    positions_[256] __attribute__((aligned(16))); ///< Position stack.
+    std::thread worker_thread_;  ///< Worker thread for searching moves.
+    int         index_;          ///< Current position index.
+    Position    positions_[256]; ///< Position stack.
 };
