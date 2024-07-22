@@ -31,6 +31,7 @@ template <typename T, int N> class StackVector
         return end_ - data_;
     }
 
+#if 0
     /// @brief Iterator class for the simple stack based vector.
     template <typename I> struct Iterator
     {
@@ -39,12 +40,21 @@ template <typename T, int N> class StackVector
         using difference_type   = std::ptrdiff_t;
         using pointer           = I *;
         using reference         = I &;
-        Iterator(I *m) : ptr(m)
+        Iterator() : ptr(nullptr)
         {
         }
-        I &operator*()
+        Iterator(pointer m) : ptr(m)
+        {
+        }
+        Iterator(const Iterator &that)            = default;
+        Iterator &operator=(const Iterator &that) = default;
+        reference operator*()
         {
             return *ptr;
+        }
+        pointer operator->()
+        {
+            return ptr;
         }
         Iterator &operator++()
         {
@@ -61,6 +71,11 @@ template <typename T, int N> class StackVector
             ptr += i;
             return *this;
         }
+        Iterator &operator-=(int i)
+        {
+            ptr -= i;
+            return *this;
+        }
         friend bool operator==(const Iterator &a, const Iterator &b)
         {
             return a.ptr == b.ptr;
@@ -69,15 +84,21 @@ template <typename T, int N> class StackVector
         {
             return a.ptr < b.ptr;
         }
+        friend bool operator>(const Iterator &a, const Iterator &b)
+        {
+            return a.ptr > b.ptr;
+        }
+        friend bool operator<=(const Iterator &a, const Iterator &b)
+        {
+            return !(a > b);
+        }
+        friend bool operator>=(const Iterator &a, const Iterator &b)
+        {
+            return !(a < b);
+        }
         friend difference_type operator-(const Iterator &a, const Iterator &b)
         {
             return a.ptr - b.ptr;
-        }
-        friend Iterator operator-(const Iterator &a, int b)
-        {
-            Iterator tmp{a};
-            tmp.ptr -= b;
-            return tmp;
         }
         friend Iterator operator+(const Iterator &a, int b)
         {
@@ -85,25 +106,33 @@ template <typename T, int N> class StackVector
             tmp.ptr += b;
             return tmp;
         }
+        friend Iterator operator-(const Iterator &a, int b)
+        {
+            Iterator tmp{a};
+            tmp.ptr -= b;
+            return tmp;
+        }
 
       private:
         I *ptr;
     };
-    Iterator<T> begin()
+#endif
+
+    T *begin()
     {
-        return Iterator<T>(data_);
+        return data_;
     }
-    Iterator<T> end()
+    T *end()
     {
-        return Iterator<T>(end_);
+        return end_;
     }
-    Iterator<const T> begin() const
+    const T *begin() const
     {
-        return Iterator<const T>(data_);
+        return data_;
     }
-    Iterator<const T> end() const
+    const T *end() const
     {
-        return Iterator<const T>(end_);
+        return end_;
     }
 
   private:

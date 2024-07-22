@@ -640,7 +640,6 @@ string Position::MoveToString(const Move &move, const MoveList *legal_moves) con
     }
     for (const Move &m : *legal_moves)
     {
-
         if (m.piece() == move.piece() && m.to() == move.to() && m.from() != move.from())
         {
             is_source_ambiguous = true;
