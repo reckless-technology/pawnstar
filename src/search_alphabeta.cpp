@@ -82,29 +82,6 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
     return alpha;
 }
 
-/// @brief Determine if a (late) move is OK to reduce.
-/// We do not reduce checking moves, captures, promotions, or pushes of pawns to 7th rank.
-/// @param move The move
-/// @param color Color to move
-/// @return true if OK to reduce
-static inline bool IsMoveOkToReduce(Move move, Color color)
-{
-    constexpr uint8_t seventh_rank[2] = {6, 1};
-    if (move.IsChecking())
-    {
-        return false;
-    }
-    if (move.captured() != NONE || move.promoted() != NONE)
-    {
-        return false;
-    }
-    if (move.piece() == PAWN && RankOf(move.to()) == seventh_rank[color])
-    {
-        return false;
-    }
-    return true;
-}
-
 /// @brief Alpha beta main search algorithm.
 /// @param game game.CurrentPosition() to search
 /// @param depth search depth
@@ -189,7 +166,6 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     // Before we generate any moves, try the transposition table move first. This might save us the cost of move
     // generation altogether, or provide better alpha beta bounds for the main search.
     Variation pv;
-    int       move_index       = 0;
     Move      best_move        = Move::None();
     int       best_score       = ALPHA;
     bool      has_raised_alpha = false;
@@ -197,8 +173,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     {
         INCREMENT("table move");
         best_move = transposition.move;
-        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, move_index);
-        ++move_index;
+        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, 0);
         if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
@@ -226,10 +201,10 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     MoveList move_list{game.CurrentPosition().GenerateLegalMoves()};
     if (move_list.size() == 0)
     {
-        // We failed to find any strictly legal moves from this game.CurrentPosition(). The game.CurrentPosition()
-        // therefore represents either checkmate or stalemate depending on whether we are presently in check. If we are
-        // in checkmate, add the ply (distance from the root node) to the losing score, so that the search algorithm
-        // chooses the shortest path to checkmate when multiple possible checkmates exist in the tree.
+        // We failed to generate any strictly legal moves from this position. The position therefore represents either
+        // checkmate or stalemate depending on whether we are presently in check. If we are in checkmate, add the ply
+        // (distance from the root node) to the losing score, so that the search algorithm chooses the shortest path to
+        // checkmate when multiple possible checkmates exist in the tree.
         if (game.CurrentPosition().IsInCheck())
         {
             INCREMENT("checkmates");
@@ -240,21 +215,28 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     }
     // Start of the main loop.
     ScoreAndSortMoves(game.CurrentPosition(), move_list, ply, depth);
-    for (const auto &move : move_list)
+    for (int move_index = 0; move_index != (int)move_list.size(); ++move_index)
     {
+        const Move move = move_list[move_index];
         if (is_transposition && move == transposition.move)
         {
             continue; // We already searched this move.
         }
         int score;
+        // Try late move reduction.
         if (!game.CurrentPosition().IsInCheck() && !game.CurrentPosition().HasBeenReduced() && beta == alpha + 1 &&
-            move_index > 1 && depth > 2 && IsMoveOkToReduce(move, game.CurrentPosition().ColorToMove()))
+            move_index > 1 && depth > 2 && !(move.captured() || move.piece() == PAWN || move.IsChecking()))
         {
             game.PlayMove(move);
-            INCREMENT("late move reductions");
+            INCREMENT("late move reduction");
             game.CurrentPosition().Reduce();
             score = -Search(game, depth - 2, ply + 1, -beta, -alpha, pv);
             game.UndoMove();
+            if (score > alpha)
+            {
+                INCREMENT("late move reduction fails");
+                score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index);
+            }
         }
         else
         {
@@ -264,7 +246,6 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         {
             return SEARCH_CANCELLED_SCORE;
         }
-        ++move_index;
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");

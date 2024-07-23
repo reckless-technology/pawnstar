@@ -45,7 +45,7 @@ constexpr int BISHOP_SQUARE[64] =
    -10,  0, 10, 10, 10, 10,  0,-10,
    -10, 10, 10, 10, 10, 10, 10,-10,
    -10,  5,  0,  0,  0,  0,  5,-10,
-   -20,-10,-10,-10,-10,-10,-10,-20,
+   -20,-10,-20,-10,-10,-20,-10,-20,
 };
 
 /// @brief Piece square table for rooks.
@@ -133,13 +133,13 @@ struct PawnStructure
 /// @brief Determine the pawn structure
 /// @tparam color color to evaluate
 /// @param position position to evaluate
-/// @param s where to store the result
-template <Color color> void DeterminePawnStructure(const Position &position, PawnStructure &s)
+/// @return Pawn structure
+template <Color color> PawnStructure DeterminePawnStructure(const Position &position)
 {
     const Bitboard friendly_pawns = position.Pawns() & position.PiecesOfColor(color);
     const Bitboard enemy_pawns    = position.Pawns() ^ friendly_pawns;
-    memset(&s, 0, sizeof(s));
-    Bitboard p = friendly_pawns;
+    PawnStructure  s{0, 0, 0, 0};
+    Bitboard       p = friendly_pawns;
     while (p)
     {
         const Square    locn = FindAndClearLsb(p);
@@ -180,6 +180,7 @@ template <Color color> void DeterminePawnStructure(const Position &position, Paw
     }
     // Doubled pawns cannot be passed pawns.
     s.passed_pawns &= ~s.doubled_pawns;
+    return s;
 }
 
 /// @brief Evaluate material on the board.
@@ -194,8 +195,8 @@ template <Color color> int EvaluateMaterial(const Position &position)
     const Bitboard bishops         = position.Bishops() & friendly_pieces;
     const Bitboard rooks           = position.Rooks() & friendly_pieces;
     const Bitboard queens          = position.Queens() & friendly_pieces;
-    int score = PopCount(pawns) * 100 + PopCount(knights) * 400 + PopCount(bishops) * 400 + PopCount(rooks) * 600 +
-                PopCount(queens) * 1200;
+    int score = PopCount(pawns) * 100 + PopCount(knights) * 300 + PopCount(bishops) * 300 + PopCount(rooks) * 500 +
+                PopCount(queens) * 900;
     // Bonus for the bishop pair.
     if ((bishops & WHITE_SQUARES) && (bishops & BLACK_SQUARES))
     {
@@ -287,14 +288,24 @@ template <Color color> int EvaluateKing(const Position &position)
                                9 * PopCount(position.Queens() & enemy_pieces);
     int piece_square_score;
     // First do piece square table.
-    if (enemy_material > 12)
+    if (enemy_material > 15)
     {
+        // Sufficient material to remain behind the pawn shelter
         piece_square_score = KING_SQUARE_MIDGAME[position.KingLocation(color) ^ rank_flip];
+    }
+    else if (enemy_material < 9)
+    {
+        // Material low enough to come to the middle of the board
+        piece_square_score = KING_SQUARE_ENDGAME[position.KingLocation(color) ^ rank_flip];
     }
     else
     {
-        // King moves the middle when the enemy has 12 or less in remaining material.
-        piece_square_score = KING_SQUARE_ENDGAME[position.KingLocation(color) ^ rank_flip];
+        // Interpolate the 2 based on enemy material value of (9,10,11,12,13,14,15)
+        const int a        = enemy_material - 8;
+        const int b        = 16 - enemy_material;
+        piece_square_score = KING_SQUARE_ENDGAME[position.KingLocation(color) ^ rank_flip] * b +
+                             KING_SQUARE_MIDGAME[position.KingLocation(color) ^ rank_flip] * a;
+        piece_square_score /= 8;
     }
     // Consider pawns in front of the king and approaching enemy pawns.
     int safety_score = 0;

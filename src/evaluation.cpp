@@ -41,9 +41,7 @@ int EvaluatePosition(const Position &position, int alpha, int beta)
     scores[WHITE] += EvaluatePieceSquare<WHITE>(position);
     scores[BLACK] += EvaluatePieceSquare<BLACK>(position);
     // Pawn structure
-    PawnStructure ps[2];
-    DeterminePawnStructure<WHITE>(position, ps[WHITE]);
-    DeterminePawnStructure<BLACK>(position, ps[BLACK]);
+    const PawnStructure ps[2]{DeterminePawnStructure<WHITE>(position), DeterminePawnStructure<BLACK>(position)};
     scores[WHITE] += EvaluatePawnStructure<WHITE>(ps[WHITE]);
     scores[BLACK] += EvaluatePawnStructure<BLACK>(ps[BLACK]);
     // Kings

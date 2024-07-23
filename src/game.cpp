@@ -90,7 +90,7 @@ bool Game::IsDrawByRepetition(bool is_search) const
 {
     int            repetitions = is_search ? 1 : 2;
     const uint64_t hash        = CurrentPosition().Hash();
-    for (int i = index_ - 2; i >= 0; --i)
+    for (int i = index_ - 4; i >= 0; i -= 2)
     {
         if (positions_[i].Hash() == hash && --repetitions == 0)
         {

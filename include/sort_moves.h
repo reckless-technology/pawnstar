@@ -12,7 +12,7 @@ uint32_t MaxKillerMoveCount(void);
 
 /// @brief Sort moves best first i.e. in descending score order
 /// @param moves Moves to be sorted
-/// @param is_stable_sort true for slower stable sort (required at root node search only)
+/// @tparam is_stable_sort true for slower stable sort (required at root node search only)
 template <bool is_stable_sort> void SortMoves(MoveList &moves)
 {
     if constexpr (is_stable_sort)
