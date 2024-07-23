@@ -43,23 +43,18 @@ Game::Game(std::string_view fen_string)
     positions_[index_]                             = Position{fen_string};
 }
 
-/// @brief Construct a game from the default starting position.
-Game::Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
-{
-}
-
-Game &Game::operator=(const Game &that)
-{
-    std::memcpy(positions_, that.positions_, sizeof(positions_));
-    index_ = that.index_;
-    return *this;
-}
-
 /// @brief Play a move and update state. Move must be legal for the current position.
 /// @param move The move to be played.
 void Game::PlayMove(Move move)
 {
-    positions_[index_ + 1] = positions_[index_].MakeMove(move);
+    positions_[index_ + 1] = CurrentPosition().MakeMove(move);
+    ++index_;
+}
+
+/// @brief Make a null move. Only used during null move heuristic.
+void Game::MakeNullMove()
+{
+    positions_[index_ + 1] = CurrentPosition().MakeNullMove();
     ++index_;
 }
 
@@ -110,13 +105,6 @@ bool Game::IsDrawByRepetition(bool is_search) const
     return false;
 }
 
-/// @brief Make a null move. Only used during null move heuristic.
-void Game::MakeNullMove()
-{
-    positions_[index_ + 1] = positions_[index_].MakeNullMove();
-    ++index_;
-}
-
 /// @brief Play a move from the given move string in either standard algebraic or XBoard format, and update game
 /// state_flags accordingly.
 /// @param move_str The string containing the move to be made.
@@ -125,7 +113,7 @@ Move Game::PlayMove(std::string_view move_str)
 {
     string candidate{move_str};
     RemoveMoveSuffixes(candidate);
-    MoveList move_list = positions_[index_].GenerateLegalMoves();
+    MoveList move_list = CurrentPosition().GenerateLegalMoves();
     for (const Move &move : move_list)
     {
         const string algebraic_move_str{move.ToString()};

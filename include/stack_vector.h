@@ -1,9 +1,9 @@
 #pragma once
-/// @brief Fixed size, simple stack storage "vector" for containing lists of moves.
-/// Considerably faster than std::vector due to not allocating data on the heap.
-/// More convenient than a std::array for insertion, sorting and iteration.
-/// Perft speed is over 2x faster using this in place of std::vector<Move> for move generation.
-/// NB: There is no buffer overflow protection.
+/// @brief Fixed size, very simple stack storage "vector" for containing lists of moves.
+/// Considerably faster than std::vector due to not allocating data on the heap. More convenient than a std::array for
+/// insertion, sorting and iteration. Perft speed is over 2x faster using this in place of std::vector for move
+/// generation, even when using reserve to preallocate the heap buffer for the vector. NB: There is no buffer overflow
+/// protection.
 template <typename T, int N> class StackVector
 {
   public:
@@ -42,94 +42,6 @@ template <typename T, int N> class StackVector
     {
         return end_ - data_;
     }
-
-#if 0
-    /// @brief Iterator class for the simple stack based vector.
-    template <typename I> struct Iterator
-    {
-        using iterator_category = std::random_access_iterator_tag;
-        using value_type        = I;
-        using difference_type   = std::ptrdiff_t;
-        using pointer           = I *;
-        using reference         = I &;
-        Iterator() : ptr(nullptr)
-        {
-        }
-        Iterator(pointer m) : ptr(m)
-        {
-        }
-        Iterator(const Iterator &that)            = default;
-        Iterator &operator=(const Iterator &that) = default;
-        reference operator*()
-        {
-            return *ptr;
-        }
-        pointer operator->()
-        {
-            return ptr;
-        }
-        Iterator &operator++()
-        {
-            ptr++;
-            return *this;
-        }
-        Iterator &operator--()
-        {
-            ptr--;
-            return *this;
-        }
-        Iterator &operator+=(int i)
-        {
-            ptr += i;
-            return *this;
-        }
-        Iterator &operator-=(int i)
-        {
-            ptr -= i;
-            return *this;
-        }
-        friend bool operator==(const Iterator &a, const Iterator &b)
-        {
-            return a.ptr == b.ptr;
-        };
-        friend bool operator<(const Iterator &a, const Iterator &b)
-        {
-            return a.ptr < b.ptr;
-        }
-        friend bool operator>(const Iterator &a, const Iterator &b)
-        {
-            return a.ptr > b.ptr;
-        }
-        friend bool operator<=(const Iterator &a, const Iterator &b)
-        {
-            return !(a > b);
-        }
-        friend bool operator>=(const Iterator &a, const Iterator &b)
-        {
-            return !(a < b);
-        }
-        friend difference_type operator-(const Iterator &a, const Iterator &b)
-        {
-            return a.ptr - b.ptr;
-        }
-        friend Iterator operator+(const Iterator &a, int b)
-        {
-            Iterator tmp{a};
-            tmp.ptr += b;
-            return tmp;
-        }
-        friend Iterator operator-(const Iterator &a, int b)
-        {
-            Iterator tmp{a};
-            tmp.ptr -= b;
-            return tmp;
-        }
-
-      private:
-        I *ptr;
-    };
-#endif
-
     T *begin()
     {
         return data_;

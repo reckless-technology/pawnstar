@@ -19,19 +19,10 @@ class Game
     bool        do_show_thinking_;  ///< Whether to show scores and PV during search
     bool        is_cancel_pending_; ///< Set to true when time for this search is expired
 
-    Game();
     Game(std::string_view fen_string);
-    Game(const Game &that);
-    Game     &operator=(const Game &that);
-    Move      PlayMove(std::string_view move_string);
-    void      PlayMove(Move move);
-    void      MakeNullMove();
-    void      UndoMove();
-    void      StartThinking();
-    void      StopThinking();
-    bool      IsGameOver() const;
-    bool      IsDrawByRepetition(bool is_search) const;
-    bool      IsDrawByFiftyMoves() const;
+    Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    {
+    }
     Position &CurrentPosition()
     {
         return positions_[index_];
@@ -40,6 +31,15 @@ class Game
     {
         return positions_[index_];
     }
+    Move PlayMove(std::string_view move_string);
+    void PlayMove(Move move);
+    void MakeNullMove();
+    void UndoMove();
+    void StartThinking();
+    void StopThinking();
+    bool IsGameOver() const;
+    bool IsDrawByRepetition(bool is_search) const;
+    bool IsDrawByFiftyMoves() const;
 
   private:
     void        SearchThreadEntry();
