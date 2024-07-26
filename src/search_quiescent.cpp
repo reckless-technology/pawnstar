@@ -27,6 +27,10 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         Variation dummy{};
         return Search(game, depth, ply, alpha, beta, dummy);
     }
+    if (game.CurrentPosition().IsDrawByMaterial())
+    {
+        return DRAW_SCORE;
+    }
     int score = EvaluatePosition(game.CurrentPosition(), alpha, beta);
     if (score >= beta)
     {

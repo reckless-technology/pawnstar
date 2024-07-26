@@ -15,13 +15,13 @@ class Position
     /// @brief Position state flags bit set.
     enum StateFlags : uint8_t
     {
-        MAY_WHITE_CASTLE_KINGSIDE  = 1 << 0, ///< white has the right to castle king side
-        MAY_WHITE_CASTLE_QUEENSIDE = 1 << 1, ///< white has the right to castle queen side
-        MAY_BLACK_CASTLE_KINGSIDE  = 1 << 2, ///< black has the right to castle king side
-        MAY_BLACK_CASTLE_QUEENSIDE = 1 << 3, ///< black has the right to castle queen side
-        IS_BLACK_TO_MOVE           = 1 << 4, ///< it is black's turn to move
-        IS_NULL_MOVE               = 1 << 5, ///< position was the result of a null move
-        HAS_BEEN_REDUCED           = 1 << 6, ///< has late move reduction been applied in this position or its ancestors
+        MAY_WHITE_CASTLE_KINGSIDE  = 1 << 0, ///< White has the right to castle king side.
+        MAY_WHITE_CASTLE_QUEENSIDE = 1 << 1, ///< White has the right to castle queen side.
+        MAY_BLACK_CASTLE_KINGSIDE  = 1 << 2, ///< Black has the right to castle king side.
+        MAY_BLACK_CASTLE_QUEENSIDE = 1 << 3, ///< Black has the right to castle queen side.
+        IS_BLACK_TO_MOVE           = 1 << 4, ///< It is black's turn to move.
+        IS_NULL_MOVE               = 1 << 5, ///< Position was the result of a null move.
+        HAS_BEEN_REDUCED           = 1 << 6, ///< Has late move reduction been applied in the tree.
         CASTLING_RIGHTS_MASK = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE |
                                 MAY_BLACK_CASTLE_QUEENSIDE),
     };
