@@ -11,7 +11,7 @@
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 {
     const MagicMoveEntry &m = BISHOP_MAGICS[location];
-    return m.attacks[m.indices[((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
+    return m.attacks[m.indices[(uint64_t)(((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift)]];
 }
 
 /// @brief Rook sliding attacks.
@@ -21,7 +21,7 @@ constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 {
     const MagicMoveEntry &m = ROOK_MAGICS[location];
-    return m.attacks[m.indices[((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
+    return m.attacks[m.indices[(uint64_t)(((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift)]];
 }
 
 /// @brief Queen sliding attacks.

@@ -59,7 +59,7 @@ Position Position::MakeNullMove() const
 /// @param to Target square
 void Position::AddPiece(Color color, Piece piece, Square to)
 {
-    const Bitboard to_bb = BITBOARD(to);
+    const Bitboard to_bb = Bitboard(to);
     PiecesOfType(piece) ^= to_bb;
     PiecesOfColor(color) ^= to_bb;
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
@@ -72,7 +72,7 @@ void Position::AddPiece(Color color, Piece piece, Square to)
 /// @param from Target square
 void Position::RemovePiece(Color color, Piece piece, Square from)
 {
-    const Bitboard from_bb = BITBOARD(from);
+    const Bitboard from_bb = Bitboard(from);
     PiecesOfType(piece) ^= from_bb;
     PiecesOfColor(color) ^= from_bb;
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
@@ -86,7 +86,7 @@ void Position::RemovePiece(Color color, Piece piece, Square from)
 /// @param to Destination square
 void Position::MovePiece(Color color, Piece piece, Square from, Square to)
 {
-    const Bitboard        from_to_bb = BITBOARD(from) | BITBOARD(to);
+    const Bitboard        from_to_bb = Bitboard(from) | Bitboard(to);
     const uint64_t *const hash       = &PIECE_SQUARE_HASHES[color][piece - 1][0];
     PiecesOfType(piece) ^= from_to_bb;
     PiecesOfColor(color) ^= from_to_bb;
@@ -200,8 +200,8 @@ Position Position::MakeMove(const Move &move) const
     position.flags_ ^= IS_BLACK_TO_MOVE;
     position.hash_ ^= BLACK_MOVE_HASH;
     position.full_move_count_ += color;
-    position.king_location_[WHITE] = Lsb(position.kings_ & position.white_pieces_);
-    position.king_location_[BLACK] = Lsb(position.kings_ & position.black_pieces_);
+    position.king_location_[WHITE] = (position.kings_ & position.white_pieces_).Lsb();
+    position.king_location_[BLACK] = (position.kings_ & position.black_pieces_).Lsb();
     position.checkers_             = position.AttacksTo(position.king_location_[EnemyOf(color)], color);
     return position;
 }
@@ -292,8 +292,8 @@ Position::Position(std::string_view fen_string) : Position()
     {
         BAD_FEN_STRING;
     }
-    king_location_[WHITE] = Lsb(kings_ & white_pieces_);
-    king_location_[BLACK] = Lsb(kings_ & black_pieces_);
+    king_location_[WHITE] = (kings_ & white_pieces_).Lsb();
+    king_location_[BLACK] = (kings_ & black_pieces_).Lsb();
     // Castling rights
     string castling_rights;
     ss >> castling_rights;
@@ -382,7 +382,7 @@ std::string Position::ToString() const
         int num_empty_squares = 0;
         for (int x = 0; x < 8; ++x)
         {
-            if (!(occupied_squares & BITBOARD(x, y)))
+            if ((occupied_squares & Bitboard(x, y)) == NO_SQUARES)
             {
                 ++num_empty_squares;
             }
@@ -393,8 +393,9 @@ std::string Position::ToString() const
                     ss << (char)('0' + num_empty_squares);
                     num_empty_squares = 0;
                 }
-                const char piece = (white_pieces_ & BITBOARD(x, y)) ? " PNBRQK"[PieceAt((Square)(x + 8 * y))]
-                                                                    : " pnbrqk"[PieceAt((Square)(x + 8 * y))];
+                const char piece = (white_pieces_ & Bitboard(x, y)) != NO_SQUARES
+                                       ? " PNBRQK"[PieceAt((Square)(x + 8 * y))]
+                                       : " pnbrqk"[PieceAt((Square)(x + 8 * y))];
                 ss << piece;
             }
         }
@@ -460,25 +461,25 @@ bool Position::IsAttacked(Square location, Color color) const
     const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
     const Bitboard        attacking_pieces    = PiecesOfColor(color);
     const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
-    if (attacking_pieces &
-        ((sets.PawnAttacks(EnemyOf(color)) & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)))
+    if ((attacking_pieces & ((sets.PawnAttacks(EnemyOf(color)) & pawns_) | (sets.knight_attacks & knights_) |
+                             (sets.king_attacks & kings_))) != NO_SQUARES)
     {
         return true;
     }
     // Rook and queen horizontal and vertical sliding attacks.
     Bitboard sliding_attackers = (rooks_ | queens_) & sets.rook_attacks & attacking_pieces;
-    while (sliding_attackers)
+    for (Square s : sliding_attackers)
     {
-        if ((intervening_squares[FindAndClearLsb(sliding_attackers)] & occupied_squares) == NO_SQUARES)
+        if ((intervening_squares[s] & occupied_squares) == NO_SQUARES)
         {
             return true;
         }
     }
     // Bishop and queen diagonal and antidiagonal sliding attacks.
     sliding_attackers = (bishops_ | queens_) & sets.bishop_attacks & attacking_pieces;
-    while (sliding_attackers)
+    for (Square s : sliding_attackers)
     {
-        if ((intervening_squares[FindAndClearLsb(sliding_attackers)] & occupied_squares) == NO_SQUARES)
+        if ((intervening_squares[s] & occupied_squares) == NO_SQUARES)
         {
             return true;
         }
@@ -502,22 +503,20 @@ Bitboard Position::AttacksTo(Square location, Color color) const
                                            (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)));
     // Rook and queen horizontal and vertical sliding attacks.
     Bitboard sliding_attackers = (rooks_ | queens_) & sets.rook_attacks & attacking_pieces;
-    while (sliding_attackers)
+    for (Square s : sliding_attackers)
     {
-        const Square s = FindAndClearLsb(sliding_attackers);
-        if (!(intervening_squares[s] & occupied_squares))
+        if ((intervening_squares[s] & occupied_squares) == NO_SQUARES)
         {
-            result |= BITBOARD(s);
+            result |= Bitboard(s);
         }
     }
     // Bishop and queen diagonal and antidiagonal sliding attacks.
     sliding_attackers = (bishops_ | queens_) & sets.bishop_attacks & attacking_pieces;
-    while (sliding_attackers)
+    for (Square s : sliding_attackers)
     {
-        const Square s = FindAndClearLsb(sliding_attackers);
-        if (!(intervening_squares[s] & occupied_squares))
+        if ((intervening_squares[s] & occupied_squares) == NO_SQUARES)
         {
-            result |= BITBOARD(s);
+            result |= Bitboard(s);
         }
     }
     return result;
@@ -528,7 +527,7 @@ Bitboard Position::AttacksTo(Square location, Color color) const
 bool Position::IsDrawByMaterial() const
 {
     const Bitboard occupied_squares = white_pieces_ | black_pieces_;
-    switch (PopCount(occupied_squares))
+    switch (occupied_squares.PopCount())
     {
     case 0:
     case 1:
@@ -540,7 +539,7 @@ bool Position::IsDrawByMaterial() const
         return true;
     case 3:
         // king and bishop vs king or king and knight vs king
-        if (bishops_ | knights_)
+        if ((bishops_ | knights_) != NO_SQUARES)
         {
             INCREMENT("draws by material (3)");
             return true;
@@ -549,10 +548,12 @@ bool Position::IsDrawByMaterial() const
     case 4:
         // king and bishop vs king and bishop with bishops on same color square
         {
-            const Bitboard white_bishops = bishops_ & white_pieces_;
-            const Bitboard black_bishops = bishops_ ^ white_bishops;
-            if (white_bishops && black_bishops &&
-                (!(white_bishops & WHITE_SQUARES) == !(black_bishops & WHITE_SQUARES)))
+            const Bitboard white_bishops                   = bishops_ & white_pieces_;
+            const Bitboard black_bishops                   = bishops_ ^ white_bishops;
+            const bool     is_white_bishop_on_white_square = (white_bishops & WHITE_SQUARES) != NO_SQUARES;
+            const bool     is_black_bishop_on_white_square = (black_bishops & WHITE_SQUARES) != NO_SQUARES;
+            if (white_bishops != NO_SQUARES && black_bishops != NO_SQUARES &&
+                is_white_bishop_on_white_square == is_black_bishop_on_white_square)
             {
                 INCREMENT("draws by material (4)");
                 return true;
@@ -574,8 +575,9 @@ bool Position::IsLegal() const
     const Color    color      = ColorToMove();
     const Bitboard white_king = kings_ & white_pieces_;
     const Bitboard black_king = kings_ & black_pieces_;
-    return PopCount(white_king) == 1 && PopCount(black_king) == 1 && white_king != black_king &&
-           !(SETS[Lsb(white_king)].king_attacks & black_king) && !IsAttacked(king_location_[EnemyOf(color)], color);
+    return white_king.PopCount() == 1 && black_king.PopCount() == 1 && white_king != black_king &&
+           (SETS[white_king.Lsb()].king_attacks & black_king) == NO_SQUARES &&
+           !IsAttacked(king_location_[EnemyOf(color)], color);
 }
 
 /// @brief Compute the Zobrist hash for a chess position.
@@ -588,14 +590,14 @@ uint64_t Position::ComputeHash() const
     for (Piece piece = PAWN; piece <= KING; piece = (Piece)(piece + 1))
     {
         Bitboard b = PiecesOfType(piece) & white_pieces_;
-        while (b)
+        for (Square s : b)
         {
-            hash ^= PIECE_SQUARE_HASHES[WHITE][piece - 1][FindAndClearLsb(b)];
+            hash ^= PIECE_SQUARE_HASHES[WHITE][piece - 1][s];
         }
         b = PiecesOfType(piece) & black_pieces_;
-        while (b)
+        for (Square s : b)
         {
-            hash ^= PIECE_SQUARE_HASHES[BLACK][piece - 1][FindAndClearLsb(b)];
+            hash ^= PIECE_SQUARE_HASHES[BLACK][piece - 1][s];
         }
     }
     return hash;

@@ -12,28 +12,27 @@ class Pins
     /// @param position Position to analyze.
     Pins(const Position &position)
     {
-        pinned_pieces                    = NO_SQUARES;
-        const Color     color            = position.ColorToMove();
-        const Bitboard  occupied_squares = position.OccupiedSquares();
-        const Bitboard  friendly_pieces  = position.PiecesOfColor(color);
-        const uint8_t   king_location    = position.KingLocation(color);
-        const Bitboard *intervening      = &INTERVENING_SQUARES[king_location][0];
-        Bitboard        enemy_sliding_pieces =
+        pinned_pieces                          = NO_SQUARES;
+        const Color           color            = position.ColorToMove();
+        const Bitboard        occupied_squares = position.OccupiedSquares();
+        const Bitboard        friendly_pieces  = position.PiecesOfColor(color);
+        const uint8_t         king_location    = position.KingLocation(color);
+        const Bitboard *const intervening      = &INTERVENING_SQUARES[king_location][0];
+        Bitboard              enemy_sliding_pieces =
             ((SETS[king_location].bishop_attacks & (position.Bishops() | position.Queens())) |
              (SETS[king_location].rook_attacks & (position.Rooks() | position.Queens()))) &
             ~friendly_pieces;
-        while (enemy_sliding_pieces)
+        for (Square slider_location : enemy_sliding_pieces)
         {
-            const Square   slider_location            = FindAndClearLsb(enemy_sliding_pieces);
             const Bitboard intervening_squares        = intervening[slider_location];
             const Bitboard intervening_pieces         = intervening_squares & occupied_squares;
             const Bitboard intervening_friendly_piece = intervening_pieces & friendly_pieces;
-            if (intervening_friendly_piece && PopCount(intervening_pieces) == 1)
+            if (intervening_friendly_piece != NO_SQUARES && intervening_pieces.PopCount() == 1)
             {
                 // There is only a single piece between the sliding enemy attacker and the king so this piece is pinned
                 // along the attack ray. The pinned piece is also allowed to capture the pinning piece.
                 pinned_pieces |= intervening_friendly_piece;
-                allowed_squares[Lsb(intervening_friendly_piece)] = intervening_squares | BITBOARD(slider_location);
+                allowed_squares[intervening_friendly_piece.Lsb()] = intervening_squares | Bitboard{slider_location};
             }
         }
     }
@@ -43,7 +42,7 @@ class Pins
     /// @return Set of allowed destination squares.
     Bitboard AllowedSquares(Square locn) const
     {
-        return BITBOARD(locn) & pinned_pieces ? allowed_squares[locn] : ALL_SQUARES;
+        return (Bitboard{locn} & pinned_pieces) != NO_SQUARES ? allowed_squares[locn] : ALL_SQUARES;
     }
 
   private:

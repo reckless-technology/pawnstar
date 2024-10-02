@@ -72,7 +72,7 @@ struct PawnSets
 struct MagicMoveEntry
 {
     uint64_t        magic;          ///< Magic multiplier.
-    Bitboard        occupancy_mask; ///< Occupancy mask (excludes final target square).
+    uint64_t        occupancy_mask; ///< Occupancy mask (excludes final target square).
     int             shift;          ///< Number of bits to right shift to get indices.
     const uint64_t *attacks;        ///< Discrete attack vectors (move sets).
     const uint8_t  *indices;        ///< Indices into the discrete attack vector array.

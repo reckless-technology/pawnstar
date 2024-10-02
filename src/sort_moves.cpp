@@ -53,7 +53,7 @@ void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int d
 uint32_t MaxKillerMoveCount()
 {
     uint32_t result = 0;
-    for (int i = 0; i != 64; ++i)
+    for (int i = 0; i != MAX_PLY; ++i)
     {
         for (int j = 0; j != 32768; ++j)
         {

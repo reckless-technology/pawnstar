@@ -231,7 +231,7 @@ class Move
         return result;
     }
 
-    constexpr std::string DebugString() const
+    constexpr const std::string DebugString() const
     {
         std::string result;
         result.push_back(" PNBRQK"[piece()]);

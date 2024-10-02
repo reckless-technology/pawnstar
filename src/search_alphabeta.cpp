@@ -60,7 +60,7 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
 {
     if (!game.CurrentPosition().IsNullMove() && !game.CurrentPosition().IsInCheck() && beta == alpha + 1 &&
         (game.CurrentPosition().Knights() | game.CurrentPosition().Bishops() | game.CurrentPosition().Rooks() |
-         game.CurrentPosition().Queens()) &&
+         game.CurrentPosition().Queens()) != NO_SQUARES &&
         EvaluatePosition(game.CurrentPosition(), alpha, beta) >= beta)
     {
         INCREMENT("null move attempts");

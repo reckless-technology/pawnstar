@@ -65,7 +65,7 @@ int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_che
 static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece piece_on_square)
 {
     const Sets    &sets     = SETS[location];
-    const Bitboard square   = BITBOARD(location);
+    const Bitboard square   = Bitboard(location);
     Bitboard       occupied = bb.white_pieces | bb.black_pieces;
     int            scores[32];
     int            ply;
@@ -78,44 +78,39 @@ static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece pi
         Bitboard       rook_attacks;
         const Bitboard attacking_pieces = bb.PiecesOfColor(color);
         Bitboard       attackers        = sets.PawnAttacks(EnemyOf(color)) & attacking_pieces & bb.pawns;
-        if (attackers)
+        if (attackers != NO_SQUARES)
         {
-            attackers &= -attackers; // Isolate LSB in case there is more than 1 attacker.
             capturing_piece = PAWN;
             goto FoundAttacker;
         }
         attackers = sets.knight_attacks & attacking_pieces & bb.knights;
-        if (attackers)
+        if (attackers != NO_SQUARES)
         {
-            attackers &= -attackers;
             capturing_piece = KNIGHT;
             goto FoundAttacker;
         }
         bishop_attacks = BishopAttacks(occupied, location);
         attackers      = bishop_attacks & attacking_pieces & bb.bishops;
-        if (attackers)
+        if (attackers != NO_SQUARES)
         {
             capturing_piece = BISHOP;
-            attackers &= -attackers;
             goto FoundAttacker;
         }
         rook_attacks = RookAttacks(occupied, location);
         attackers    = rook_attacks & attacking_pieces & bb.rooks;
-        if (attackers)
+        if (attackers != NO_SQUARES)
         {
             capturing_piece = ROOK;
-            attackers &= -attackers;
             goto FoundAttacker;
         }
         attackers = (bishop_attacks | rook_attacks) & attacking_pieces & bb.queens;
-        if (attackers)
+        if (attackers != NO_SQUARES)
         {
             capturing_piece = QUEEN;
-            attackers &= -attackers;
             goto FoundAttacker;
         }
         attackers = sets.king_attacks & attacking_pieces & bb.kings;
-        if (attackers)
+        if (attackers != NO_SQUARES)
         {
             capturing_piece = KING;
             goto FoundAttacker;
@@ -126,6 +121,7 @@ static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece pi
         break;
 
     FoundAttacker:
+        attackers.IsolateLsb();
         bb.PiecesOfType(piece_on_square) ^= square;
         bb.PiecesOfColor(EnemyOf(color)) ^= square;
         bb.PiecesOfType(capturing_piece) ^= attackers | square;

@@ -148,16 +148,15 @@ template <Color color> PawnStructure DeterminePawnStructure(const Position &posi
     const Bitboard enemy_pawns    = position.Pawns() ^ friendly_pawns;
     PawnStructure  ps;
     Bitboard       fp = friendly_pawns;
-    while (fp)
+    for (Square locn : fp)
     {
-        const Square    locn = FindAndClearLsb(fp);
-        const Bitboard  bb   = BITBOARD(locn);
+        const Bitboard  bb   = Bitboard(locn);
         const PawnSets &sets = PAWN_SETS[color][locn];
         if ((sets.passed_pawn_mask & enemy_pawns) == NO_SQUARES)
         {
             ps.passed_pawns |= bb;
         }
-        if (sets.doubled_pawn_mask & friendly_pawns)
+        if ((sets.doubled_pawn_mask & friendly_pawns) != NO_SQUARES)
         {
             ps.doubled_pawns |= bb;
         }
@@ -171,7 +170,7 @@ template <Color color> PawnStructure DeterminePawnStructure(const Position &posi
             {
                 const Bitboard enemy_pawn_attacks = ShiftSouthwest(enemy_pawns) | ShiftSoutheast(enemy_pawns);
                 const Square   forward_locn       = (Square)(locn + 8);
-                if (enemy_pawn_attacks & BITBOARD(forward_locn))
+                if ((enemy_pawn_attacks & Bitboard(forward_locn)) != NO_SQUARES)
                 {
                     ps.backward_pawns |= bb;
                 }
@@ -180,7 +179,7 @@ template <Color color> PawnStructure DeterminePawnStructure(const Position &posi
             {
                 const Bitboard enemy_pawn_attacks = ShiftNorthwest(enemy_pawns) | ShiftNortheast(enemy_pawns);
                 const Square   forward_locn       = (Square)(locn - 8);
-                if (enemy_pawn_attacks & BITBOARD(forward_locn))
+                if ((enemy_pawn_attacks & Bitboard(forward_locn)) != NO_SQUARES)
                 {
                     ps.backward_pawns |= bb;
                 }
@@ -204,10 +203,10 @@ template <Color color> int EvaluateMaterial(const Position &position)
     const Bitboard bishops         = position.Bishops() & friendly_pieces;
     const Bitboard rooks           = position.Rooks() & friendly_pieces;
     const Bitboard queens          = position.Queens() & friendly_pieces;
-    int score = PopCount(pawns) * 100 + PopCount(knights) * 400 + PopCount(bishops) * 400 + PopCount(rooks) * 600 +
-                PopCount(queens) * 1200;
+    int score = pawns.PopCount() * 100 + knights.PopCount() * 400 + bishops.PopCount() * 400 + rooks.PopCount() * 600 +
+                queens.PopCount() * 1200;
     // Bonus for the bishop pair.
-    if ((bishops & WHITE_SQUARES) && (bishops & BLACK_SQUARES))
+    if ((bishops & WHITE_SQUARES) != NO_SQUARES && (bishops & BLACK_SQUARES) != NO_SQUARES)
     {
         score += 100;
     }
@@ -217,7 +216,7 @@ template <Color color> int EvaluateMaterial(const Position &position)
         score -= 50;
     }
     // Adjustment for knights based on number of friendly pawns.
-    // score += PopCount(knights) * (PopCount(pawns) - 4) * 5;
+    score += knights.PopCount() * (pawns.PopCount() - 4) * 5;
     return score;
 }
 
@@ -232,19 +231,17 @@ template <Color color> int EvaluateMobility(const Position &position)
     const Bitboard occupied_squares = position.OccupiedSquares();
     int            score            = 0;
     Bitboard       b                = position.Bishops() & friendly_pieces;
-    while (b)
+    for (Square locn : b)
     {
-        const Square   locn        = FindAndClearLsb(b);
         const Bitboard attacks     = BishopAttacks(occupied_squares, locn) & ~friendly_pieces;
-        const int      num_attacks = PopCount(attacks);
+        const int      num_attacks = attacks.PopCount();
         score += BISHOP_ATTACK_SCORES[num_attacks];
     }
     b = position.Rooks() & friendly_pieces;
-    while (b)
+    for (Square locn : b)
     {
-        const Square   locn        = FindAndClearLsb(b);
         const Bitboard attacks     = RookAttacks(occupied_squares, locn) & ~friendly_pieces;
-        const int      num_attacks = PopCount(attacks);
+        const int      num_attacks = attacks.PopCount();
         score += ROOK_ATTACK_SCORES[num_attacks];
     }
     return score;
@@ -260,29 +257,29 @@ template <Color color> int EvaluatePieceSquare(const Position &position)
     const Bitboard    friendly_pieces = position.PiecesOfColor(color);
     int               score           = 0;
     Bitboard          b               = position.Pawns() & friendly_pieces;
-    while (b)
+    for (Square locn : b)
     {
-        score += PAWN_SQUARE[FindAndClearLsb(b) ^ rank_flip];
+        score += PAWN_SQUARE[locn ^ rank_flip];
     }
     b = position.Knights() & friendly_pieces;
-    while (b)
+    for (Square locn : b)
     {
-        score += KNIGHT_SQUARE[FindAndClearLsb(b) ^ rank_flip];
+        score += KNIGHT_SQUARE[locn ^ rank_flip];
     }
     b = position.Bishops() & friendly_pieces;
-    while (b)
+    for (Square locn : b)
     {
-        score += BISHOP_SQUARE[FindAndClearLsb(b) ^ rank_flip];
+        score += BISHOP_SQUARE[locn ^ rank_flip];
     }
     b = position.Rooks() & friendly_pieces;
-    while (b)
+    for (Square locn : b)
     {
-        score += ROOK_SQUARE[FindAndClearLsb(b) ^ rank_flip];
+        score += ROOK_SQUARE[locn ^ rank_flip];
     }
     b = position.Queens() & friendly_pieces;
-    while (b)
+    for (Square locn : b)
     {
-        score += QUEEN_SQUARE[FindAndClearLsb(b) ^ rank_flip];
+        score += QUEEN_SQUARE[locn ^ rank_flip];
     }
     return score;
 }
@@ -296,13 +293,13 @@ template <Color color> int EvaluatePawnStructure(const PawnStructure &ps)
     constexpr uint8_t rank_flip = (color == WHITE ? RANK_FLIP : 0);
     Bitboard          b         = ps.passed_pawns;
     int               score     = 0;
-    while (b)
+    for (Square locn : b)
     {
-        score += PASSED_PAWN_SQUARE[FindAndClearLsb(b) ^ rank_flip];
+        score += PASSED_PAWN_SQUARE[locn ^ rank_flip];
     }
-    score -= PopCount(ps.backward_pawns) * 20;
-    score -= PopCount(ps.doubled_pawns) * 10;
-    score -= PopCount(ps.isolated_pawns) * 20;
+    score -= ps.backward_pawns.PopCount() * 20;
+    score -= ps.doubled_pawns.PopCount() * 10;
+    score -= ps.isolated_pawns.PopCount() * 20;
     return score;
 }
 
@@ -321,9 +318,9 @@ template <Color color> int EvaluateKing(const Position &position)
 
     // Determine enemy non-pawn material value. This starts out at the beginning of the game as 31
     // (2 x N + 2 x B + 2 x R + 1 x Q)
-    const int enemy_material = 3 * PopCount((position.Knights() | position.Bishops()) & enemy_pieces) +
-                               5 * PopCount(position.Rooks() & enemy_pieces) +
-                               9 * PopCount(position.Queens() & enemy_pieces);
+    const int enemy_material = 3 * ((position.Knights() | position.Bishops()) & enemy_pieces).PopCount() +
+                               5 * (position.Rooks() & enemy_pieces).PopCount() +
+                               9 * (position.Queens() & enemy_pieces).PopCount();
     int piece_square_score;
     // First do piece square table.
     if (enemy_material > 15)
@@ -363,9 +360,10 @@ template <Color color> int EvaluateKing(const Position &position)
             pawn_shelter_2 = ShiftSouth(pawn_shelter_1);
             pawn_shelter_3 = ShiftSouth(pawn_shelter_2);
         }
-        safety_score = 25 * PopCount(friendly_pawns & pawn_shelter_1) + 10 * PopCount(friendly_pawns & pawn_shelter_2) +
-                       5 * PopCount(friendly_pawns & pawn_shelter_3) - 25 * PopCount(enemy_pawns & pawn_shelter_1) -
-                       10 * PopCount(enemy_pawns & pawn_shelter_2) - 5 * PopCount(enemy_pawns & pawn_shelter_3);
+        safety_score =
+            25 * (friendly_pawns & pawn_shelter_1).PopCount() + 10 * (friendly_pawns & pawn_shelter_2).PopCount() +
+            5 * (friendly_pawns & pawn_shelter_3).PopCount() - 25 * (enemy_pawns & pawn_shelter_1).PopCount() -
+            10 * (enemy_pawns & pawn_shelter_2).PopCount() - 5 * (enemy_pawns & pawn_shelter_3).PopCount();
     }
     // Penalty for open files near our king.
     const Bitboard king_file = FILE_BITBOARDS[FileOf(position.KingLocation(color))];
@@ -374,12 +372,12 @@ template <Color color> int EvaluateKing(const Position &position)
         safety_score -= 30;
     }
     Bitboard adjacent_file = ShiftWest(king_file);
-    if (adjacent_file && ((adjacent_file & friendly_pawns) == NO_SQUARES))
+    if (adjacent_file != NO_SQUARES && ((adjacent_file & friendly_pawns) == NO_SQUARES))
     {
         safety_score -= 20;
     }
     adjacent_file = ShiftEast(king_file);
-    if (adjacent_file && ((adjacent_file & friendly_pawns) == NO_SQUARES))
+    if (adjacent_file != NO_SQUARES && ((adjacent_file & friendly_pawns) == NO_SQUARES))
     {
         safety_score -= 20;
     }
