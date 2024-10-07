@@ -230,15 +230,13 @@ template <Color color> int EvaluateMobility(const Position &position)
     const Bitboard friendly_pieces  = position.PiecesOfColor(color);
     const Bitboard occupied_squares = position.OccupiedSquares();
     int            score            = 0;
-    Bitboard       b                = position.Bishops() & friendly_pieces;
-    for (Square locn : b)
+    for (Square locn : position.Bishops() & friendly_pieces)
     {
         const Bitboard attacks     = BishopAttacks(occupied_squares, locn) & ~friendly_pieces;
         const int      num_attacks = attacks.PopCount();
         score += BISHOP_ATTACK_SCORES[num_attacks];
     }
-    b = position.Rooks() & friendly_pieces;
-    for (Square locn : b)
+    for (Square locn : position.Rooks() & friendly_pieces)
     {
         const Bitboard attacks     = RookAttacks(occupied_squares, locn) & ~friendly_pieces;
         const int      num_attacks = attacks.PopCount();
@@ -256,28 +254,23 @@ template <Color color> int EvaluatePieceSquare(const Position &position)
     constexpr uint8_t rank_flip       = (color == WHITE ? RANK_FLIP : 0);
     const Bitboard    friendly_pieces = position.PiecesOfColor(color);
     int               score           = 0;
-    Bitboard          b               = position.Pawns() & friendly_pieces;
-    for (Square locn : b)
+    for (Square locn : position.Pawns() & friendly_pieces)
     {
         score += PAWN_SQUARE[locn ^ rank_flip];
     }
-    b = position.Knights() & friendly_pieces;
-    for (Square locn : b)
+    for (Square locn : position.Knights() & friendly_pieces)
     {
         score += KNIGHT_SQUARE[locn ^ rank_flip];
     }
-    b = position.Bishops() & friendly_pieces;
-    for (Square locn : b)
+    for (Square locn : position.Bishops() & friendly_pieces)
     {
         score += BISHOP_SQUARE[locn ^ rank_flip];
     }
-    b = position.Rooks() & friendly_pieces;
-    for (Square locn : b)
+    for (Square locn : position.Rooks() & friendly_pieces)
     {
         score += ROOK_SQUARE[locn ^ rank_flip];
     }
-    b = position.Queens() & friendly_pieces;
-    for (Square locn : b)
+    for (Square locn : position.Queens() & friendly_pieces)
     {
         score += QUEEN_SQUARE[locn ^ rank_flip];
     }
@@ -291,9 +284,8 @@ template <Color color> int EvaluatePieceSquare(const Position &position)
 template <Color color> int EvaluatePawnStructure(const PawnStructure &ps)
 {
     constexpr uint8_t rank_flip = (color == WHITE ? RANK_FLIP : 0);
-    Bitboard          b         = ps.passed_pawns;
     int               score     = 0;
-    for (Square locn : b)
+    for (Square locn : ps.passed_pawns)
     {
         score += PASSED_PAWN_SQUARE[locn ^ rank_flip];
     }

@@ -1,18 +1,33 @@
-/// @file Precomputes at compile time, constants used by pawnstar.
+/// @file Precomputes, at compile time, constants used by pawnstar.
 /// This program is compiled and then executed by the Makefile to create the "generated_data.cpp" source file which is
-/// then used in compilation of the main program.
+/// then used in the compilation of the main program.
 
 #include <array>
 #include <cinttypes>
 #include <cstdio>
 #include <functional>
 #include <set>
+#include <string_view>
 #include <vector>
 
 // Fixed square definitions.
-constexpr uint64_t NOT_FILE_H = 0x7F7F7F7F7F7F7F7Full; ///< Mask off the h file.
-constexpr uint64_t NOT_FILE_A = 0xFEFEFEFEFEFEFEFEull; ///< Mask off the a file.
-constexpr uint64_t NO_SQUARES = 0ull;
+constexpr uint64_t NOT_FILE_H        = 0x7F7F7F7F7F7F7F7Full; ///< Mask off the h file.
+constexpr uint64_t NOT_FILE_A        = 0xFEFEFEFEFEFEFEFEull; ///< Mask off the a file.
+constexpr uint64_t NO_SQUARES        = 0ull;
+constexpr char     PIECE_NAMES[7][8] = {"none", "pawn", "knight", "bishop", "rook", "queen", "king"};
+constexpr char     COLOR_NAMES[2][8] = {"white", "black"};
+
+/// @brief Chess piece types.
+enum Piece
+{
+    NONE,
+    PAWN,
+    KNIGHT,
+    BISHOP,
+    ROOK,
+    QUEEN,
+    KING,
+};
 
 // clang-format off
 constexpr uint8_t   FileOf(int locn)            { return (uint8_t)locn  & 7; }                  ///< Convert square index to file.
@@ -31,21 +46,6 @@ constexpr uint64_t  ShiftWest(uint64_t b)       { return (b & NOT_FILE_A) >> 1; 
 constexpr uint64_t  ShiftNorthwest(uint64_t b)  { return (b & NOT_FILE_A) << 7; }               ///< Shift a Bitboard one square to the northwest.
 constexpr bool      IsInBoard(int x, int y)     { return x >= 0 && x < 8 && y >= 0 && y < 8; }  ///< Is this square on the board.
 // clang-format on
-
-/// @brief Chess piece types.
-enum Piece
-{
-    NONE,
-    PAWN,
-    KNIGHT,
-    BISHOP,
-    ROOK,
-    QUEEN,
-    KING,
-};
-
-static const char *const PIECE_NAMES[7] = {"none", "pawn", "knight", "bishop", "rook", "queen", "king"};
-static const char *const COLOR_NAMES[2] = {"white", "black"};
 
 /// @brief Compass rose directions from white's perspective, i.e. north is "forward" for white.
 enum Direction
@@ -68,19 +68,18 @@ struct DirectionVector
 };
 
 // clang-format off
-
 /// @brief Each of the directions on the compass.
-constexpr DirectionVector DIRECTION_VECTORS[] = 
-{
-    { .dx =  0, .dy =  1 }, ///< North
-    { .dx =  1, .dy =  1 }, ///< Northeast
-    { .dx =  1, .dy =  0 }, ///< East
-    { .dx =  1, .dy = -1 }, ///< Southeast
-    { .dx =  0, .dy = -1 }, ///< South
-    { .dx = -1, .dy = -1 }, ///< Southwest
-    { .dx = -1, .dy =  0 }, ///< West
-    { .dx = -1, .dy =  1 }, ///< Northwest
-};
+constexpr std::array<DirectionVector, 8> DIRECTION_VECTORS = 
+{{
+    {  0,  1 }, ///< North
+    {  1,  1 }, ///< Northeast
+    {  1,  0 }, ///< East
+    {  1, -1 }, ///< Southeast
+    {  0, -1 }, ///< South
+    { -1, -1 }, ///< Southwest
+    { -1,  0 }, ///< West
+    { -1,  1 }, ///< Northwest
+}};
 // clang-format on
 
 /// @brief Population count (number of bits set).
@@ -88,16 +87,11 @@ constexpr DirectionVector DIRECTION_VECTORS[] =
 /// @return Number of 1 bits in x.
 constexpr int PopCount(uint64_t x)
 {
-    int count = 0;
-    while (x)
-    {
-        ++count;
-        x &= x - 1;
-    }
-    return count;
+    return __builtin_popcountll(x);
 }
 
 /// @brief Generate a 64 bit pseudo random number Zobrist hash key.
+/// Uses XORshift* algborithm
 /// @return Next value in sequence.
 static uint64_t NextRandomKey()
 {
@@ -114,8 +108,8 @@ static uint64_t NextRandomKey()
 /// @return Vector from locn in direction specified, excluding source square.
 constexpr uint64_t RayFrom(uint8_t locn, Direction direction)
 {
-    uint64_t               result = NO_SQUARES;
-    const DirectionVector &dv     = DIRECTION_VECTORS[direction];
+    uint64_t    result = NO_SQUARES;
+    const auto &dv     = DIRECTION_VECTORS[direction];
     for (int x = FileOf(locn) + dv.dx, y = RankOf(locn) + dv.dy; IsInBoard(x, y); x += dv.dx, y += dv.dy)
     {
         result |= Bitboard(x, y);
@@ -128,7 +122,8 @@ constexpr uint64_t RayFrom(uint8_t locn, Direction direction)
 /// @return Squares attacked by a knight standing on locn.
 constexpr uint64_t KnightAttacks(uint8_t locn)
 {
-    constexpr std::pair<int, int> deltas[] = {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}};
+    constexpr std::array<std::pair<int, int>, 8> deltas = {
+        {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}}};
 
     uint64_t  result = NO_SQUARES;
     const int locn_x = FileOf(locn);
@@ -353,13 +348,14 @@ constexpr uint64_t DoubledPawnMaskBlack(uint8_t locn)
 /// @return If from and to are colinear, the set of squares between them.
 constexpr uint64_t InterveningSquares(int from, int to)
 {
-    constexpr Direction directions[] = {NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST, NORTHWEST};
+    constexpr std::array<Direction, 8> directions = {
+        {NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST, NORTHWEST}};
     for (auto dir : directions)
     {
-        const uint64_t vector_from = RayFrom(from, dir);
-        if (vector_from & Bitboard(to))
+        const uint64_t ray_from = RayFrom(from, dir);
+        if (ray_from & Bitboard(to))
         {
-            return vector_from ^ RayFrom(to, dir) ^ Bitboard(to);
+            return ray_from ^ RayFrom(to, dir) ^ Bitboard(to);
         }
     }
     return NO_SQUARES;
@@ -450,7 +446,7 @@ constexpr std::vector<uint64_t> EnumerateMaskCombinations(uint64_t mask)
     do
     {
         result.push_back(n);
-        n = (n - mask) & mask;
+        n = (n - mask) & mask; // From Hacker's delight!
     } while (n);
     return result;
 }
@@ -535,73 +531,73 @@ static Magic FindMagic(uint8_t locn, MaskFn mask_fn, AttackFn attack_fn)
 /// @brief A magic Bitboard search vector entry.
 struct MagicVector
 {
-    const char *name;      ///< Piece name (bishop or rook).
-    AttackFn    attack_fn; ///< Attacked squares function.
-    MaskFn      mask_fn;   ///< Occupancy mask function.
+    const char name[8];   ///< Piece name (bishop or rook).
+    AttackFn   attack_fn; ///< Attacked squares function.
+    MaskFn     mask_fn;   ///< Occupancy mask function.
 };
 
 // clang-format off
-constexpr MagicVector MAGIC_VECTORS[] = 
-{
+constexpr std::array<MagicVector, 2> MAGIC_VECTORS = 
+{{
     { "BISHOP", BishopAttacks, BishopOccupancyMask }, 
     { "ROOK",   RookAttacks,   RookOccupancyMask   },
-};
+}};
 // clang-format on
 
 /// Maps a location to a set of squares for that location.
-typedef std::function<uint64_t(uint8_t locn)> GeneratorFn;
+typedef uint64_t (*GeneratorFn)(uint8_t);
 
 /// @brief A generator to map a square index to a set of target squares for that index, e.g. "All squares north of
 /// here", "Squares attacked by a queen standing here" etc.
 struct Generator
 {
-    const char *name;     ///< Name of generated output.
+    const char  name[32]; ///< Name of generated output.
     GeneratorFn function; ///< Function to generate output.
 };
 
 /// @brief Generators for the main precomputed Bitboard arrays.
-static const Generator SET_GENERATORS[] = {
+constexpr std::array<Generator, 18> SET_GENERATORS = {{
     // clang-format off
-    {"north",                   [](uint8_t locn){ return RayFrom(locn, NORTH);                                              }   },
-    {"northeast",               [](uint8_t locn){ return RayFrom(locn, NORTHEAST);                                          }   },
-    {"east",                    [](uint8_t locn){ return RayFrom(locn, EAST);                                               }   },
-    {"southeast",               [](uint8_t locn){ return RayFrom(locn, SOUTHEAST);                                          }   },
-    {"south",                   [](uint8_t locn){ return RayFrom(locn, SOUTH);                                              }   },
-    {"southwest",               [](uint8_t locn){ return RayFrom(locn, SOUTHWEST);                                          }   },
-    {"west",                    [](uint8_t locn){ return RayFrom(locn, WEST);                                               }   },
-    {"northwest",               [](uint8_t locn){ return RayFrom(locn, NORTHWEST);                                          }   },
-    {"pawn_attacks_white",      [](uint8_t locn){ return ShiftNorthwest(Bitboard(locn)) | ShiftNortheast(Bitboard(locn));   },  },
-    {"pawn_attacks_black",      [](uint8_t locn){ return ShiftSouthwest(Bitboard(locn)) | ShiftSoutheast(Bitboard(locn));   },  },
-    {"knight_attacks",          KnightAttacks                                                                                   },
-    {"bishop_attacks",          BishopAttacksOnEmptyBoard                                                                       },
-    {"rook_attacks",            RookAttacksOnEmptyBoard                                                                         },
-    {"queen_attacks",           QueenAttacksOnEmptyBoard                                                                        },
-    {"king_attacks",            KingAttacks                                                                                     },
-    {"king_attacks2",           KingAttacks2                                                                                    },
-    {"king_pawn_shelter_white", KingPawnShelterWhite                                                                            },
-    {"king_pawn_shelter_black", KingPawnShelterBlack                                                                            },
+    {"north",                   [](uint8_t locn) constexpr { return RayFrom(locn, NORTH);                                              }   },
+    {"northeast",               [](uint8_t locn) constexpr { return RayFrom(locn, NORTHEAST);                                          }   },
+    {"east",                    [](uint8_t locn) constexpr { return RayFrom(locn, EAST);                                               }   },
+    {"southeast",               [](uint8_t locn) constexpr { return RayFrom(locn, SOUTHEAST);                                          }   },
+    {"south",                   [](uint8_t locn) constexpr { return RayFrom(locn, SOUTH);                                              }   },
+    {"southwest",               [](uint8_t locn) constexpr { return RayFrom(locn, SOUTHWEST);                                          }   },
+    {"west",                    [](uint8_t locn) constexpr { return RayFrom(locn, WEST);                                               }   },
+    {"northwest",               [](uint8_t locn) constexpr { return RayFrom(locn, NORTHWEST);                                          }   },
+    {"pawn_attacks_white",      [](uint8_t locn) constexpr { return ShiftNorthwest(Bitboard(locn)) | ShiftNortheast(Bitboard(locn));   },  },
+    {"pawn_attacks_black",      [](uint8_t locn) constexpr { return ShiftSouthwest(Bitboard(locn)) | ShiftSoutheast(Bitboard(locn));   },  },
+    {"knight_attacks",          KnightAttacks                                                                                              },
+    {"bishop_attacks",          BishopAttacksOnEmptyBoard                                                                                  },
+    {"rook_attacks",            RookAttacksOnEmptyBoard                                                                                    },
+    {"queen_attacks",           QueenAttacksOnEmptyBoard                                                                                   },
+    {"king_attacks",            KingAttacks                                                                                                },
+    {"king_attacks2",           KingAttacks2                                                                                               },
+    {"king_pawn_shelter_white", KingPawnShelterWhite                                                                                       },
+    {"king_pawn_shelter_black", KingPawnShelterBlack                                                                                       },
     // clang-format on
-};
+}};
 
 /// @brief Generators for white pawn structure squares.
-static const Generator PAWN_GENERATORS_WHITE[] = {
+constexpr std::array<Generator, 4> PAWN_GENERATORS_WHITE = {{
     // clang-format off
     {"passed_pawn_mask",    PassedPawnMaskWhite,    },
     {"isolated_pawn_mask",  IsolatedPawnMaskWhite,  },
     {"supported_pawn_mask", SupportedPawnMaskWhite, },
     {"doubled_pawn_mask",   DoubledPawnMaskWhite,   },
     // clang-format on
-};
+}};
 
 /// @brief Generators for black pawn structure squares.
-static const Generator PAWN_GENERATORS_BLACK[] = {
+constexpr std::array<Generator, 4> PAWN_GENERATORS_BLACK = {{
     // clang-format off
     {"passed_pawn_mask",    PassedPawnMaskBlack,    },
     {"isolated_pawn_mask",  IsolatedPawnMaskBlack,  },
     {"supported_pawn_mask", SupportedPawnMaskBlack, },
     {"doubled_pawn_mask",   DoubledPawnMaskBlack,   },
     // clang-format on
-};
+}};
 
 /// @brief Generate the generic sets for each square.
 static void GenerateSets()
@@ -609,11 +605,11 @@ static void GenerateSets()
     printf("extern const Sets SETS[64] = \n{");
     for (uint8_t locn = 0; locn != 64; ++locn)
     {
-        printf("\n    { /* square %c%c */", FileChar(locn), RankChar(locn));
+        printf("\n    { // square %c%c", FileChar(locn), RankChar(locn));
         for (const auto &generator : SET_GENERATORS)
         {
             const uint64_t b = generator.function(locn);
-            printf("\n        .%-25s = 0x%016" PRIX64 "ull, /* popcnt %2d */", generator.name, b, PopCount(b));
+            printf("\n        .%-25s = 0x%016" PRIX64 "ull, // popcnt %2d", generator.name, b, PopCount(b));
         }
         printf("\n    },");
     }
@@ -629,12 +625,12 @@ static void GeneratePawnSets()
         printf("\n    {");
         for (uint8_t locn = 0; locn != 64; ++locn)
         {
-            printf("\n        { /* %s square %c%c */", COLOR_NAMES[color], FileChar(locn), RankChar(locn));
+            printf("\n        { // %s square %c%c", COLOR_NAMES[color], FileChar(locn), RankChar(locn));
             auto &generators{color == 0 ? PAWN_GENERATORS_WHITE : PAWN_GENERATORS_BLACK};
             for (const auto &generator : generators)
             {
                 const uint64_t b = generator.function(locn);
-                printf("\n            .%-28s = 0x%016" PRIX64 "ull, /* popcnt %2d */", generator.name, b, PopCount(b));
+                printf("\n            .%-28s = 0x%016" PRIX64 "ull, // popcnt %2d", generator.name, b, PopCount(b));
             }
             printf("\n        },");
         }
@@ -649,7 +645,7 @@ static void GenerateInterveningSquares()
     printf("extern const Bitboard INTERVENING_SQUARES[64][64] = \n{");
     for (int i = 0; i != 64; ++i)
     {
-        printf("\n    { /* square %c%c */", FileChar(i), RankChar(i));
+        printf("\n    { // square %c%c", FileChar(i), RankChar(i));
         for (int j = 0; j != 64; ++j)
         {
             if ((j & 7) == 0)
@@ -672,7 +668,7 @@ static void GenerateHashes()
         printf("\n    {");
         for (int piece = PAWN; piece <= KING; ++piece)
         {
-            printf("\n        {   /* %s %s */", COLOR_NAMES[color], PIECE_NAMES[piece]);
+            printf("\n        {   // %s %s", COLOR_NAMES[color], PIECE_NAMES[piece]);
             for (int i = 0; i != 64; ++i)
             {
                 if ((i & 7) == 0)
@@ -739,7 +735,7 @@ static void GenerateMagics(void)
                    magics[locn].attacks.size());
             for (std::size_t j = 0; j != magics[locn].attacks.size(); ++j)
             {
-                if (j % 8 == 0)
+                if (j % 4 == 0)
                 {
                     printf("\n    ");
                 }
@@ -768,7 +764,7 @@ static void GenerateMagics(void)
 /// file which is then used by the main program.
 int main()
 {
-    printf("/* This file was generated on " __DATE__ " at " __TIME__ " */\n");
+    printf("// This file was generated on " __DATE__ " at " __TIME__ "\n");
     printf("#include \"generated_data.h\"\n");
     GenerateSets();
     GeneratePawnSets();
