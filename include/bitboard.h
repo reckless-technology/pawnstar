@@ -1,5 +1,5 @@
 #pragma once
-/// @file Types, values and functions for using Bitboards.
+/// @file Types, values and functions for using chess Bitboards.
 
 #include <cstdint>
 
@@ -30,11 +30,14 @@ class Bitboard
   private:
     uint64_t v; ///< The bitboard value.
 
+    static constexpr uint64_t NOT_FILE_A = 0xFEFEFEFEFEFEFEFEull; ///< Mask off the a file.
+    static constexpr uint64_t NOT_FILE_H = 0x7F7F7F7F7F7F7F7Full; ///< Mask off the h file.
+
   public:
     constexpr Bitboard()
     {
     }
-    constexpr Bitboard(uint64_t b) : v(b)
+    constexpr Bitboard(uint64_t v) : v(v)
     {
     }
     constexpr Bitboard(Square location) : v(1ull << location)
@@ -90,33 +93,65 @@ class Bitboard
     {
         return Bitboard{v ^ that.v};
     }
-    constexpr Bitboard operator*(Bitboard that) const
-    {
-        return Bitboard{v * that.v};
-    }
     constexpr Bitboard operator~() const
     {
         return Bitboard{~v};
-    }
-    constexpr Bitboard operator<<(int i) const
-    {
-        return Bitboard{v << i};
-    }
-    constexpr Bitboard operator>>(int i) const
-    {
-        return Bitboard{v >> i};
     }
     constexpr Square Lsb() const
     {
         return (Square)__builtin_ctzll(v);
     }
+    constexpr Square Msb() const
+    {
+        return (Square)(63 - __builtin_clzll(v));
+    }
     constexpr int PopCount() const
     {
         return __builtin_popcountll(v);
     }
+    constexpr bool IsEmpty() const
+    {
+        return v == 0;
+    }
+    constexpr bool IsNotEmpty() const
+    {
+        return v != 0;
+    }
     constexpr explicit operator uint64_t() const
     {
         return v;
+    }
+    constexpr Bitboard ShiftNorth() const
+    {
+        return Bitboard{v << 8};
+    }
+    constexpr Bitboard ShiftNortheast() const
+    {
+        return Bitboard{(v & NOT_FILE_H) << 9};
+    }
+    constexpr Bitboard ShiftEast() const
+    {
+        return Bitboard{(v & NOT_FILE_H) << 1};
+    }
+    constexpr Bitboard ShiftSoutheast() const
+    {
+        return Bitboard{(v & NOT_FILE_H) >> 7};
+    }
+    constexpr Bitboard ShiftSouth() const
+    {
+        return Bitboard{v >> 8};
+    }
+    constexpr Bitboard ShiftSouthwest() const
+    {
+        return Bitboard{(v & NOT_FILE_A) >> 9};
+    }
+    constexpr Bitboard ShiftWest() const
+    {
+        return Bitboard{(v & NOT_FILE_A) >> 1};
+    }
+    constexpr Bitboard ShiftNorthwest() const
+    {
+        return Bitboard{(v & NOT_FILE_A) << 7};
     }
 
     /// @brief Dummy sentinel for end of input iterator range.
@@ -127,7 +162,7 @@ class Bitboard
     /// @brief Input iterator to allow iteration over the squares in a Bitboard.
     /// Dereferencing the iterator returns the least significant bit set.
     /// Incrementing the iterator clears the least significant bit set.
-    /// This allows nice clean semantics like: "for (Square s : b)" for iterating over the bits set in the bitboard.
+    /// This allows nice clean semantics like: "for (Square s : v)" for iterating over the bits set in a bitboard.
     class Iterator
     {
       public:
@@ -153,12 +188,12 @@ class Bitboard
         uint64_t i;
     };
 
-    Iterator begin() const
+    constexpr Iterator begin() const
     {
         return Iterator{*this};
     }
 
-    Sentinel end() const
+    constexpr Sentinel end() const
     {
         return Sentinel{};
     }
@@ -166,61 +201,24 @@ class Bitboard
 
 // Useful Bitboard constant values.
 // clang-format off
-constexpr Bitboard NO_SQUARES       {0};
-constexpr Bitboard ALL_SQUARES      {~NO_SQUARES};
-constexpr Bitboard RANK_1           {0xFFull};
-constexpr Bitboard RANK_2           {RANK_1 << 8};
-constexpr Bitboard RANK_3           {RANK_2 << 8};
-constexpr Bitboard RANK_4           {RANK_3 << 8};
-constexpr Bitboard RANK_5           {RANK_4 << 8};
-constexpr Bitboard RANK_6           {RANK_5 << 8};
-constexpr Bitboard RANK_7           {RANK_6 << 8};
-constexpr Bitboard RANK_8           {RANK_7 << 8};
-constexpr Bitboard FILE_A           {0x0101010101010101ull};
-constexpr Bitboard FILE_B           {FILE_A << 1};
-constexpr Bitboard FILE_C           {FILE_B << 1};
-constexpr Bitboard FILE_D           {FILE_C << 1};
-constexpr Bitboard FILE_E           {FILE_D << 1};
-constexpr Bitboard FILE_F           {FILE_E << 1};
-constexpr Bitboard FILE_G           {FILE_F << 1};
-constexpr Bitboard FILE_H           {FILE_G << 1};
-constexpr Bitboard NOT_FILE_H       {~FILE_H};
-constexpr Bitboard NOT_FILE_A       {~FILE_A};
-constexpr Bitboard WHITE_SQUARES    {0x55AA55AA55AA55AAull};
-constexpr Bitboard BLACK_SQUARES    {~WHITE_SQUARES};
+static constexpr Bitboard NO_SQUARES       {0ull};
+static constexpr Bitboard ALL_SQUARES      {~NO_SQUARES};
+static constexpr Bitboard RANK_1           {0xFFull};
+static constexpr Bitboard RANK_2           {RANK_1.ShiftNorth()};
+static constexpr Bitboard RANK_3           {RANK_2.ShiftNorth()};
+static constexpr Bitboard RANK_4           {RANK_3.ShiftNorth()};
+static constexpr Bitboard RANK_5           {RANK_4.ShiftNorth()};
+static constexpr Bitboard RANK_6           {RANK_5.ShiftNorth()};
+static constexpr Bitboard RANK_7           {RANK_6.ShiftNorth()};
+static constexpr Bitboard RANK_8           {RANK_7.ShiftNorth()};
+static constexpr Bitboard FILE_A           {0x0101010101010101ull};
+static constexpr Bitboard FILE_B           {FILE_A.ShiftEast()};
+static constexpr Bitboard FILE_C           {FILE_B.ShiftEast()};
+static constexpr Bitboard FILE_D           {FILE_C.ShiftEast()};
+static constexpr Bitboard FILE_E           {FILE_D.ShiftEast()};
+static constexpr Bitboard FILE_F           {FILE_E.ShiftEast()};
+static constexpr Bitboard FILE_G           {FILE_F.ShiftEast()};
+static constexpr Bitboard FILE_H           {FILE_G.ShiftEast()};
+static constexpr Bitboard WHITE_SQUARES    {0x55AA55AA55AA55AAull};
+static constexpr Bitboard BLACK_SQUARES    {~WHITE_SQUARES};
 // clang-format on
-
-/// Functions to shift bitboards by one square in the specified direction. Compass rose directions are from White's
-/// perspective.
-constexpr Bitboard ShiftNorth(Bitboard b)
-{
-    return b << 8;
-}
-constexpr Bitboard ShiftNortheast(Bitboard b)
-{
-    return (b & NOT_FILE_H) << 9;
-}
-constexpr Bitboard ShiftEast(Bitboard b)
-{
-    return (b & NOT_FILE_H) << 1;
-}
-constexpr Bitboard ShiftSoutheast(Bitboard b)
-{
-    return (b & NOT_FILE_H) >> 7;
-}
-constexpr Bitboard ShiftSouth(Bitboard b)
-{
-    return b >> 8;
-}
-constexpr Bitboard ShiftSouthwest(Bitboard b)
-{
-    return (b & NOT_FILE_A) >> 9;
-}
-constexpr Bitboard ShiftWest(Bitboard b)
-{
-    return (b & NOT_FILE_A) >> 1;
-}
-constexpr Bitboard ShiftNorthwest(Bitboard b)
-{
-    return (b & NOT_FILE_A) << 7;
-}

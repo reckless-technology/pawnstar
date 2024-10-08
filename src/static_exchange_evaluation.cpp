@@ -79,39 +79,39 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         Bitboard       rook_attacks;
         const Bitboard attacking_pieces = bb.PiecesOfColor(color);
         Bitboard       attackers        = sets.PawnAttacks(EnemyOf(color)) & attacking_pieces & bb.pawns;
-        if (attackers != NO_SQUARES)
+        if (attackers.IsNotEmpty())
         {
             capturing_piece = PAWN;
             goto FoundAttacker;
         }
         attackers = sets.knight_attacks & attacking_pieces & bb.knights;
-        if (attackers != NO_SQUARES)
+        if (attackers.IsNotEmpty())
         {
             capturing_piece = KNIGHT;
             goto FoundAttacker;
         }
         bishop_attacks = BishopAttacks(occupied, location);
         attackers      = bishop_attacks & attacking_pieces & bb.bishops;
-        if (attackers != NO_SQUARES)
+        if (attackers.IsNotEmpty())
         {
             capturing_piece = BISHOP;
             goto FoundAttacker;
         }
         rook_attacks = RookAttacks(occupied, location);
         attackers    = rook_attacks & attacking_pieces & bb.rooks;
-        if (attackers != NO_SQUARES)
+        if (attackers.IsNotEmpty())
         {
             capturing_piece = ROOK;
             goto FoundAttacker;
         }
         attackers = (bishop_attacks | rook_attacks) & attacking_pieces & bb.queens;
-        if (attackers != NO_SQUARES)
+        if (attackers.IsNotEmpty())
         {
             capturing_piece = QUEEN;
             goto FoundAttacker;
         }
         attackers = sets.king_attacks & attacking_pieces & bb.kings;
-        if (attackers != NO_SQUARES)
+        if (attackers.IsNotEmpty())
         {
             capturing_piece = KING;
             goto FoundAttacker;

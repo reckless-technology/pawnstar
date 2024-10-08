@@ -152,34 +152,34 @@ template <Color color> PawnStructure DeterminePawnStructure(const Position &posi
     {
         const Bitboard  bb   = Bitboard(locn);
         const PawnSets &sets = PAWN_SETS[color][locn];
-        if ((sets.passed_pawn_mask & enemy_pawns) == NO_SQUARES)
+        if ((sets.passed_pawn_mask & enemy_pawns).IsEmpty())
         {
             ps.passed_pawns |= bb;
         }
-        if ((sets.doubled_pawn_mask & friendly_pawns) != NO_SQUARES)
+        if ((sets.doubled_pawn_mask & friendly_pawns).IsNotEmpty())
         {
             ps.doubled_pawns |= bb;
         }
-        if ((sets.isolated_pawn_mask & friendly_pawns) == NO_SQUARES)
+        if ((sets.isolated_pawn_mask & friendly_pawns).IsEmpty())
         {
             ps.isolated_pawns |= bb;
         }
-        if ((sets.supported_pawn_mask & friendly_pawns) == NO_SQUARES)
+        if ((sets.supported_pawn_mask & friendly_pawns).IsEmpty())
         {
             if constexpr (color == WHITE)
             {
-                const Bitboard enemy_pawn_attacks = ShiftSouthwest(enemy_pawns) | ShiftSoutheast(enemy_pawns);
+                const Bitboard enemy_pawn_attacks = enemy_pawns.ShiftSouthwest() | enemy_pawns.ShiftSoutheast();
                 const Square   forward_locn       = (Square)(locn + 8);
-                if ((enemy_pawn_attacks & Bitboard(forward_locn)) != NO_SQUARES)
+                if ((enemy_pawn_attacks & Bitboard(forward_locn)).IsNotEmpty())
                 {
                     ps.backward_pawns |= bb;
                 }
             }
             else
             {
-                const Bitboard enemy_pawn_attacks = ShiftNorthwest(enemy_pawns) | ShiftNortheast(enemy_pawns);
+                const Bitboard enemy_pawn_attacks = enemy_pawns.ShiftNorthwest() | enemy_pawns.ShiftNortheast();
                 const Square   forward_locn       = (Square)(locn - 8);
-                if ((enemy_pawn_attacks & Bitboard(forward_locn)) != NO_SQUARES)
+                if ((enemy_pawn_attacks & Bitboard(forward_locn)).IsNotEmpty())
                 {
                     ps.backward_pawns |= bb;
                 }
@@ -206,12 +206,12 @@ template <Color color> int EvaluateMaterial(const Position &position)
     int score = pawns.PopCount() * 100 + knights.PopCount() * 400 + bishops.PopCount() * 400 + rooks.PopCount() * 600 +
                 queens.PopCount() * 1200;
     // Bonus for the bishop pair.
-    if ((bishops & WHITE_SQUARES) != NO_SQUARES && (bishops & BLACK_SQUARES) != NO_SQUARES)
+    if ((bishops & WHITE_SQUARES).IsNotEmpty() && (bishops & BLACK_SQUARES).IsNotEmpty())
     {
         score += 100;
     }
     // Penalty for no pawns.
-    if (pawns == NO_SQUARES)
+    if (pawns.IsEmpty())
     {
         score -= 50;
     }
@@ -344,13 +344,13 @@ template <Color color> int EvaluateKing(const Position &position)
 
         if constexpr (color == WHITE)
         {
-            pawn_shelter_2 = ShiftNorth(pawn_shelter_1);
-            pawn_shelter_3 = ShiftNorth(pawn_shelter_2);
+            pawn_shelter_2 = pawn_shelter_1.ShiftNorth();
+            pawn_shelter_3 = pawn_shelter_2.ShiftNorth();
         }
         else
         {
-            pawn_shelter_2 = ShiftSouth(pawn_shelter_1);
-            pawn_shelter_3 = ShiftSouth(pawn_shelter_2);
+            pawn_shelter_2 = pawn_shelter_1.ShiftSouth();
+            pawn_shelter_3 = pawn_shelter_2.ShiftSouth();
         }
         safety_score =
             25 * (friendly_pawns & pawn_shelter_1).PopCount() + 10 * (friendly_pawns & pawn_shelter_2).PopCount() +
@@ -359,17 +359,17 @@ template <Color color> int EvaluateKing(const Position &position)
     }
     // Penalty for open files near our king.
     const Bitboard king_file = FILE_BITBOARDS[FileOf(position.KingLocation(color))];
-    if ((king_file & friendly_pawns) == NO_SQUARES)
+    if ((king_file & friendly_pawns).IsEmpty())
     {
         safety_score -= 30;
     }
-    Bitboard adjacent_file = ShiftWest(king_file);
-    if (adjacent_file != NO_SQUARES && ((adjacent_file & friendly_pawns) == NO_SQUARES))
+    Bitboard adjacent_file = king_file.ShiftWest();
+    if (adjacent_file.IsNotEmpty() && ((adjacent_file & friendly_pawns).IsEmpty()))
     {
         safety_score -= 20;
     }
-    adjacent_file = ShiftEast(king_file);
-    if (adjacent_file != NO_SQUARES && ((adjacent_file & friendly_pawns) == NO_SQUARES))
+    adjacent_file = king_file.ShiftEast();
+    if (adjacent_file.IsNotEmpty() && ((adjacent_file & friendly_pawns).IsEmpty()))
     {
         safety_score -= 20;
     }

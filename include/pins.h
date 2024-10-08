@@ -27,7 +27,7 @@ class Pins
             const Bitboard intervening_squares        = intervening[slider_location];
             const Bitboard intervening_pieces         = intervening_squares & occupied_squares;
             const Bitboard intervening_friendly_piece = intervening_pieces & friendly_pieces;
-            if (intervening_friendly_piece != NO_SQUARES && intervening_pieces.PopCount() == 1)
+            if (intervening_friendly_piece.IsNotEmpty() && intervening_pieces.PopCount() == 1)
             {
                 // There is only a single piece between the sliding enemy attacker and the king so this piece is pinned
                 // along the attack ray. The pinned piece is also allowed to capture the pinning piece.
@@ -42,7 +42,7 @@ class Pins
     /// @return Set of allowed destination squares.
     Bitboard AllowedSquares(Square locn) const
     {
-        return (Bitboard{locn} & pinned_pieces) != NO_SQUARES ? allowed_squares[locn] : ALL_SQUARES;
+        return (Bitboard{locn} & pinned_pieces).IsNotEmpty() ? allowed_squares[locn] : ALL_SQUARES;
     }
 
   private:

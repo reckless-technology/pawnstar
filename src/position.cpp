@@ -382,7 +382,7 @@ std::string Position::ToString() const
         int num_empty_squares = 0;
         for (int x = 0; x < 8; ++x)
         {
-            if ((occupied_squares & Bitboard(x, y)) == NO_SQUARES)
+            if ((occupied_squares & Bitboard(x, y)).IsEmpty())
             {
                 ++num_empty_squares;
             }
@@ -393,7 +393,7 @@ std::string Position::ToString() const
                     ss << (char)('0' + num_empty_squares);
                     num_empty_squares = 0;
                 }
-                const char piece = (white_pieces_ & Bitboard(x, y)) != NO_SQUARES
+                const char piece = (white_pieces_ & Bitboard(x, y)).IsNotEmpty()
                                        ? " PNBRQK"[PieceAt((Square)(x + 8 * y))]
                                        : " pnbrqk"[PieceAt((Square)(x + 8 * y))];
                 ss << piece;
@@ -473,7 +473,7 @@ Bitboard Position::AttacksTo(Square location, Color color) const
 /// @return True if square is attacked by color.
 bool Position::IsAttacked(Square location, Color color) const
 {
-    return AttacksTo(location, color) != NO_SQUARES;
+    return AttacksTo(location, color).IsNotEmpty();
 }
 
 /// @brief Determine if the position is draw by insufficient material.
@@ -493,7 +493,7 @@ bool Position::IsDrawByMaterial() const
         return true;
     case 3:
         // king and bishop vs king or king and knight vs king
-        if ((bishops_ | knights_) != NO_SQUARES)
+        if ((bishops_ | knights_).IsNotEmpty())
         {
             INCREMENT("draws by material (3)");
             return true;
@@ -504,9 +504,9 @@ bool Position::IsDrawByMaterial() const
         {
             const Bitboard white_bishops                   = bishops_ & white_pieces_;
             const Bitboard black_bishops                   = bishops_ ^ white_bishops;
-            const bool     is_white_bishop_on_white_square = (white_bishops & WHITE_SQUARES) != NO_SQUARES;
-            const bool     is_black_bishop_on_white_square = (black_bishops & WHITE_SQUARES) != NO_SQUARES;
-            if (white_bishops != NO_SQUARES && black_bishops != NO_SQUARES &&
+            const bool     is_white_bishop_on_white_square = (white_bishops & WHITE_SQUARES).IsNotEmpty();
+            const bool     is_black_bishop_on_white_square = (black_bishops & WHITE_SQUARES).IsNotEmpty();
+            if (white_bishops.IsNotEmpty() && black_bishops.IsNotEmpty() &&
                 is_white_bishop_on_white_square == is_black_bishop_on_white_square)
             {
                 INCREMENT("draws by material (4)");
@@ -530,7 +530,7 @@ bool Position::IsLegal() const
     const Bitboard white_king = kings_ & white_pieces_;
     const Bitboard black_king = kings_ & black_pieces_;
     return white_king.PopCount() == 1 && black_king.PopCount() == 1 && white_king != black_king &&
-           (SETS[white_king.Lsb()].king_attacks & black_king) == NO_SQUARES &&
+           (SETS[white_king.Lsb()].king_attacks & black_king).IsEmpty() &&
            !IsAttacked(king_location_[EnemyOf(color)], color);
 }
 

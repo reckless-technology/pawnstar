@@ -67,7 +67,7 @@ class Position
     constexpr Bitboard  PiecesOfType(Piece piece) const     {return (&pawns_)[piece - PAWN];}
     constexpr Square    KingLocation(Color color) const     {return king_location_[color];}
     constexpr uint64_t  Hash() const                        {return hash_;}
-    constexpr bool      IsInCheck() const                   {return checkers_ != NO_SQUARES;}
+    constexpr bool      IsInCheck() const                   {return checkers_.IsNotEmpty();}
     constexpr uint8_t   MoveCount() const                   {return full_move_count_;}
     constexpr uint8_t   ReversibleMoveCount() const         {return reversible_move_count_;}
     constexpr Square    EnPassantIndex() const              {return en_passant_square_;}
@@ -136,8 +136,8 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
     // Determine the squares which our king cannot move to, i.e. any square which is attacked or X-ray attacked by any
     // enemy piece.
 
-    Bitboard forbidden_king_squares = color == WHITE ? ShiftSouthwest(enemy_pawns) | ShiftSoutheast(enemy_pawns)
-                                                     : ShiftNorthwest(enemy_pawns) | ShiftNortheast(enemy_pawns);
+    Bitboard forbidden_king_squares = color == WHITE ? enemy_pawns.ShiftSouthwest() | enemy_pawns.ShiftSoutheast()
+                                                     : enemy_pawns.ShiftNorthwest() | enemy_pawns.ShiftNortheast();
 
     Bitboard b = knights_ & enemy_pieces;
     for (Square s : b)
@@ -264,13 +264,13 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
         {
             if constexpr (color == WHITE)
             {
-                if (MayWhiteCastleKingside() && (occupied_squares & (Bitboard(F1) | Bitboard(G1))) == NO_SQUARES &&
+                if (MayWhiteCastleKingside() && (occupied_squares & (Bitboard(F1) | Bitboard(G1))).IsEmpty() &&
                     !IsAttacked(F1, BLACK) && !IsAttacked(G1, BLACK))
                 {
                     moves.push_back(Move::CastlingMove(E1, G1));
                 }
                 if (MayWhiteCastleQueenside() &&
-                    (occupied_squares & (Bitboard(B1) | Bitboard(C1) | Bitboard(D1))) == NO_SQUARES &&
+                    (occupied_squares & (Bitboard(B1) | Bitboard(C1) | Bitboard(D1))).IsEmpty() &&
                     !IsAttacked(D1, BLACK) && !IsAttacked(C1, BLACK))
                 {
                     moves.push_back(Move::CastlingMove(E1, C1));
@@ -278,13 +278,13 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             }
             else
             {
-                if (MayBlackCastleKingside() && (occupied_squares & (Bitboard(F8) | Bitboard(G8))) == NO_SQUARES &&
+                if (MayBlackCastleKingside() && (occupied_squares & (Bitboard(F8) | Bitboard(G8))).IsEmpty() &&
                     !IsAttacked(F8, WHITE) && !IsAttacked(G8, WHITE))
                 {
                     moves.push_back(Move::CastlingMove(E8, G8));
                 }
                 if (MayBlackCastleQueenside() &&
-                    (occupied_squares & (Bitboard(B8) | Bitboard(C8) | Bitboard(D8))) == NO_SQUARES &&
+                    (occupied_squares & (Bitboard(B8) | Bitboard(C8) | Bitboard(D8))).IsEmpty() &&
                     !IsAttacked(D8, WHITE) && !IsAttacked(C8, WHITE))
                 {
                     moves.push_back(Move::CastlingMove(E8, C8));
@@ -310,10 +310,10 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
     if constexpr (color == WHITE)
     {
         pawns              = pawns_ & white_pieces_;
-        single_pushes      = ShiftNorth(pawns) & ~occupied_squares;
-        double_pushes      = ShiftNorth(single_pushes) & ~occupied_squares & RANK_4;
-        captures_west      = ShiftNorthwest(pawns) & black_pieces_;
-        captures_east      = ShiftNortheast(pawns) & black_pieces_;
+        single_pushes      = pawns.ShiftNorth() & ~occupied_squares;
+        double_pushes      = single_pushes.ShiftNorth() & ~occupied_squares & RANK_4;
+        captures_west      = pawns.ShiftNorthwest() & black_pieces_;
+        captures_east      = pawns.ShiftNortheast() & black_pieces_;
         en_passant_sources = en_passant_square_ ? SETS[en_passant_square_].pawn_attacks_black & pawns : NO_SQUARES;
         promotions         = single_pushes & RANK_8;
         promotions_west    = captures_west & RANK_8;
@@ -325,10 +325,10 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
     else
     {
         pawns              = pawns_ & black_pieces_;
-        single_pushes      = ShiftSouth(pawns) & ~occupied_squares;
-        double_pushes      = ShiftSouth(single_pushes) & ~occupied_squares & RANK_5;
-        captures_west      = ShiftSouthwest(pawns) & white_pieces_;
-        captures_east      = ShiftSoutheast(pawns) & white_pieces_;
+        single_pushes      = pawns.ShiftSouth() & ~occupied_squares;
+        double_pushes      = single_pushes.ShiftSouth() & ~occupied_squares & RANK_5;
+        captures_west      = pawns.ShiftSouthwest() & white_pieces_;
+        captures_east      = pawns.ShiftSoutheast() & white_pieces_;
         en_passant_sources = en_passant_square_ ? SETS[en_passant_square_].pawn_attacks_white & pawns : NO_SQUARES;
         promotions         = single_pushes & RANK_1;
         promotions_west    = captures_west & RANK_1;
@@ -354,7 +354,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
         for (Square to : b)
         {
             const Square from = (Square)(to - delta);
-            if ((pins.AllowedSquares(from) & Bitboard(to)) != NO_SQUARES)
+            if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
                 const Piece captured = PieceAt(to);
                 moves.push_back(Move::PromotionCaptureMove(from, to, captured, QUEEN));
@@ -368,7 +368,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
     for (Square to : b)
     {
         const Square from = (Square)(to - push_delta);
-        if ((pins.AllowedSquares(from) & Bitboard(to)) != NO_SQUARES)
+        if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
         {
             moves.push_back(Move::PromotionMove(from, to, QUEEN));
             moves.push_back(Move::PromotionMove(from, to, ROOK));
@@ -389,7 +389,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
         for (Square to : b)
         {
             const Square from = (Square)(to - delta);
-            if ((pins.AllowedSquares(from) & Bitboard(to)) != NO_SQUARES)
+            if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
                 moves.push_back(Move::CaptureMove(from, to, PAWN, PieceAt(to)));
             }
@@ -401,7 +401,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
         for (Square to : b)
         {
             const Square from = (Square)(to - push_delta);
-            if ((pins.AllowedSquares(from) & Bitboard(to)) != NO_SQUARES)
+            if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
                 moves.push_back(Move::NonCaptureMove(from, to, PAWN));
             }
@@ -410,7 +410,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
         for (Square to : b)
         {
             const Square from = (Square)(to - push_delta * 2);
-            if ((pins.AllowedSquares(from) & Bitboard(to)) != NO_SQUARES)
+            if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
                 moves.push_back(Move::DoublePushMove(from, to));
             }
@@ -426,10 +426,10 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
     {
         const Square to                 = en_passant_square_;
         const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));
-        if ((pins.AllowedSquares(from) & Bitboard(to)) != NO_SQUARES)
+        if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
         {
-            if ((allowed_non_captures & Bitboard(to)) != NO_SQUARES ||
-                (allowed_captures & Bitboard(captured_pawn_locn)) != NO_SQUARES)
+            if ((allowed_non_captures & Bitboard(to)).IsNotEmpty() ||
+                (allowed_captures & Bitboard(captured_pawn_locn)).IsNotEmpty())
             {
                 // Test for the "weird" check that occurs when there is an enemy rook or queen on the same rank as our
                 // king which is only discovered after removing both pawns from the rank during an en passant capture.
@@ -443,7 +443,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
                     Bitboard bb = (rooks_ | queens_) & enemy_pieces & (SETS[king_locn].west | SETS[king_locn].east);
                     for (Square s : bb)
                     {
-                        if ((INTERVENING_SQUARES[king_locn][s] & pseudo_occupied_squares) == NO_SQUARES)
+                        if ((INTERVENING_SQUARES[king_locn][s] & pseudo_occupied_squares).IsEmpty())
                         {
                             // We can't make this move as it would lead to a discovered check.
                             is_discovered_check = true;

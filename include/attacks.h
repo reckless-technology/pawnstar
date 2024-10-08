@@ -17,7 +17,7 @@
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 {
     const MagicMoveEntry &m = BISHOP_MAGICS[location];
-    return m.attacks[m.indices[(uint64_t)(((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift)]];
+    return m.attacks[m.indices[(((uint64_t)occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
 }
 
 /// @brief Rook sliding attacks.
@@ -27,42 +27,44 @@ constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 {
     const MagicMoveEntry &m = ROOK_MAGICS[location];
-    return m.attacks[m.indices[(uint64_t)(((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift)]];
+    return m.attacks[m.indices[(((uint64_t)occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
 }
 
 #else
 
-/// Alternate sliding piece attacks using loops instead of magic bitboards.
-/// Slower, only used for regression testing purposes.
+/// Alternate sliding piece attacks using traditional approach instead of magic bitboards. This is slower, and only used
+/// for regression testing purposes.
 
-typedef Bitboard (*BitboardFn)(Bitboard);
-
-template <BitboardFn fn> constexpr Bitboard RayAttacks(Bitboard occupied_squares, Square location)
+constexpr Square LsbX(Bitboard b)
 {
-    Bitboard result = NO_SQUARES;
-    for (Bitboard b = fn(Bitboard(location)); b != NO_SQUARES; b = fn(b))
-    {
-        result |= b;
-        if ((b & occupied_squares) != NO_SQUARES)
-        {
-            break;
-        }
-    }
-    return result;
+    return (b | 0x8000000000000000ull).Lsb();
+}
+
+constexpr Square MsbX(Bitboard b)
+{
+    return (b | 1).Msb();
 }
 
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 {
-    return RayAttacks<ShiftNortheast>(occupied_squares, location) |
-           RayAttacks<ShiftNorthwest>(occupied_squares, location) |
-           RayAttacks<ShiftSoutheast>(occupied_squares, location) |
-           RayAttacks<ShiftSouthwest>(occupied_squares, location);
+    const Sets &s      = SETS[location];
+    Bitboard    result = s.bishop_attacks;
+    result ^= SETS[LsbX(s.northeast & occupied_squares)].northeast;
+    result ^= SETS[LsbX(s.northwest & occupied_squares)].northwest;
+    result ^= SETS[MsbX(s.southwest & occupied_squares)].southwest;
+    result ^= SETS[MsbX(s.southeast & occupied_squares)].southeast;
+    return result;
 }
 
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 {
-    return RayAttacks<ShiftNorth>(occupied_squares, location) | RayAttacks<ShiftEast>(occupied_squares, location) |
-           RayAttacks<ShiftSouth>(occupied_squares, location) | RayAttacks<ShiftWest>(occupied_squares, location);
+    const Sets &s      = SETS[location];
+    Bitboard    result = s.rook_attacks;
+    result ^= SETS[LsbX(s.north & occupied_squares)].north;
+    result ^= SETS[MsbX(s.south & occupied_squares)].south;
+    result ^= SETS[LsbX(s.east & occupied_squares)].east;
+    result ^= SETS[MsbX(s.west & occupied_squares)].west;
+    return result;
 }
 
 #endif
