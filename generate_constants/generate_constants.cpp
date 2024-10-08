@@ -125,8 +125,8 @@ constexpr uint64_t KnightAttacks(uint8_t locn)
 
     for (const auto &[dx, dy] : deltas)
     {
-        int x = locn_x + dx;
-        int y = locn_y + dy;
+        const int x = locn_x + dx;
+        const int y = locn_y + dy;
         if (IsInBoard(x, y))
         {
             result |= Bitboard(x, y);

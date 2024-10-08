@@ -44,10 +44,10 @@ void RunPositionTests(int depth)
     const int start_ms = ElapsedMilliseconds();
     for (string_view test_pos : POSITION_TESTS)
     {
-        Game game{test_pos};
-        game.time_control_.clock_type        = CLOCK_FIXED_DEPTH;
-        game.time_control_.fixed_depth.depth = depth;
-        game.do_show_thinking_               = true;
+        Game game;
+        game.NewGame(test_pos);
+        game.time_control_.clock_type = CHESS_CLOCK_FIXED_DEPTH;
+        game.time_control_.depth      = depth;
         printf("\n%s\n", game.CurrentPosition().ToString().c_str());
         DebugXClear();
         SearchRootNode(game);

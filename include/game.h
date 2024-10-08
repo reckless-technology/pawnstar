@@ -15,13 +15,11 @@ class Game
   public:
     TimeControl time_control_;      ///< Clock controls for the current game
     int         node_count_;        ///< Number of nodes (positions) during search
-    Color       engine_color_;      ///< The color which pawnstar is playing
-    bool        do_show_thinking_;  ///< Whether to show scores and PV during search
     bool        is_cancel_pending_; ///< Set to true when time for this search is expired
 
-    Game(std::string_view fen_string);
-    Game() : Game("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
+    Game()
     {
+        NewGame();
     }
     Position &CurrentPosition()
     {
@@ -31,6 +29,9 @@ class Game
     {
         return positions_[index_];
     }
+
+    void NewGame(std::string_view fen_string);
+    void NewGame();
     Move PlayMove(std::string_view move_string);
     void PlayMove(Move move);
     void MakeNullMove();

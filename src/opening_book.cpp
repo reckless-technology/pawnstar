@@ -71,6 +71,7 @@ void DisplayAvailableBookMoves(const Position &position)
     {
         return;
     }
+    // Create an associative container, indexed by move, of how many times that move appears for this position.
     unordered_map<Move, int, Move> move_counts;
     for (const auto &move : book[position.Hash()])
     {
@@ -80,7 +81,7 @@ void DisplayAvailableBookMoves(const Position &position)
     MoveList move_list = position.GenerateLegalMoves();
     for (const auto &[move, freq] : move_counts)
     {
-        string move_string{position.MoveToString(move, &move_list)};
+        const string move_string{position.MoveToString(move, &move_list)};
         printf("%-8s %3d\n", move_string.c_str(), freq);
     }
 }

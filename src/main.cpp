@@ -21,24 +21,24 @@ int main()
     setbuf(stdout, NULL);
     printf(
 #if 1
-        "                       .::.                            \n"
-        "                       _::_                            \n"
-        "                     _/____\\_                         \n"
-        "                     \\      /                         \n"
-        "                      \\____/                          \n"
-        "                      (____)                           \n"
-        "                       |  |                            \n"
-        "                       |__|                            \n"
-        "                      /    \\                          \n"
-        "                     (______)                          \n"
-        "                    (________)                         \n"
-        "                    /________\\                      \n\n"
+        "                       .::.        \n"
+        "                       _::_        \n"
+        "                     _/____\\_     \n"
+        "                     \\      /     \n"
+        "                      \\____/      \n"
+        "                      (____)       \n"
+        "                       |  |        \n"
+        "                       |__|        \n"
+        "                      /    \\      \n"
+        "                     (______)      \n"
+        "                    (________)     \n"
+        "                    /________\\  \n\n"
 #endif
-        "Pawnstar: A Winboard and Xboard compatible chess engine\n"
-        "(C) Jonny Reckless 2009 - 2024                         \n"
+        "Pawnstar: a UCI compatible chess engine\n"
+        "(C) Jonny Reckless 2009 - 2024\n"
         "Compiled: " __DATE__ " " __TIME__ "\n");
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
-    if (!InitializeOpeningBookFromFile("doc/pawnstar.book"))
+    if (!InitializeOpeningBookFromFile("..doc/pawnstar.book"))
     {
         printf("NOTE: unable to open book file\n");
     }

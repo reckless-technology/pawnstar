@@ -29,24 +29,28 @@ constexpr void RemoveMoveSuffixes(string &move_str)
 
 /// @brief Construct a game from a FEN (Forsyth Edwards) position string.
 /// @param fen_string Initial position.
-Game::Game(std::string_view fen_string)
+void Game::NewGame(std::string_view fen_string)
 {
-    time_control_.hard_stop_search_ms              = 0;
-    time_control_.clock_type                       = CLOCK_STANDARD;
-    time_control_.standard.milliseconds_per_period = 5 * 60 * 1000; // 5 minutes
-    time_control_.standard.moves_per_period        = 40;            // 40 moves in 5 mins
-    time_control_.standard.milliseconds_remaining  = 5 * 60 * 1000;
-    node_count_                                    = 0;
-    engine_color_                                  = NEITHER_COLOR;
-    do_show_thinking_                              = true;
-    index_                                         = 0;
-    positions_[index_]                             = Position{fen_string};
+    time_control_.hard_stop_ms        = 0;
+    time_control_.clock_type          = CHESS_CLOCK_STANDARD;
+    time_control_.ms_remaining        = 5 * 60 * 1000; // 5 minutes
+    time_control_.num_moves_remaining = 0;
+    node_count_                       = 0;
+    index_                            = 0;
+    is_cancel_pending_                = false;
+    positions_[index_]                = Position{fen_string};
+}
+
+void Game::NewGame()
+{
+    NewGame("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 }
 
 /// @brief Play a move and update state. Move must be legal for the current position.
 /// @param move The move to be played.
 void Game::PlayMove(Move move)
 {
+
     positions_[index_ + 1] = CurrentPosition().MakeMove(move);
     ++index_;
 }
@@ -166,9 +170,8 @@ void Game::SearchThreadEntry()
     Move move = SearchRootNode(*this);
     if (move)
     {
-        std::string move_string{CurrentPosition().MoveToString(move, nullptr)};
         PlayMove(move);
-        printf("move %s\n", move_string.c_str());
+        printf("bestmove %s\n", move.ToString().c_str());
         IsGameOver();
     }
 }

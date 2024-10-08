@@ -94,8 +94,8 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
 int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &parent_pv)
 {
     INCREMENT("alpha beta calls");
-    if ((++game.node_count_ & 0xFFFF) == 0 && game.time_control_.hard_stop_search_ms != 0 &&
-        ElapsedMilliseconds() >= game.time_control_.hard_stop_search_ms)
+    if ((++game.node_count_ & 0xFFFF) == 0 && game.time_control_.hard_stop_ms != 0 &&
+        ElapsedMilliseconds() >= game.time_control_.hard_stop_ms)
     {
         game.is_cancel_pending_ = true;
         return SEARCH_CANCELLED_SCORE;
