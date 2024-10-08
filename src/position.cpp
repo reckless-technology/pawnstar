@@ -451,75 +451,29 @@ std::string Position::ToString() const
     return ss.str();
 }
 
-/// @brief Determine if a square is attacked by a color
-/// @param location  location of attacked square
-/// @param color attacking color
-/// @return true if color attacks location, otherwise false
-bool Position::IsAttacked(Square location, Color color) const
-{
-    const Sets           &sets                = SETS[location];
-    const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard        attacking_pieces    = PiecesOfColor(color);
-    const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
-    if ((attacking_pieces & ((sets.PawnAttacks(EnemyOf(color)) & pawns_) | (sets.knight_attacks & knights_) |
-                             (sets.king_attacks & kings_))) != NO_SQUARES)
-    {
-        return true;
-    }
-    // Rook and queen horizontal and vertical sliding attacks.
-    Bitboard sliding_attackers = (rooks_ | queens_) & sets.rook_attacks & attacking_pieces;
-    for (Square s : sliding_attackers)
-    {
-        if ((intervening_squares[s] & occupied_squares) == NO_SQUARES)
-        {
-            return true;
-        }
-    }
-    // Bishop and queen diagonal and antidiagonal sliding attacks.
-    sliding_attackers = (bishops_ | queens_) & sets.bishop_attacks & attacking_pieces;
-    for (Square s : sliding_attackers)
-    {
-        if ((intervening_squares[s] & occupied_squares) == NO_SQUARES)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 /// @brief Determine attacks to a square by a color.
-/// @param position Board position.
 /// @param location Square index.
 /// @param color Attacking color.
 /// @return Set of squares of color containing a piece attacking location.
 Bitboard Position::AttacksTo(Square location, Color color) const
 {
-    const Sets           &sets                = SETS[location];
-    const Bitboard *const intervening_squares = &INTERVENING_SQUARES[location][0];
-    const Bitboard        attacking_pieces    = PiecesOfColor(color);
-    const Bitboard        occupied_squares    = white_pieces_ | black_pieces_;
-    // Pawn, knight and king attacks can be done by direct lookup since blockers do not affect their attack set.
-    Bitboard result = (attacking_pieces & ((sets.PawnAttacks(EnemyOf(color)) & pawns_) |
-                                           (sets.knight_attacks & knights_) | (sets.king_attacks & kings_)));
-    // Rook and queen horizontal and vertical sliding attacks.
-    Bitboard sliding_attackers = (rooks_ | queens_) & sets.rook_attacks & attacking_pieces;
-    for (Square s : sliding_attackers)
-    {
-        if ((intervening_squares[s] & occupied_squares) == NO_SQUARES)
-        {
-            result |= Bitboard(s);
-        }
-    }
-    // Bishop and queen diagonal and antidiagonal sliding attacks.
-    sliding_attackers = (bishops_ | queens_) & sets.bishop_attacks & attacking_pieces;
-    for (Square s : sliding_attackers)
-    {
-        if ((intervening_squares[s] & occupied_squares) == NO_SQUARES)
-        {
-            result |= Bitboard(s);
-        }
-    }
+    const Sets    &sets             = SETS[location];
+    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
+    Bitboard       result =
+        ((sets.PawnAttacks(EnemyOf(color)) & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_));
+    result |= RookAttacks(occupied_squares, location) & (rooks_ | queens_);
+    result |= BishopAttacks(occupied_squares, location) & (bishops_ | queens_);
+    result &= PiecesOfColor(color);
     return result;
+}
+
+/// @brief Determine if a square is attacked.
+/// @param location Square index
+/// @param color Attacking color.
+/// @return True if square is attacked by color.
+bool Position::IsAttacked(Square location, Color color) const
+{
+    return AttacksTo(location, color) != NO_SQUARES;
 }
 
 /// @brief Determine if the position is draw by insufficient material.
@@ -627,8 +581,8 @@ string Position::MoveToString(const Move &move, const MoveList *legal_moves) con
     bool         is_file_unique      = true;
     bool         is_rank_unique      = true;
     const char   move_piece          = " PNBRQK"[move.piece()];
-    // Determine if there is more than one piece of the same type which is capable of moving to the target square, and
-    // will require further disambiguation.
+    // Determine if there is more than one piece of the same type which is capable of moving to the target square,
+    // and will require further disambiguation.
     MoveList moves;
     if (legal_moves == nullptr)
     {

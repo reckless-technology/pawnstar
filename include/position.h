@@ -103,7 +103,7 @@ class Position
     Bitboard             white_pieces_;             ///< squares with a white piece on them
     Bitboard             black_pieces_;             ///< squares with a black piece on them
     Piece                squares_[64];              ///< Squares array for fast piece lookup
-    Bitboard             checkers_;                 ///< Set of squares which attack the kin
+    Bitboard             checkers_;                 ///< Set of squares which attack the king
     uint64_t             hash_;                     ///< Zobrist hash of this position, maintained incrementally
     uint8_t              flags_;                    ///< game state-machine flags
     Square               king_location_[2];         ///< square index of white and black kings
