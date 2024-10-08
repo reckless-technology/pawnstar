@@ -9,29 +9,37 @@
 constexpr int piece_values[7] = {0, 100, 300, 300, 500, 900, 10000};
 
 /// @brief Bitboards of piece on the board used for static exchange evaluation.
-struct SeeBoards
+struct SeeBoard
 {
-    Bitboard  pawns;
-    Bitboard  knights;
-    Bitboard  bishops;
-    Bitboard  rooks;
-    Bitboard  queens;
-    Bitboard  kings;
-    Bitboard  white_pieces;
-    Bitboard  black_pieces;
+    Bitboard pawns;
+    Bitboard knights;
+    Bitboard bishops;
+    Bitboard rooks;
+    Bitboard queens;
+    Bitboard kings;
+    Bitboard white_pieces;
+    Bitboard black_pieces;
+
+    SeeBoard(const Position &p)
+        : pawns(p.Pawns()), knights(p.Knights()), bishops(p.Bishops()), rooks(p.Rooks()), queens(p.Queens()),
+          kings(p.Kings()), white_pieces(p.WhitePieces()), black_pieces(p.BlackPieces())
+    {
+    }
+
     Bitboard &PiecesOfType(Piece piece)
     {
         return (&pawns)[piece - PAWN];
     }
+
     Bitboard &PiecesOfColor(Color color)
     {
         return (&white_pieces)[color];
     }
 };
 
-static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece piece_on_square);
+static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece piece_on_square);
 
-/// @brief Evaluate the SEE for a move.
+/// @brief Evaluate the static exchange evaluation for a move.
 /// @param src_position Position to evaluate.
 /// @param move Move to evaluate.
 /// @param is_checking On exit, set to true if the move gave check.
@@ -40,14 +48,7 @@ int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_che
 {
     Position dst_position{src_position.MakeMove(move)};
     is_checking = dst_position.IsInCheck();
-    SeeBoards bb{.pawns        = dst_position.Pawns(),
-                 .knights      = dst_position.Knights(),
-                 .bishops      = dst_position.Bishops(),
-                 .rooks        = dst_position.Rooks(),
-                 .queens       = dst_position.Queens(),
-                 .kings        = dst_position.Kings(),
-                 .white_pieces = dst_position.WhitePieces(),
-                 .black_pieces = dst_position.BlackPieces()};
+    SeeBoard bb{dst_position};
     if (move.promoted() != NONE)
     {
         return piece_values[move.captured()] + piece_values[move.promoted()] - piece_values[PAWN] -
@@ -62,7 +63,7 @@ int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_che
 /// @param color color to move
 /// @param piece_on_square piece currently standing on the target square
 /// @return int swap off (static exchange) score
-static int EvaluateSwapOff(SeeBoards &bb, Square location, Color color, Piece piece_on_square)
+static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece piece_on_square)
 {
     const Sets    &sets     = SETS[location];
     const Bitboard square   = Bitboard(location);
