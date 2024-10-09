@@ -19,6 +19,7 @@ int main()
 {
     setbuf(stdin, NULL);
     setbuf(stdout, NULL);
+    std::cout << std::unitbuf;
     printf(
 #if 1
         "                       .::.        \n"

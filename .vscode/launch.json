@@ -17,7 +17,7 @@
                 },
                 {
                     "description": "Set hex output",
-                    "text": "set output-radix 16",
+                    "text": "set output-radix 10",
                     "ignoreFailures": false
                 }
             ]
@@ -38,7 +38,7 @@
                 },
                 {
                     "description": "Set hex output",
-                    "text": "set output-radix 16",
+                    "text": "set output-radix 10",
                     "ignoreFailures": false
                 }
             ]

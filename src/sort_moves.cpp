@@ -71,7 +71,7 @@ uint32_t MaxKillerMoveCount()
     uint32_t result = 0;
     for (int i = 0; i != MAX_PLY; ++i)
     {
-        for (int j = 0; j != 32768; ++j)
+        for (int j = 0; j != 64 * 64; ++j)
         {
             if (killer_move_counts[i][j] > result)
             {
