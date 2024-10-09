@@ -6,6 +6,7 @@
 
 #include "debug_hashtable.h"
 #include "move.h"
+#include "search.h"
 #include "sort_moves.h"
 #include "static_exchange_evaluation.h"
 
@@ -23,29 +24,44 @@ void ResetKillerCounts()
     memset(killer_move_counts, 0, sizeof(killer_move_counts));
 }
 
-/// @brief Sort moves "best first".
-/// Uses static exchange evaluation (SEE) to provide a provisional score for each move for sorting.
-/// @param position position for which the moves were generated
-/// @param moves list of moves to be sorted
-/// @param ply distance from root node
-/// @param depth remaining search depth (unused)
-void ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int depth)
+/// @brief Assign provisional scores to each mover and then sort them best first.
+/// @param game Game being searched
+/// @param moves List of legal moves to evaluate.
+/// @param depth Current search depth.
+/// @param ply Current search ply.
+/// @param alpha Alpha value
+/// @param beta Beta value
+void ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alpha, int beta)
 {
     const uint32_t *const counts = &killer_move_counts[ply][0];
-    for (Move &move : moves)
+    if (depth > 3)
     {
-        // Assign provisional scores based on static exchange evaluation and how many cutoffs this move has caused in
-        // the search history.
-        bool      is_checking;
-        const int see_score = EvaluateStaticExchange(position, move, is_checking);
-        move.AssignScore(see_score * 1000 + counts[move.piece_from_to_mask()]);
-        if (is_checking)
+        Variation dummy_pv{};
+        for (std::size_t i = 0; i != moves.size(); ++i)
         {
-            move.GivesCheck();
+            bool      is_checking;
+            const int score = SearchSingleMove(game, depth - 3, ply, alpha, beta, moves[i], dummy_pv, i, is_checking);
+            moves[i].AssignScore(score * 1000 + counts[moves[i].piece_from_to_mask()]);
+            if (is_checking)
+            {
+                moves[i].GivesCheck();
+            }
+        }
+    }
+    else
+    {
+        for (Move &move : moves)
+        {
+            bool      is_checking;
+            const int score = EvaluateStaticExchange(game.CurrentPosition(), move, is_checking);
+            move.AssignScore(score * 1000 + counts[move.piece_from_to_mask()]);
+            if (is_checking)
+            {
+                move.GivesCheck();
+            }
         }
     }
     SortMoves<false>(moves);
-    (void)depth;
 }
 
 /// @brief Get the maximum count in the killer move table

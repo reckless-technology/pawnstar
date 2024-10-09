@@ -18,6 +18,7 @@ SOURCES             = \
 	input_handling.cpp \
 	main.cpp \
 	opening_book.cpp \
+	perft_results.cpp \
 	position.cpp \
 	random.cpp \
 	search_alphabeta.cpp \

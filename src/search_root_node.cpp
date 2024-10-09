@@ -8,6 +8,8 @@
 #include "sort_moves.h"
 #include "transposition_table.h"
 
+#include <format>
+#include <iostream>
 #include <sstream>
 #include <string>
 
@@ -36,7 +38,7 @@ Move SearchRootNode(Game &game)
         return move_list[0];
     }
     // Plan time usage for this search.
-    int timeout_ms   = 0; // Cancel search when this time expires.
+    int ms_timeout   = 0; // Cancel search when this time expires.
     int ms_allocated = 0; // Soft allocated time for the move.
     switch (game.time_control_.clock_type)
     {
@@ -48,22 +50,23 @@ Move SearchRootNode(Game &game)
         }
         else
         {
-            ms_allocated = game.time_control_.ms_remaining / 20;
+            const int num_moves_to_go_estimate = std::max(40 - game.CurrentPosition().MoveCount(), 5);
+            ms_allocated                       = game.time_control_.ms_remaining / num_moves_to_go_estimate;
         }
-        timeout_ms = std::max(100, std::min(ms_allocated * 2, game.time_control_.ms_remaining - 3000));
+        ms_timeout = std::max(100, std::min(ms_allocated * 2, game.time_control_.ms_remaining - 3000));
         game.time_control_.hard_stop_ms =
-            ElapsedMilliseconds() + timeout_ms; // Stop searching regardless when this elapses.
+            ElapsedMilliseconds() + ms_timeout; // Stop searching regardless when this elapses.
         break;
 
     case CHESS_CLOCK_FIXED_DEPTH:
-        timeout_ms                      = 0;
+        ms_timeout                      = 0;
         ms_allocated                    = 0;
         game.time_control_.hard_stop_ms = 0;
         break;
 
     case CHESS_CLOCK_FIXED_TIME:
-        timeout_ms                      = game.time_control_.ms_remaining;
-        game.time_control_.hard_stop_ms = ElapsedMilliseconds() + timeout_ms;
+        ms_timeout                      = game.time_control_.ms_remaining;
+        game.time_control_.hard_stop_ms = ElapsedMilliseconds() + ms_timeout;
         ms_allocated                    = 0;
         break;
 
@@ -82,8 +85,9 @@ Move SearchRootNode(Game &game)
     Move      best_moves[MAX_PLY]; // Best move found at each ply of search.
     for (std::size_t i = 0; i != move_list.size(); ++i)
     {
-        const int score =
-            SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i], principal_variation, i);
+        bool      is_checking;
+        const int score = SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i],
+                                           principal_variation, i, is_checking);
         move_list[i].AssignScore(score);
     }
     SortMoves<true>(move_list);
@@ -101,7 +105,8 @@ Move SearchRootNode(Game &game)
         game.node_count_ = 0;
         for (std::size_t i = 0; i != move_list.size(); ++i)
         {
-            const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list[i], child_pv, i);
+            bool      is_checking;
+            const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list[i], child_pv, i, is_checking);
             move_list[i].AssignScore(score);
             if (game.is_cancel_pending_)
             {
@@ -125,8 +130,9 @@ Move SearchRootNode(Game &game)
                     ss << move;
                     is_first_move = false;
                 }
-                printf("info depth %2u score cp %5d time %5u nodes %8u pv %s\n", depth, best_moves[depth].score(),
-                       (ElapsedMilliseconds() - start_ms), game.node_count_, ss.str().c_str());
+                std::cout << std::format("info depth {:2} score cp {:5} time {:5} nodes {:8} pv {}\n", depth,
+                                         best_moves[depth].score(), (ElapsedMilliseconds() - start_ms),
+                                         game.node_count_, ss.str());
             }
         }
         int stop_ms = ElapsedMilliseconds();

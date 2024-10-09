@@ -1,10 +1,16 @@
 /// @file Standard perft move generation tests.
 
 #include <algorithm>
+#include <chrono>
 #include <cinttypes>
 #include <cstring>
+#include <format>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
+
+using namespace std::chrono;
 
 using std::string;
 using std::string_view;
@@ -15,7 +21,7 @@ using std::string_view;
 #include "transposition_table.h"
 
 /// @brief Structure to hold move type counts for enhanced perft.
-struct PerftCounts
+struct PerftxCounts
 {
     uint64_t legal_moves; ///< Total number of legal moves at leaf nodes
     uint64_t captures;    ///< Number of capture moves
@@ -24,19 +30,28 @@ struct PerftCounts
     uint64_t promotions;  ///< Number of pawn promotions
     uint64_t checks;      ///< Number of checking moves
 
-    bool operator==(const PerftCounts &) const = default;
+    bool operator==(const PerftxCounts &) const = default;
 };
 
-/// @brief Structure to hold a perft test.
+/// @brief Structure to hold an enhanced perft test.
+struct PerftxTest
+{
+    string_view  position; ///< FEN string of starting position
+    int          depth;    ///< perft search depth
+    PerftxCounts counts;   ///< expected results
+};
+
+/// @brief Structure to hold a basic perft test.
 struct PerftTest
 {
-    string_view position; ///< FEN string of starting position
+    std::string position; ///< FEN string of starting position
     int         depth;    ///< perft search depth
-    PerftCounts counts;   ///< expected results
+    uint64_t    count;    ///< total number of leaf node moves
 };
 
 // clang-format off
-constexpr PerftTest perft_tests[] = {
+constexpr PerftxTest perftx_tests[] = 
+{
     //    position                                                      depth         nodes     captures        ep     castles  promotions      checks
     {"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -",                7, { 3195901860,   108329926,   319617,     883453,          0,   33103848 } },
     {"r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -",    6, { 8031647685,  1558445089,  3577504,  184513607,   56627920,   92238050 } },
@@ -52,7 +67,7 @@ constexpr PerftTest perft_tests[] = {
 /// @param depth search depth
 /// @param color color to move
 /// @param counts where to store categorized move total counts
-static void PerftExtra(const Position &src_position, int depth, Color color, PerftCounts &counts)
+static void PerftExtra(const Position &src_position, int depth, Color color, PerftxCounts &counts)
 {
     static uint32_t call_count = 0;
     if (!(++call_count & 0xFFFFF))
@@ -103,11 +118,6 @@ static void PerftExtra(const Position &src_position, int depth, Color color, Per
 /// @param num_moves total number of moves at terminal / leaf nodes
 static void Perft(const Position &src_position, int depth, Color color, uint64_t &num_moves)
 {
-    static uint32_t call_count = 0;
-    if (!(++call_count & 0xFFFFF))
-    {
-        printf("\rpositions processed %10" PRIu64, num_moves);
-    }
     MoveList move_list{src_position.GenerateLegalMoves()};
     if (depth > 1)
     {
@@ -121,47 +131,77 @@ static void Perft(const Position &src_position, int depth, Color color, uint64_t
     num_moves += move_list.size();
 }
 
+extern const std::vector<std::string> perft_results;
+
 /// @brief Rund the set of perft tests.
 void RunPerftTests(void)
 {
-    int      start, first_start, stop = 0;
+    std::vector<PerftTest> tests;
+    for (auto test : perft_results)
+    {
+        // Split into tokens separated by semicolons
+        std::vector<std::string> tokens;
+        for (;;)
+        {
+            const auto i = test.find(';');
+            if (i == std::string::npos)
+            {
+                tokens.push_back(test);
+                break;
+            }
+            tokens.push_back(test.substr(0, i));
+            test = test.substr(i + 1);
+        }
+        // First token is FEN position
+        std::string fen = tokens[0];
+        // Remaining tokens are depth and counts
+        for (std::size_t i = 1; i < tokens.size(); ++i)
+        {
+            // Format is "Dxx NNNN"
+            int      depth;
+            uint64_t count;
+            if (std::sscanf(tokens[i].c_str(), "D%d %" PRIu64, &depth, &count) != 2)
+            {
+                std::cout << std::format("ERROR: unable to scan perft test {}\n", test);
+            }
+            tests.push_back(PerftTest{fen, depth, count});
+        }
+    }
     bool     is_good     = true;
     uint64_t total_nodes = 0;
-    first_start          = ElapsedMilliseconds();
-    for (const PerftTest &test : perft_tests)
+    auto     first_start = ElapsedMicroseconds();
+    int64_t  stop;
+    for (const auto &test : tests)
     {
         Position position{test.position};
         string   pos_string{position.ToString()};
-        printf("\n%s\n", pos_string.c_str());
         uint64_t num_moves = 0;
-        total_nodes += test.counts.legal_moves;
-        start = ElapsedMilliseconds();
+        total_nodes += test.count;
+        auto start = ElapsedMicroseconds();
         Perft(position, test.depth, position.ColorToMove(), num_moves);
-        stop = ElapsedMilliseconds();
+        stop = ElapsedMicroseconds();
         if (stop == start)
         {
             stop = start + 1; // avoid divide by zero error in positions per second for short tests
         }
-        printf("\r");
-        printf("%-40s%10d\n", "depth", test.depth);
-        printf("%-40s%10" PRIu64 "\n", "legal moves", num_moves);
-        printf("%-40s%10d\n", "elapsed ms", stop - start);
-        printf("%-40s%10" PRIu64 "\n", "moves per second", num_moves * 1000 / (stop - start));
-        if (num_moves != test.counts.legal_moves)
+        std::cout << std::format("{:<80} depth:{:2} moves:{:10} Mnps:{:4}\n", pos_string, test.depth, num_moves,
+                                 num_moves / (stop - start));
+        if (num_moves != test.count)
         {
-            printf("************* ERROR on this position *************\n");
+            std::cout << "************* ERROR on this position *************\n";
             is_good = false;
         }
     }
-    printf("%-40s%10u\n", "total elapsed milliseconds", stop - first_start);
-    printf("%-40s%10" PRIu64 "\n", "mean positions per second", total_nodes * 1000 / (stop - first_start));
+    std::cout << std::format("total elapsed milliseconds              {:10}\n", (stop - first_start) / 1000);
+    std::cout << std::format("mean positions per second               {:10}\n",
+                             total_nodes * 1000000 / (stop - first_start));
     if (is_good)
     {
-        printf("******************* PERFT PASS *******************\n");
+        std::cout << "******************* PERFT PASS *******************\n";
     }
     else
     {
-        printf("******************* PERFT FAIL *******************\n");
+        std::cout << "******************* PERFT FAIL *******************\n";
     }
 }
 
@@ -172,12 +212,12 @@ void RunPerftTestsExtra()
     bool     is_good     = true;
     uint64_t total_nodes = 0;
     first_start          = ElapsedMilliseconds();
-    for (const PerftTest &test : perft_tests)
+    for (const PerftxTest &test : perftx_tests)
     {
         Position position{test.position};
         string   pos_string{position.ToString()};
         printf("\n%s\n", pos_string.c_str());
-        PerftCounts counts{0, 0, 0, 0, 0, 0};
+        PerftxCounts counts{0, 0, 0, 0, 0, 0};
         total_nodes += test.counts.legal_moves;
         start = ElapsedMilliseconds();
         PerftExtra(position, test.depth, position.ColorToMove(), counts);

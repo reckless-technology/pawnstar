@@ -1,4 +1,5 @@
 #pragma once
+#include "game.h"
 #include "move.h"
 
 #include <algorithm>
@@ -7,7 +8,7 @@ class Position;
 
 void     RecordKillerMove(int ply, Move move);
 void     ResetKillerCounts();
-void     ScoreAndSortMoves(const Position &position, MoveList &moves, int ply, int depth);
+void     ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alpha, int beta);
 uint32_t MaxKillerMoveCount(void);
 
 /// @brief Sort moves best first i.e. in descending score order

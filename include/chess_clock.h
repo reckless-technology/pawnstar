@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 /// @brief Time control chess clock types.
 enum ClockType
@@ -22,4 +23,6 @@ struct TimeControl
 
 /// @brief Get elapsed time.
 /// @return Milliseconds since first invocation.
-int ElapsedMilliseconds(void);
+int64_t ElapsedMilliseconds();
+
+int64_t ElapsedMicroseconds();

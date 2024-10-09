@@ -41,7 +41,7 @@ constexpr string_view POSITION_TESTS[] = {
 /// @param depth Saerch depth.
 void RunPositionTests(int depth)
 {
-    const int start_ms = ElapsedMilliseconds();
+    const auto start_ms = ElapsedMilliseconds();
     for (string_view test_pos : POSITION_TESTS)
     {
         Game game;
@@ -60,5 +60,5 @@ void RunPositionTests(int depth)
 #endif
         DebugXWrite();
     }
-    printf("total elapsed milliseconds                        %10d\n", ElapsedMilliseconds() - start_ms);
+    printf("total elapsed milliseconds                        %10ld\n", ElapsedMilliseconds() - start_ms);
 }

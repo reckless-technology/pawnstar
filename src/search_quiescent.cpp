@@ -44,7 +44,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     }
     int      best_score = score;
     MoveList move_list{game.CurrentPosition().GenerateLegalCaptures()};
-    ScoreAndSortMoves(game.CurrentPosition(), move_list, ply, depth);
+    ScoreAndSortMoves(game, move_list, depth, ply, alpha, beta);
     for (Move move : move_list)
     {
         if (move.score() < 0)

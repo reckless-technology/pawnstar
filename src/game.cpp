@@ -1,4 +1,6 @@
 #include <cstring>
+#include <format>
+#include <iostream>
 #include <string>
 #include <string_view>
 
@@ -71,7 +73,7 @@ void Game::UndoMove()
     }
     else
     {
-        printf("ERROR: undo a non existent move!\n");
+        std::cout << "ERROR: undo a non existent move!\n";
     }
 }
 
@@ -138,27 +140,27 @@ bool Game::IsGameOver() const
 {
     if (CurrentPosition().IsCheckmate())
     {
-        printf(CurrentPosition().ColorToMove() == BLACK ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
+        std::cout << (CurrentPosition().ColorToMove() == BLACK ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
         return true;
     }
     if (CurrentPosition().IsStalemate())
     {
-        printf("1/2-1/2 {stalemate}\n");
+        std::cout << "1/2-1/2 {stalemate}\n";
         return true;
     }
     if (IsDrawByRepetition(false))
     {
-        printf("1/2-1/2 {draw by repetition}\n");
+        std::cout << "1/2-1/2 {draw by repetition}\n";
         return true;
     }
     if (CurrentPosition().IsDrawByMaterial())
     {
-        printf("1/2-1/2 {draw by insufficient material}\n");
+        std::cout << "1/2-1/2 {draw by insufficient material}\n";
         return true;
     }
     if (IsDrawByFiftyMoves())
     {
-        printf("1/2-1/2 {draw by 50 reversible moves}\n");
+        std::cout << "1/2-1/2 {draw by 50 reversible moves}\n";
         return true;
     }
     return false;
@@ -171,7 +173,7 @@ void Game::SearchThreadEntry()
     if (move)
     {
         PlayMove(move);
-        printf("bestmove %s\n", move.ToString().c_str());
+        std::cout << std::format("bestmmove {}\n", move.ToString());
         IsGameOver();
     }
 }

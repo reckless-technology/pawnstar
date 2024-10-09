@@ -17,9 +17,11 @@
 /// @param pv Parent's principal variation
 /// @param move_index Move number (0 is first move)
 /// @return score for this move
-int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index)
+int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index,
+                     bool &is_checking)
 {
     game.PlayMove(move);
+    is_checking = game.CurrentPosition().IsInCheck();
     int score;
     if (beta > alpha + 1 && move_index > 0 && !game.CurrentPosition().IsInCheck() && !move.IsChecking())
     {
@@ -174,7 +176,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     {
         INCREMENT("table move");
         best_move = transposition.move;
-        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, 0);
+        bool is_checking;
+        int  score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, 0, is_checking);
         if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
@@ -215,7 +218,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         return DRAW_SCORE;
     }
     // Start of the main loop.
-    ScoreAndSortMoves(game.CurrentPosition(), move_list, ply, depth);
+    ScoreAndSortMoves(game, move_list, depth, ply, alpha, beta);
     for (int move_index = 0; move_index != (int)move_list.size(); ++move_index)
     {
         const Move move = move_list[move_index];
@@ -236,12 +239,14 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             if (score > alpha)
             {
                 INCREMENT("late move reduction fails");
-                score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index);
+                bool is_checking;
+                score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index, is_checking);
             }
         }
         else
         {
-            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index);
+            bool is_checking;
+            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index, is_checking);
         }
         if (game.is_cancel_pending_)
         {
@@ -279,7 +284,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         INCREMENT("pv nodes");
         RecordTransposition(game.CurrentPosition().Hash(), depth, alpha, best_move, NODE_PV);
         RecordKillerMove(ply, best_move);
-        CopyVariation(parent_pv, pv, game.CurrentPosition().MoveToString(best_move, &move_list));
+        CopyVariation(parent_pv, pv, best_move.ToString());
     }
     else
     {

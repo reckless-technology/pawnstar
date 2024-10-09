@@ -10,7 +10,8 @@ typedef std::vector<std::string> Variation;
 
 Move SearchRootNode(Game &game);
 int  Search(Game &game, int depth, int ply, int alpha, int beta, Variation &parent_pv);
-int  SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index);
+int  SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index,
+                      bool &is_checking);
 int  SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta);
 
 /// @brief When the PV changes we need to copy the new PV up the tree recursively.
