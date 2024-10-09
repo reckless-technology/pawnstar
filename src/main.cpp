@@ -20,24 +20,21 @@ int main()
     setbuf(stdin, NULL);
     setbuf(stdout, NULL);
     std::cout << std::unitbuf;
-    std::cout <<
-#if 1
-        "   .::.    \n"
-        "   _::_    \n"
-        " _/____\\_ \n"
-        " \\      / \n"
-        "  \\____/  \n"
-        "  (____)   \n"
-        "   |  |    \n"
-        "   |__|    \n"
-        "  /    \\  \n"
-        " (______)  \n"
-        "(________) \n"
-        "/________\\\n"
-#endif
-        "Pawnstar: a UCI compatible chess engine\n"
-        "(C) Jonny Reckless 2009 - 2024\n"
-        "Compiled: " __DATE__ " " __TIME__ "\n";
+    std::cout << "   .::.    \n"
+                 "   _::_    \n"
+                 " _/____\\_ \n"
+                 " \\      / \n"
+                 "  \\____/  \n"
+                 "  (____)   \n"
+                 "   |  |    \n"
+                 "   |__|    \n"
+                 "  /    \\  \n"
+                 " (______)  \n"
+                 "(________) \n"
+                 "/________\\\n"
+                 "Pawnstar: a UCI compatible chess engine\n"
+                 "(C) Jonny Reckless 2009 - 2024\n"
+                 "Compiled: " __DATE__ " " __TIME__ "\n";
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
     if (!InitializeOpeningBookFromFile("doc/pawnstar.book"))
     {

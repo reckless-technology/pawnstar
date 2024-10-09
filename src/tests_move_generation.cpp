@@ -90,7 +90,7 @@ void RunPerftTests(void)
     int64_t  stop;
     for (const auto &test : tests)
     {
-        Position position{test.position};
+        Position position = Position::FromString(test.position);
         string   pos_string{position.ToString()};
         uint64_t num_moves = 0;
         total_nodes += test.count;

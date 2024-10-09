@@ -206,44 +206,26 @@ Position Position::MakeMove(const Move &move) const
     return position;
 }
 
-#define BAD_FEN_STRING                                   \
-    {                                                    \
-        const std::string s{fen_string};                 \
-        printf("ERROR: bad FEN string %s\n", s.c_str()); \
-        return;                                          \
-    }
-
 /// @brief Construct a position.
 /// @param fen_string Forsyth Edwards string.
-Position::Position(std::string_view fen_string) : Position()
+Position Position::FromString(std::string_view fen_string)
 {
+    Position position;
+    std::memset(&position, 0, sizeof(position));
     constexpr string_view white_piece_names{"PNBRQK"};
     constexpr string_view black_piece_names{"pnbrqk"};
-    constexpr string_view ep_files{"abcdefgh"};
-    constexpr string_view ep_ranks{"36"};
     stringstream          ss;
     ss << fen_string;
     // Pieces on the board
     string pieces;
     ss >> pieces;
-    if (pieces == "")
-    {
-        BAD_FEN_STRING;
-    }
     int x = 0, y = 7;
     for (const char &c : pieces)
     {
         if (c == '/')
         {
-            if (x != 8)
-            {
-                BAD_FEN_STRING;
-            }
             x = 0;
-            if (--y == -1)
-            {
-                BAD_FEN_STRING;
-            }
+            --y;
             continue;
         }
         if (c >= '1' && c <= '8')
@@ -251,15 +233,11 @@ Position::Position(std::string_view fen_string) : Position()
             x += c - '0';
             continue;
         }
-        if (x >= 8)
-        {
-            BAD_FEN_STRING;
-        }
         auto a = white_piece_names.find(c);
         if (a != string::npos)
         {
             const Piece piece = (Piece)(a + 1);
-            AddPiece(WHITE, piece, (Square)(x + 8 * y));
+            position.AddPiece(WHITE, piece, (Square)(x + 8 * y));
             ++x;
             continue;
         }
@@ -267,43 +245,26 @@ Position::Position(std::string_view fen_string) : Position()
         if (a != string::npos)
         {
             const Piece piece = (Piece)(a + 1);
-            AddPiece(BLACK, piece, (Square)(x + 8 * y));
+            position.AddPiece(BLACK, piece, (Square)(x + 8 * y));
             ++x;
             continue;
         }
-        BAD_FEN_STRING;
-    }
-    if (x != 8 || y != 0)
-    {
-        BAD_FEN_STRING;
     }
     // Side to move
     string color_to_move;
     ss >> color_to_move;
-    if (color_to_move == "")
-    {
-        BAD_FEN_STRING;
-    }
     if (color_to_move == "b")
     {
-        flags_ |= IS_BLACK_TO_MOVE;
+        position.flags_ |= IS_BLACK_TO_MOVE;
     }
-    else if (color_to_move != "w")
-    {
-        BAD_FEN_STRING;
-    }
-    king_location_[WHITE] = (kings_ & white_pieces_).Lsb();
-    king_location_[BLACK] = (kings_ & black_pieces_).Lsb();
+    position.king_location_[WHITE] = (position.kings_ & position.white_pieces_).Lsb();
+    position.king_location_[BLACK] = (position.kings_ & position.black_pieces_).Lsb();
     // Castling rights
     string castling_rights;
     ss >> castling_rights;
-    if (castling_rights == "")
-    {
-        BAD_FEN_STRING;
-    }
     if (castling_rights == "-")
     {
-        flags_ &= ~CASTLING_RIGHTS_MASK;
+        position.flags_ &= ~CASTLING_RIGHTS_MASK;
     }
     else
     {
@@ -312,64 +273,52 @@ Position::Position(std::string_view fen_string) : Position()
             switch (c)
             {
             case 'K':
-                flags_ |= MAY_WHITE_CASTLE_KINGSIDE;
+                position.flags_ |= MAY_WHITE_CASTLE_KINGSIDE;
                 break;
             case 'Q':
-                flags_ |= MAY_WHITE_CASTLE_QUEENSIDE;
+                position.flags_ |= MAY_WHITE_CASTLE_QUEENSIDE;
                 break;
             case 'k':
-                flags_ |= MAY_BLACK_CASTLE_KINGSIDE;
+                position.flags_ |= MAY_BLACK_CASTLE_KINGSIDE;
                 break;
             case 'q':
-                flags_ |= MAY_BLACK_CASTLE_QUEENSIDE;
+                position.flags_ |= MAY_BLACK_CASTLE_QUEENSIDE;
                 break;
             default:
-                BAD_FEN_STRING;
+                break;
             }
         }
     }
     // En passant capture square
     string ep_square;
     ss >> ep_square;
-    if (ep_square == "")
-    {
-        BAD_FEN_STRING;
-    }
     if (ep_square == "-")
     {
-        en_passant_square_ = NO_SQUARE;
+        position.en_passant_square_ = NO_SQUARE;
     }
     else
     {
-        if (ep_square.length() != 2 || ep_files.find(ep_square[0]) == string::npos ||
-            ep_ranks.find(ep_square[1]) == string::npos)
-        {
-            BAD_FEN_STRING;
-        }
-        en_passant_square_ = (Square)((ep_square[0] - 'a') + 8 * (ep_square[1] - '1'));
+        position.en_passant_square_ = (Square)((ep_square[0] - 'a') + 8 * (ep_square[1] - '1'));
     }
     if (ss)
     {
         // Half move clock - optional
         int hmc = 0;
         ss >> hmc;
-        reversible_move_count_ = (uint8_t)hmc;
+        position.reversible_move_count_ = (uint8_t)hmc;
     }
     if (ss)
     {
         // Full move number - optional
         int fmn = 1;
         ss >> fmn;
-        full_move_count_ = (uint8_t)fmn - 1;
+        position.full_move_count_ = (uint8_t)fmn - 1;
     }
-    hash_ = ComputeHash();
-    if (!IsLegal())
-    {
-        BAD_FEN_STRING;
-    }
+    position.hash_ = position.ComputeHash();
     // Is this position check?
-    const Color color = ColorToMove();
-    checkers_         = AttacksTo(king_location_[color], EnemyOf(color));
+    const Color color  = position.ColorToMove();
+    position.checkers_ = position.AttacksTo(position.king_location_[color], EnemyOf(color));
+    return position;
 }
 
 std::string Position::ToString() const

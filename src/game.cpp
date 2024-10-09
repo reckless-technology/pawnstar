@@ -24,7 +24,7 @@ void Game::NewGame(std::string_view fen_string)
     node_count_                       = 0;
     index_                            = 0;
     is_cancel_pending_                = false;
-    positions_[index_]                = Position{fen_string};
+    positions_[index_]                = Position::FromString(fen_string);
 }
 
 void Game::NewGame()

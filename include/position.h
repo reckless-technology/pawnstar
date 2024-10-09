@@ -27,19 +27,19 @@ class Position
     };
 
   public:
-    Position()                                = default;
-    Position(const Position &that)            = default;
-    Position &operator=(const Position &that) = default;
-    Position(std::string_view fen_string);                      ///< Construct a position from a FEN string.
-    Position    MakeMove(const Move &move) const;               ///< Create a position by making a regular move.
-    Position    MakeNullMove() const;                           ///< Create a position by making a null move.
-    bool        IsAttacked(Square location, Color color) const; ///< Determine if location is attacked by color.
-    Bitboard    AttacksTo(Square location, Color color) const;  ///< Find all attackers to specified square.
-    bool        IsLegal() const;                                ///< Is this a legal chess position.
-    bool        IsCheckmate() const;                            ///< Is this position checkmate.
-    bool        IsStalemate() const;                            ///< Is this position stalemate.
-    bool        IsDrawByMaterial() const;                       ///< Is this position a draw by insufficient material.
-    std::string ToString() const;                               ///< Return the FEN string for this position.
+    Position()                                      = default;
+    Position(const Position &that)                  = default;
+    Position       &operator=(const Position &that) = default;
+    static Position FromString(std::string_view fen_string);        ///< Construct a position from a FEN string.
+    Position        MakeMove(const Move &move) const;               ///< Create a position by making a regular move.
+    Position        MakeNullMove() const;                           ///< Create a position by making a null move.
+    bool            IsAttacked(Square location, Color color) const; ///< Determine if location is attacked by color.
+    Bitboard        AttacksTo(Square location, Color color) const;  ///< Find all attackers to specified square.
+    bool            IsLegal() const;                                ///< Is this a legal chess position.
+    bool            IsCheckmate() const;                            ///< Is this position checkmate.
+    bool            IsStalemate() const;                            ///< Is this position stalemate.
+    bool            IsDrawByMaterial() const; ///< Is this position a draw by insufficient material.
+    std::string     ToString() const;         ///< Return the FEN string for this position.
     // clang-format off
     // Const accessors.
     constexpr bool      MayWhiteCastleKingside() const      {return !!(flags_ & MAY_WHITE_CASTLE_KINGSIDE);}
