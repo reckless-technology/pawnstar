@@ -21,7 +21,7 @@ constexpr std::array color_names = {"white", "black"};
 /// @brief Chess piece types.
 enum Piece
 {
-    NONE,
+    NO_PIECE,
     PAWN,
     KNIGHT,
     BISHOP,

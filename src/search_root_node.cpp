@@ -38,7 +38,7 @@ Move SearchRootNode(Game &game)
         return move_list[0];
     }
     // Plan time usage for this search.
-    int ms_timeout   = 0; // Cancel search when this time expires.
+    int ms_timeout   = 0; // Hard stop: cancel search when this time expires.
     int ms_allocated = 0; // Soft allocated time for the move.
     switch (game.time_control_.clock_type)
     {
@@ -53,9 +53,8 @@ Move SearchRootNode(Game &game)
             const int num_moves_to_go_estimate = std::max(40 - game.CurrentPosition().MoveCount(), 5);
             ms_allocated                       = game.time_control_.ms_remaining / num_moves_to_go_estimate;
         }
-        ms_timeout = std::max(100, std::min(ms_allocated * 2, game.time_control_.ms_remaining - 3000));
-        game.time_control_.hard_stop_ms =
-            ElapsedMilliseconds() + ms_timeout; // Stop searching regardless when this elapses.
+        ms_timeout = std::max(100, std::min(ms_allocated * 2, game.time_control_.ms_remaining - 1000));
+        game.time_control_.hard_stop_ms = ElapsedMilliseconds() + ms_timeout;
         break;
 
     case CHESS_CLOCK_FIXED_DEPTH:
@@ -118,7 +117,7 @@ Move SearchRootNode(Game &game)
                 best_move         = move_list[i];
                 best_moves[depth] = move_list[i];
                 // Show thinking output
-                CopyVariation(principal_variation, child_pv, best_move.ToString());
+                CopyVariation(principal_variation, child_pv, best_move);
                 stringstream ss;
                 bool         is_first_move = true;
                 for (const auto &move : principal_variation)
@@ -127,7 +126,7 @@ Move SearchRootNode(Game &game)
                     {
                         ss << ' ';
                     }
-                    ss << move;
+                    ss << move.ToString();
                     is_first_move = false;
                 }
                 std::cout << std::format("info depth {:2} score cp {:5} time {:5} nodes {:8} pv {}\n", depth,

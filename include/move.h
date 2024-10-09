@@ -10,7 +10,7 @@
 /// @brief Chess pieces.
 enum Piece : uint8_t
 {
-    NONE,
+    NO_PIECE,
     PAWN,
     KNIGHT,
     BISHOP,
@@ -24,9 +24,11 @@ enum Color : uint8_t
 {
     WHITE,
     BLACK,
-    NEITHER_COLOR,
 };
 
+/// @brief Return the enemy of a color
+/// @param color the color
+/// @return The opposite color
 constexpr Color EnemyOf(Color color)
 {
     return color == WHITE ? BLACK : WHITE;
@@ -65,14 +67,13 @@ constexpr char RankChar(Square locn)
     return '1' + RankOf(locn);
 }
 
-///
 /// @brief Class for representing a chess move.
 /// Moves are represented by a 64 bit integer with the following bit fields:
 ///   BITS      INTERPRETATION
 ///  0 -  5     To (destination square index)
 ///  6 - 11     From (source square index)
 /// 12 - 14     MoveType
-/// 15 - 15     Is checking flag
+/// 15 - 15     Is checking flag (move gives check)
 /// 32 - 63     score
 class Move
 {
@@ -132,7 +133,7 @@ class Move
         case PAWN_DOUBLE_PUSH:
         case CASTLING:
         case EP_CAPTURE:
-            return NONE;
+            return NO_PIECE;
         case PROMOTION_KNIGHT:
             return KNIGHT;
         case PROMOTION_BISHOP:
@@ -180,34 +181,34 @@ class Move
         return Move{0};
     }
 
-    constexpr static Move RegularMove(Square from, Square to)
+    constexpr static Move Regular(Square from, Square to)
     {
         return Move{to | (from << 6)};
     }
 
-    constexpr static Move PromotionMove(Square from, Square to, Piece promoted)
+    constexpr static Move Promotion(Square from, Square to, Piece promoted)
     {
         return Move{to | (from << 6) | (promoted << 12)};
     }
 
-    constexpr static Move CastlingMove(Square from, Square to)
+    constexpr static Move Castling(Square from, Square to)
     {
         return Move{to | (from << 6) | (CASTLING << 12)};
     }
 
-    constexpr static Move EpCaptureMove(Square from, Square to)
+    constexpr static Move EpCapture(Square from, Square to)
     {
         return Move{to | (from << 6) | (EP_CAPTURE << 12)};
     }
 
-    constexpr static Move DoublePushMove(Square from, Square to)
+    constexpr static Move DoublePush(Square from, Square to)
     {
         return Move{to | (from << 6) | (PAWN_DOUBLE_PUSH << 12)};
     }
 
-    constexpr std::size_t operator()(const Move &m) const
+    constexpr std::size_t operator()(const Move &move) const
     {
-        return (std::size_t)m; // Used for hashing moves in std containers.
+        return (std::size_t)move.m; // Used for hashing moves in std containers.
     }
 
     constexpr const std::string ToString() const
@@ -217,7 +218,7 @@ class Move
         result.push_back(RankChar(from()));
         result.push_back(FileChar(to()));
         result.push_back(RankChar(to()));
-        if (promoted() != NONE)
+        if (promoted() != NO_PIECE)
         {
             result.push_back(" pnbrqk"[promoted()]);
         }

@@ -164,14 +164,14 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
     Bitboard king_captures = king_move_targets & enemy_pieces;
     for (Square to : king_captures)
     {
-        moves.push_back(Move::RegularMove(king_locn, to));
+        moves.push_back(Move::Regular(king_locn, to));
     }
     if constexpr (do_all_moves)
     {
         Bitboard king_non_captures = king_move_targets & ~occupied_squares;
         for (Square to : king_non_captures)
         {
-            moves.push_back(Move::RegularMove(king_locn, to));
+            moves.push_back(Move::Regular(king_locn, to));
         }
     }
 
@@ -205,14 +205,14 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
         Bitboard       capture_targets = attacks & allowed_captures;
         for (Square to : capture_targets)
         {
-            moves.push_back(Move::RegularMove(from, to));
+            moves.push_back(Move::Regular(from, to));
         }
         if constexpr (do_all_moves)
         {
             Bitboard non_capture_targets = attacks & allowed_non_captures;
             for (Square to : non_capture_targets)
             {
-                moves.push_back(Move::RegularMove(from, to));
+                moves.push_back(Move::Regular(from, to));
             }
         }
     }
@@ -236,14 +236,14 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             Bitboard       capture_targets = attacks & allowed_captures;
             for (Square to : capture_targets)
             {
-                moves.push_back(Move::RegularMove(from, to));
+                moves.push_back(Move::Regular(from, to));
             }
             if constexpr (do_all_moves)
             {
                 Bitboard non_capture_targets = attacks & allowed_non_captures;
                 for (Square to : non_capture_targets)
                 {
-                    moves.push_back(Move::RegularMove(from, to));
+                    moves.push_back(Move::Regular(from, to));
                 }
             }
         }
@@ -264,13 +264,13 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
                 if (MayWhiteCastleKingside() && (occupied_squares & (Bitboard(F1) | Bitboard(G1))).IsEmpty() &&
                     !IsAttacked(F1, BLACK) && !IsAttacked(G1, BLACK))
                 {
-                    moves.push_back(Move::CastlingMove(E1, G1));
+                    moves.push_back(Move::Castling(E1, G1));
                 }
                 if (MayWhiteCastleQueenside() &&
                     (occupied_squares & (Bitboard(B1) | Bitboard(C1) | Bitboard(D1))).IsEmpty() &&
                     !IsAttacked(D1, BLACK) && !IsAttacked(C1, BLACK))
                 {
-                    moves.push_back(Move::CastlingMove(E1, C1));
+                    moves.push_back(Move::Castling(E1, C1));
                 }
             }
             else
@@ -278,13 +278,13 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
                 if (MayBlackCastleKingside() && (occupied_squares & (Bitboard(F8) | Bitboard(G8))).IsEmpty() &&
                     !IsAttacked(F8, WHITE) && !IsAttacked(G8, WHITE))
                 {
-                    moves.push_back(Move::CastlingMove(E8, G8));
+                    moves.push_back(Move::Castling(E8, G8));
                 }
                 if (MayBlackCastleQueenside() &&
                     (occupied_squares & (Bitboard(B8) | Bitboard(C8) | Bitboard(D8))).IsEmpty() &&
                     !IsAttacked(D8, WHITE) && !IsAttacked(C8, WHITE))
                 {
-                    moves.push_back(Move::CastlingMove(E8, C8));
+                    moves.push_back(Move::Castling(E8, C8));
                 }
             }
         }
@@ -353,10 +353,10 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             const Square from = (Square)(to - delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::PromotionMove(from, to, QUEEN));
-                moves.push_back(Move::PromotionMove(from, to, ROOK));
-                moves.push_back(Move::PromotionMove(from, to, BISHOP));
-                moves.push_back(Move::PromotionMove(from, to, KNIGHT));
+                moves.push_back(Move::Promotion(from, to, QUEEN));
+                moves.push_back(Move::Promotion(from, to, ROOK));
+                moves.push_back(Move::Promotion(from, to, BISHOP));
+                moves.push_back(Move::Promotion(from, to, KNIGHT));
             }
         }
     }
@@ -366,10 +366,10 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
         const Square from = (Square)(to - push_delta);
         if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
         {
-            moves.push_back(Move::PromotionMove(from, to, QUEEN));
-            moves.push_back(Move::PromotionMove(from, to, ROOK));
-            moves.push_back(Move::PromotionMove(from, to, BISHOP));
-            moves.push_back(Move::PromotionMove(from, to, KNIGHT));
+            moves.push_back(Move::Promotion(from, to, QUEEN));
+            moves.push_back(Move::Promotion(from, to, ROOK));
+            moves.push_back(Move::Promotion(from, to, BISHOP));
+            moves.push_back(Move::Promotion(from, to, KNIGHT));
         }
     }
     // clang-format off
@@ -387,7 +387,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             const Square from = (Square)(to - delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::RegularMove(from, to));
+                moves.push_back(Move::Regular(from, to));
             }
         }
     }
@@ -399,7 +399,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             const Square from = (Square)(to - push_delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::RegularMove(from, to));
+                moves.push_back(Move::Regular(from, to));
             }
         }
         b = double_pushes & allowed_non_captures;
@@ -408,7 +408,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             const Square from = (Square)(to - push_delta * 2);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::DoublePushMove(from, to));
+                moves.push_back(Move::DoublePush(from, to));
             }
         }
     }
@@ -449,7 +449,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
                 }
                 if (!is_discovered_check)
                 {
-                    moves.push_back(Move::EpCaptureMove(from, to));
+                    moves.push_back(Move::EpCapture(from, to));
                 }
             }
         }

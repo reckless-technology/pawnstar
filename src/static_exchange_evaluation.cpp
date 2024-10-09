@@ -52,7 +52,7 @@ int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_che
     const Piece piece    = src_position.PieceAt(move.from());
     const Piece captured = move.type() == Move::EP_CAPTURE ? PAWN : src_position.PieceAt(move.to());
     const Piece promoted = move.promoted();
-    if (promoted != NONE)
+    if (promoted != NO_PIECE)
     {
         return piece_values[captured] + piece_values[promoted] - piece_values[PAWN] -
                EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.promoted());

@@ -76,7 +76,7 @@ void Position::RemovePiece(Color color, Piece piece, Square from)
     PiecesOfType(piece) ^= from_bb;
     PiecesOfColor(color) ^= from_bb;
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
-    squares_[from] = NONE;
+    squares_[from] = NO_PIECE;
 }
 
 /// @brief Move a piece on the board.
@@ -91,7 +91,7 @@ void Position::MovePiece(Color color, Piece piece, Square from, Square to)
     PiecesOfType(piece) ^= from_to_bb;
     PiecesOfColor(color) ^= from_to_bb;
     hash_ ^= hash[to] ^ hash[from];
-    squares_[from] = NONE;
+    squares_[from] = NO_PIECE;
     squares_[to]   = piece;
 }
 
@@ -118,7 +118,7 @@ Position Position::MakeMove(const Move &move) const
     {
     case PAWN:
         position.reversible_move_count_ = 0;
-        if (captured != NONE)
+        if (captured != NO_PIECE)
         {
             if (move.type() == Move::EP_CAPTURE)
             {
@@ -131,7 +131,7 @@ Position Position::MakeMove(const Move &move) const
                 position.RemovePiece(EnemyOf(color), captured, to);
             }
         }
-        if (move.promoted() != NONE)
+        if (move.promoted() != NO_PIECE)
         {
             // Replace the pawn with the promoted piece.
             position.RemovePiece(color, PAWN, from);

@@ -235,7 +235,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             move_index > 1 &&                                       // it's not the first move
             depth > 2 &&                                            // we don't drop directly into quiescence search
             !move.IsChecking() &&                                   // move does not give check
-            game.CurrentPosition().PieceAt(move.to()) == NONE &&    // move is not a capture
+            game.CurrentPosition().PieceAt(move.to()) == NO_PIECE &&    // move is not a capture
             game.CurrentPosition().PieceAt(move.from()) != PAWN)    // move is not a pawn move
         // clang-format on
         {
@@ -292,7 +292,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         INCREMENT("pv nodes");
         RecordTransposition(game.CurrentPosition().Hash(), depth, alpha, best_move, NODE_PV);
         RecordKillerMove(ply, best_move);
-        CopyVariation(parent_pv, pv, best_move.ToString());
+        CopyVariation(parent_pv, pv, best_move);
     }
     else
     {

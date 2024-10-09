@@ -62,6 +62,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
+            RecordKillerMove(ply, move);
             return score;
         }
         if (score > best_score)
