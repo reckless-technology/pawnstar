@@ -38,7 +38,7 @@ int main()
         "(C) Jonny Reckless 2009 - 2024\n"
         "Compiled: " __DATE__ " " __TIME__ "\n");
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
-    if (!InitializeOpeningBookFromFile("..doc/pawnstar.book"))
+    if (!InitializeOpeningBookFromFile("doc/pawnstar.book"))
     {
         printf("NOTE: unable to open book file\n");
     }
@@ -46,6 +46,6 @@ int main()
     DebugXClear();
     for (std::string line; std::getline(std::cin, line);)
     {
-        ProcessInput(game, std::string_view(line));
+        ProcessInput(game, line);
     }
 }
