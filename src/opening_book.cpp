@@ -78,10 +78,9 @@ void DisplayAvailableBookMoves(const Position &position)
         ++move_counts[move];
     }
     printf("MOVE   COUNT\n");
-    MoveList move_list = position.GenerateLegalMoves();
     for (const auto &[move, freq] : move_counts)
     {
-        const string move_string{position.MoveToString(move, &move_list)};
+        const string move_string{move.ToString()};
         printf("%-8s %3d\n", move_string.c_str(), freq);
     }
 }

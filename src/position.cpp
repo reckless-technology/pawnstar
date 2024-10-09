@@ -103,8 +103,8 @@ Position Position::MakeMove(const Move &move) const
     const Color  color    = ColorToMove();
     const Square from     = move.from();
     const Square to       = move.to();
-    const Piece  piece    = move.piece();
-    const Piece  captured = move.captured();
+    const Piece  piece    = PieceAt(from);
+    const Piece  captured = move.type() == Move::EP_CAPTURE ? PAWN : PieceAt(to);
 
     Position position{*this};
     position.flags_ &= ~IS_NULL_MOVE;
@@ -120,7 +120,7 @@ Position Position::MakeMove(const Move &move) const
         position.reversible_move_count_ = 0;
         if (captured != NONE)
         {
-            if (move.IsEpCapture())
+            if (move.type() == Move::EP_CAPTURE)
             {
                 // En passant capture: capture location is source rank, destination file.
                 const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));
@@ -140,7 +140,7 @@ Position Position::MakeMove(const Move &move) const
         else
         {
             position.MovePiece(color, PAWN, from, to);
-            if (move.IsPawnDoublePush())
+            if (move.type() == Move::PAWN_DOUBLE_PUSH)
             {
                 // Pawn double push: affects en passant.
                 position.en_passant_square_ = (Square)((from + to) >> 1);
@@ -163,7 +163,7 @@ Position Position::MakeMove(const Move &move) const
         break;
 
     case KING:
-        if (!move.IsCastling())
+        if (!(move.type() == Move::CASTLING))
         {
             if (captured)
             {
@@ -565,130 +565,4 @@ bool Position::IsStalemate() const
 bool Position::IsCheckmate() const
 {
     return IsInCheck() && GenerateLegalMoves().size() == 0;
-}
-
-/// @brief Convert a move to standard algebraic notation string.
-/// @param move The move input to be formatted as a string.
-/// @param legal_moves Optional pointer to list of legal moves. May be nullptr (slower).
-/// @return SAN formatted move string.
-string Position::MoveToString(const Move &move, const MoveList *legal_moves) const
-{
-    stringstream result;
-    string       disambiguation;
-    string       from_square{FileChar(move.from()), RankChar(move.from())};
-    string       to_square{FileChar(move.to()), RankChar(move.to())};
-    bool         is_source_ambiguous = false;
-    bool         is_file_unique      = true;
-    bool         is_rank_unique      = true;
-    const char   move_piece          = " PNBRQK"[move.piece()];
-    // Determine if there is more than one piece of the same type which is capable of moving to the target square,
-    // and will require further disambiguation.
-    MoveList moves;
-    if (legal_moves == nullptr)
-    {
-        moves       = GenerateLegalMoves();
-        legal_moves = &moves;
-    }
-    if (std::find(legal_moves->begin(), legal_moves->end(), move) == legal_moves->end())
-    {
-        printf("ERROR: move %s not found in position %s\n", move.DebugString().c_str(), ToString().c_str());
-        exit(0);
-    }
-    for (const Move &m : *legal_moves)
-    {
-        if (m.piece() == move.piece() && m.to() == move.to() && m.from() != move.from())
-        {
-            is_source_ambiguous = true;
-            if (FileOf(m.from()) == FileOf(move.from()))
-            {
-                is_file_unique = false;
-            }
-            if (RankOf(m.from()) == RankOf(move.from()))
-            {
-                is_rank_unique = false;
-            }
-        }
-    }
-    // Determine how to disambiguate source square based on the uniqueness of the source rank and file.
-    if (is_source_ambiguous)
-    {
-        if (is_file_unique)
-        {
-            disambiguation = from_square[0];
-        }
-        else if (is_rank_unique)
-        {
-            disambiguation = from_square[1];
-        }
-        else
-        {
-            disambiguation = from_square;
-        }
-    }
-    switch (move.piece())
-    {
-    case PAWN:
-        if (move.captured() != NONE)
-        {
-            result << from_square[0] << 'x' << to_square;
-            if (move.IsEpCapture())
-            {
-                result << "e.p.";
-            }
-        }
-        else
-        {
-            result << to_square;
-        }
-        if (move.promoted() != NONE)
-        {
-            result << '=' << "  NBRQ"[move.promoted()];
-        }
-        break;
-
-    case KING:
-        if (move.IsCastling())
-        {
-            switch (move.to())
-            {
-            case G1:
-            case G8:
-                result << "O-O";
-                break;
-            case C1:
-            case C8:
-                result << "O-O-O";
-                break;
-            default:
-                break;
-            }
-            break;
-        }
-        // FALLTHROUGH
-    case KNIGHT:
-    case BISHOP:
-    case ROOK:
-    case QUEEN:
-    default:
-        if (move.captured() != NONE)
-        {
-            result << move_piece << disambiguation << 'x' << to_square;
-        }
-        else
-        {
-            result << move_piece << disambiguation << to_square;
-        }
-        break;
-    }
-    // Determine if this move results in check or checkmate.
-    Position dst_position{MakeMove(move)};
-    if (dst_position.IsCheckmate())
-    {
-        result << '#';
-    }
-    else if (dst_position.IsInCheck())
-    {
-        result << "+";
-    }
-    return result.str();
 }

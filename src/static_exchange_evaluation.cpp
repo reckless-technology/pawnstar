@@ -48,13 +48,16 @@ int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_che
 {
     Position dst_position{src_position.MakeMove(move)};
     is_checking = dst_position.IsInCheck();
-    SeeBoard bb{dst_position};
-    if (move.promoted() != NONE)
+    SeeBoard    bb{dst_position};
+    const Piece piece    = src_position.PieceAt(move.from());
+    const Piece captured = move.type() == Move::EP_CAPTURE ? PAWN : src_position.PieceAt(move.to());
+    const Piece promoted = move.promoted();
+    if (promoted != NONE)
     {
-        return piece_values[move.captured()] + piece_values[move.promoted()] - piece_values[PAWN] -
+        return piece_values[captured] + piece_values[promoted] - piece_values[PAWN] -
                EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.promoted());
     }
-    return piece_values[move.captured()] - EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.piece());
+    return piece_values[captured] - EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), piece);
 }
 
 /// @brief Determine the swap off value for a capture on a square.

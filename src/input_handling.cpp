@@ -30,11 +30,6 @@ struct Handler
     }
 };
 
-void handle_perftx(Game &, std::span<std::string>)
-{
-    RunPerftTestsExtra();
-}
-
 void handle_perft(Game &, std::span<std::string>)
 {
     RunPerftTests();
@@ -191,7 +186,6 @@ constexpr std::array handlers =
     Handler { COMMAND(help),           "Display a summary of commands"},
     Handler { COMMAND(isready),        "Respond with readyok"},
     Handler { COMMAND(perft),          "Run basic move generation tests"},
-    Handler { COMMAND(perftx),         "Run extended move generation tests"},
     Handler { COMMAND(position),       "Set the position and series of moves"},
     Handler { COMMAND(postests),       "Search the Bratko Kopec test positions"},
     Handler { COMMAND(quit),           "Exit the program"},

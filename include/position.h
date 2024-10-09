@@ -40,9 +40,6 @@ class Position
     bool        IsStalemate() const;                            ///< Is this position stalemate.
     bool        IsDrawByMaterial() const;                       ///< Is this position a draw by insufficient material.
     std::string ToString() const;                               ///< Return the FEN string for this position.
-    std::string MoveToString(const Move     &move,
-                             const MoveList *legal_moves) const; ///< Generate the SAN string for a specific legal move.
-
     // clang-format off
     // Const accessors.
     constexpr bool      MayWhiteCastleKingside() const      {return !!(flags_ & MAY_WHITE_CASTLE_KINGSIDE);}
@@ -167,14 +164,14 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
     Bitboard king_captures = king_move_targets & enemy_pieces;
     for (Square to : king_captures)
     {
-        moves.push_back(Move::CaptureMove(king_locn, to, KING, PieceAt(to)));
+        moves.push_back(Move::RegularMove(king_locn, to));
     }
     if constexpr (do_all_moves)
     {
         Bitboard king_non_captures = king_move_targets & ~occupied_squares;
         for (Square to : king_non_captures)
         {
-            moves.push_back(Move::NonCaptureMove(king_locn, to, KING));
+            moves.push_back(Move::RegularMove(king_locn, to));
         }
     }
 
@@ -208,14 +205,14 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
         Bitboard       capture_targets = attacks & allowed_captures;
         for (Square to : capture_targets)
         {
-            moves.push_back(Move::CaptureMove(from, to, KNIGHT, PieceAt(to)));
+            moves.push_back(Move::RegularMove(from, to));
         }
         if constexpr (do_all_moves)
         {
             Bitboard non_capture_targets = attacks & allowed_non_captures;
             for (Square to : non_capture_targets)
             {
-                moves.push_back(Move::NonCaptureMove(from, to, KNIGHT));
+                moves.push_back(Move::RegularMove(from, to));
             }
         }
     }
@@ -239,14 +236,14 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             Bitboard       capture_targets = attacks & allowed_captures;
             for (Square to : capture_targets)
             {
-                moves.push_back(Move::CaptureMove(from, to, piece, PieceAt(to)));
+                moves.push_back(Move::RegularMove(from, to));
             }
             if constexpr (do_all_moves)
             {
                 Bitboard non_capture_targets = attacks & allowed_non_captures;
                 for (Square to : non_capture_targets)
                 {
-                    moves.push_back(Move::NonCaptureMove(from, to, piece));
+                    moves.push_back(Move::RegularMove(from, to));
                 }
             }
         }
@@ -356,11 +353,10 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             const Square from = (Square)(to - delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                const Piece captured = PieceAt(to);
-                moves.push_back(Move::PromotionCaptureMove(from, to, captured, QUEEN));
-                moves.push_back(Move::PromotionCaptureMove(from, to, captured, ROOK));
-                moves.push_back(Move::PromotionCaptureMove(from, to, captured, BISHOP));
-                moves.push_back(Move::PromotionCaptureMove(from, to, captured, KNIGHT));
+                moves.push_back(Move::PromotionMove(from, to, QUEEN));
+                moves.push_back(Move::PromotionMove(from, to, ROOK));
+                moves.push_back(Move::PromotionMove(from, to, BISHOP));
+                moves.push_back(Move::PromotionMove(from, to, KNIGHT));
             }
         }
     }
@@ -391,7 +387,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             const Square from = (Square)(to - delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::CaptureMove(from, to, PAWN, PieceAt(to)));
+                moves.push_back(Move::RegularMove(from, to));
             }
         }
     }
@@ -403,7 +399,7 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
             const Square from = (Square)(to - push_delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::NonCaptureMove(from, to, PAWN));
+                moves.push_back(Move::RegularMove(from, to));
             }
         }
         b = double_pushes & allowed_non_captures;

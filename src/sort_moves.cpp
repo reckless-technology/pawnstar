@@ -10,13 +10,13 @@
 #include "sort_moves.h"
 #include "static_exchange_evaluation.h"
 
-//                   indexed by      ply   pce from  to
-static uint32_t killer_move_counts[MAX_PLY][8 * 64 * 64];
+//                   indexed by      ply   from  to
+static uint32_t killer_move_counts[MAX_PLY][64 * 64];
 
 void RecordKillerMove(int ply, Move move)
 {
-    // Mask all except piece, from, to (lower 15 bits)
-    ++killer_move_counts[ply][move.piece_from_to_mask()];
+    // Mask all except from to
+    ++killer_move_counts[ply][move.from_to_mask()];
 }
 
 void ResetKillerCounts()
@@ -41,7 +41,7 @@ void ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alph
         {
             bool      is_checking;
             const int score = SearchSingleMove(game, depth - 3, ply, alpha, beta, moves[i], dummy_pv, i, is_checking);
-            moves[i].AssignScore(score * 1000 + counts[moves[i].piece_from_to_mask()]);
+            moves[i].AssignScore(score * 1000 + counts[moves[i].from_to_mask()]);
             if (is_checking)
             {
                 moves[i].GivesCheck();
@@ -54,7 +54,7 @@ void ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alph
         {
             bool      is_checking;
             const int score = EvaluateStaticExchange(game.CurrentPosition(), move, is_checking);
-            move.AssignScore(score * 1000 + counts[move.piece_from_to_mask()]);
+            move.AssignScore(score * 1000 + counts[move.from_to_mask()]);
             if (is_checking)
             {
                 move.GivesCheck();

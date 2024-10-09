@@ -71,17 +71,24 @@ constexpr char RankChar(Square locn)
 ///   BITS      INTERPRETATION
 ///  0 -  5     To (destination square index)
 ///  6 - 11     From (source square index)
-/// 12 - 14     Moving piece type
-/// 15 - 17     Captured piece type in the case of capture moves
-/// 18 - 20     Promoted piece type in the case of pawn promotions
-/// 21 - 21     Castling move flag
-/// 22 - 22     En passant capture flag
-/// 23 - 23     Pawn double push flag
-/// 24 - 24     Is checking move flag (this move gives check)
-/// 32 - 63     Contains the move score (as signed int) after move has been evaluated / sorted
+/// 12 - 14     MoveType
+/// 15 - 15     Is checking flag
+/// 32 - 63     score
 class Move
 {
   public:
+    enum MoveType : uint8_t
+    {
+        REGULAR,
+        PAWN_DOUBLE_PUSH,
+        PROMOTION_KNIGHT = KNIGHT,
+        PROMOTION_BISHOP = BISHOP,
+        PROMOTION_ROOK   = ROOK,
+        PROMOTION_QUEEN  = QUEEN,
+        EP_CAPTURE,
+        CASTLING,
+    };
+
     constexpr Move()
     {
     }
@@ -98,18 +105,8 @@ class Move
 
     constexpr bool operator==(const Move &that) const
     {
-        // Just consider from, to, piece, captured, promoted fields when testing moves for equality.
-        return (m & 0x1FFFFF) == (that.m & 0x1FFFFF);
-    }
-
-    constexpr Piece piece() const
-    {
-        return (Piece)((m >> 12) & 0x07);
-    }
-
-    constexpr Square from() const
-    {
-        return (Square)((m >> 6) & 0x3F);
+        /// Only consider from, to and type fields for equality.
+        return (m & 0x7FFF) == (that.m & 0x7FFF);
     }
 
     constexpr Square to() const
@@ -117,14 +114,34 @@ class Move
         return (Square)(m & 0x3F);
     }
 
-    constexpr Piece captured() const
+    constexpr Square from() const
     {
-        return (Piece)((m >> 15) & 0x07);
+        return (Square)((m >> 6) & 0x3F);
+    }
+
+    constexpr MoveType type() const
+    {
+        return (MoveType)((m >> 12) & 0x07);
     }
 
     constexpr Piece promoted() const
     {
-        return (Piece)((m >> 18) & 0x07);
+        switch (type())
+        {
+        case REGULAR:
+        case PAWN_DOUBLE_PUSH:
+        case CASTLING:
+        case EP_CAPTURE:
+            return NONE;
+        case PROMOTION_KNIGHT:
+            return KNIGHT;
+        case PROMOTION_BISHOP:
+            return BISHOP;
+        case PROMOTION_ROOK:
+            return ROOK;
+        case PROMOTION_QUEEN:
+            return QUEEN;
+        }
     }
 
     constexpr int score() const
@@ -132,24 +149,10 @@ class Move
         return (int)(m >> 32);
     }
 
-    constexpr int piece_from_to_mask() const
+    constexpr int from_to_mask() const
     {
-        return m & 0x7FFF; // Lower 15 bits contain (piece, from, to): index into killer move table.
-    }
-
-    constexpr bool IsCastling() const
-    {
-        return m & IS_CASTLING;
-    }
-
-    constexpr bool IsEpCapture() const
-    {
-        return m & IS_EP_CAPTURE;
-    }
-
-    constexpr bool IsPawnDoublePush() const
-    {
-        return m & IS_DOUBLE_PUSH;
+        // Lower 12 bits contain (from, to)
+        return m & 0xFFF;
     }
 
     constexpr bool IsChecking() const
@@ -177,39 +180,29 @@ class Move
         return Move{0};
     }
 
-    constexpr static Move PromotionCaptureMove(Square from, Square to, Piece captured, Piece promoted)
+    constexpr static Move RegularMove(Square from, Square to)
     {
-        return Move{to | (from << 6) | (PAWN << 12) | (captured << 15) | (promoted << 18)};
+        return Move{to | (from << 6)};
     }
 
     constexpr static Move PromotionMove(Square from, Square to, Piece promoted)
     {
-        return Move{to | (from << 6) | (PAWN << 12) | (promoted << 18)};
+        return Move{to | (from << 6) | (promoted << 12)};
     }
 
     constexpr static Move CastlingMove(Square from, Square to)
     {
-        return Move{to | (from << 6) | (KING << 12) | IS_CASTLING};
+        return Move{to | (from << 6) | (CASTLING << 12)};
     }
 
     constexpr static Move EpCaptureMove(Square from, Square to)
     {
-        return Move{to | (from << 6) | (PAWN << 12) | (PAWN << 15) | IS_EP_CAPTURE};
+        return Move{to | (from << 6) | (EP_CAPTURE << 12)};
     }
 
     constexpr static Move DoublePushMove(Square from, Square to)
     {
-        return Move{to | (from << 6) | (PAWN << 12) | IS_DOUBLE_PUSH};
-    }
-
-    constexpr static Move CaptureMove(Square from, Square to, Piece piece, Piece captured)
-    {
-        return Move{to | (from << 6) | (piece << 12) | (captured << 15)};
-    }
-
-    constexpr static Move NonCaptureMove(Square from, Square to, Piece piece)
-    {
-        return Move{to | (from << 6) | (piece << 12)};
+        return Move{to | (from << 6) | (PAWN_DOUBLE_PUSH << 12)};
     }
 
     constexpr std::size_t operator()(const Move &m) const
@@ -231,43 +224,6 @@ class Move
         return result;
     }
 
-    constexpr const std::string DebugString() const
-    {
-        std::string result;
-        result.push_back(" PNBRQK"[piece()]);
-        result.push_back(FileChar(from()));
-        result.push_back(RankChar(from()));
-        result.push_back(FileChar(to()));
-        result.push_back(RankChar(to()));
-        if (captured())
-        {
-            result.push_back('x');
-            result.push_back(" PNBRQK"[captured()]);
-        }
-        if (promoted())
-        {
-            result.push_back('=');
-            result.push_back(" PNBRQK"[promoted()]);
-        }
-        if (IsCastling())
-        {
-            result += " O-O";
-        }
-        if (IsEpCapture())
-        {
-            result += " e.p.";
-        }
-        if (IsPawnDoublePush())
-        {
-            result += " (dp)";
-        }
-        if (IsChecking())
-        {
-            result.push_back('+');
-        }
-        return result;
-    }
-
   private:
     int64_t m;
 
@@ -277,10 +233,7 @@ class Move
 
     enum MoveFlags
     {
-        IS_CASTLING    = 1 << 21,
-        IS_EP_CAPTURE  = 1 << 22,
-        IS_DOUBLE_PUSH = 1 << 23,
-        IS_CHECKING    = 1 << 24,
+        IS_CHECKING = 1 << 15,
     };
 };
 

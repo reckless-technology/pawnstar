@@ -13,22 +13,6 @@ using std::string_view;
 #include "search.h"
 #include "transposition_table.h"
 
-constexpr string_view move_suffixes[] = {"+", "#", "ep", "e.p.", "!", "?"};
-
-/// @brief Remove ambiguous or extraneous suffices from the SAN move.
-/// @param move_str Move string to process.
-constexpr void RemoveMoveSuffixes(string &move_str)
-{
-    for (const string_view sv : move_suffixes)
-    {
-        auto locn = move_str.find(sv);
-        if (locn != string::npos)
-        {
-            move_str.erase(locn);
-        }
-    }
-}
-
 /// @brief Construct a game from a FEN (Forsyth Edwards) position string.
 /// @param fen_string Initial position.
 void Game::NewGame(std::string_view fen_string)
@@ -111,21 +95,17 @@ bool Game::IsDrawByRepetition(bool is_search) const
     return false;
 }
 
-/// @brief Play a move from the given move string in either standard algebraic or XBoard format, and update game
-/// state_flags accordingly.
+/// @brief Play a move from the given move string and update game state_flags accordingly.
 /// @param move_str The string containing the move to be made.
 /// @return The move which was made, or Move::None in the case the string did not contain a legal move.
 Move Game::PlayMove(std::string_view move_str)
 {
-    string candidate{move_str};
-    RemoveMoveSuffixes(candidate);
+    string   candidate{move_str};
     MoveList move_list = CurrentPosition().GenerateLegalMoves();
     for (const Move &move : move_list)
     {
         const string algebraic_move_str{move.ToString()};
-        string       san_move_str{CurrentPosition().MoveToString(move, &move_list)};
-        RemoveMoveSuffixes(san_move_str);
-        if (san_move_str == candidate || algebraic_move_str == candidate)
+        if (algebraic_move_str == candidate)
         {
             PlayMove(move);
             return move;

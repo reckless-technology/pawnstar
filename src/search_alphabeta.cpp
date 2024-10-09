@@ -227,9 +227,17 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             continue; // We already searched this move.
         }
         int score;
-        // Try late move reduction.
-        if (!game.CurrentPosition().IsInCheck() && !game.CurrentPosition().HasBeenReduced() && beta == alpha + 1 &&
-            move_index > 1 && depth > 2 && !(move.captured() || move.piece() == PAWN || move.IsChecking()))
+        // Try late move reduction, if all the conditions are met.
+        // clang-format off
+        if (!game.CurrentPosition().IsInCheck() &&                  // we are not in check
+            !game.CurrentPosition().HasBeenReduced() &&             // we haven't already tried LMR in an ancestor node
+            beta == alpha + 1 &&                                    // it is not a PV node
+            move_index > 1 &&                                       // it's not the first move
+            depth > 2 &&                                            // we don't drop directly into quiescence search
+            !move.IsChecking() &&                                   // move does not give check
+            game.CurrentPosition().PieceAt(move.to()) == NONE &&    // move is not a capture
+            game.CurrentPosition().PieceAt(move.from()) != PAWN)    // move is not a pawn move
+        // clang-format on
         {
             game.PlayMove(move);
             INCREMENT("late move reduction");
