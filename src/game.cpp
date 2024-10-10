@@ -153,7 +153,7 @@ void Game::SearchThreadEntry()
     if (move)
     {
         PlayMove(move);
-        std::cout << std::format("bestmmove {}\n", move.ToString());
+        std::cout << std::format("bestmove {}\n", move.ToString());
         IsGameOver();
     }
 }
