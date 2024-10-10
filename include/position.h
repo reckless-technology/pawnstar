@@ -11,21 +11,6 @@
 /// @brief Class to represent a chess position.
 class Position
 {
-  private:
-    /// @brief Position state flags bit set.
-    enum StateFlags : uint8_t
-    {
-        MAY_WHITE_CASTLE_KINGSIDE  = 1 << 0, ///< White has the right to castle king side.
-        MAY_WHITE_CASTLE_QUEENSIDE = 1 << 1, ///< White has the right to castle queen side.
-        MAY_BLACK_CASTLE_KINGSIDE  = 1 << 2, ///< Black has the right to castle king side.
-        MAY_BLACK_CASTLE_QUEENSIDE = 1 << 3, ///< Black has the right to castle queen side.
-        IS_BLACK_TO_MOVE           = 1 << 4, ///< It is black's turn to move.
-        IS_NULL_MOVE               = 1 << 5, ///< Position was the result of a null move.
-        HAS_BEEN_REDUCED           = 1 << 6, ///< Has late move reduction been applied in the tree.
-        CASTLING_RIGHTS_MASK = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE |
-                                MAY_BLACK_CASTLE_QUEENSIDE),
-    };
-
   public:
     Position()                                      = default;
     Position(const Position &that)                  = default;
@@ -108,6 +93,20 @@ class Position
     uint8_t              reversible_move_count_;    ///< number of consecutive reversible half-moves (plies)
     uint8_t              full_move_count_;          ///< number of full moves (zero indexed)
     static const uint8_t CASTLING_RIGHTS_MASKS[64]; ///< ANDed with move source and dest to compute new rights
+
+    /// @brief Position state flags bit set.
+    enum StateFlags : uint8_t
+    {
+        MAY_WHITE_CASTLE_KINGSIDE  = 1 << 0, ///< White has the right to castle king side.
+        MAY_WHITE_CASTLE_QUEENSIDE = 1 << 1, ///< White has the right to castle queen side.
+        MAY_BLACK_CASTLE_KINGSIDE  = 1 << 2, ///< Black has the right to castle king side.
+        MAY_BLACK_CASTLE_QUEENSIDE = 1 << 3, ///< Black has the right to castle queen side.
+        IS_BLACK_TO_MOVE           = 1 << 4, ///< It is black's turn to move.
+        IS_NULL_MOVE               = 1 << 5, ///< Position was the result of a null move.
+        HAS_BEEN_REDUCED           = 1 << 6, ///< Has late move reduction been applied in the tree.
+        CASTLING_RIGHTS_MASK = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE |
+                                MAY_BLACK_CASTLE_QUEENSIDE),
+    };
 };
 
 static_assert(sizeof(Position) == 152);

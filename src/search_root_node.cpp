@@ -118,20 +118,20 @@ Move SearchRootNode(Game &game)
                 best_moves[depth] = move_list[i];
                 // Show thinking output
                 CopyVariation(principal_variation, child_pv, best_move);
-                stringstream ss;
-                bool         is_first_move = true;
+                string pv_string;
+                bool   is_first_move = true;
                 for (const auto &move : principal_variation)
                 {
                     if (!is_first_move)
                     {
-                        ss << ' ';
+                        pv_string.push_back(' ');
                     }
-                    ss << move.ToString();
+                    pv_string.append(move.ToString());
                     is_first_move = false;
                 }
                 std::cout << std::format("info depth {:2} score cp {:5} time {:5} nodes {:8} pv {}\n", depth,
-                                         best_moves[depth].score(), (ElapsedMilliseconds() - start_ms),
-                                         game.node_count_, ss.str());
+                                         best_moves[depth].score(), ElapsedMilliseconds() - start_ms, game.node_count_,
+                                         pv_string);
             }
         }
         int stop_ms = ElapsedMilliseconds();

@@ -24,7 +24,7 @@ void ResetKillerCounts()
     memset(killer_move_counts, 0, sizeof(killer_move_counts));
 }
 
-/// @brief Assign provisional scores to each mover and then sort them best first.
+/// @brief Assign provisional scores to each move and then sort them best first.
 /// @param game Game being searched
 /// @param moves List of legal moves to evaluate.
 /// @param depth Current search depth.
@@ -34,17 +34,22 @@ void ResetKillerCounts()
 void ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alpha, int beta)
 {
     const uint32_t *const counts = &killer_move_counts[ply][0];
-    if (depth > 3)
+    if (depth > 4)
     {
         Variation dummy_pv{};
         for (std::size_t i = 0; i != moves.size(); ++i)
         {
             bool      is_checking;
-            const int score = SearchSingleMove(game, depth - 3, ply, alpha, beta, moves[i], dummy_pv, i, is_checking);
-            moves[i].AssignScore(score * 1000 + counts[moves[i].from_to_mask()]);
+            const int score = SearchSingleMove(game, depth - 4, ply, alpha, beta, moves[i], dummy_pv, i, is_checking);
             if (is_checking)
             {
                 moves[i].GivesCheck();
+                // Give a bonus score to moves which give check.
+                moves[i].AssignScore(score * 1000 + counts[moves[i].from_to_mask()] + 50000);
+            }
+            else
+            {
+                moves[i].AssignScore(score * 1000 + counts[moves[i].from_to_mask()]);
             }
         }
     }
@@ -54,10 +59,14 @@ void ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alph
         {
             bool      is_checking;
             const int score = EvaluateStaticExchange(game.CurrentPosition(), move, is_checking);
-            move.AssignScore(score * 1000 + counts[move.from_to_mask()]);
             if (is_checking)
             {
                 move.GivesCheck();
+                move.AssignScore(score * 1000 + counts[move.from_to_mask()] + 50000);
+            }
+            else
+            {
+                move.AssignScore(score * 1000 + counts[move.from_to_mask()]);
             }
         }
     }
