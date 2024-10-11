@@ -32,7 +32,6 @@ class Position
     constexpr bool      MayBlackCastleKingside() const      {return !!(flags_ & MAY_BLACK_CASTLE_KINGSIDE);}
     constexpr bool      MayBlackCastleQueenside() const     {return !!(flags_ & MAY_BLACK_CASTLE_QUEENSIDE);}
     constexpr bool      IsNullMove() const                  {return !!(flags_ & IS_NULL_MOVE);}
-    constexpr bool      HasBeenReduced() const              {return !!(flags_ & HAS_BEEN_REDUCED);}
     constexpr Color     ColorToMove() const                 {return flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE;}
     constexpr Bitboard  Pawns() const                       {return pawns_;}
     constexpr Bitboard  Knights() const                     {return knights_;}
@@ -54,7 +53,6 @@ class Position
     constexpr uint8_t   ReversibleMoveCount() const         {return reversible_move_count_;}
     constexpr Square    EnPassantIndex() const              {return en_passant_square_;}
     // Non const accessors.
-    constexpr void      Reduce()                            {flags_ |= HAS_BEEN_REDUCED;}
     constexpr Bitboard& PiecesOfColor(Color color)          {return (&white_pieces_)[color];}
     constexpr Bitboard& PiecesOfType(Piece piece)           {return (&pawns_)[piece - PAWN];}
     // clang-format on
@@ -103,7 +101,6 @@ class Position
         MAY_BLACK_CASTLE_QUEENSIDE = 1 << 3, ///< Black has the right to castle queen side.
         IS_BLACK_TO_MOVE           = 1 << 4, ///< It is black's turn to move.
         IS_NULL_MOVE               = 1 << 5, ///< Position was the result of a null move.
-        HAS_BEEN_REDUCED           = 1 << 6, ///< Has late move reduction been applied in the tree.
         CASTLING_RIGHTS_MASK = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE |
                                 MAY_BLACK_CASTLE_QUEENSIDE),
     };

@@ -10,18 +10,24 @@
 #include "sort_moves.h"
 #include "static_exchange_evaluation.h"
 
-//                   indexed by      ply   from  to
-static uint32_t killer_move_counts[MAX_PLY][64 * 64];
+//                 indexed by      ply   from  to
+static uint32_t good_move_counts[MAX_PLY][64 * 64];
 
-void RecordKillerMove(int ply, Move move)
+void RecordGoodMove(int depth, int ply, Move move)
 {
-    // Mask all except from to
-    ++killer_move_counts[ply][move.from_to_mask()];
+    if (depth > 0)
+    {
+        good_move_counts[ply][move.from_to_mask()] += depth * depth;
+    }
+    else
+    {
+        ++good_move_counts[ply][move.from_to_mask()];
+    }
 }
 
 void ResetKillerCounts()
 {
-    memset(killer_move_counts, 0, sizeof(killer_move_counts));
+    memset(good_move_counts, 0, sizeof(good_move_counts));
 }
 
 /// @brief Assign provisional scores to each move and then sort them best first.
@@ -33,23 +39,25 @@ void ResetKillerCounts()
 /// @param beta Beta value
 void ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alpha, int beta)
 {
-    const uint32_t *const counts = &killer_move_counts[ply][0];
+    const uint32_t *const counts = &good_move_counts[ply][0];
     if (depth > 4)
     {
         Variation dummy_pv{};
-        for (std::size_t i = 0; i != moves.size(); ++i)
+        for (Move &move : moves)
         {
+            const int move_index = &move - moves.begin();
             bool      is_checking;
-            const int score = SearchSingleMove(game, depth - 4, ply, alpha, beta, moves[i], dummy_pv, i, is_checking);
+            const int score =
+                SearchSingleMove(game, depth - 3, ply, alpha, beta, move, dummy_pv, move_index, is_checking);
             if (is_checking)
             {
-                moves[i].GivesCheck();
+                move.GivesCheck();
                 // Give a bonus score to moves which give check.
-                moves[i].AssignScore(score * 1000 + counts[moves[i].from_to_mask()] + 50000);
+                move.AssignScore(score * 10000 + counts[move.from_to_mask()] + 1000000);
             }
             else
             {
-                moves[i].AssignScore(score * 1000 + counts[moves[i].from_to_mask()]);
+                move.AssignScore(score * 10000 + counts[move.from_to_mask()]);
             }
         }
     }
@@ -62,11 +70,11 @@ void ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alph
             if (is_checking)
             {
                 move.GivesCheck();
-                move.AssignScore(score * 1000 + counts[move.from_to_mask()] + 50000);
+                move.AssignScore(score * 10000 + counts[move.from_to_mask()] + 1000000);
             }
             else
             {
-                move.AssignScore(score * 1000 + counts[move.from_to_mask()]);
+                move.AssignScore(score * 10000 + counts[move.from_to_mask()]);
             }
         }
     }
@@ -82,9 +90,9 @@ uint32_t MaxKillerMoveCount()
     {
         for (int j = 0; j != 64 * 64; ++j)
         {
-            if (killer_move_counts[i][j] > result)
+            if (good_move_counts[i][j] > result)
             {
-                result = killer_move_counts[i][j];
+                result = good_move_counts[i][j];
             }
         }
     }

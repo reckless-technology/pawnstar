@@ -18,19 +18,20 @@ int EvaluatePosition(const Position &position, int alpha, int beta)
     // Piece square tables
     scores[WHITE] += EvaluatePieceSquare<WHITE>(position);
     scores[BLACK] += EvaluatePieceSquare<BLACK>(position);
-    // Mobility
-    scores[WHITE] += EvaluateMobility<WHITE>(position);
-    scores[BLACK] += EvaluateMobility<BLACK>(position);
     // Pawn structure
-    const PawnStructure ps_white{DeterminePawnStructure<WHITE>(position)};
-    const PawnStructure ps_black{DeterminePawnStructure<BLACK>(position)};
-    scores[WHITE] += EvaluatePawnStructure<WHITE>(ps_white);
-    scores[BLACK] += EvaluatePawnStructure<BLACK>(ps_black);
+    const std::array<PawnStructure, 2> ps{DeterminePawnStructure<WHITE>(position),
+                                          DeterminePawnStructure<BLACK>(position)};
+    scores[WHITE] += EvaluatePawnStructure<WHITE>(ps[WHITE]);
+    scores[BLACK] += EvaluatePawnStructure<BLACK>(ps[BLACK]);
+    // Mobility
+    scores[WHITE] += EvaluateMobility<WHITE>(position, ps);
+    scores[BLACK] += EvaluateMobility<BLACK>(position, ps);
     // Kings
     scores[WHITE] += EvaluateKing<WHITE>(position);
     scores[BLACK] += EvaluateKing<BLACK>(position);
     const int score = position.ColorToMove() == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];
-    return score;
+    // Round to nearest 5
+    return (score / 5) * 5;
     (void)alpha;
     (void)beta;
 }

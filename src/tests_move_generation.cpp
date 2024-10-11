@@ -31,9 +31,8 @@ struct PerftTest
 /// @brief Run standard perft test - recursive search.
 /// @param src_position position to search
 /// @param depth search depth
-/// @param color color to move
 /// @param num_moves total number of moves at terminal / leaf nodes
-static void Perft(const Position &src_position, int depth, Color color, uint64_t &num_moves)
+static void Perft(const Position &src_position, int depth, uint64_t &num_moves)
 {
     MoveList move_list{src_position.GenerateLegalMoves()};
     if (depth > 1)
@@ -41,7 +40,7 @@ static void Perft(const Position &src_position, int depth, Color color, uint64_t
         for (Move move : move_list)
         {
             Position position{src_position.MakeMove(move)};
-            Perft(position, depth - 1, EnemyOf(color), num_moves);
+            Perft(position, depth - 1, num_moves);
         }
         return;
     }
@@ -54,40 +53,41 @@ extern const std::vector<std::string> perft_results;
 void RunPerftTests(void)
 {
     std::vector<PerftTest> tests;
-    for (auto test : perft_results)
+    for (auto test_str : perft_results)
     {
         // Split into tokens separated by semicolons
         std::vector<std::string> tokens;
         for (;;)
         {
-            const auto i = test.find(';');
+            const auto i = test_str.find(';');
             if (i == std::string::npos)
             {
-                tokens.push_back(test);
+                tokens.push_back(test_str);
                 break;
             }
-            tokens.push_back(test.substr(0, i));
-            test = test.substr(i + 1);
+            tokens.push_back(test_str.substr(0, i));
+            test_str = test_str.substr(i + 1);
         }
         // First token is FEN position
         std::string fen = tokens[0];
+        tokens.erase(tokens.begin());
         // Remaining tokens are depth and counts
-        for (std::size_t i = 1; i < tokens.size(); ++i)
+        for (auto token : tokens)
         {
             // Format is "Dxx NNNN"
             int      depth;
             uint64_t count;
-            if (std::sscanf(tokens[i].c_str(), "D%d %" PRIu64, &depth, &count) != 2)
+            if (std::sscanf(token.c_str(), " D%d %" PRIu64, &depth, &count) != 2)
             {
-                std::cout << std::format("ERROR: unable to scan perft test {}\n", test);
+                std::cout << std::format("ERROR: unable to scan perft test {}\n", test_str);
             }
             tests.push_back(PerftTest{fen, depth, count});
         }
     }
     bool     is_good     = true;
     uint64_t total_nodes = 0;
-    auto     first_start = ElapsedMicroseconds();
     int64_t  stop;
+    auto     first_start = ElapsedMicroseconds();
     for (const auto &test : tests)
     {
         Position position = Position::FromString(test.position);
@@ -95,7 +95,7 @@ void RunPerftTests(void)
         uint64_t num_moves = 0;
         total_nodes += test.count;
         auto start = ElapsedMicroseconds();
-        Perft(position, test.depth, position.ColorToMove(), num_moves);
+        Perft(position, test.depth, num_moves);
         stop = ElapsedMicroseconds();
         if (stop == start)
         {

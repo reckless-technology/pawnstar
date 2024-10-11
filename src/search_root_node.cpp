@@ -102,11 +102,13 @@ Move SearchRootNode(Game &game)
         Variation child_pv{};
         int       alpha  = ALPHA;
         game.node_count_ = 0;
-        for (std::size_t i = 0; i != move_list.size(); ++i)
+        // int move_index   = 0;
+        for (auto &move : move_list)
         {
-            bool      is_checking;
-            const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move_list[i], child_pv, i, is_checking);
-            move_list[i].AssignScore(score);
+            int  move_index = &move - move_list.begin();
+            bool is_checking;
+            int  score = SearchSingleMove(game, depth, 0, alpha, BETA, move, child_pv, move_index, is_checking);
+            move.AssignScore(score);
             if (game.is_cancel_pending_)
             {
                 return best_move;
@@ -114,8 +116,8 @@ Move SearchRootNode(Game &game)
             if (score > alpha)
             {
                 alpha             = score;
-                best_move         = move_list[i];
-                best_moves[depth] = move_list[i];
+                best_move         = move;
+                best_moves[depth] = move;
                 // Show thinking output
                 CopyVariation(principal_variation, child_pv, best_move);
                 string pv_string;

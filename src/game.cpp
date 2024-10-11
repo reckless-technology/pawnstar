@@ -76,9 +76,9 @@ bool Game::IsDrawByFiftyMoves() const
 /// @brief Determine if the game is a draw by repetition.
 /// @param is_search true in the main search (single repetition), false for the FIDE rule (double repetition)
 /// @return true if draw by repetition.
-bool Game::IsDrawByRepetition(bool is_search) const
+bool Game::IsDrawByRepetition() const
 {
-    int            repetitions = is_search ? 1 : 2;
+    int            repetitions = 2;
     const uint64_t hash        = CurrentPosition().Hash();
     for (int i = index_ - 4; i >= 0; i -= 2)
     {
@@ -128,7 +128,7 @@ bool Game::IsGameOver() const
         std::cout << "1/2-1/2 {stalemate}\n";
         return true;
     }
-    if (IsDrawByRepetition(false))
+    if (IsDrawByRepetition())
     {
         std::cout << "1/2-1/2 {draw by repetition}\n";
         return true;

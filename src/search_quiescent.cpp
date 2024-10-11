@@ -27,10 +27,6 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         Variation dummy{};
         return Search(game, depth, ply, alpha, beta, dummy);
     }
-    if (game.CurrentPosition().IsDrawByMaterial())
-    {
-        return DRAW_SCORE;
-    }
     int score = EvaluatePosition(game.CurrentPosition(), alpha, beta);
     if (score >= beta)
     {
@@ -47,11 +43,6 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     ScoreAndSortMoves(game, move_list, depth, ply, alpha, beta);
     for (Move move : move_list)
     {
-        if (move.score() < 0)
-        {
-            INCREMENT("quiescent negative SEE skips");
-            return best_score;
-        }
         game.PlayMove(move);
         score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
         game.UndoMove();
@@ -62,7 +53,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            RecordKillerMove(ply, move);
+            RecordGoodMove(depth, ply, move);
             return score;
         }
         if (score > best_score)
@@ -72,6 +63,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent pv changed");
+                RecordGoodMove(depth, ply, move);
             }
         }
     }

@@ -452,7 +452,7 @@ bool Position::IsDrawByMaterial() const
         // king and bishop vs king and bishop with bishops on same color square
         {
             const Bitboard white_bishops                   = bishops_ & white_pieces_;
-            const Bitboard black_bishops                   = bishops_ ^ white_bishops;
+            const Bitboard black_bishops                   = bishops_ & black_pieces_;
             const bool     is_white_bishop_on_white_square = (white_bishops & WHITE_SQUARES).IsNotEmpty();
             const bool     is_black_bishop_on_white_square = (black_bishops & WHITE_SQUARES).IsNotEmpty();
             if (white_bishops.IsNotEmpty() && black_bishops.IsNotEmpty() &&

@@ -20,10 +20,11 @@
 int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index,
                      bool &is_checking)
 {
+    const bool was_in_check = game.CurrentPosition().IsInCheck();
     game.PlayMove(move);
     is_checking = game.CurrentPosition().IsInCheck();
     int score;
-    if (beta > alpha + 1 && move_index > 0 && !game.CurrentPosition().IsInCheck() && !move.IsChecking())
+    if (beta > alpha + 1 && move_index > 0 && !was_in_check && !is_checking)
     {
         INCREMENT("pvs attempts");
         score = -Search(game, depth - 1, ply + 1, -alpha - 1, -alpha, pv);
@@ -51,7 +52,7 @@ int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move m
 static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int beta)
 {
     // clang-format off
-    if (depth > 3 &&                            // do not drop directly into quiescence search
+    if (depth > 2 &&                            // do not drop directly into quiescence search
         !game.CurrentPosition().IsNullMove() && // previous move was not a null move
         !game.CurrentPosition().IsInCheck() &&  // we are not in check
         beta == alpha + 1 &&                    // this is not a PV node
@@ -59,10 +60,10 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
         EvaluatePosition(game.CurrentPosition(), alpha, beta) >= beta)  // static evaluation is at least beta
     // clang-format on
     {
-        INCREMENT("null move attempts");
+        INCREMENT("null move");
         Variation dummy{};
         game.MakeNullMove();
-        int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
+        int score = -Search(game, depth - 2, ply + 1, -beta, -alpha, dummy);
         game.UndoMove();
         if (game.is_cancel_pending_)
         {
@@ -95,7 +96,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         game.is_cancel_pending_ = true;
         return SEARCH_CANCELLED_SCORE;
     }
-    if (game.CurrentPosition().IsDrawByMaterial() || game.IsDrawByFiftyMoves() || game.IsDrawByRepetition(true))
+    if (game.CurrentPosition().IsDrawByMaterial() || game.IsDrawByFiftyMoves() || game.IsDrawByRepetition())
     {
         return DRAW_SCORE;
     }
@@ -104,10 +105,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         INCREMENT("max ply reached");
         return EvaluatePosition(game.CurrentPosition(), alpha, beta);
     }
-    if (depth <= 0 && !game.CurrentPosition().IsInCheck())
-    {
-        return SearchQuiescent(game, depth, ply, alpha, beta);
-    }
+
     // Determine if there is an entry in the transposition table for this position. If so, see if it is sufficient for
     // us to avoid the search entirely.
     Transposition transposition;
@@ -142,23 +140,28 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             // We know the exact score and the best move from this position. However, do the full search
             // to get the PV. The extra time searching these few principal variation nodes is trivial.
             INCREMENT("table hit pv node");
+            ++depth;
             break;
         }
     }
 
-    // Try null move pruning.
-    if (!is_transposition || transposition.node_type == NODE_CUT)
+    // Can we go directly to the quiescence search?
+    if (depth <= 0 && !game.CurrentPosition().IsInCheck())
     {
-        const int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
-        if (game.is_cancel_pending_)
-        {
-            return SEARCH_CANCELLED_SCORE;
-        }
-        if (null_move_score >= beta)
-        {
-            return null_move_score;
-        }
+        return SearchQuiescent(game, depth, ply, alpha, beta);
     }
+
+    // Try null move pruning.
+    const int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
+    if (game.is_cancel_pending_)
+    {
+        return SEARCH_CANCELLED_SCORE;
+    }
+    if (null_move_score >= beta)
+    {
+        return null_move_score;
+    }
+
     // Before we generate any moves, try the transposition table move first. This might save us the cost of move
     // generation altogether, or provide better alpha beta bounds for the main search.
     Variation pv;
@@ -179,7 +182,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         {
             INCREMENT("table move beta cutoffs");
             RecordTransposition(game.CurrentPosition().Hash(), depth, score, transposition.move, NODE_CUT);
-            RecordKillerMove(ply, transposition.move);
+            RecordGoodMove(depth, ply, transposition.move);
             return score;
         }
         best_score = score;
@@ -191,7 +194,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             // Provisionally store this move as a CUT node - it may later turn out to be a PV but we don't know that yet
             // until we have searched every move.
             RecordTransposition(game.CurrentPosition().Hash(), depth, score, transposition.move, NODE_CUT);
-            RecordKillerMove(ply, transposition.move);
+            RecordGoodMove(depth, ply, transposition.move);
         }
     }
     // We didn't get a cutoff from the transposition table so proceed with generating and searching moves.
@@ -201,7 +204,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         // We failed to generate any strictly legal moves from this position. The position therefore represents either
         // checkmate or stalemate depending on whether we are presently in check. If we are in checkmate, add the ply
         // (distance from the root node) to the losing score, so that the search algorithm chooses the shortest path to
-        // checkmate when multiple possible checkmates exist in the tree.
+        // checkmate when multiple possible checkmate paths exist.
         if (game.CurrentPosition().IsInCheck())
         {
             INCREMENT("checkmates");
@@ -223,25 +226,20 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         int score;
         // Try late move reduction, if all the conditions are met.
         // clang-format off
-        if (!game.CurrentPosition().IsInCheck() &&                      // we are not in check
-            !game.CurrentPosition().HasBeenReduced() &&                 // we haven't already tried LMR in an ancestor node
-            beta == alpha + 1 &&                                        // it is not a PV node
-            move_index > 1 &&                                           // it's not the first move
-            depth > 2 &&                                                // we don't drop directly into quiescence search
-            !move.IsChecking() &&                                       // move does not give check
-            game.CurrentPosition().PieceAt(move.to()) == NO_PIECE &&    // move is not a capture
-            game.CurrentPosition().PieceAt(move.from()) != PAWN)        // move is not a pawn move
+        if (!game.CurrentPosition().IsInCheck() &&  // we are not in check
+            beta == alpha + 1 &&                    // it is not a PV node
+            move_index > 0 &&                       // it's not the first move
+            depth > 2 &&                            // we don't drop directly into quiescence search
+            !move.IsChecking() &&                   // move does not give check
+            move.score() < 0)                       // move has negative SEE
         // clang-format on
         {
-            game.PlayMove(move);
             INCREMENT("late move reduction");
-            game.CurrentPosition().Reduce();
-            score = -Search(game, depth - 2, ply + 1, -beta, -alpha, pv);
-            game.UndoMove();
-            if (score > alpha)
+            bool is_checking;
+            score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, move_index, is_checking);
+            if (score > best_score)
             {
                 INCREMENT("late move reduction fails");
-                bool is_checking;
                 score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index, is_checking);
             }
         }
@@ -258,7 +256,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         {
             INCREMENT("beta cutoffs");
             RecordTransposition(game.CurrentPosition().Hash(), depth, score, move, NODE_CUT);
-            RecordKillerMove(ply, move);
+            RecordGoodMove(depth, ply, move);
             return score;
         }
         if (score > best_score)
@@ -274,7 +272,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
                 // Provisionally store this move as a CUT node - it may later turn out to be a PV but we don't know that
                 // for sure yet until we have searched every move.
                 RecordTransposition(game.CurrentPosition().Hash(), depth, score, move, NODE_CUT);
-                RecordKillerMove(ply, move);
+                RecordGoodMove(depth, ply, move);
             }
         }
     }
@@ -285,7 +283,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         // parent node.
         INCREMENT("pv nodes");
         RecordTransposition(game.CurrentPosition().Hash(), depth, alpha, best_move, NODE_PV);
-        RecordKillerMove(ply, best_move);
+        RecordGoodMove(depth, ply, best_move);
         CopyVariation(parent_pv, pv, best_move);
     }
     else

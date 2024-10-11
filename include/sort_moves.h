@@ -6,7 +6,7 @@
 
 class Position;
 
-void     RecordKillerMove(int ply, Move move);
+void     RecordGoodMove(int depth, int ply, Move move);
 void     ResetKillerCounts();
 void     ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alpha, int beta);
 uint32_t MaxKillerMoveCount(void);

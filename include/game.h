@@ -39,7 +39,7 @@ class Game
     void StartThinking();
     void StopThinking();
     bool IsGameOver() const;
-    bool IsDrawByRepetition(bool is_search) const;
+    bool IsDrawByRepetition() const;
     bool IsDrawByFiftyMoves() const;
 
   private:

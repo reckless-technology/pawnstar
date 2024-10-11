@@ -181,7 +181,7 @@ constexpr uint64_t KingAttacks(uint8_t locn)
 /// @return Squares reachable by a King in 2 moves.
 constexpr uint64_t KingAttacks2(uint8_t locn)
 {
-    return KingFill(KingFill(Bitboard(locn)));
+    return KingFill(KingFill(Bitboard(locn))) & ~Bitboard(locn);
 }
 
 /// @brief King pawn shelter white.
@@ -190,7 +190,7 @@ constexpr uint64_t KingAttacks2(uint8_t locn)
 constexpr uint64_t KingPawnShelterWhite(uint8_t locn)
 {
     const uint64_t b = Bitboard(locn);
-    return ShiftNorthwest(b) | ShiftNorth(b) | ShiftNortheast(b);
+    return locn == 4 ? NO_SQUARES : ShiftNorthwest(b) | ShiftNorth(b) | ShiftNortheast(b); // Ignore square e1
 }
 
 /// @brief King pawn shelter black.
@@ -199,7 +199,7 @@ constexpr uint64_t KingPawnShelterWhite(uint8_t locn)
 constexpr uint64_t KingPawnShelterBlack(uint8_t locn)
 {
     const uint64_t b = Bitboard(locn);
-    return ShiftSouthwest(b) | ShiftSouth(b) | ShiftSoutheast(b);
+    return locn == 60 ? NO_SQUARES : ShiftSouthwest(b) | ShiftSouth(b) | ShiftSoutheast(b); // Ignore square e8
 }
 
 /// @brief Passed pawn mask for white.
