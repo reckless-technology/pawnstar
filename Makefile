@@ -44,7 +44,7 @@ RELEASE_FLAGS       = -g -O3 -D NDEBUG
 
 .PHONY: all clean debug prep release remake gen
 
-all: debug release
+all: release
 
 gen: $(GENERATOR_EXE)
 
@@ -63,7 +63,7 @@ $(RELEASE_EXE): $(RELEASE_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(RELEASE_FLAGS) -o $(RELEASE_EXE) $(RELEASE_OBJECTS)
 
 # Compile a release object from source
-$(RELEASE_DIR)/%.o: src/%.cpp $(HEADERS)  $(GENERATED_DATA)
+$(RELEASE_DIR)/%.o: src/%.cpp $(HEADERS) $(GENERATED_DATA)
 	$(CXX) -c $(CXXFLAGS) $(RELEASE_FLAGS) -o $@ $<
 
 $(GENERATED_DATA) : $(GENERATOR_EXE)
