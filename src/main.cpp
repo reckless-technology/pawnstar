@@ -38,7 +38,7 @@ int main()
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
     if (!InitializeOpeningBookFromFile("doc/pawnstar.book"))
     {
-        printf("NOTE: unable to open book file\n");
+        std::cout << "NOTE: unable to open book file\n";
     }
     Game game{};
     DebugXClear();

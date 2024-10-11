@@ -6,6 +6,9 @@
 #include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
+#include <array>
+#include <format>
+#include <iostream>
 #include <string>
 #include <string_view>
 
@@ -22,11 +25,11 @@ struct SeeTest
 
 /// @brief SEE test vectors.
 // clang-format off
-constexpr SeeTest tests[]{
+constexpr std::array<SeeTest,2> tests{{
     // Position                                                 Move to evaluate        Score
     {"1k1r4/1pp4p/p7/4p3/8/P5P1/1PP4P/2K1R3 w - -",             Move::Regular(E1, E5),  100},
     {"1k1r3q/1ppn3p/p4b2/4p3/8/P2N2P1/1PP1R1BP/2K1Q3 w - -",    Move::Regular(D3, E5), -200},
-};
+}};
 // clang-format on
 
 /// @brief Run the set of SEE tests.
@@ -40,8 +43,8 @@ void RunStaticExchangeTests(void)
         string   move_string{test.move.ToString()};
         bool     is_checking;
         int      score = EvaluateStaticExchange(position, test.move, is_checking);
-        printf("\n%s\nSEE for %s = %d\n", pos_str.c_str(), move_string.c_str(), score);
+        std::cout << std::format("\n{}\nSEE for {} = {}\n", pos_str, move_string, score);
         is_pass &= (score == test.see_score);
     }
-    printf("\n%s\n", is_pass ? "PASSED" : "FAILED");
+    std::cout << std::format("\n{}\n", is_pass ? "PASSED" : "FAILED");
 }

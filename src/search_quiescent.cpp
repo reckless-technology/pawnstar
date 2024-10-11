@@ -43,6 +43,11 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     ScoreAndSortMoves(game, move_list, depth, ply, alpha, beta);
     for (Move move : move_list)
     {
+        if (move.score() < 0)
+        {
+            INCREMENT("quiescent SEE skipped");
+            return best_score;
+        }
         game.PlayMove(move);
         score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
         game.UndoMove();

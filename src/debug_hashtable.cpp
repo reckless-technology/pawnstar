@@ -1,4 +1,5 @@
 
+#include <format>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -23,12 +24,12 @@ void DebugXClear()
 void DebugXWrite()
 {
     std::map<std::string_view, uint32_t> sorted_entries(debug_dictionary.begin(), debug_dictionary.end());
-    std::cout << "************************** DEBUGX **************************" << std::endl;
+    std::cout << "********************* DEBUGX *********************" << std::endl;
     for (const auto &[title, count] : sorted_entries)
     {
-        std::cout << std::setw(50) << std::left << title << std::setw(10) << std::right << count << std::endl;
+        std::cout << std::format("{:<40}{:10}\n", title, count);
     }
-    std::cout << "************************************************************" << std::endl;
+    std::cout << "**************************************************" << std::endl;
 }
 
 #endif

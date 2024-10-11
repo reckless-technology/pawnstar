@@ -6,11 +6,15 @@
 #include "sort_moves.h"
 #include "transposition_table.h"
 
+#include <array>
+#include <format>
+#include <iostream>
 #include <string_view>
+
 using std::string_view;
 
 /// @brief Standard Bratko Kopec test positions in FEN format.
-constexpr string_view POSITION_TESTS[] = {
+constexpr std::array POSITION_TESTS{
     "1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -",
     "3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - -",
     "2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - -",
@@ -48,7 +52,7 @@ void RunPositionTests(int depth)
         game.NewGame(test_pos);
         game.time_control_.clock_type = CHESS_CLOCK_FIXED_DEPTH;
         game.time_control_.depth      = depth;
-        printf("\n%s\n", game.CurrentPosition().ToString().c_str());
+        std::cout << std::format("\n{}\n", game.CurrentPosition().ToString());
         DebugXClear();
         SearchRootNode(game);
 #if DEBUGX
@@ -60,5 +64,5 @@ void RunPositionTests(int depth)
 #endif
         DebugXWrite();
     }
-    printf("total elapsed milliseconds                        %10ld\n", ElapsedMilliseconds() - start_ms);
+    std::cout << std::format("{:<40}{:10}\n", "total elapsed milliseconds", ElapsedMilliseconds() - start_ms);
 }

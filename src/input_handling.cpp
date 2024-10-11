@@ -1,4 +1,6 @@
 #include <cstring>
+#include <format>
+#include <iostream>
 #include <iterator>
 #include <ranges>
 #include <span>
@@ -58,7 +60,7 @@ void handle_freebook(Game &, std::span<std::string>)
 
 void handle_eval(Game &game, std::span<std::string>)
 {
-    printf("evaluation %5d\n", EvaluatePosition(game.CurrentPosition(), ALPHA, BETA));
+    std::cout << std::format("evaluation {}\n", EvaluatePosition(game.CurrentPosition(), ALPHA, BETA));
 }
 
 void handle_dbg(Game &, std::span<std::string>)
@@ -79,14 +81,14 @@ void handle_seetests(Game &, std::span<std::string>)
 void handle_getboard(Game &game, std::span<std::string>)
 {
     auto fen = game.CurrentPosition().ToString();
-    printf("%s\n", fen.c_str());
+    std::cout << std::format("{}\n", fen);
 }
 
 void handle_uci(Game &, std::span<std::string>)
 {
-    printf("id name Pawnstar\n");
-    printf("id author Jonny Reckless\n");
-    printf("uciok\n");
+    std::cout << "id name Pawnstar\n";
+    std::cout << "id author Jonny Reckless\n";
+    std::cout << "uciok\n";
 }
 
 void handle_ucinewgame(Game &game, std::span<std::string>)
@@ -144,7 +146,7 @@ void handle_quit(Game &game, std::span<std::string>)
 
 void handle_isready(Game &, std::span<std::string>)
 {
-    printf("readyok\n");
+    std::cout << "readyok\n";
 }
 
 void handle_position(Game &game, std::span<std::string> args)
@@ -198,10 +200,10 @@ constexpr std::array handlers =
 
 void handle_help(Game &, std::span<std::string>)
 {
-    printf("Available commands:\n");
+    std::cout << "Available commands:\n";
     for (auto &i : handlers)
     {
-        printf("%-12s %s\n", i.name.data(), i.description.data());
+        std::cout << std::format("{:<12} {}\n", i.name.data(), i.description.data());
     }
 }
 

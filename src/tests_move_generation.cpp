@@ -109,8 +109,8 @@ void RunPerftTests(void)
             is_good = false;
         }
     }
-    std::cout << std::format("total elapsed milliseconds              {:10}\n", (stop - first_start) / 1000);
-    std::cout << std::format("mean positions per second               {:10}\n",
+    std::cout << std::format("{:<40}{:10}\n", "total elapsed milliseconds", (stop - first_start) / 1000);
+    std::cout << std::format("{:<40}{:10}\n", "mean positions per second",
                              total_nodes * 1000000 / (stop - first_start));
     if (is_good)
     {

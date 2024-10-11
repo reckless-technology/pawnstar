@@ -1,3 +1,4 @@
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -77,11 +78,10 @@ void DisplayAvailableBookMoves(const Position &position)
     {
         ++move_counts[move];
     }
-    printf("MOVE   COUNT\n");
+    std::cout << "MOVE   COUNT\n";
     for (const auto &[move, freq] : move_counts)
     {
-        const string move_string{move.ToString()};
-        printf("%-8s %3d\n", move_string.c_str(), freq);
+        std::cout << std::format("{:<8} {:3}\n", move.ToString(), freq);
     }
 }
 

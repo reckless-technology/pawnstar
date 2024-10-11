@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstring>
+#include <iostream>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -411,7 +412,7 @@ bool Position::IsDrawByMaterial() const
     {
     case 0:
     case 1:
-        printf("ERROR: too few pieces for play\n");
+        std::cout << "ERROR: too few pieces for play\n";
         return true;
     case 2:
         // king vs king
