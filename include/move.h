@@ -68,66 +68,64 @@ constexpr char RankChar(Square locn)
 }
 
 /// @brief Class for representing a chess move.
-/// Moves are represented by a 64 bit integer with the following bit fields:
-///   BITS      INTERPRETATION
-///  0 -  5     To (destination square index)
-///  6 - 11     From (source square index)
-/// 12 - 14     MoveType
-/// 15 - 15     Is checking flag (move gives check)
-/// 32 - 63     score
-class Move
+class alignas(8) Move
 {
   public:
+    /// @brief Move types.
     enum MoveType : uint8_t
     {
-        REGULAR,
-        PAWN_DOUBLE_PUSH,
-        PROMOTION_KNIGHT = KNIGHT,
-        PROMOTION_BISHOP = BISHOP,
-        PROMOTION_ROOK   = ROOK,
-        PROMOTION_QUEEN  = QUEEN,
-        EP_CAPTURE,
-        CASTLING,
+        REGULAR,                   ///< Regular move type including captures.
+        PAWN_DOUBLE_PUSH,          ///< Pawn double push (affects en passant).
+        PROMOTION_KNIGHT = KNIGHT, ///< Promotion to knight.
+        PROMOTION_BISHOP = BISHOP, ///< Promotion to bishop.
+        PROMOTION_ROOK   = ROOK,   ///< Promotion to rook.
+        PROMOTION_QUEEN  = QUEEN,  ///< Promotion to queen.
+        EP_CAPTURE,                ///< En passant capture.
+        CASTLING,                  ///< Castling.
     };
 
+    /// @brief Default constructor: does NOT initialize the move object (for speed).
     constexpr Move()
     {
     }
 
-    constexpr Move(const Move &that) : m(that.m)
+    constexpr Move(const Move &that)
     {
+        *(uint64_t *)this = *(uint64_t *)(&that);
     }
 
     constexpr Move &operator=(const Move &that)
     {
-        m = that.m;
+        *(uint64_t *)this = *(uint64_t *)(&that);
         return *this;
     }
 
+    /// @brief Equality operator. Only consider from, to and type when testing equality.
+    /// @param that Other move to compare.
+    /// @return true if moves are "equivalent".
     constexpr bool operator==(const Move &that) const
     {
-        /// Only consider from, to and type fields for equality.
-        return (m & 0x7FFF) == (that.m & 0x7FFF);
+        return to_ == that.to_ && from_ == that.from_ && type_ == that.type_;
     }
 
     constexpr Square to() const
     {
-        return (Square)(m & 0x3F);
+        return to_;
     }
 
     constexpr Square from() const
     {
-        return (Square)((m >> 6) & 0x3F);
+        return from_;
     }
 
     constexpr MoveType type() const
     {
-        return (MoveType)((m >> 12) & 0x07);
+        return type_;
     }
 
     constexpr Piece promoted() const
     {
-        switch (type())
+        switch (type_)
         {
         case REGULAR:
         case PAWN_DOUBLE_PUSH:
@@ -147,68 +145,69 @@ class Move
 
     constexpr int score() const
     {
-        return (int)(m >> 32);
+        return score_;
     }
 
+    /// @brief Create a from-to bitmask for indexing into the good moves hash table.
+    /// @return 12 bit from-to combination.
     constexpr int from_to_mask() const
     {
-        // Lower 12 bits contain (from, to)
-        return m & 0xFFF;
+        return to_ | ((int)from_ << 6);
     }
 
     constexpr bool IsChecking() const
     {
-        return m & IS_CHECKING;
+        return flags_ & IS_CHECKING;
     }
 
     constexpr void AssignScore(int score)
     {
-        m = (m & 0xFFFFFFFF) | ((int64_t)score << 32);
+        score_ = score;
     }
 
     constexpr void GivesCheck()
     {
-        m |= IS_CHECKING;
+        flags_ = IS_CHECKING;
     }
 
     constexpr operator bool() const
     {
-        return m != 0;
+        return to_ != 0 || from_ != 0;
     }
 
     constexpr static Move None()
     {
-        return Move{0};
+        return Move{(Square)0, (Square)0};
     }
 
     constexpr static Move Regular(Square from, Square to)
     {
-        return Move{to | (from << 6)};
+        return Move{from, to};
     }
 
     constexpr static Move Promotion(Square from, Square to, Piece promoted)
     {
-        return Move{to | (from << 6) | (promoted << 12)};
+        return Move{from, to, (MoveType)promoted};
     }
 
     constexpr static Move Castling(Square from, Square to)
     {
-        return Move{to | (from << 6) | (CASTLING << 12)};
+        return Move{from, to, CASTLING};
     }
 
     constexpr static Move EpCapture(Square from, Square to)
     {
-        return Move{to | (from << 6) | (EP_CAPTURE << 12)};
+        return Move{from, to, EP_CAPTURE};
     }
 
     constexpr static Move DoublePush(Square from, Square to)
     {
-        return Move{to | (from << 6) | (PAWN_DOUBLE_PUSH << 12)};
+        return Move{from, to, PAWN_DOUBLE_PUSH};
     }
 
     constexpr std::size_t operator()(const Move &move) const
     {
-        return (std::size_t)move.m; // Used for hashing moves in std containers.
+        return (std::size_t) * (uint64_t *)&move;
     }
 
     constexpr const std::string ToString() const
@@ -226,16 +225,28 @@ class Move
     }
 
   private:
-    int64_t m;
+    enum MoveFlags : uint8_t
+    {
+        NO_FLAG     = 0,
+        IS_CHECKING = 1,
+    };
 
-    constexpr Move(int64_t v) : m(v)
+    Square    to_;
+    Square    from_;
+    MoveType  type_;
+    MoveFlags flags_;
+    int       score_;
+
+    constexpr Move(Square from, Square to) : to_(to), from_(from), type_(REGULAR), flags_(NO_FLAG), score_(0)
     {
     }
 
-    enum MoveFlags
+    constexpr Move(Square from, Square to, MoveType type)
+        : to_(to), from_(from), type_(type), flags_(NO_FLAG), score_(0)
     {
-        IS_CHECKING = 1 << 15,
-    };
+    }
 };
+
+static_assert(sizeof(Move) == sizeof(uint64_t));
 
 typedef StackVector<Move, MAX_MOVES_PER_POSITION> MoveList;

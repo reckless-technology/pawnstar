@@ -82,17 +82,18 @@ Move SearchRootNode(Game &game)
     AgeTranspositionTable();
     Variation principal_variation{};
     Move      best_moves[MAX_PLY]; // Best move found at each ply of search.
-    for (std::size_t i = 0; i != move_list.size(); ++i)
+    for (auto &move : move_list)
     {
+        const int move_index = &move - move_list.begin();
         bool      is_checking;
-        const int score = SearchSingleMove(game, STARTING_SEARCH_DEPTH, 0, ALPHA, BETA, move_list[i],
-                                           principal_variation, i, is_checking);
-        move_list[i].AssignScore(score);
+        const int score =
+            SearchSingleMove(game, START_DEPTH, 0, ALPHA, BETA, move, principal_variation, move_index, is_checking);
+        move.AssignScore(score);
     }
     SortMoves<true>(move_list);
-    Move best_move                    = move_list[0];
-    best_moves[STARTING_SEARCH_DEPTH] = best_move;
-    for (int depth = STARTING_SEARCH_DEPTH + 1; depth != MAX_PLY; ++depth)
+    Move best_move          = move_list[0];
+    best_moves[START_DEPTH] = best_move;
+    for (int depth = START_DEPTH + 1; depth != MAX_PLY; ++depth)
     {
         if (game.time_control_.clock_type == CHESS_CLOCK_FIXED_DEPTH && depth > game.time_control_.depth)
         {
@@ -102,12 +103,11 @@ Move SearchRootNode(Game &game)
         Variation child_pv{};
         int       alpha  = ALPHA;
         game.node_count_ = 0;
-        // int move_index   = 0;
         for (auto &move : move_list)
         {
-            int  move_index = &move - move_list.begin();
-            bool is_checking;
-            int  score = SearchSingleMove(game, depth, 0, alpha, BETA, move, child_pv, move_index, is_checking);
+            const int move_index = &move - move_list.begin();
+            bool      is_checking;
+            const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move, child_pv, move_index, is_checking);
             move.AssignScore(score);
             if (game.is_cancel_pending_)
             {
@@ -150,7 +150,7 @@ Move SearchRootNode(Game &game)
             const int elapsed_ms              = stop_ms - start_ms;
             bool      is_best_move_consistent = true;
             bool      is_score_stable         = true;
-            for (int i = STARTING_SEARCH_DEPTH; i != depth; ++i)
+            for (int i = START_DEPTH; i != depth; ++i)
             {
                 if (best_moves[i] != best_moves[depth])
                 {

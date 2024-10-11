@@ -15,6 +15,6 @@ constexpr int      MAX_PLY                     = 64;        ///< terminate the s
 constexpr int      RANK_FLIP                   = 0x38;      ///< used as an XOR mask to flip the board horizontally
 constexpr int      SEARCH_CANCELLED_SCORE      = -12345678; ///< illegal value returned when search is cancelled
 constexpr int      SCORE_INSTABILITY_THRESHOLD = 50;        ///< window of score variability
-constexpr int      STARTING_SEARCH_DEPTH       = 3;         ///< depth to do full width search for initial move ordering
+constexpr int      START_DEPTH                 = 3;         ///< depth to do full width search for initial move ordering
 constexpr int      MEGABYTE                    = 1 << 20;   ///< bytes in a megabyte
 constexpr uint64_t BLACK_MOVE_HASH             = 0xB92B78FCCF92F8CDull; ///< just a big random number
