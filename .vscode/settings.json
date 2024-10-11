@@ -74,6 +74,7 @@
         "netfwd": "cpp",
         "timer": "cpp",
         "future": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "*.inc": "cpp"
     }
 }

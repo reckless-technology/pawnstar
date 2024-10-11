@@ -10,6 +10,7 @@
 #include "move.h"
 
 /// @brief Class to represent a chess position.
+/// This is the primary class that holds the state of the board and represents the rules of chess.
 class Position
 {
   public:
@@ -171,14 +172,14 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     Bitboard king_captures = king_move_targets & enemy_pieces;
     for (Square to : king_captures)
     {
-        moves.push_back(Move::Regular(king_locn, to));
+        moves.push_back(Move::Capture(king_locn, to));
     }
     if constexpr (do_all_moves)
     {
         Bitboard king_non_captures = king_move_targets & ~occupied_squares;
         for (Square to : king_non_captures)
         {
-            moves.push_back(Move::Regular(king_locn, to));
+            moves.push_back(Move::NonCapture(king_locn, to));
         }
     }
 
@@ -212,14 +213,14 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         Bitboard       capture_targets = attacks & allowed_captures;
         for (Square to : capture_targets)
         {
-            moves.push_back(Move::Regular(from, to));
+            moves.push_back(Move::Capture(from, to));
         }
         if constexpr (do_all_moves)
         {
             Bitboard non_capture_targets = attacks & allowed_non_captures;
             for (Square to : non_capture_targets)
             {
-                moves.push_back(Move::Regular(from, to));
+                moves.push_back(Move::NonCapture(from, to));
             }
         }
     }
@@ -243,14 +244,14 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             Bitboard       capture_targets = attacks & allowed_captures;
             for (Square to : capture_targets)
             {
-                moves.push_back(Move::Regular(from, to));
+                moves.push_back(Move::Capture(from, to));
             }
             if constexpr (do_all_moves)
             {
                 Bitboard non_capture_targets = attacks & allowed_non_captures;
                 for (Square to : non_capture_targets)
                 {
-                    moves.push_back(Move::Regular(from, to));
+                    moves.push_back(Move::NonCapture(from, to));
                 }
             }
         }
@@ -394,7 +395,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             const Square from = (Square)(to - delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::Regular(from, to));
+                moves.push_back(Move::Capture(from, to));
             }
         }
     }
@@ -406,7 +407,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             const Square from = (Square)(to - push_delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::Regular(from, to));
+                moves.push_back(Move::NonCapture(from, to));
             }
         }
         b = double_pushes & allowed_non_captures;

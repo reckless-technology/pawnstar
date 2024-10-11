@@ -72,14 +72,15 @@ class alignas(8) Move
 {
   public:
     /// @brief Move types.
-    enum MoveType : uint8_t
+    enum Type : uint8_t
     {
-        REGULAR,                   ///< Regular move type including captures.
-        PAWN_DOUBLE_PUSH,          ///< Pawn double push (affects en passant).
+        NON_CAPTURE,               ///< Regular non capture move.
+        CAPTURE,                   ///< Capture move.
         PROMOTION_KNIGHT = KNIGHT, ///< Promotion to knight.
         PROMOTION_BISHOP = BISHOP, ///< Promotion to bishop.
         PROMOTION_ROOK   = ROOK,   ///< Promotion to rook.
         PROMOTION_QUEEN  = QUEEN,  ///< Promotion to queen.
+        PAWN_DOUBLE_PUSH,          ///< Pawn double push (affects en passant).
         EP_CAPTURE,                ///< En passant capture.
         CASTLING,                  ///< Castling.
     };
@@ -118,7 +119,7 @@ class alignas(8) Move
         return from_;
     }
 
-    constexpr MoveType type() const
+    constexpr Type type() const
     {
         return type_;
     }
@@ -127,10 +128,11 @@ class alignas(8) Move
     {
         switch (type_)
         {
-        case REGULAR:
+        case NON_CAPTURE:
+        case CAPTURE:
         case PAWN_DOUBLE_PUSH:
-        case CASTLING:
         case EP_CAPTURE:
+        case CASTLING:
             return NO_PIECE;
         case PROMOTION_KNIGHT:
             return KNIGHT;
@@ -180,14 +182,19 @@ class alignas(8) Move
         return Move{(Square)0, (Square)0};
     }
 
-    constexpr static Move Regular(Square from, Square to)
+    constexpr static Move NonCapture(Square from, Square to)
     {
         return Move{from, to};
     }
 
+    constexpr static Move Capture(Square from, Square to)
+    {
+        return Move{from, to, CAPTURE};
+    }
+
     constexpr static Move Promotion(Square from, Square to, Piece promoted)
     {
-        return Move{from, to, (MoveType)promoted};
+        return Move{from, to, (Type)promoted};
     }
 
     constexpr static Move Castling(Square from, Square to)
@@ -238,16 +245,15 @@ class alignas(8) Move
 
     Square    to_;
     Square    from_;
-    MoveType  type_;
+    Type      type_;
     MoveFlags flags_;
     int       score_;
 
-    constexpr Move(Square from, Square to) : to_(to), from_(from), type_(REGULAR), flags_(NO_FLAG), score_(0)
+    constexpr Move(Square from, Square to) : to_(to), from_(from), type_(NON_CAPTURE), flags_(NO_FLAG), score_(0)
     {
     }
 
-    constexpr Move(Square from, Square to, MoveType type)
-        : to_(to), from_(from), type_(type), flags_(NO_FLAG), score_(0)
+    constexpr Move(Square from, Square to, Type type) : to_(to), from_(from), type_(type), flags_(NO_FLAG), score_(0)
     {
     }
 };

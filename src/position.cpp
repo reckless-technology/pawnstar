@@ -78,80 +78,61 @@ void Position::MovePiece(Color color, Piece piece, Square from, Square to)
 /// @return new Position following the move.
 Position Position::MakeMove(const Move &move) const
 {
-    const Color  color    = ColorToMove();
-    const Square from     = move.from();
-    const Square to       = move.to();
-    const Piece  piece    = PieceAt(from);
-    const Piece  captured = move.type() == Move::EP_CAPTURE ? PAWN : PieceAt(to);
+    const Color  color = ColorToMove();
+    const Square from  = move.from();
+    const Square to    = move.to();
+    const Piece  piece = PieceAt(from);
 
     Position position{*this};
     position.flags_ &= ~IS_NULL_MOVE;
     position.flags_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
-    position.hash_ ^= CASTLING_RIGHTS_HASHES[position.flags_ & CASTLING_RIGHTS_MASK] ^
-                      CASTLING_RIGHTS_HASHES[this->flags_ & CASTLING_RIGHTS_MASK];
+    position.hash_ ^= CASTLING_RIGHTS_HASHES[CASTLING_RIGHTS_MASK & position.flags_] ^
+                      CASTLING_RIGHTS_HASHES[CASTLING_RIGHTS_MASK & this->flags_];
     position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
     position.en_passant_square_ = NO_SQUARE;
-    ++position.reversible_move_count_;
-    switch (piece)
-    {
-    case PAWN:
-        position.reversible_move_count_ = 0;
-        if (captured != NO_PIECE)
-        {
-            if (move.type() == Move::EP_CAPTURE)
-            {
-                // En passant capture: capture location is source rank, destination file.
-                const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));
-                position.RemovePiece(EnemyOf(color), PAWN, captured_pawn_locn);
-            }
-            else
-            {
-                position.RemovePiece(EnemyOf(color), captured, to);
-            }
-        }
-        if (move.promoted() != NO_PIECE)
-        {
-            // Replace the pawn with the promoted piece.
-            position.RemovePiece(color, PAWN, from);
-            position.AddPiece(color, move.promoted(), to);
-        }
-        else
-        {
-            position.MovePiece(color, PAWN, from, to);
-            if (move.type() == Move::PAWN_DOUBLE_PUSH)
-            {
-                // Pawn double push: affects en passant.
-                position.en_passant_square_ = (Square)((from + to) >> 1);
-                position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
-            }
-        }
-        break;
 
-    case KNIGHT:
-    case BISHOP:
-    case ROOK:
-    case QUEEN:
-    default:
-        if (captured)
-        {
-            position.RemovePiece(EnemyOf(color), captured, to);
-            position.reversible_move_count_ = 0;
-        }
+    switch (move.type())
+    {
+    case Move::Type::NON_CAPTURE:
+        ++position.reversible_move_count_;
         position.MovePiece(color, piece, from, to);
         break;
 
-    case KING:
-        if (!(move.type() == Move::CASTLING))
+    case Move::Type::CAPTURE:
+        position.reversible_move_count_ = 0;
+        position.RemovePiece(EnemyOf(color), PieceAt(to), to);
+        position.MovePiece(color, piece, from, to);
+        break;
+
+    case Move::Type::PROMOTION_KNIGHT:
+    case Move::Type::PROMOTION_BISHOP:
+    case Move::Type::PROMOTION_ROOK:
+    case Move::Type::PROMOTION_QUEEN:
+        position.reversible_move_count_ = 0;
+        if (PieceAt(to) != NO_PIECE)
         {
-            if (captured)
-            {
-                position.RemovePiece(EnemyOf(color), captured, to);
-                position.reversible_move_count_ = 0;
-            }
-            position.MovePiece(color, KING, from, to);
-            break;
+            position.RemovePiece(EnemyOf(color), PieceAt(to), to);
         }
-        // Castling moves.
+        position.RemovePiece(color, PAWN, from);
+        position.AddPiece(color, move.promoted(), to);
+        break;
+
+    case Move::Type::PAWN_DOUBLE_PUSH:
+        position.reversible_move_count_ = 0;
+        position.MovePiece(color, PAWN, from, to);
+        position.en_passant_square_ = (Square)((from + to) >> 1);
+        position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
+        break;
+
+    case Move::Type::EP_CAPTURE:
+        position.reversible_move_count_ = 0;
+        // En passant capture: capture location is source rank, destination file.
+        position.RemovePiece(EnemyOf(color), PAWN, (Square)((from & 0x38) | (to & 0x07)));
+        position.MovePiece(color, PAWN, from, to);
+        break;
+
+    case Move::Type::CASTLING:
+        position.reversible_move_count_ = 0;
         switch (to)
         {
         case G1:
@@ -174,12 +155,11 @@ Position Position::MakeMove(const Move &move) const
             break;
         }
         break;
-    };
+    }
     position.flags_ ^= IS_BLACK_TO_MOVE;
     position.hash_ ^= BLACK_MOVE_HASH;
-    position.full_move_count_ += color;
-    position.king_location_[WHITE] = (position.kings_ & position.white_pieces_).Lsb();
-    position.king_location_[BLACK] = (position.kings_ & position.black_pieces_).Lsb();
+    position.full_move_count_ += color; // Increments after black's move.
+    position.king_location_[color] = (position.kings_ & position.PiecesOfColor(color)).Lsb();
     position.checkers_             = position.AttacksTo(position.king_location_[EnemyOf(color)], color);
     return position;
 }
