@@ -205,11 +205,16 @@ class alignas(8) Move
         return Move{from, to, PAWN_DOUBLE_PUSH};
     }
 
+    /// @brief Used for putting moves in std library hashed containers.
+    /// @param move Move to hash.
+    /// @return Hashed value of move.
     constexpr std::size_t operator()(const Move &move) const
     {
         return (std::size_t) * (uint64_t *)&move;
     }
 
+    /// @brief Convert a move to an algebraic notation string, e.g. "e1g1", "a7a8q".
+    /// @return Move string.
     constexpr const std::string ToString() const
     {
         std::string result;

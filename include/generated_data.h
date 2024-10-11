@@ -62,14 +62,14 @@ struct PawnSets
 ///@brief An entry in the magic bitboard move generator array.
 /// Each entry contains information to generate sliding moves for either a bishop or a rook, for one square.
 /// Uses an extra indirection via indices, since indices are 1 byte each and attack sets are 8 bytes each. This saves a
-/// lot of space in the (already very large) rook magic bitboard tables, since for examaple for rooks there are 12 bits
+/// lot of space in the (already very large) rook magic bitboard tables, since for example for rooks there are 12 bits
 /// in the occupancy mask (4096 indices) but typically only around 100 actual move sets. To get the sliding piece move
 /// targets without branches or loops we use:
 ///
 /// m.attacks[m.indices[((occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]]
 ///
-/// The magic bitboard sets are generated at compile time by compiling and then running "generate_constants.cpp"
-struct MagicMoveEntry
+/// The magic bitboard sets are generated at compile time.
+struct MagicBitboard
 {
     uint64_t        magic;          ///< Magic multiplier.
     uint64_t        occupancy_mask; ///< Occupancy mask (excludes final target square).
@@ -78,11 +78,11 @@ struct MagicMoveEntry
     const uint8_t  *indices;        ///< Indices into the discrete attack vector array.
 };
 
-extern const Sets           SETS[64];                      ///< Sets for each square on the board.
-extern const PawnSets       PAWN_SETS[2][64];              ///< Sets for each square for white and black.
-extern const Bitboard       INTERVENING_SQUARES[64][64];   ///< Squares between 2 squares (if they are colinear).
-extern const uint64_t       CASTLING_RIGHTS_HASHES[16];    ///< Zobrist hashes for castling rights.
-extern const uint64_t       EN_PASSANT_HASHES[64];         ///< Zobrist hashes for en passant capture avilability.
-extern const uint64_t       PIECE_SQUARE_HASHES[2][6][64]; ///< Zobrist hashes for pieces on the board.
-extern const MagicMoveEntry ROOK_MAGICS[64];               ///< Magic move entries for rook moves.
-extern const MagicMoveEntry BISHOP_MAGICS[64];             ///< Magic move entries for bishop moves.
+extern const Sets          SETS[64];                      ///< Sets for each square on the board.
+extern const PawnSets      PAWN_SETS[2][64];              ///< Sets for each square for white and black.
+extern const Bitboard      INTERVENING_SQUARES[64][64];   ///< Squares between 2 squares (if they are colinear).
+extern const uint64_t      CASTLING_RIGHTS_HASHES[16];    ///< Zobrist hashes for castling rights.
+extern const uint64_t      EN_PASSANT_HASHES[64];         ///< Zobrist hashes for en passant capture avilability.
+extern const uint64_t      PIECE_SQUARE_HASHES[2][6][64]; ///< Zobrist hashes for pieces on the board.
+extern const MagicBitboard ROOK_MAGICS[64];               ///< Magic move entries for rook moves.
+extern const MagicBitboard BISHOP_MAGICS[64];             ///< Magic move entries for bishop moves.

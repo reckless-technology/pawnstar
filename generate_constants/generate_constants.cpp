@@ -745,7 +745,7 @@ static void GenerateMagics(void)
             std::cout << std::format("\n}};\n");
         }
         // Next print the MagicMoveEntry for this piece / square combination.
-        std::cout << std::format("extern constexpr MagicMoveEntry {}_MAGICS[64] = \n{{\n", pm.name);
+        std::cout << std::format("extern constexpr MagicBitboard {}_MAGICS[64] = \n{{\n", pm.name);
         for (int i = 0; i != 64; ++i)
         {
             std::cout << std::format("    {{\n");

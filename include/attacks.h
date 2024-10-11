@@ -16,7 +16,7 @@
 /// @return Set of squares attacked by a bishop on location.
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 {
-    const MagicMoveEntry &m = BISHOP_MAGICS[location];
+    const MagicBitboard &m = BISHOP_MAGICS[location];
     return m.attacks[m.indices[(((uint64_t)occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
 }
 
@@ -26,7 +26,7 @@ constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 /// @return Set of squares attacked by a rook on location.
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 {
-    const MagicMoveEntry &m = ROOK_MAGICS[location];
+    const MagicBitboard &m = ROOK_MAGICS[location];
     return m.attacks[m.indices[(((uint64_t)occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
 }
 
@@ -37,7 +37,7 @@ constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 
 constexpr Square LsbX(Bitboard b)
 {
-    return (b | 0x8000000000000000ull).Lsb();
+    return (b | 0x8000000000000000).Lsb();
 }
 
 constexpr Square MsbX(Bitboard b)
