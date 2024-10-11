@@ -7,54 +7,54 @@
 template <typename T, int N> class StackVector
 {
   public:
-    StackVector()
+    constexpr StackVector()
     {
         end_ = data_;
     }
-    StackVector(const StackVector &that)
+    constexpr StackVector(const StackVector &that)
     {
         std::copy(that.begin(), that.end(), this->begin());
         end_ = data_ + that.size();
     }
-    StackVector &operator=(const StackVector &that)
+    constexpr StackVector &operator=(const StackVector &that)
     {
         std::copy(that.begin(), that.end(), this->begin());
         end_ = data_ + that.size();
         return *this;
     }
-    void push_back(const T &m)
+    constexpr void push_back(const T &m)
     {
         *end_++ = m;
     }
-    void clear()
+    constexpr void clear()
     {
         end_ = data_;
     }
-    T &operator[](std::size_t i)
+    constexpr T &operator[](std::size_t i)
     {
         return data_[i];
     }
-    const T &operator[](std::size_t i) const
+    constexpr const T &operator[](std::size_t i) const
     {
         return data_[i];
     }
-    std::size_t size() const
+    constexpr std::size_t size() const
     {
         return end_ - data_;
     }
-    T *begin()
+    constexpr T *begin()
     {
         return data_;
     }
-    T *end()
+    constexpr T *end()
     {
         return end_;
     }
-    const T *begin() const
+    constexpr const T *begin() const
     {
         return data_;
     }
-    const T *end() const
+    constexpr const T *end() const
     {
         return end_;
     }

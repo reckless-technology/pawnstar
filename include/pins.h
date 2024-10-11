@@ -4,13 +4,15 @@
 #include "generated_data.h"
 #include "position.h"
 
+#include <array>
+
 /// @brief Class for representing pinned pieces on the board and the squares to which they are allowed to move.
 class Pins
 {
   public:
     /// @brief Constructor.
     /// @param position Position to analyze.
-    Pins(const Position &position)
+    constexpr Pins(const Position &position)
     {
         pinned_pieces                          = NO_SQUARES;
         const Color           color            = position.ColorToMove();
@@ -40,12 +42,12 @@ class Pins
     /// @brief Return the allowable squares which a piece may move to considering pins.
     /// @param locn Square index
     /// @return Set of allowed destination squares.
-    Bitboard AllowedSquares(Square locn) const
+    constexpr Bitboard AllowedSquares(Square locn) const
     {
         return (Bitboard{locn} & pinned_pieces).IsNotEmpty() ? allowed_squares[locn] : ALL_SQUARES;
     }
 
   private:
-    Bitboard pinned_pieces;       ///< Set of squares which are pinned.
-    Bitboard allowed_squares[64]; ///< Contains the set of allowed squares a pinned piece may safely move to.
+    Bitboard                 pinned_pieces;   ///< Set of squares which are pinned.
+    std::array<Bitboard, 64> allowed_squares; ///< Allowed squares per source.
 };

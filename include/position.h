@@ -66,7 +66,7 @@ class Position
     void     RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board
     void     MovePiece(Color color, Piece piece, Square from, Square to); ///< Move a piece on the board
     uint64_t ComputeHash() const;                                         ///< Compute the Zobrist hash from scratch
-    template <Color, bool> MoveList GenMoves() const;                     ///< Generate legal moves
+    template <Color, bool> constexpr MoveList GenMoves() const;           ///< Generate legal moves
 
     Bitboard              pawns_;                 ///< squares with a pawn on them
     Bitboard              knights_;               ///< squares with a knight on them
@@ -125,7 +125,7 @@ static_assert(sizeof(Position) == 152);
 /// @tparam color color to generate moves for
 /// @tparam do_all_moves if true generate all moves, otherwise captures and promotions only
 /// @return list of moves generated
-template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
+template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves() const
 {
     constexpr Color enemy_color      = EnemyOf(color);
     const Bitboard  occupied_squares = white_pieces_ | black_pieces_;

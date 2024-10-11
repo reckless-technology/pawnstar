@@ -23,7 +23,7 @@ void DebugXClear()
 /// @brief Print the debug dictionary in alphabetic order.
 void DebugXWrite()
 {
-    std::map<std::string_view, uint32_t> sorted_entries(debug_dictionary.begin(), debug_dictionary.end());
+    std::map<std::string_view, int64_t> sorted_entries(debug_dictionary.begin(), debug_dictionary.end());
     std::cout << "********************* DEBUGX *********************" << std::endl;
     for (const auto &[title, count] : sorted_entries)
     {
