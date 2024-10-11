@@ -6,7 +6,9 @@
 #include <cctype>
 #include <cinttypes>
 #include <cstdio>
+#include <format>
 #include <functional>
+#include <iostream>
 #include <set>
 #include <string_view>
 #include <vector>
@@ -178,7 +180,7 @@ constexpr uint64_t KingAttacks(uint8_t locn)
 
 /// @brief King attacks 2.
 /// @param locn Square index.
-/// @return Squares reachable by a King in 2 moves.
+/// @return Squares reachable by a king in 2 moves.
 constexpr uint64_t KingAttacks2(uint8_t locn)
 {
     return KingFill(KingFill(Bitboard(locn))) & ~Bitboard(locn);
@@ -596,107 +598,108 @@ constexpr std::array<Generator, 4> pawn_generators_black = {{
 /// @brief Generate the generic sets for each square.
 static void GenerateSets()
 {
-    printf("extern const Sets SETS[64] = \n{");
+    std::cout << std::format("extern constexpr Sets SETS[64] = \n{{");
     for (uint8_t locn = 0; locn != 64; ++locn)
     {
-        printf("\n    { // square %c%c", FileChar(locn), RankChar(locn));
+        std::cout << std::format("\n    {{ // square {}{}", FileChar(locn), RankChar(locn));
         for (const auto &generator : bitboard_generators)
         {
             const uint64_t b = generator.function(locn);
-            printf("\n        .%-25s = 0x%016" PRIX64 "ull, // popcnt %2d", generator.name, b, PopCount(b));
+            std::cout << std::format("\n        .{:<25} = 0x{:016X}, // popcnt {:2}", generator.name, b, PopCount(b));
         }
-        printf("\n    },");
+        std::cout << std::format("\n    }},");
     }
-    printf("\n};\n");
+    std::cout << std::format("\n}};\n");
 }
 
 /// @brief Generate pawn structure sets for each color for each square.
 static void GeneratePawnSets()
 {
-    printf("extern const PawnSets PAWN_SETS[2][64] = \n{");
+    std::cout << std::format("extern constexpr PawnSets PAWN_SETS[2][64] = \n{{");
     for (int color = 0; color != 2; ++color)
     {
-        printf("\n    {");
+        std::cout << std::format("\n    {{");
         for (uint8_t locn = 0; locn != 64; ++locn)
         {
-            printf("\n        { // %s square %c%c", color_names[color], FileChar(locn), RankChar(locn));
+            std::cout << std::format("\n        {{ // {} {}{}", color_names[color], FileChar(locn), RankChar(locn));
             auto &generators{color == 0 ? pawn_generators_white : pawn_generators_black};
             for (const auto &generator : generators)
             {
                 const uint64_t b = generator.function(locn);
-                printf("\n            .%-28s = 0x%016" PRIX64 "ull, // popcnt %2d", generator.name, b, PopCount(b));
+                std::cout << std::format("\n            .{:<20} = 0x{:016X}, // popcnt {:2}", generator.name, b,
+                                         PopCount(b));
             }
-            printf("\n        },");
+            std::cout << std::format("\n        }},");
         }
-        printf("\n    },");
+        std::cout << std::format("\n    }},");
     }
-    printf("\n};\n");
+    std::cout << std::format("\n}};\n");
 }
 
 /// @brief Generate the intervening squares array.
 static void GenerateInterveningSquares()
 {
-    printf("extern const Bitboard INTERVENING_SQUARES[64][64] = \n{");
+    std::cout << std::format("extern constexpr Bitboard INTERVENING_SQUARES[64][64] = \n{{");
     for (int i = 0; i != 64; ++i)
     {
-        printf("\n    { // square %c%c", FileChar(i), RankChar(i));
+        std::cout << std::format("\n    {{ // square {}{}", FileChar(i), RankChar(i));
         for (int j = 0; j != 64; ++j)
         {
             if ((j & 7) == 0)
             {
-                printf("\n        ");
+                std::cout << std::format("\n        ");
             }
-            printf("0x%016" PRIX64 "ull,", InterveningSquares(i, j));
+            std::cout << std::format("0x{:016X},", InterveningSquares(i, j));
         }
-        printf("\n    },");
+        std::cout << std::format("\n    }},");
     }
-    printf("\n};\n");
+    std::cout << std::format("\n}};\n");
 }
 
 /// @brief Generate Zobrist hash keys for pieces, castling rights and en passant capture.
 static void GenerateHashes()
 {
-    printf("extern const uint64_t PIECE_SQUARE_HASHES[2][6][64] = \n{");
+    std::cout << std::format("extern constexpr uint64_t PIECE_SQUARE_HASHES[2][6][64] = \n{{");
     for (int color = 0; color != 2; ++color)
     {
-        printf("\n    {");
+        std::cout << std::format("\n    {{");
         for (int piece = PAWN; piece <= KING; ++piece)
         {
-            printf("\n        {   // %s %s", color_names[color], piece_names[piece]);
+            std::cout << std::format("\n        {{   // {} {}", color_names[color], piece_names[piece]);
             for (int i = 0; i != 64; ++i)
             {
                 if ((i & 7) == 0)
                 {
-                    printf("\n            ");
+                    std::cout << std::format("\n            ");
                 }
-                printf("0x%016" PRIX64 "ull,", NextRandomKey());
+                std::cout << std::format("0x{:016X},", NextRandomKey());
             }
-            printf("\n        },");
+            std::cout << std::format("\n        }},");
         }
-        printf("\n    },");
+        std::cout << std::format("\n    }},");
     }
-    printf("\n};\n");
-    printf("extern const uint64_t CASTLING_RIGHTS_HASHES[16] = \n{");
+    std::cout << std::format("\n}};\n");
+    std::cout << std::format("extern constexpr uint64_t CASTLING_RIGHTS_HASHES[16] = \n{{");
     for (int i = 0; i != 16; ++i)
     {
         if ((i & 7) == 0)
         {
-            printf("\n    ");
+            std::cout << std::format("\n    ");
         }
-        printf("0x%016" PRIX64 "ull,", NextRandomKey());
+        std::cout << std::format("0x{:016X},", NextRandomKey());
     }
-    printf("\n};\n");
-    printf("extern const uint64_t EN_PASSANT_HASHES[64] = \n{");
+    std::cout << std::format("\n}};\n");
+    std::cout << std::format("extern constexpr uint64_t EN_PASSANT_HASHES[64] = \n{{");
     for (int i = 0; i != 64; ++i)
     {
         if ((i & 7) == 0)
         {
-            printf("\n    ");
+            std::cout << std::format("\n    ");
         }
         const int rank = RankOf(i);
-        printf("0x%016" PRIX64 "ull,", rank == 2 || rank == 5 ? NextRandomKey() : 0);
+        std::cout << std::format("0x{:016X},", rank == 2 || rank == 5 ? NextRandomKey() : 0);
     }
-    printf("\n};\n");
+    std::cout << std::format("\n}};\n");
 }
 
 /// @brief Generate magic bitboards for bishop and rook sliding attacks.
@@ -718,41 +721,42 @@ static void GenerateMagics(void)
             square_names[locn][1] = RankChar(locn);
             square_names[locn][2] = 0;
             const int num_attacks = 1 << (64 - magics[locn].shift);
-            printf("static const uint8_t %s_MAGIC_INDICES_%s[%d] = \n{", pm.name, square_names[locn], num_attacks);
+            std::cout << std::format("static constexpr uint8_t {}_MAGIC_INDICES_{}[{}] = \n{{", pm.name,
+                                     square_names[locn], num_attacks);
             for (int j = 0; j != num_attacks; ++j)
             {
                 if (j % 16 == 0)
                 {
-                    printf("\n    ");
+                    std::cout << std::format("\n    ");
                 }
-                printf("0x%02X, ", magics[locn].indices[j]);
+                std::cout << std::format("0x{:02X}, ", magics[locn].indices[j]);
             }
-            printf("\n};\n");
-            printf("static const uint64_t %s_MAGIC_ATTACKS_%s[%zu] = \n{", pm.name, square_names[locn],
-                   magics[locn].attacks.size());
+            std::cout << std::format("\n}};\n");
+            std::cout << std::format("static constexpr uint64_t {}_MAGIC_ATTACKS_{}[{}] = \n{{", pm.name,
+                                     square_names[locn], magics[locn].attacks.size());
             for (std::size_t j = 0; j != magics[locn].attacks.size(); ++j)
             {
                 if (j % 4 == 0)
                 {
-                    printf("\n    ");
+                    std::cout << std::format("\n    ");
                 }
-                printf("0x%016" PRIX64 "ull, ", magics[locn].attacks[j]);
+                std::cout << std::format("0x{:016X},", magics[locn].attacks[j]);
             }
-            printf("\n};\n");
+            std::cout << std::format("\n}};\n");
         }
         // Next print the MagicMoveEntry for this piece / square combination.
-        printf("extern const MagicMoveEntry %s_MAGICS[64] = \n{\n", pm.name);
+        std::cout << std::format("extern constexpr MagicMoveEntry {}_MAGICS[64] = \n{{\n", pm.name);
         for (int i = 0; i != 64; ++i)
         {
-            printf("    {\n");
-            printf("        .magic          = 0x%016" PRIX64 "ull,\n", magics[i].magic);
-            printf("        .occupancy_mask = 0x%016" PRIX64 "ull,\n", magics[i].mask);
-            printf("        .shift          = %d,\n", magics[i].shift);
-            printf("        .attacks        = %s_MAGIC_ATTACKS_%s,\n", pm.name, square_names[i]);
-            printf("        .indices        = %s_MAGIC_INDICES_%s,\n", pm.name, square_names[i]);
-            printf("    },\n");
+            std::cout << std::format("    {{\n");
+            std::cout << std::format("        .magic          = 0x{:016X},\n", magics[i].magic);
+            std::cout << std::format("        .occupancy_mask = 0x{:016X},\n", magics[i].mask);
+            std::cout << std::format("        .shift          = {},\n", magics[i].shift);
+            std::cout << std::format("        .attacks        = {}_MAGIC_ATTACKS_{},\n", pm.name, square_names[i]);
+            std::cout << std::format("        .indices        = {}_MAGIC_INDICES_{},\n", pm.name, square_names[i]);
+            std::cout << std::format("    }},\n");
         }
-        printf("};\n");
+        std::cout << std::format("}};\n");
     }
 }
 
@@ -760,8 +764,8 @@ static void GenerateMagics(void)
 /// file which is then used by the main program.
 int main()
 {
-    printf("// This file was generated on " __DATE__ " at " __TIME__ "\n");
-    printf("#include \"generated_data.h\"\n");
+    std::cout << "// This file was generated on " __DATE__ " at " __TIME__ "\n";
+    std::cout << "#include \"generated_data.h\"\n";
     GenerateSets();
     GeneratePawnSets();
     GenerateInterveningSquares();
