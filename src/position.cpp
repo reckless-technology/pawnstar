@@ -14,29 +14,6 @@ using std::vector;
 #include "position.h"
 #include "transposition_table.h"
 
-#define A1M (uint8_t)(~Position::MAY_WHITE_CASTLE_QUEENSIDE)
-#define E1M (uint8_t)(~(Position::MAY_WHITE_CASTLE_QUEENSIDE | Position::MAY_WHITE_CASTLE_KINGSIDE))
-#define H1M (uint8_t)(~Position::MAY_WHITE_CASTLE_KINGSIDE)
-#define A8M (uint8_t)(~Position::MAY_BLACK_CASTLE_QUEENSIDE)
-#define E8M (uint8_t)(~(Position::MAY_BLACK_CASTLE_QUEENSIDE | Position::MAY_BLACK_CASTLE_KINGSIDE))
-#define H8M (uint8_t)(~Position::MAY_BLACK_CASTLE_KINGSIDE)
-#define OK  0xFF
-
-/// @brief Castling rights flags which are ANDED with a move source and destination square to form new castling rights
-/// after a move. Only moves affecting a1, e1, h1, a8, e8, h8 will have any effect.
-constexpr uint8_t Position::CASTLING_RIGHTS_MASKS[64] = {
-    /* clang-format off */
-    A1M, OK, OK, OK,E1M, OK, OK,H1M, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-    A8M, OK, OK, OK,E8M, OK, OK,H8M,
-    /* clang-format on */
-};
-
 /// @brief Make a null move: don't actually move any pieces on the board.
 /// # Flip side to move
 /// # Clear en passant capture availablity

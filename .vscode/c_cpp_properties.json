@@ -8,7 +8,8 @@
             "cppStandard": "c++20",
             "defines": [
                 "DEBUGX=1"
-            ]
+            ],
+            "configurationProvider": "ms-vscode.makefile-tools"
         }
     ],
     "version": 4

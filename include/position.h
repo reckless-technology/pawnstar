@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -25,8 +26,11 @@ class Position
     bool            IsStalemate() const;                            ///< Is this position stalemate.
     bool            IsDrawByMaterial() const; ///< Is this position a draw by insufficient material.
     std::string     ToString() const;         ///< Return the FEN string for this position.
+
     // clang-format off
     // Const accessors.
+    MoveList            GenerateLegalMoves() const          {return ColorToMove() == WHITE ? GenMoves<WHITE, true>() : GenMoves<BLACK, true>();}
+    MoveList            GenerateLegalCaptures() const       {return ColorToMove() == WHITE ? GenMoves<WHITE, false>() : GenMoves<BLACK, false>();}
     constexpr bool      MayWhiteCastleKingside() const      {return !!(flags_ & MAY_WHITE_CASTLE_KINGSIDE);}
     constexpr bool      MayWhiteCastleQueenside() const     {return !!(flags_ & MAY_WHITE_CASTLE_QUEENSIDE);}
     constexpr bool      MayBlackCastleKingside() const      {return !!(flags_ & MAY_BLACK_CASTLE_KINGSIDE);}
@@ -57,16 +61,6 @@ class Position
     constexpr Bitboard& PiecesOfType(Piece piece)           {return (&pawns_)[piece - PAWN];}
     // clang-format on
 
-    MoveList GenerateLegalMoves() const
-    {
-        return ColorToMove() == WHITE ? GenMoves<WHITE, true>() : GenMoves<BLACK, true>();
-    }
-
-    MoveList GenerateLegalCaptures() const
-    {
-        return ColorToMove() == WHITE ? GenMoves<WHITE, false>() : GenMoves<BLACK, false>();
-    }
-
   private:
     void     AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
     void     RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board
@@ -74,36 +68,53 @@ class Position
     uint64_t ComputeHash() const;                                         ///< Compute the Zobrist hash from scratch
     template <Color, bool> MoveList GenMoves() const;                     ///< Generate legal moves
 
-    Bitboard             pawns_;                    ///< squares with a pawn on them
-    Bitboard             knights_;                  ///< squares with a knight on them
-    Bitboard             bishops_;                  ///< squares with a bishop on them
-    Bitboard             rooks_;                    ///< squares with a rook on them
-    Bitboard             queens_;                   ///< squares with a queen on them
-    Bitboard             kings_;                    ///< squares with a king on them
-    Bitboard             white_pieces_;             ///< squares with a white piece on them
-    Bitboard             black_pieces_;             ///< squares with a black piece on them
-    Piece                squares_[64];              ///< Squares array for fast piece lookup
-    Bitboard             checkers_;                 ///< Set of squares which attack the king
-    uint64_t             hash_;                     ///< Zobrist hash of this position, maintained incrementally
-    uint8_t              flags_;                    ///< game state-machine flags
-    Square               king_location_[2];         ///< square index of white and black kings
-    Square               en_passant_square_;        ///< en passant capture availability square
-    uint8_t              reversible_move_count_;    ///< number of consecutive reversible half-moves (plies)
-    uint8_t              full_move_count_;          ///< number of full moves (zero indexed)
-    static const uint8_t CASTLING_RIGHTS_MASKS[64]; ///< ANDed with move source and dest to compute new rights
+    Bitboard              pawns_;                 ///< squares with a pawn on them
+    Bitboard              knights_;               ///< squares with a knight on them
+    Bitboard              bishops_;               ///< squares with a bishop on them
+    Bitboard              rooks_;                 ///< squares with a rook on them
+    Bitboard              queens_;                ///< squares with a queen on them
+    Bitboard              kings_;                 ///< squares with a king on them
+    Bitboard              white_pieces_;          ///< squares with a white piece on them
+    Bitboard              black_pieces_;          ///< squares with a black piece on them
+    std::array<Piece, 64> squares_;               ///< Squares array for fast piece lookup
+    Bitboard              checkers_;              ///< Set of squares which attack the king
+    uint64_t              hash_;                  ///< Zobrist hash of this position, maintained incrementally
+    std::array<Square, 2> king_location_;         ///< square index of white and black kings
+    Square                en_passant_square_;     ///< en passant capture availability square
+    uint8_t               reversible_move_count_; ///< number of consecutive reversible half-moves (plies)
+    uint8_t               full_move_count_;       ///< number of full moves (zero indexed)
+    uint8_t               flags_;                 ///< game state-machine flags
 
-    /// @brief Position state flags bit set.
-    enum StateFlags : uint8_t
+    // Bit values for flags_
+    static constexpr uint8_t MAY_WHITE_CASTLE_KINGSIDE  = 0x01; ///< White has the right to castle king side.
+    static constexpr uint8_t MAY_WHITE_CASTLE_QUEENSIDE = 0x02; ///< White has the right to castle queen side.
+    static constexpr uint8_t MAY_BLACK_CASTLE_KINGSIDE  = 0x04; ///< Black has the right to castle king side.
+    static constexpr uint8_t MAY_BLACK_CASTLE_QUEENSIDE = 0x08; ///< Black has the right to castle queen side.
+    static constexpr uint8_t CASTLING_RIGHTS_MASK       = 0x0F; ///< Mask off castling rights bits only.
+    static constexpr uint8_t IS_BLACK_TO_MOVE           = 0x10; ///< It is black's turn to move.
+    static constexpr uint8_t IS_NULL_MOVE               = 0x20; ///< Position was the result of a null move.
+    static constexpr uint8_t A1M                        = ~MAY_WHITE_CASTLE_QUEENSIDE;
+    static constexpr uint8_t E1M                        = ~(MAY_WHITE_CASTLE_QUEENSIDE | MAY_WHITE_CASTLE_KINGSIDE);
+    static constexpr uint8_t H1M                        = ~MAY_WHITE_CASTLE_KINGSIDE;
+    static constexpr uint8_t A8M                        = ~MAY_BLACK_CASTLE_QUEENSIDE;
+    static constexpr uint8_t E8M                        = ~(MAY_BLACK_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE);
+    static constexpr uint8_t H8M                        = ~MAY_BLACK_CASTLE_KINGSIDE;
+    static constexpr uint8_t OK                         = 0xFF;
+
+    // clang-format off
+    /// Masks applied to move from and to to determine new castling rights.
+    constexpr static std::array<uint8_t, 64> CASTLING_RIGHTS_MASKS
     {
-        MAY_WHITE_CASTLE_KINGSIDE  = 1 << 0, ///< White has the right to castle king side.
-        MAY_WHITE_CASTLE_QUEENSIDE = 1 << 1, ///< White has the right to castle queen side.
-        MAY_BLACK_CASTLE_KINGSIDE  = 1 << 2, ///< Black has the right to castle king side.
-        MAY_BLACK_CASTLE_QUEENSIDE = 1 << 3, ///< Black has the right to castle queen side.
-        IS_BLACK_TO_MOVE           = 1 << 4, ///< It is black's turn to move.
-        IS_NULL_MOVE               = 1 << 5, ///< Position was the result of a null move.
-        CASTLING_RIGHTS_MASK = (MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE |
-                                MAY_BLACK_CASTLE_QUEENSIDE),
+    A1M, OK, OK, OK,E1M, OK, OK,H1M, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+     OK, OK, OK, OK, OK, OK, OK, OK, 
+    A8M, OK, OK, OK,E8M, OK, OK,H8M,
     };
+    // clang-format on
 };
 
 static_assert(sizeof(Position) == 152);
@@ -335,11 +346,11 @@ template <Color color, bool do_all_moves> MoveList Position::GenMoves() const
     single_pushes ^= promotions;
 
     // clang-format off
-    const std::pair<Bitboard, int8_t> capture_promotions[] = 
-    {
+    const std::array<std::pair<Bitboard, int8_t>, 2> capture_promotions 
+    {{
         {promotions_west, west_delta},
         {promotions_east, east_delta}
-    };
+    }};
     // clang-format on
     for (auto &[bb, delta] : capture_promotions)
     {

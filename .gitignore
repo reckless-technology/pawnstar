@@ -30,5 +30,6 @@ bin/
 x64/
 build/
 src/generated_data.cpp
+include/generated_data.inc
 generate_constants/gen_constants*
 doc/html/

@@ -78,11 +78,6 @@ struct MagicBitboard
     const uint8_t  *indices;        ///< Indices into the discrete attack vector array.
 };
 
-extern const Sets          SETS[64];                      ///< Sets for each square on the board.
-extern const PawnSets      PAWN_SETS[2][64];              ///< Sets for each square for white and black.
-extern const Bitboard      INTERVENING_SQUARES[64][64];   ///< Squares between 2 squares (if they are colinear).
-extern const uint64_t      CASTLING_RIGHTS_HASHES[16];    ///< Zobrist hashes for castling rights.
-extern const uint64_t      EN_PASSANT_HASHES[64];         ///< Zobrist hashes for en passant capture avilability.
-extern const uint64_t      PIECE_SQUARE_HASHES[2][6][64]; ///< Zobrist hashes for pieces on the board.
-extern const MagicBitboard ROOK_MAGICS[64];               ///< Magic move entries for rook moves.
-extern const MagicBitboard BISHOP_MAGICS[64];             ///< Magic move entries for bishop moves.
+// This file is generated at compile time.
+// The Makefile compiles and then executes "generate_constants" to create it.
+#include "generated_data.inc"
