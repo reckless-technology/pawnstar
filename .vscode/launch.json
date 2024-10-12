@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "miDebuggerPath": "/usr/bin/gdb",
             "request": "launch",
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}/debug",
             "program": "${workspaceFolder}/debug/pawnstar",
             "setupCommands": [
@@ -17,7 +17,7 @@
                 },
                 {
                     "description": "Set hex output",
-                    "text": "set output-radix 10",
+                    "text": "set output-radix 16",
                     "ignoreFailures": false
                 }
             ]
@@ -27,7 +27,7 @@
             "type": "cppdbg",
             "miDebuggerPath": "/usr/bin/gdb",
             "request": "launch",
-            "stopAtEntry": true,
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}/release",
             "program": "${workspaceFolder}/release/pawnstar",
             "setupCommands": [
@@ -38,7 +38,7 @@
                 },
                 {
                     "description": "Set hex output",
-                    "text": "set output-radix 10",
+                    "text": "set output-radix 16",
                     "ignoreFailures": false
                 }
             ]

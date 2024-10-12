@@ -422,44 +422,37 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             }
         }
     }
-    // Generate en passant captures. En passant captures are legal if:
-    //  a) The en passant square (push target) is in the non capture mask, OR
-    //  b) The captured pawn location (capture target) is in the capture mask
-    // We also have to test for the special case of "discovered" horizontal check when removing both pawns from the
-    // king's rank, if the king is on the same rank as the capturing and captured pawns.
+    // Generate en passant captures. En passant captures are only legal if the captured pawn location (capture target)
+    // is in the capture mask. We also have to test for the special case of discovered horizontal check when removing
+    // both pawns from the king's rank, if the king is on the same rank as the capturing and captured pawns, and there
+    // is also an enemy rook or queen on the same rank.
     b = en_passant_sources;
     for (Square from : b)
     {
         const Square to                 = en_passant_square_;
         const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));
-        if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
+        if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty() &&
+            (allowed_captures & Bitboard(captured_pawn_locn)).IsNotEmpty())
         {
-            if ((allowed_captures & Bitboard(captured_pawn_locn)).IsNotEmpty())
+            // Test for the weird check that occurs when there is an enemy rook or queen on the same rank as our king
+            // which is only discovered after removing both pawns from the rank during an en passant capture.
+            if (RankOf(king_locn) == RankOf(from))
             {
-                // Test for the "weird" check that occurs when there is an enemy rook or queen on the same rank as our
-                // king which is only discovered after removing both pawns from the rank during an en passant capture.
-                bool is_discovered_check = false;
-                if (RankOf(king_locn) == RankOf(from)) // Only applies when our king is on the ep capturing pawn's rank.
+                // Remove the capturing and ep captured pawns from the occupied squares set and test for horizontal ray
+                // attacks.
+                const Bitboard pseudo_occupied_squares =
+                    occupied_squares ^ Bitboard(captured_pawn_locn) ^ Bitboard(from);
+                const Bitboard horizontal_attacks =
+                    RookAttacks(pseudo_occupied_squares, king_locn) & (SETS[king_locn].west | SETS[king_locn].east);
+                if ((horizontal_attacks & enemy_pieces & (rooks_ | queens_)).IsEmpty())
                 {
-                    // Remove the capturing and ep captured pawns from the occupied squares set and test for horizontal
-                    // ray attacks.
-                    const Bitboard pseudo_occupied_squares =
-                        occupied_squares ^ Bitboard(captured_pawn_locn) ^ Bitboard(from);
-                    Bitboard bb = (rooks_ | queens_) & enemy_pieces & (SETS[king_locn].west | SETS[king_locn].east);
-                    for (Square s : bb)
-                    {
-                        if ((INTERVENING_SQUARES[king_locn][s] & pseudo_occupied_squares).IsEmpty())
-                        {
-                            // We can't make this move as it would lead to a discovered check.
-                            is_discovered_check = true;
-                            break;
-                        }
-                    }
-                }
-                if (!is_discovered_check)
-                {
+                    // We can make this move since it's not a discovered check.
                     moves.push_back(Move::EpCapture(from, to));
                 }
+            }
+            else
+            {
+                moves.push_back(Move::EpCapture(from, to));
             }
         }
     }

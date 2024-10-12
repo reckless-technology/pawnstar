@@ -36,7 +36,7 @@ OBJECTS             = $(SOURCES:.cpp=.o)
 
 DEBUG_EXE           = $(DEBUG_DIR)/$(PROGRAM)
 DEBUG_OBJECTS       = $(addprefix $(DEBUG_DIR)/,$(OBJECTS))
-DEBUG_FLAGS         = -g -Og -D DEBUG -fsanitize=undefined -fsanitize=address
+DEBUG_FLAGS         = -g -O0 -D DEBUG -fsanitize=undefined -fsanitize=address
 
 RELEASE_EXE         = $(RELEASE_DIR)/$(PROGRAM)
 RELEASE_OBJECTS     = $(addprefix $(RELEASE_DIR)/, $(OBJECTS))
