@@ -129,7 +129,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             // We don't know the exact score of the best move from this position, but we do know it is at most
             // transposition.score
             INCREMENT("table hit all node");
-            if (transposition.score <= alpha)
+            if (transposition.score < alpha)
             {
                 INCREMENT("table hit all node cutoffs");
                 return transposition.score;

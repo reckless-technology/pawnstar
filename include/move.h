@@ -67,6 +67,11 @@ constexpr char RankChar(Square locn)
     return '1' + RankOf(locn);
 }
 
+constexpr std::string SquareName(Square locn)
+{
+    return {FileChar(locn), RankChar(locn)};
+}
+
 /// @brief Class for representing a chess move.
 class alignas(8) Move
 {

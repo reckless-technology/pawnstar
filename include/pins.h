@@ -18,15 +18,15 @@ class Pins
         const Color           color            = position.ColorToMove();
         const Bitboard        occupied_squares = position.OccupiedSquares();
         const Bitboard        friendly_pieces  = position.PiecesOfColor(color);
-        const uint8_t         king_location    = position.KingLocation(color);
+        const Square          king_location    = position.KingLocation(color);
         const Bitboard *const intervening      = &INTERVENING_SQUARES[king_location][0];
         Bitboard              enemy_sliding_pieces =
             ((SETS[king_location].bishop_attacks & (position.Bishops() | position.Queens())) |
              (SETS[king_location].rook_attacks & (position.Rooks() | position.Queens()))) &
             ~friendly_pieces;
-        for (Square slider_location : enemy_sliding_pieces)
+        for (Square s : enemy_sliding_pieces)
         {
-            const Bitboard intervening_squares        = intervening[slider_location];
+            const Bitboard intervening_squares        = intervening[s];
             const Bitboard intervening_pieces         = intervening_squares & occupied_squares;
             const Bitboard intervening_friendly_piece = intervening_pieces & friendly_pieces;
             if (intervening_friendly_piece.IsNotEmpty() && intervening_pieces.PopCount() == 1)
@@ -34,17 +34,17 @@ class Pins
                 // There is only a single piece between the sliding enemy attacker and the king so this piece is pinned
                 // along the attack ray. The pinned piece is also allowed to capture the pinning piece.
                 pinned_pieces |= intervening_friendly_piece;
-                allowed_squares[intervening_friendly_piece.Lsb()] = intervening_squares | Bitboard{slider_location};
+                allowed_squares[intervening_friendly_piece.Lsb()] = intervening_squares | Bitboard{s};
             }
         }
     }
 
     /// @brief Return the allowable squares which a piece may move to considering pins.
-    /// @param locn Square index
+    /// @param s Square index
     /// @return Set of allowed destination squares.
-    constexpr Bitboard AllowedSquares(Square locn) const
+    constexpr Bitboard AllowedSquares(Square s) const
     {
-        return (Bitboard{locn} & pinned_pieces).IsNotEmpty() ? allowed_squares[locn] : ALL_SQUARES;
+        return (Bitboard{s} & pinned_pieces).IsNotEmpty() ? allowed_squares[s] : ALL_SQUARES;
     }
 
   private:

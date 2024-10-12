@@ -1,6 +1,8 @@
 #pragma once
 
 #include <array>
+#include <format>
+#include <iostream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -228,14 +230,14 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // Generate bishop, rook and queen moves.
     typedef Bitboard (*AttackFn)(Bitboard occupied_squares, Square locn);
     // clang-format off
-    constexpr std::pair<Piece, AttackFn> SLIDING_ATTACKERS[3] = 
-    {
+    constexpr std::array<std::pair<Piece, AttackFn>, 3> sliding_attackers 
+    {{
         { BISHOP,   BishopAttacks }, 
         { ROOK,     RookAttacks   }, 
         { QUEEN,    QueenAttacks  }
-    };
+    }};
     // clang-format on
-    for (auto &[piece, attack_fn] : SLIDING_ATTACKERS)
+    for (auto &[piece, attack_fn] : sliding_attackers)
     {
         b = PiecesOfType(piece) & friendly_pieces;
         for (Square from : b)
@@ -381,11 +383,11 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         }
     }
     // clang-format off
-    const std::pair<Bitboard, int8_t> captures[] = 
-    {
+    const std::array<std::pair<Bitboard, int8_t>, 2> captures 
+    {{
         {captures_west, west_delta}, 
         {captures_east, east_delta}
-    };
+    }};
     // clang-format on
     for (auto &[bb, delta] : captures)
     {
@@ -432,8 +434,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));
         if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
         {
-            if ((allowed_non_captures & Bitboard(to)).IsNotEmpty() ||
-                (allowed_captures & Bitboard(captured_pawn_locn)).IsNotEmpty())
+            if ((allowed_captures & Bitboard(captured_pawn_locn)).IsNotEmpty())
             {
                 // Test for the "weird" check that occurs when there is an enemy rook or queen on the same rank as our
                 // king which is only discovered after removing both pawns from the rank during an en passant capture.

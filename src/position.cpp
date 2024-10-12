@@ -73,8 +73,8 @@ void Position::MovePiece(Color color, Piece piece, Square from, Square to)
     squares_[to]   = piece;
 }
 
-/// @brief Make a move
-/// @param move The move
+/// @brief Make a move and return the new position.
+/// @param move The move to be made.
 /// @return new Position following the move.
 Position Position::MakeMove(const Move &move) const
 {

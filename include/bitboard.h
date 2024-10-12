@@ -2,6 +2,7 @@
 /// @file Types, values and functions for using chess Bitboards.
 
 #include <cstdint>
+#include <string>
 
 #include "move.h"
 
@@ -53,6 +54,26 @@ class Bitboard
     {
         v = that.v;
         return *this;
+    }
+    constexpr std::string ToString() const
+    {
+        std::string result;
+        for (int y = 7; y >= 0; --y)
+        {
+            for (int x = 0; x < 8; ++x)
+            {
+                if (v & (1ull << (x + 8 * y)))
+                {
+                    result.push_back('1');
+                }
+                else
+                {
+                    result.push_back('0');
+                }
+            }
+            result.push_back('\n');
+        }
+        return result;
     }
     constexpr void IsolateLsb()
     {
