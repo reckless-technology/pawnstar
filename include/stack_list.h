@@ -1,25 +1,28 @@
 #pragma once
-/// @brief Fixed size, very simple stack storage "vector" for containing lists of moves.
-/// Considerably faster than std::vector due to not allocating data on the heap. More convenient than a std::array for
-/// insertion, sorting and iteration. Perft speed is over 2x faster using this in place of std::vector for move
+
+#include <array>
+
+/// @brief Fixed size, very simple stack storage container for lists of moves.
+/// Considerably faster than std::vector due to not allocating data on the heap. More convenient than a raw std::array
+/// for insertion, sorting and iteration. Perft speed is over 2x faster using this in place of std::vector for move
 /// generation, even when using reserve to preallocate the heap buffer for the vector. NB: There is no buffer overflow
-/// protection.
-template <typename T, int N> class StackVector
+/// protection, so use with caution.
+template <typename T, int N> class StackList
 {
   public:
-    constexpr StackVector()
+    constexpr StackList()
     {
-        end_ = data_;
+        end_ = data_.begin();
     }
-    constexpr StackVector(const StackVector &that)
+    constexpr StackList(const StackList &that)
     {
         std::copy(that.begin(), that.end(), this->begin());
-        end_ = data_ + that.size();
+        end_ = data_.begin() + that.size();
     }
-    constexpr StackVector &operator=(const StackVector &that)
+    constexpr StackList &operator=(const StackList &that)
     {
         std::copy(that.begin(), that.end(), this->begin());
-        end_ = data_ + that.size();
+        end_ = data_.begin() + that.size();
         return *this;
     }
     constexpr void push_back(const T &m)
@@ -28,7 +31,7 @@ template <typename T, int N> class StackVector
     }
     constexpr void clear()
     {
-        end_ = data_;
+        end_ = data_.begin();
     }
     constexpr T &operator[](std::size_t i)
     {
@@ -40,11 +43,11 @@ template <typename T, int N> class StackVector
     }
     constexpr std::size_t size() const
     {
-        return end_ - data_;
+        return end_ - data_.begin();
     }
     constexpr T *begin()
     {
-        return data_;
+        return data_.begin();
     }
     constexpr T *end()
     {
@@ -52,7 +55,7 @@ template <typename T, int N> class StackVector
     }
     constexpr const T *begin() const
     {
-        return data_;
+        return data_.begin();
     }
     constexpr const T *end() const
     {
@@ -60,6 +63,6 @@ template <typename T, int N> class StackVector
     }
 
   private:
-    T *end_;
-    T  data_[N];
+    std::array<T, N>           data_;
+    std::array<T, N>::iterator end_;
 };

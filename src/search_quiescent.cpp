@@ -45,8 +45,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     ScoreAndSortMoves(game, move_list, ply);
     for (Move &move : move_list)
     {
-        bool      is_checking;
-        const int see_score = EvaluateStaticExchange(game.CurrentPosition(), move, is_checking);
+        const auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
         if (see_score < 0 && !is_checking)
         {
             // Skip moves with a negative SEE which do not give check; they're most likely futile.

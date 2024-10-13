@@ -632,6 +632,7 @@ static void GenerateHashes()
         std::cout << std::format("0x{:016X},", rank == 2 || rank == 5 ? NextRandomKey() : 0);
     }
     std::cout << std::format("\n}};\n");
+    std::cout << std::format("constexpr uint64_t BLACK_MOVE_HASH=0x{:016X};\n", NextRandomKey());
 }
 
 /// @brief Generate magic bitboards for bishop and rook sliding attacks.

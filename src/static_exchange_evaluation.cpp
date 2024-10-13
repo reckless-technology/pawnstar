@@ -43,21 +43,22 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
 /// @param src_position Position to evaluate.
 /// @param move Move to evaluate.
 /// @param is_checking On exit, set to true if the move gave check.
-/// @return static exchange evaluation score for this move.
-int EvaluateStaticExchange(const Position &src_position, Move move, bool &is_checking)
+/// @return static exchange evaluation score for this move, and whether move gives check.
+std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move move)
 {
-    Position dst_position{src_position.MakeMove(move)};
-    is_checking = dst_position.IsInCheck();
+    Position    dst_position{src_position.MakeMove(move)};
+    const bool  is_checking = dst_position.IsInCheck();
     SeeBoard    bb{dst_position};
     const Piece piece    = src_position.PieceAt(move.from());
     const Piece captured = move.type() == Move::EP_CAPTURE ? PAWN : src_position.PieceAt(move.to());
     const Piece promoted = move.promoted();
     if (promoted != NO_PIECE)
     {
-        return piece_values[captured] + piece_values[promoted] - piece_values[PAWN] -
-               EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.promoted());
+        return {piece_values[captured] + piece_values[promoted] - piece_values[PAWN] -
+                    EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.promoted()),
+                is_checking};
     }
-    return piece_values[captured] - EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), piece);
+    return {piece_values[captured] - EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), piece), is_checking};
 }
 
 /// @brief Determine the swap off value for a capture on a square.

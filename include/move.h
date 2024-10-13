@@ -5,7 +5,7 @@
 #include <string>
 
 #include "constants.h"
-#include "stack_vector.h"
+#include "stack_list.h"
 
 /// @brief Chess pieces.
 enum Piece : uint8_t
@@ -265,4 +265,4 @@ class alignas(8) Move
 
 static_assert(sizeof(Move) == sizeof(uint64_t));
 
-typedef StackVector<Move, MAX_MOVES_PER_POSITION> MoveList;
+typedef StackList<Move, MAX_MOVES_PER_POSITION> MoveList;

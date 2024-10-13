@@ -41,8 +41,7 @@ void RunStaticExchangeTests(void)
         Position position = Position::FromString(test.fen_string);
         string   pos_str{position.ToString()};
         string   move_string{test.move.ToString()};
-        bool     is_checking;
-        int      score = EvaluateStaticExchange(position, test.move, is_checking);
+        const auto [score, is_checking] = EvaluateStaticExchange(position, test.move);
         std::cout << std::format("\n{}\nSEE for {} = {}\n", pos_str, move_string, score);
         is_pass &= (score == test.see_score);
     }

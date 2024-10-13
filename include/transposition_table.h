@@ -1,5 +1,5 @@
 #pragma once
-#include <cstdint>
+#include <optional>
 
 #include "move.h"
 
@@ -26,8 +26,8 @@ struct Transposition
 
 static_assert(sizeof(Transposition) == 24);
 
-bool                        FindTransposition(uint64_t hash, Transposition &transposition);
-void                        InitializeTranspositionTable(std::size_t megabytes);
-void                        RecordTransposition(uint64_t hash, int depth, int score, Move move, NodeType node_type);
-void                        AgeTranspositionTable();
-std::pair<std::size_t, int> TranspositionTableUsage();
+std::optional<Transposition> FindTransposition(uint64_t hash);
+void                         InitializeTranspositionTable(std::size_t megabytes);
+void                         RecordTransposition(uint64_t hash, int depth, int score, Move move, NodeType node_type);
+void                         AgeTranspositionTable();
+std::pair<std::size_t, int>  TranspositionTableUsage();

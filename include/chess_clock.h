@@ -13,7 +13,6 @@ enum ClockType
 /// @brief Clock and time controls.
 struct TimeControl
 {
-
     ClockType clock_type;          ///< standard chess clock, incremental clock, fixed time or fixed depth
     int       hard_stop_ms;        ///< Wall clock time to hard stop searching and move
     int       ms_remaining;        ///< Number of ms remaining in this clock period.
@@ -21,8 +20,10 @@ struct TimeControl
     int       depth;               ///< Search depth (when CLOCK_FIXED_DEPTH is used).
 };
 
-/// @brief Get elapsed time.
+/// @brief Get elapsed milliseconds.
 /// @return Milliseconds since first invocation.
 int64_t ElapsedMilliseconds();
 
+/// @brief Get elapsed microseconds.
+/// @return Microseconds since first invocation.
 int64_t ElapsedMicroseconds();

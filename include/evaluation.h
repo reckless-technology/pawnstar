@@ -211,10 +211,10 @@ template <Color color> int EvaluateMaterial(const Position &position)
     const Bitboard queens          = position.Queens() & friendly_pieces;
     // clang-format off
     int score = pawns.PopCount()   * 100 + 
-                knights.PopCount() * 320 + 
-                bishops.PopCount() * 330 + 
-                rooks.PopCount()   * 500 +
-                queens.PopCount()  * 900;
+                knights.PopCount() * 400 + 
+                bishops.PopCount() * 400 + 
+                rooks.PopCount()   * 600 +
+                queens.PopCount()  * 1200;
     // clang-format on
     // Bonus for the bishop pair.
     if ((bishops & WHITE_SQUARES).IsNotEmpty() && (bishops & BLACK_SQUARES).IsNotEmpty())

@@ -8,7 +8,9 @@
 #include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
-/// @brief Search a single move and return its alpha beta score.
+#include <utility>
+
+/// @brief Search a single move and return its alpha beta score and whether it gives check.
 /// @param game Game we are searching.
 /// @param depth Depth to search to.
 /// @param ply Distance from root node.
@@ -17,15 +19,14 @@
 /// @param move Move to search.
 /// @param pv Parent's principal variation
 /// @param move_index Move number (0 is first move).
-/// @return score for this move.
-int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index,
-                     bool &is_checking)
+/// @return score for this move, and whether move is checking.
+std::pair<int, bool> SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv,
+                                      int move_index)
 {
     const bool was_in_check = game.CurrentPosition().IsInCheck();
     game.PlayMove(move);
-    is_checking = game.CurrentPosition().IsInCheck();
-    int score;
-    // Maybe try PVS?
+    const bool is_checking = game.CurrentPosition().IsInCheck();
+    int        score;
     if (beta > alpha + 1 && move_index > 0 && !was_in_check && !is_checking)
     {
         INCREMENT("pvs attempts");
@@ -41,7 +42,7 @@ int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move m
         score = -Search(game, depth - 1, ply + 1, -beta, -alpha, pv);
     }
     game.UndoMove();
-    return score;
+    return {score, is_checking};
 }
 
 /// @brief Try null move pruning.
@@ -112,20 +113,19 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
 
     // Determine if there is an entry in the transposition table for this position. If so, see if it is sufficient for
     // us to avoid the search entirely.
-    Transposition transposition;
-    const bool    is_transposition = FindTransposition(game.CurrentPosition().Hash(), transposition);
-    if (is_transposition && transposition.depth >= depth)
+    const auto transposition = FindTransposition(game.CurrentPosition().Hash());
+    if (transposition && transposition->depth >= depth)
     {
-        switch (transposition.node_type)
+        switch (transposition->node_type)
         {
         case NODE_CUT:
             // We don't know the exact score of the best move from this position, but we do know it is at least
             // transposition.score
             INCREMENT("table hit cut node");
-            if (transposition.score >= beta)
+            if (transposition->score >= beta)
             {
                 INCREMENT("table hit cut node cutoffs");
-                return transposition.score;
+                return transposition->score;
             }
             break;
 
@@ -133,10 +133,10 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             // We don't know the exact score of the best move from this position, but we do know it is at most
             // transposition.score
             INCREMENT("table hit all node");
-            if (transposition.score < alpha)
+            if (transposition->score < alpha)
             {
                 INCREMENT("table hit all node cutoffs");
-                return transposition.score;
+                return transposition->score;
             }
             break;
 
@@ -172,12 +172,11 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     Move      best_move        = Move::None();
     int       best_score       = ALPHA;
     bool      has_raised_alpha = false;
-    if (is_transposition && transposition.move)
+    if (transposition && transposition->move)
     {
         INCREMENT("table move");
-        best_move = transposition.move;
-        bool is_checking;
-        int  score = SearchSingleMove(game, depth, ply, alpha, beta, transposition.move, pv, 0, is_checking);
+        best_move = transposition->move;
+        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition->move, pv, 0).first;
         if (game.is_cancel_pending_)
         {
             return SEARCH_CANCELLED_SCORE;
@@ -185,8 +184,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            RecordTransposition(game.CurrentPosition().Hash(), depth, score, transposition.move, NODE_CUT);
-            RecordGoodMove(ply, transposition.move);
+            RecordTransposition(game.CurrentPosition().Hash(), depth, score, transposition->move, NODE_CUT);
+            RecordGoodMove(ply, transposition->move);
             return score;
         }
         best_score = score;
@@ -195,7 +194,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             INCREMENT("table move raised alpha");
             alpha            = score;
             has_raised_alpha = true;
-            RecordGoodMove(ply, transposition.move);
+            RecordGoodMove(ply, transposition->move);
         }
     }
     // We didn't get a cutoff from the transposition table so proceed with generating and searching moves.
@@ -222,19 +221,18 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     for (const Move &move : move_list)
     {
         const int move_index = &move - move_list.begin();
-        if (is_transposition && move == transposition.move)
+        if (transposition && move == transposition->move)
         {
             continue; // We already searched this move.
         }
-        int  score;
-        bool is_checking;
+        int score;
         // Maybe try late move reduction, if all the conditions are met.
         if (!game.CurrentPosition().IsInCheck() && // we are not in check
             depth > 2 &&                           // do not drop directly into quiescence
             beta == alpha + 1 &&                   // it is not a PV node
             move_index > 3)                        // we already tried a few moves without cutoff
         {
-            const int see_score = EvaluateStaticExchange(game.CurrentPosition(), move, is_checking);
+            auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
             if (!is_checking && see_score <= 0) // move does not give check and does not win material
             {
                 INCREMENT("late move reduction");
@@ -244,21 +242,21 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
                     --lmr_depth;
                     INCREMENT("late move reduction extreme");
                 }
-                score = SearchSingleMove(game, lmr_depth, ply, alpha, beta, move, pv, move_index, is_checking);
+                score = SearchSingleMove(game, lmr_depth, ply, alpha, beta, move, pv, move_index).first;
                 if (score > alpha)
                 {
                     INCREMENT("late move reduction fails");
-                    score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index, is_checking);
+                    score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index).first;
                 }
             }
             else
             {
-                score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index, is_checking);
+                score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index).first;
             }
         }
         else
         {
-            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index, is_checking);
+            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index).first;
         }
         if (game.is_cancel_pending_)
         {

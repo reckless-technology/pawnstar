@@ -86,9 +86,8 @@ Move SearchRootNode(Game &game)
     for (auto &move : move_list)
     {
         const int move_index = &move - move_list.begin();
-        bool      is_checking;
         const int score =
-            SearchSingleMove(game, START_DEPTH, 0, ALPHA, BETA, move, principal_variation, move_index, is_checking);
+            SearchSingleMove(game, START_DEPTH, 0, ALPHA, BETA, move, principal_variation, move_index).first;
         move.AssignScore(score);
     }
     SortMoves<true>(move_list);
@@ -107,8 +106,7 @@ Move SearchRootNode(Game &game)
         for (auto &move : move_list)
         {
             const int move_index = &move - move_list.begin();
-            bool      is_checking;
-            const int score = SearchSingleMove(game, depth, 0, alpha, BETA, move, child_pv, move_index, is_checking);
+            const int score      = SearchSingleMove(game, depth, 0, alpha, BETA, move, child_pv, move_index).first;
             move.AssignScore(score);
             if (game.is_cancel_pending_)
             {

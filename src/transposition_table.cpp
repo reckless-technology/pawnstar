@@ -33,17 +33,15 @@ void InitializeTranspositionTable(std::size_t megabytes)
 
 /// @brief Find an entry in the TT if one exists for this position.
 /// @param hash Zobrist hash of position
-/// @param transposition Reference to transposition to assign if found
-/// @return true if a transposition was found in the table.
-bool FindTransposition(uint64_t hash, Transposition &transposition)
+/// @return If a transposition was found in the table, then return it
+std::optional<Transposition> FindTransposition(uint64_t hash)
 {
     const Transposition &t = table[hash % table.size()];
     if (t.hash == hash)
     {
-        transposition = t;
-        return true;
+        return t;
     }
-    return false;
+    return std::nullopt;
 }
 
 /// @brief Insert a new entry into the table.
