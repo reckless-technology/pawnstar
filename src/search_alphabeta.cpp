@@ -5,6 +5,7 @@
 #include "position.h"
 #include "search.h"
 #include "sort_moves.h"
+#include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
 /// @brief Search a single move and return its alpha beta score.
@@ -25,7 +26,7 @@ int SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move m
     is_checking = game.CurrentPosition().IsInCheck();
     int score;
     // Maybe try PVS?
-    if (beta > alpha + 1 && move_index > 1 && !was_in_check && !is_checking)
+    if (beta > alpha + 1 && move_index > 0 && !was_in_check && !is_checking)
     {
         INCREMENT("pvs attempts");
         score = -Search(game, depth - 1, ply + 1, -alpha - 1, -alpha, pv);
@@ -194,9 +195,6 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             INCREMENT("table move raised alpha");
             alpha            = score;
             has_raised_alpha = true;
-            // Provisionally store this move as a CUT node - it may later turn out to be a PV but we don't know that yet
-            // until we have searched every move.
-            RecordTransposition(game.CurrentPosition().Hash(), depth, score, transposition.move, NODE_CUT);
             RecordGoodMove(ply, transposition.move);
         }
     }
@@ -216,36 +214,44 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         INCREMENT("stalemates");
         return DRAW_SCORE;
     }
+
     // Assign provisional scores to each move and sort them best first.
     ScoreAndSortMoves(game, move_list, ply);
+
     // Start of the main loop.
-    for (int move_index = 0; move_index != (int)move_list.size(); ++move_index)
+    for (const Move &move : move_list)
     {
-        const Move move = move_list[move_index];
+        const int move_index = &move - move_list.begin();
         if (is_transposition && move == transposition.move)
         {
             continue; // We already searched this move.
         }
-        int score;
-        // Try late move reduction, if all the conditions are met.
+        int  score;
+        bool is_checking;
+        // Maybe try late move reduction, if all the conditions are met.
         if (!game.CurrentPosition().IsInCheck() && // we are not in check
+            depth > 2 &&                           // do not drop directly into quiescence
             beta == alpha + 1 &&                   // it is not a PV node
-            move_index > 0 &&                      // it's not the first move
-            !move.IsChecking() &&                  // move does not give check
-            move.score() < 0)                      // move has negative SEE
+            move_index > 3)                        // we already tried a few moves without cutoff
         {
-            INCREMENT("late move reduction");
-            bool is_checking;
-            score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, move_index, is_checking);
-            if (score > best_score)
+            const int see_score = EvaluateStaticExchange(game.CurrentPosition(), move, is_checking);
+            if (!is_checking && see_score <= 0) // move does not give check and does not win material
             {
-                INCREMENT("late move reduction fails");
+                INCREMENT("late move reduction");
+                score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, move_index, is_checking);
+                if (score > alpha)
+                {
+                    INCREMENT("late move reduction fails");
+                    score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index, is_checking);
+                }
+            }
+            else
+            {
                 score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index, is_checking);
             }
         }
         else
         {
-            bool is_checking;
             score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index, is_checking);
         }
         if (game.is_cancel_pending_)
@@ -269,9 +275,6 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
                 INCREMENT("pv changed");
                 alpha            = score;
                 has_raised_alpha = true;
-                // Provisionally store this move as a CUT node - it may later turn out to be a PV but we don't know that
-                // for sure yet until we have searched every move.
-                RecordTransposition(game.CurrentPosition().Hash(), depth, score, move, NODE_CUT);
                 RecordGoodMove(ply, move);
             }
         }
