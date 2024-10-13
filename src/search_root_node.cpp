@@ -73,12 +73,13 @@ Move SearchRootNode(Game &game)
         game.time_control_.hard_stop_ms = 0;
         break;
     }
-    DebugXClear();
+
     int start_ms            = ElapsedMilliseconds();
     game.is_cancel_pending_ = false;
     // For first pass move ordering before we do any search, just use a shallow search with wide open alpha beta window.
     // Subsequent passes will use the results of the previous iteration to sort the moves (the merge sort is stable).
-    ResetKillerCounts();
+    DebugXClear();
+    ResetHistoryTable();
     AgeTranspositionTable();
     Variation principal_variation{};
     Move      best_moves[MAX_PLY]; // Best move found at each ply of search.

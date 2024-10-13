@@ -21,6 +21,7 @@ void Game::NewGame(std::string_view fen_string)
     time_control_.clock_type          = CHESS_CLOCK_STANDARD;
     time_control_.ms_remaining        = 5 * 60 * 1000; // 5 minutes
     time_control_.num_moves_remaining = 0;
+    time_control_.depth               = 10;
     node_count_                       = 0;
     index_                            = 0;
     is_cancel_pending_                = false;
@@ -95,17 +96,16 @@ bool Game::IsDrawByRepetition() const
     return false;
 }
 
-/// @brief Play a move from the given move string and update game state_flags accordingly.
-/// @param move_str The string containing the move to be made.
-/// @return The move which was made, or Move::None in the case the string did not contain a legal move.
+/// @brief Play a move from the given string and update game state accordingly.
+/// @param move_str The string containing the move to be made, e.g. "e2e4", "e7e8q" (promotion), "e1g1" (castling).
+/// @return The move which was made, or Move::None in the case the string did not contain a legal move for this
+/// position, and no move was therefore played.
 Move Game::PlayMove(std::string_view move_str)
 {
-    string   candidate{move_str};
     MoveList move_list = CurrentPosition().GenerateLegalMoves();
     for (const Move &move : move_list)
     {
-        const string algebraic_move_str{move.ToString()};
-        if (algebraic_move_str == candidate)
+        if (move.ToString() == move_str)
         {
             PlayMove(move);
             return move;

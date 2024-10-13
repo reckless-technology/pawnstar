@@ -4,15 +4,16 @@
 #include "position.h"
 #include "search.h"
 #include "sort_moves.h"
+#include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
-/// @brief Alpha beta quiescence (capture only) search.
-/// @param game Game we are searching
-/// @param depth search depth (<= 0 for quiescence)
-/// @param ply distance from root node
-/// @param alpha parent floor value
-/// @param beta parent ceiling value
-/// @return score The score for this position
+/// @brief Alpha beta quiescence search.
+/// @param game Game to be searched.
+/// @param depth Search depth (<= 0)
+/// @param ply Distance from root node.
+/// @param alpha Alpha value.
+/// @param beta Beta value.
+/// @return Quiescent score for this node.
 int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
 {
     INCREMENT("quiescent calls");
@@ -23,6 +24,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     }
     if (game.CurrentPosition().IsInCheck())
     {
+        // We can't handle checks in quiescence.
         INCREMENT("quiescent checks");
         Variation dummy{};
         return Search(game, depth, ply, alpha, beta, dummy);
@@ -40,13 +42,16 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     }
     int      best_score = score;
     MoveList move_list{game.CurrentPosition().GenerateLegalCaptures()};
-    ScoreAndSortMoves(game, move_list, depth, ply, alpha, beta);
+    ScoreAndSortMoves(game, move_list, ply);
     for (Move &move : move_list)
     {
-        if (move.score() < 0)
+        bool      is_checking;
+        const int see_score = EvaluateStaticExchange(game.CurrentPosition(), move, is_checking);
+        if (see_score < 0 && !is_checking)
         {
-            INCREMENT("quiescent SEE skipped");
-            return best_score;
+            // Skip moves with a negative SEE which do not give check; they're most likely futile.
+            INCREMENT("quiescent negative see");
+            continue;
         }
         game.PlayMove(move);
         score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
@@ -58,7 +63,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            RecordGoodMove(depth, ply, move);
+            RecordGoodMove(ply, move);
             return score;
         }
         if (score > best_score)
@@ -68,7 +73,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent pv changed");
-                RecordGoodMove(depth, ply, move);
+                RecordGoodMove(ply, move);
             }
         }
     }

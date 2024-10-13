@@ -1,8 +1,7 @@
+
 #include <algorithm>
-#include <cinttypes>
-#include <cstdio>
+#include <array>
 #include <cstring>
-#include <vector>
 
 #include "debug_hashtable.h"
 #include "move.h"
@@ -10,91 +9,57 @@
 #include "sort_moves.h"
 #include "static_exchange_evaluation.h"
 
-//                 indexed by      ply   from  to
-static uint32_t good_move_counts[MAX_PLY][64 * 64];
+/// @brief Array of good move counts indexed by move from and to squares (12 bits), for a single ply.
+typedef std::array<uint32_t, 64 * 64> PlyCounts;
 
-void RecordGoodMove(int depth, int ply, Move move)
+/// @brief History table: good move counts arrays for each ply of search.
+static std::array<PlyCounts, MAX_PLY> history_table;
+
+/// @brief Record a good move in the history table.
+/// @param ply Current search ply.
+/// @param move The move to record.
+void RecordGoodMove(int ply, Move move)
 {
-    if (depth > 0)
-    {
-        good_move_counts[ply][move.from_to_mask()] += depth * depth;
-    }
-    else
-    {
-        ++good_move_counts[ply][move.from_to_mask()];
-    }
+    ++history_table[ply][move.from_to_mask()];
 }
 
-void ResetKillerCounts()
+/// @brief Clear the history table.
+/// This is typically done before starting each root node search.
+void ResetHistoryTable()
 {
-    memset(good_move_counts, 0, sizeof(good_move_counts));
+    std::ranges::for_each(history_table, [](PlyCounts &x) { x.fill(0); });
 }
+
+/// @brief Raw material values for MVV/LVA provisional scoring of moves.
+constexpr std::array<int, 7> piece_values{0, 100, 300, 300, 500, 900, 10000};
 
 /// @brief Assign provisional scores to each move and then sort them best first.
+/// Use MVV/LVA plus history table counts to score moves. This is primitive, but way faster than static exchange
+/// evaluation, and seems to work pretty well in practice.
 /// @param game Game being searched
 /// @param moves List of legal moves to evaluate.
-/// @param depth Current search depth.
 /// @param ply Current search ply.
-/// @param alpha Alpha value
-/// @param beta Beta value
-void ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alpha, int beta)
+void ScoreAndSortMoves(Game &game, MoveList &moves, int ply)
 {
-    const uint32_t *const counts = &good_move_counts[ply][0];
-    if (depth > 4)
+    const PlyCounts &counts   = history_table[ply];
+    const Position  &position = game.CurrentPosition();
+    for (Move &move : moves)
     {
-        Variation dummy_pv{};
-        for (Move &move : moves)
-        {
-            const int move_index = &move - moves.begin();
-            bool      is_checking;
-            const int score =
-                SearchSingleMove(game, depth - 3, ply, alpha, beta, move, dummy_pv, move_index, is_checking);
-            if (is_checking)
-            {
-                move.GivesCheck();
-                // Give a bonus score to moves which give check.
-                move.AssignScore(score * 10000 + counts[move.from_to_mask()] + 1000000);
-            }
-            else
-            {
-                move.AssignScore(score * 10000 + counts[move.from_to_mask()]);
-            }
-        }
-    }
-    else
-    {
-        for (Move &move : moves)
-        {
-            bool      is_checking;
-            const int score = EvaluateStaticExchange(game.CurrentPosition(), move, is_checking);
-            if (is_checking)
-            {
-                move.GivesCheck();
-                move.AssignScore(score * 10000 + counts[move.from_to_mask()] + 1000000);
-            }
-            else
-            {
-                move.AssignScore(score * 10000 + counts[move.from_to_mask()]);
-            }
-        }
+        move.AssignScore(piece_values[position.PieceAt(move.to())] * 10000 -
+                         piece_values[position.PieceAt(move.from())] * 1000 + counts[move.from_to_mask()]);
     }
     SortMoves<false>(moves);
 }
 
-/// @brief Get the maximum count in the killer move table
-/// @return Count of the most popular killer move
-uint32_t MaxKillerMoveCount()
+/// @brief Get the maximum count in the history move table.
+/// @return Count of the most popular history table move.
+uint32_t MaxHistoryCount()
 {
     uint32_t result = 0;
-    for (int i = 0; i != MAX_PLY; ++i)
+    for (const auto &ply : history_table)
     {
-        for (int j = 0; j != 64 * 64; ++j)
-        {
-            if (good_move_counts[i][j] > result)
-            {
-                result = good_move_counts[i][j];
-            }
-        }
+        const auto ply_max = *std::ranges::max_element(ply);
+        result             = std::max(result, ply_max);
     }
     return result;
 }

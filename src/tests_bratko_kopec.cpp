@@ -56,9 +56,9 @@ void RunPositionTests(int depth)
         DebugXClear();
         SearchRootNode(game);
 #if DEBUGX
-        auto [count, percent] = TranspositionTableUsage();
-        auto killer_max_count = MaxKillerMoveCount();
-        ASSIGN("killer move max count", killer_max_count);
+        auto [count, percent]  = TranspositionTableUsage();
+        auto max_history_count = MaxHistoryCount();
+        ASSIGN("history move max count", max_history_count);
         ASSIGN("table usage count", count);
         ASSIGN("table usage percent", percent);
 #endif

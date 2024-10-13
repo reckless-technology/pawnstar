@@ -36,7 +36,7 @@ int main()
                  "(C) Jonny Reckless 2009 - 2024\n"
                  "Compiled: " __DATE__ " " __TIME__ "\n";
     InitializeTranspositionTable(HASHTABLE_MEGABYTES);
-    if (!InitializeOpeningBookFromFile("doc/pawnstar.book"))
+    if (!InitializeOpeningBookFromFile("pawnstar.book"))
     {
         std::cout << "NOTE: unable to open book file\n";
     }

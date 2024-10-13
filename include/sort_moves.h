@@ -6,10 +6,10 @@
 
 class Position;
 
-void     RecordGoodMove(int depth, int ply, Move move);
-void     ResetKillerCounts();
-void     ScoreAndSortMoves(Game &game, MoveList &moves, int depth, int ply, int alpha, int beta);
-uint32_t MaxKillerMoveCount(void);
+void     RecordGoodMove(int ply, Move move);
+void     ResetHistoryTable();
+void     ScoreAndSortMoves(Game &game, MoveList &moves, int ply);
+uint32_t MaxHistoryCount(void);
 
 /// @brief Sort moves best first i.e. in descending score order
 /// @param moves Moves to be sorted

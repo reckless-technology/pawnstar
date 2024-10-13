@@ -96,12 +96,12 @@ class Position
     static constexpr uint8_t CASTLING_RIGHTS_MASK       = 0x0F; ///< Mask off castling rights bits only.
     static constexpr uint8_t IS_BLACK_TO_MOVE           = 0x10; ///< It is black's turn to move.
     static constexpr uint8_t IS_NULL_MOVE               = 0x20; ///< Position was the result of a null move.
-    static constexpr uint8_t A1M                        = ~MAY_WHITE_CASTLE_QUEENSIDE;
+    static constexpr uint8_t A1M                        = ~(MAY_WHITE_CASTLE_QUEENSIDE);
     static constexpr uint8_t E1M                        = ~(MAY_WHITE_CASTLE_QUEENSIDE | MAY_WHITE_CASTLE_KINGSIDE);
-    static constexpr uint8_t H1M                        = ~MAY_WHITE_CASTLE_KINGSIDE;
-    static constexpr uint8_t A8M                        = ~MAY_BLACK_CASTLE_QUEENSIDE;
+    static constexpr uint8_t H1M                        = ~(MAY_WHITE_CASTLE_KINGSIDE);
+    static constexpr uint8_t A8M                        = ~(MAY_BLACK_CASTLE_QUEENSIDE);
     static constexpr uint8_t E8M                        = ~(MAY_BLACK_CASTLE_QUEENSIDE | MAY_BLACK_CASTLE_KINGSIDE);
-    static constexpr uint8_t H8M                        = ~MAY_BLACK_CASTLE_KINGSIDE;
+    static constexpr uint8_t H8M                        = ~(MAY_BLACK_CASTLE_KINGSIDE);
     static constexpr uint8_t OK                         = 0xFF;
 
     // clang-format off
