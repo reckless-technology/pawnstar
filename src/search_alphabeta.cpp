@@ -238,7 +238,13 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             if (!is_checking && see_score <= 0) // move does not give check and does not win material
             {
                 INCREMENT("late move reduction");
-                score = SearchSingleMove(game, depth - 1, ply, alpha, beta, move, pv, move_index, is_checking);
+                int lmr_depth = depth - 1;
+                if (move_index > 10 && see_score < 0)
+                {
+                    --lmr_depth;
+                    INCREMENT("late move reduction extreme");
+                }
+                score = SearchSingleMove(game, lmr_depth, ply, alpha, beta, move, pv, move_index, is_checking);
                 if (score > alpha)
                 {
                     INCREMENT("late move reduction fails");
