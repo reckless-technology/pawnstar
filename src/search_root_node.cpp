@@ -165,7 +165,7 @@ Move SearchRootNode(Game &game)
                 std::cout << "info string Best move consistent AND score stable - search terminated.\n";
                 break;
             }
-            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 3) > ms_allocated)
+            if ((is_best_move_consistent || is_score_stable) && (elapsed_ms * 2) > ms_allocated)
             {
                 std::cout << std::format("info string {} - search terminated.\n",
                                          is_best_move_consistent ? "Best move consistent" : "Score stable");

@@ -3,9 +3,10 @@
 #include <cstdint>
 
 #include "bitboard.h"
+#include "game.h"
 #include "position.h"
 
-int EvaluatePosition(const Position &position, int alpha, int beta);
+int EvaluatePosition(const Game &game, int alpha, int beta);
 
 // clang-format off
 
@@ -221,11 +222,6 @@ template <Color color> int EvaluateMaterial(const Position &position)
     {
         score += 50;
     }
-    // Penalty for no pawns.
-    if (pawns.IsEmpty())
-    {
-        score -= 50;
-    }
     return score;
 }
 
@@ -313,12 +309,13 @@ template <Color color> int EvaluatePawnStructure(const PawnStructure &ps)
     return score;
 }
 
-/// @brief Scales King safety computation percent according to enemy's classical material remaining.
-/// At the start of the game each side has 31 in non pawn material, and king safety matters most.
-/// (2 x N + 2 x B + 2 x R + 1 x Q)
-constexpr std::array<int, 32> KING_SAFETY_MULTIPLIER{0,   0,   0,   0,   0,   0,   0,   10,  20,  30,  40,
-                                                     50,  60,  70,  80,  90,  100, 100, 100, 100, 100, 100,
-                                                     100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
+/// @brief Scales King safety weighting percentage according to enemy's classical material remaining.
+/// At the start of the game each side has 39 in material, and our king safety matters most.
+/// In the endgame, king safety is not important and the king should come out and play an active role.
+/// (8 x P + 2 x N + 2 x B + 2 x R + 1 x Q = 39)
+constexpr std::array<int, 40> KING_SAFETY_MULTIPLIER{
+    0,  0,  0,   0,   10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75,  80,  85,
+    90, 95, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
 
 /// @brief Evaluate king score based on positional factors and enemy material.
 /// @tparam color Color to evaluate
@@ -333,9 +330,11 @@ template <Color color> int EvaluateKing(const Position &position)
     const Bitboard    enemy_pawns     = enemy_pieces & position.Pawns();
 
     // Determine enemy non-pawn material value.
-    const int enemy_material = 3 * ((position.Knights() | position.Bishops()) & enemy_pieces).PopCount() +
-                               5 * (position.Rooks() & enemy_pieces).PopCount() +
-                               9 * (position.Queens() & enemy_pieces).PopCount();
+    int enemy_material = (position.Pawns() & enemy_pieces).PopCount() +
+                         3 * ((position.Knights() | position.Bishops()) & enemy_pieces).PopCount() +
+                         5 * (position.Rooks() & enemy_pieces).PopCount() +
+                         9 * (position.Queens() & enemy_pieces).PopCount();
+    enemy_material = std::min(enemy_material, 39); // Ignore early promotions and extra queens.
 
     // Scale piece square score according to enemy material.
     int piece_square_score =
@@ -363,10 +362,10 @@ template <Color color> int EvaluateKing(const Position &position)
         }
         // clang-format off
         safety_score =
-            20 * (friendly_pawns & pawn_shelter_1).PopCount() + 
-            15 * (friendly_pawns & pawn_shelter_2).PopCount() +
-            10 * (friendly_pawns & pawn_shelter_3).PopCount() - 
-            20 * (enemy_pawns & pawn_shelter_1).PopCount() -
+            25 * (friendly_pawns & pawn_shelter_1).PopCount() + 
+            10 * (friendly_pawns & pawn_shelter_2).PopCount() +
+            5 * (friendly_pawns & pawn_shelter_3).PopCount() - 
+            25 * (enemy_pawns & pawn_shelter_1).PopCount() -
             15 * (enemy_pawns & pawn_shelter_2).PopCount() - 
             10 * (enemy_pawns & pawn_shelter_3).PopCount();
         // clang-format on
@@ -375,17 +374,17 @@ template <Color color> int EvaluateKing(const Position &position)
         const Bitboard king_file = FILE_BITBOARDS[FileOf(position.KingLocation(color))];
         if ((king_file & friendly_pawns).IsEmpty())
         {
-            safety_score -= 30;
+            safety_score -= 20;
         }
         Bitboard adjacent_file = king_file.ShiftWest();
         if (adjacent_file.IsNotEmpty() && (adjacent_file & friendly_pawns).IsEmpty())
         {
-            safety_score -= 20;
+            safety_score -= 15;
         }
         adjacent_file = king_file.ShiftEast();
         if (adjacent_file.IsNotEmpty() && (adjacent_file & friendly_pawns).IsEmpty())
         {
-            safety_score -= 20;
+            safety_score -= 15;
         }
 
         // Bonus for friendly pieces near to our king

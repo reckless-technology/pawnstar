@@ -20,7 +20,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     if (ply == MAX_PLY)
     {
         INCREMENT("quiescent max ply");
-        return EvaluatePosition(game.CurrentPosition(), alpha, beta);
+        return EvaluatePosition(game, alpha, beta);
     }
     if (game.CurrentPosition().IsInCheck())
     {
@@ -29,7 +29,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         Variation dummy{};
         return Search(game, depth, ply, alpha, beta, dummy);
     }
-    int score = EvaluatePosition(game.CurrentPosition(), alpha, beta);
+    int score = EvaluatePosition(game, alpha, beta);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");

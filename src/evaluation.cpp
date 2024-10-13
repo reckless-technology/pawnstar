@@ -4,14 +4,19 @@
 #include "transposition_table.h"
 
 /// @brief Evaluate the current position, assuming neither king is in check and the position is quiet.
-/// @param position position to evaluate
+/// @param game game position to evaluate
 /// @param alpha current alpha value
 /// @param beta current beta value
 /// @return score from the perspective of the side to move
-int EvaluatePosition(const Position &position, int alpha, int beta)
+int EvaluatePosition(const Game &game, int alpha, int beta)
 {
     INCREMENT("eval calls");
-    int scores[2];
+    if (game.CurrentPosition().IsDrawByMaterial() || game.IsDrawByFiftyMoves() || game.IsDrawByRepetition())
+    {
+        return DRAW_SCORE;
+    }
+    int             scores[2];
+    const Position &position = game.CurrentPosition();
     // Phase 1: Evaluate material values alone.
     scores[WHITE] = EvaluateMaterial<WHITE>(position);
     scores[BLACK] = EvaluateMaterial<BLACK>(position);

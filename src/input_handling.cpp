@@ -60,7 +60,7 @@ void handle_freebook(Game &, std::span<std::string>)
 
 void handle_eval(Game &game, std::span<std::string>)
 {
-    std::cout << std::format("evaluation {}\n", EvaluatePosition(game.CurrentPosition(), ALPHA, BETA));
+    std::cout << std::format("evaluation {}\n", EvaluatePosition(game, ALPHA, BETA));
 }
 
 void handle_dbg(Game &, std::span<std::string>)
