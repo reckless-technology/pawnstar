@@ -1,11 +1,13 @@
 /// @file functions to search for the best move.
 #pragma once
 
+#include "constants.h"
 #include "game.h"
 #include "move.h"
+#include "stack_list.h"
 
 /// @brief A variation (typically principal variation) is a line of play or series of moves.
-typedef std::vector<Move> Variation;
+typedef StackList<Move, MAX_PLY> Variation;
 
 Move                 SearchRootNode(Game &game);
 int                  Search(Game &game, int depth, int ply, int alpha, int beta, Variation &parent_pv);

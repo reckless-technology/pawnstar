@@ -80,7 +80,7 @@ Move SearchRootNode(Game &game)
     // Subsequent passes will use the results of the previous iteration to sort the moves (the merge sort is stable).
     DebugXClear();
     ResetHistoryTable();
-    AgeTranspositionTable();
+    game.Table().Age();
     Variation principal_variation{};
     Move      best_moves[MAX_PLY]; // Best move found at each ply of search.
     for (auto &move : move_list)

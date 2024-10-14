@@ -19,7 +19,7 @@
 /// @param move Move to search.
 /// @param pv Parent's principal variation
 /// @param move_index Move number (0 is first move).
-/// @return score for this move, and whether move is checking.
+/// @return Score for this move, and whether move is checking.
 std::pair<int, bool> SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv,
                                       int move_index)
 {
@@ -50,6 +50,7 @@ std::pair<int, bool> SearchSingleMove(Game &game, int depth, int ply, int alpha,
     int        score;
     if (beta > alpha + 1 && move_index > 0 && !was_in_check && !is_checking)
     {
+        // Try principal variation search.
         INCREMENT("pvs attempts");
         score = -Search(game, child_depth, ply + 1, -alpha - 1, -alpha, pv);
         if (score > alpha)
@@ -77,11 +78,11 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
 {
     const Position &position = game.CurrentPosition();
     const Color     color    = position.ColorToMove();
-    // Only try NMP if all conditions are met.
+    // Only try null move pruning if all conditions are met.
     if (!position.IsNullMove() &&                       // previous move was not a null move
         !position.IsInCheck() &&                        // we are not in check
         beta == alpha + 1 &&                            // this is not a PV node
-        position.PiecesOfColor(color).PopCount() > 4 && // we have at least 4 friendly pieces
+        position.PiecesOfColor(color).PopCount() > 4 && // we have at least 5 friendly pieces
         EvaluatePosition(game, alpha, beta) >= beta)    // static evaluation is at least beta
     {
         INCREMENT("null move");
@@ -127,19 +128,14 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         INCREMENT("max ply reached");
         return EvaluatePosition(game, alpha, beta);
     }
-    if (game.CurrentPosition().IsInCheck())
-    {
-        INCREMENT("checks");
-        ++depth;
-    }
     // Determine if there is an entry in the transposition table for this position. If so, see if it is sufficient for
     // us to avoid the search entirely.
-    const auto transposition = FindTransposition(game.CurrentPosition().Hash());
+    const auto transposition = game.Table().FindTransposition(game.CurrentPosition().Hash());
     if (transposition && transposition->depth >= depth)
     {
         switch (transposition->node_type)
         {
-        case NODE_CUT:
+        case Transposition::NodeType::CUT:
             // We don't know the exact score of the best move from this position, but we do know it is at least
             // transposition.score
             INCREMENT("table hit cut node");
@@ -150,7 +146,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             }
             break;
 
-        case NODE_ALL:
+        case Transposition::NodeType::ALL:
             // We don't know the exact score of the best move from this position, but we do know it is at most
             // transposition.score
             INCREMENT("table hit all node");
@@ -161,7 +157,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             }
             break;
 
-        case NODE_PV:
+        case Transposition::NodeType::PV:
             // We know the exact score and the best move from this position. However, do the full search
             // to get the PV. The extra time searching these few principal variation nodes is trivial.
             INCREMENT("table hit pv node");
@@ -205,7 +201,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            RecordTransposition(game.CurrentPosition().Hash(), depth, score, transposition->move, NODE_CUT);
+            game.Table().RecordTransposition(Transposition{game.CurrentPosition().Hash(), transposition->move, score,
+                                                           depth, Transposition::NodeType::CUT});
             RecordGoodMove(ply, transposition->move);
             return score;
         }
@@ -278,7 +275,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            RecordTransposition(game.CurrentPosition().Hash(), depth, score, move, NODE_CUT);
+            game.Table().RecordTransposition(
+                Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::CUT});
             RecordGoodMove(ply, move);
             return score;
         }
@@ -302,7 +300,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         // We raised alpha but did not cutoff; this was a PV node (these are rare) so copy the PV up the tree to our
         // parent node.
         INCREMENT("pv nodes");
-        RecordTransposition(game.CurrentPosition().Hash(), depth, alpha, best_move, NODE_PV);
+        game.Table().RecordTransposition(
+            Transposition{game.CurrentPosition().Hash(), best_move, alpha, depth, Transposition::NodeType::PV});
         RecordGoodMove(ply, best_move);
         CopyVariation(parent_pv, pv, best_move);
     }
@@ -310,7 +309,8 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     {
         // We tried every move but did not raise alpha; this was an all node.
         INCREMENT("all nodes");
-        RecordTransposition(game.CurrentPosition().Hash(), depth, best_score, best_move, NODE_ALL);
+        game.Table().RecordTransposition(
+            Transposition{game.CurrentPosition().Hash(), best_move, best_score, depth, Transposition::NodeType::ALL});
     }
     return best_score;
 }

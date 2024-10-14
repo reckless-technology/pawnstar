@@ -56,7 +56,7 @@ void RunPositionTests(int depth)
         DebugXClear();
         SearchRootNode(game);
 #if DEBUGX
-        auto [count, percent]  = TranspositionTableUsage();
+        auto [count, percent]  = game.Table().UsageStats();
         auto max_history_count = MaxHistoryCount();
         ASSIGN("history move max count", max_history_count);
         ASSIGN("table usage count", count);

@@ -1,3 +1,4 @@
+#include "constants.h"
 #include "debug_hashtable.h"
 #include "game.h"
 #include "opening_book.h"
@@ -35,7 +36,6 @@ int main()
                  "Pawnstar: a UCI compatible chess engine\n"
                  "(C) Jonny Reckless 2009 - 2024\n"
                  "Compiled: " __DATE__ " " __TIME__ "\n";
-    InitializeTranspositionTable(HASHTABLE_MEGABYTES);
     if (!InitializeOpeningBookFromFile("pawnstar.book"))
     {
         std::cout << "info string Unable to open book file.\n";

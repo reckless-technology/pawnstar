@@ -309,14 +309,6 @@ template <Color color> int EvaluatePawnStructure(const PawnStructure &ps)
     return score;
 }
 
-/// @brief Scales King safety weighting percentage according to enemy's classical material remaining.
-/// At the start of the game each side has 39 in material, and our king safety matters most.
-/// In the endgame, king safety is not important and the king should come out and play an active role.
-/// (8 x P + 2 x N + 2 x B + 2 x R + 1 x Q = 39)
-constexpr std::array<int, 40> KING_SAFETY_MULTIPLIER{
-    0,  0,  0,   0,   10,  15,  20,  25,  30,  35,  40,  45,  50,  55,  60,  65,  70,  75,  80,  85,
-    90, 95, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100};
-
 /// @brief Evaluate king score based on positional factors and enemy material.
 /// @tparam color Color to evaluate
 /// @param position Position
@@ -329,22 +321,12 @@ template <Color color> int EvaluateKing(const Position &position)
     const Bitboard    friendly_pawns  = friendly_pieces & position.Pawns();
     const Bitboard    enemy_pawns     = enemy_pieces & position.Pawns();
 
-    // Determine enemy non-pawn material value.
-    int enemy_material = (position.Pawns() & enemy_pieces).PopCount() +
-                         3 * ((position.Knights() | position.Bishops()) & enemy_pieces).PopCount() +
-                         5 * (position.Rooks() & enemy_pieces).PopCount() +
-                         9 * (position.Queens() & enemy_pieces).PopCount();
-    enemy_material = std::min(enemy_material, 39); // Ignore early promotions and extra queens.
-
-    // Scale piece square score according to enemy material.
-    int piece_square_score =
-        KING_SQUARE_MIDGAME[position.KingLocation(color) ^ rank_flip] * KING_SAFETY_MULTIPLIER[enemy_material] +
-        KING_SQUARE_ENDGAME[position.KingLocation(color) ^ rank_flip] * (100 - KING_SAFETY_MULTIPLIER[enemy_material]);
-    piece_square_score /= 100;
+    const int piece_square_score = position.Queens().IsEmpty()
+                                       ? KING_SQUARE_ENDGAME[position.KingLocation(color) ^ rank_flip]
+                                       : KING_SQUARE_MIDGAME[position.KingLocation(color) ^ rank_flip];
 
     int safety_score = 0;
-    // Only compute king safety when the enemy has more than 6 in classical material
-    if (enemy_material > 6)
+    if (position.Queens().IsNotEmpty())
     {
         // Consider pawns in front of the king and approaching enemy pawns.
         const Bitboard pawn_shelter_1 = SETS[position.KingLocation(color)].KingPawnShelter(color);
@@ -386,15 +368,11 @@ template <Color color> int EvaluateKing(const Position &position)
         {
             safety_score -= 15;
         }
-
-        // Bonus for friendly pieces near to our king
-        const Bitboard adjacent1 = SETS[position.KingLocation(color)].king_attacks;
-        const Bitboard adjacent2 = SETS[position.KingLocation(color)].king_attacks2 ^ adjacent1;
-        const Bitboard non_pawns = friendly_pieces ^ friendly_pawns;
-        safety_score += 10 * (adjacent1 & non_pawns).PopCount() + 5 * (adjacent2 & non_pawns).PopCount();
-
-        // Scale the king safety score according to the enemy's material.
-        safety_score = (safety_score * KING_SAFETY_MULTIPLIER[enemy_material]) / 100;
     }
+    // Bonus for friendly pieces near to our king
+    const Bitboard adjacent1 = SETS[position.KingLocation(color)].king_attacks;
+    const Bitboard adjacent2 = SETS[position.KingLocation(color)].king_attacks2 ^ adjacent1;
+    const Bitboard non_pawns = friendly_pieces ^ friendly_pawns;
+    safety_score += 10 * (adjacent1 & non_pawns).PopCount() + 5 * (adjacent2 & non_pawns).PopCount();
     return piece_square_score + safety_score;
 }
