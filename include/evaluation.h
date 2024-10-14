@@ -1,4 +1,6 @@
 #pragma once
+/// @file Data and functions to evaluate a chess position.
+
 #include <array>
 #include <cstdint>
 

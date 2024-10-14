@@ -29,6 +29,18 @@ template <typename T, int N> class StackList
     {
         *end_++ = m;
     }
+    constexpr T pop_back()
+    {
+        return *--end_;
+    }
+    constexpr T &back()
+    {
+        return end_[-1];
+    }
+    constexpr const T &back() const
+    {
+        return end_[-1];
+    }
     constexpr void clear()
     {
         end_ = data_.begin();

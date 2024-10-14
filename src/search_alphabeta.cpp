@@ -89,7 +89,7 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
         game.MakeNullMove();
         int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
         game.UndoMove();
-        if (game.is_cancel_pending_)
+        if (game.is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;
         }
@@ -115,11 +115,11 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
 int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &parent_pv)
 {
     INCREMENT("alpha beta calls");
-    if ((++game.node_count_ & 0xFFFF) == 0 && game.time_control_.hard_stop_ms != 0 &&
-        ElapsedMilliseconds() >= game.time_control_.hard_stop_ms)
+    if ((++game.node_count & 0xFFFF) == 0 && game.time_control.hard_stop_ms != 0 &&
+        ElapsedMilliseconds() >= game.time_control.hard_stop_ms)
     {
         // Out of time; stop searching immediately.
-        game.is_cancel_pending_ = true;
+        game.is_cancel_pending = true;
         return SEARCH_CANCELLED_SCORE;
     }
     if (ply == MAX_PLY)
@@ -173,7 +173,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
 
     // Try null move pruning.
     const int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
-    if (game.is_cancel_pending_)
+    if (game.is_cancel_pending)
     {
         return SEARCH_CANCELLED_SCORE;
     }
@@ -193,7 +193,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         INCREMENT("table move");
         best_move = transposition->move;
         int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition->move, pv, 0).first;
-        if (game.is_cancel_pending_)
+        if (game.is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;
         }
@@ -267,7 +267,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             INCREMENT("late move reduction fails");
             score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index).first;
         }
-        if (game.is_cancel_pending_)
+        if (game.is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;
         }

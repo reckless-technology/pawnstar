@@ -35,11 +35,11 @@ class HistoryTable
     void RecordGoodMove(int ply, const Move &move)
     {
         auto &table = *data_;
-        ++table[ply * 4096 + move.from_to_mask()];
+        ++table[ply * 4096 + move.from_to()];
     }
     uint32_t GetCount(int ply, const Move &move) const
     {
         const auto &table = *data_;
-        return table[ply * 4096 + move.from_to_mask()];
+        return table[ply * 4096 + move.from_to()];
     }
 };

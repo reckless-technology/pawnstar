@@ -181,9 +181,9 @@ class Bitboard
     };
 
     /// @brief Input iterator to allow iteration over the squares in a Bitboard.
-    /// Dereferencing the iterator returns the least significant bit set.
+    /// Dereferencing the iterator returns the index of the least significant bit set.
     /// Incrementing the iterator clears the least significant bit set.
-    /// This allows nice clean semantics like: "for (Square s : v)" for iterating over the bits set in a bitboard.
+    /// This allows nice clean semantics like: "for (Square s : b)" when iterating over the bits set in a bitboard.
     class Iterator
     {
       public:
@@ -222,24 +222,24 @@ class Bitboard
 
 // Useful Bitboard constant values.
 // clang-format off
-static constexpr Bitboard NO_SQUARES       {0ull};
-static constexpr Bitboard ALL_SQUARES      {~NO_SQUARES};
-static constexpr Bitboard RANK_1           {0xFFull};
-static constexpr Bitboard RANK_2           {RANK_1.ShiftNorth()};
-static constexpr Bitboard RANK_3           {RANK_2.ShiftNorth()};
-static constexpr Bitboard RANK_4           {RANK_3.ShiftNorth()};
-static constexpr Bitboard RANK_5           {RANK_4.ShiftNorth()};
-static constexpr Bitboard RANK_6           {RANK_5.ShiftNorth()};
-static constexpr Bitboard RANK_7           {RANK_6.ShiftNorth()};
-static constexpr Bitboard RANK_8           {RANK_7.ShiftNorth()};
-static constexpr Bitboard FILE_A           {0x0101010101010101ull};
-static constexpr Bitboard FILE_B           {FILE_A.ShiftEast()};
-static constexpr Bitboard FILE_C           {FILE_B.ShiftEast()};
-static constexpr Bitboard FILE_D           {FILE_C.ShiftEast()};
-static constexpr Bitboard FILE_E           {FILE_D.ShiftEast()};
-static constexpr Bitboard FILE_F           {FILE_E.ShiftEast()};
-static constexpr Bitboard FILE_G           {FILE_F.ShiftEast()};
-static constexpr Bitboard FILE_H           {FILE_G.ShiftEast()};
-static constexpr Bitboard WHITE_SQUARES    {0x55AA55AA55AA55AAull};
-static constexpr Bitboard BLACK_SQUARES    {~WHITE_SQUARES};
+static constexpr Bitboard NO_SQUARES        {0ull};
+static constexpr Bitboard ALL_SQUARES       {~NO_SQUARES};
+static constexpr Bitboard RANK_1            {0xFFull};
+static constexpr Bitboard RANK_2            {RANK_1.ShiftNorth()};
+static constexpr Bitboard RANK_3            {RANK_2.ShiftNorth()};
+static constexpr Bitboard RANK_4            {RANK_3.ShiftNorth()};
+static constexpr Bitboard RANK_5            {RANK_4.ShiftNorth()};
+static constexpr Bitboard RANK_6            {RANK_5.ShiftNorth()};
+static constexpr Bitboard RANK_7            {RANK_6.ShiftNorth()};
+static constexpr Bitboard RANK_8            {RANK_7.ShiftNorth()};
+static constexpr Bitboard FILE_A            {0x0101010101010101ull};
+static constexpr Bitboard FILE_B            {FILE_A.ShiftEast()};
+static constexpr Bitboard FILE_C            {FILE_B.ShiftEast()};
+static constexpr Bitboard FILE_D            {FILE_C.ShiftEast()};
+static constexpr Bitboard FILE_E            {FILE_D.ShiftEast()};
+static constexpr Bitboard FILE_F            {FILE_E.ShiftEast()};
+static constexpr Bitboard FILE_G            {FILE_F.ShiftEast()};
+static constexpr Bitboard FILE_H            {FILE_G.ShiftEast()};
+static constexpr Bitboard WHITE_SQUARES     {0x55AA55AA55AA55AAull};
+static constexpr Bitboard BLACK_SQUARES     {~WHITE_SQUARES};
 // clang-format on

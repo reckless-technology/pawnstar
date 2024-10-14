@@ -17,15 +17,15 @@ using std::string_view;
 /// @param fen_string Initial position.
 void Game::NewGame(std::string_view fen_string)
 {
-    time_control_.hard_stop_ms        = 0;
-    time_control_.clock_type          = CHESS_CLOCK_STANDARD;
-    time_control_.ms_remaining        = 5 * 60 * 1000; // 5 minutes
-    time_control_.num_moves_remaining = 0;
-    time_control_.depth               = 10;
-    node_count_                       = 0;
-    index_                            = 0;
-    is_cancel_pending_                = false;
-    positions_[index_]                = Position::FromString(fen_string);
+    time_control.hard_stop_ms        = 0;
+    time_control.clock_type          = CHESS_CLOCK_STANDARD;
+    time_control.ms_remaining        = 5 * 60 * 1000; // 5 minutes
+    time_control.num_moves_remaining = 0;
+    time_control.depth               = 10;
+    node_count                       = 0;
+    is_cancel_pending                = false;
+    positions_.clear();
+    positions_.push_back(Position::FromString(fen_string));
 }
 
 void Game::NewGame()
@@ -38,28 +38,19 @@ void Game::NewGame()
 void Game::PlayMove(Move move)
 {
 
-    positions_[index_ + 1] = CurrentPosition().MakeMove(move);
-    ++index_;
+    positions_.push_back(CurrentPosition().MakeMove(move));
 }
 
 /// @brief Make a null move. Only used during null move heuristic.
 void Game::MakeNullMove()
 {
-    positions_[index_ + 1] = CurrentPosition().MakeNullMove();
-    ++index_;
+    positions_.push_back(CurrentPosition().MakeNullMove());
 }
 
 /// @brief Undo the last move played.
 void Game::UndoMove()
 {
-    if (index_ > 0)
-    {
-        --index_;
-    }
-    else
-    {
-        std::cout << "ERROR: undo a non existent move!\n";
-    }
+    positions_.pop_back();
 }
 
 /// @brief Determine if the game is a draw by the 50 move rule.
@@ -81,14 +72,15 @@ bool Game::IsDrawByRepetition() const
 {
     int            repetitions = 2;
     const uint64_t hash        = CurrentPosition().Hash();
-    for (int i = index_ - 4; i >= 0; i -= 2)
+    // Start looking 4 half moves back, i.e. 2 moves ago, for repeated positions.
+    for (auto pos = positions_.end() - 5; pos >= positions_.begin(); pos -= 2)
     {
-        if (positions_[i].Hash() == hash && --repetitions == 0)
+        if (pos->Hash() == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition");
             return true;
         }
-        if (positions_[i].ReversibleMoveCount() == 0)
+        if (pos->ReversibleMoveCount() == 0)
         {
             return false;
         }
@@ -161,7 +153,7 @@ void Game::SearchThreadEntry()
 /// @brief If currently thinking, stop immediately.
 void Game::StopThinking()
 {
-    is_cancel_pending_ = true;
+    is_cancel_pending = true;
     if (worker_thread_.joinable())
     {
         worker_thread_.join();

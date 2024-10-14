@@ -49,8 +49,8 @@ void RunPositionTests(int depth)
     {
         Game game;
         game.NewGame(test_pos);
-        game.time_control_.clock_type = CHESS_CLOCK_FIXED_DEPTH;
-        game.time_control_.depth      = depth;
+        game.time_control.clock_type = CHESS_CLOCK_FIXED_DEPTH;
+        game.time_control.depth      = depth;
         std::cout << std::format("\n{}\n", game.CurrentPosition().ToString());
         DebugXClear();
         SearchRootNode(game);

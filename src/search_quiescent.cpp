@@ -54,7 +54,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         game.PlayMove(move);
         score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
         game.UndoMove();
-        if (game.is_cancel_pending_)
+        if (game.is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;
         }
