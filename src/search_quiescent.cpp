@@ -3,7 +3,6 @@
 #include "game.h"
 #include "position.h"
 #include "search.h"
-#include "sort_moves.h"
 #include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
@@ -42,7 +41,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     }
     int      best_score = score;
     MoveList move_list{game.CurrentPosition().GenerateLegalCaptures()};
-    ScoreAndSortMoves(game, move_list, ply);
+    game.ScoreAndSortMoves(move_list, ply);
     for (Move &move : move_list)
     {
         const auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
@@ -62,7 +61,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            RecordGoodMove(ply, move);
+            game.history_table.RecordGoodMove(ply, move);
             return score;
         }
         if (score > best_score)
@@ -72,7 +71,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent pv changed");
-                RecordGoodMove(ply, move);
+                game.history_table.RecordGoodMove(ply, move);
             }
         }
     }

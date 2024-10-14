@@ -24,7 +24,6 @@ SOURCES             = \
 	search_alphabeta.cpp \
 	search_quiescent.cpp \
 	search_root_node.cpp \
-	sort_moves.cpp \
 	static_exchange_evaluation.cpp \
 	tests_bratko_kopec.cpp \
 	tests_move_generation.cpp \

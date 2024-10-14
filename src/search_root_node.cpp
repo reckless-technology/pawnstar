@@ -5,7 +5,6 @@
 #include "opening_book.h"
 #include "position.h"
 #include "search.h"
-#include "sort_moves.h"
 #include "transposition_table.h"
 
 #include <format>
@@ -79,8 +78,8 @@ Move SearchRootNode(Game &game)
     // For first pass move ordering before we do any search, just use a shallow search with wide open alpha beta window.
     // Subsequent passes will use the results of the previous iteration to sort the moves (the merge sort is stable).
     DebugXClear();
-    ResetHistoryTable();
-    game.Table().Age();
+    game.history_table.Reset();
+    game.transposition_table.Age();
     Variation principal_variation{};
     Move      best_moves[MAX_PLY]; // Best move found at each ply of search.
     for (auto &move : move_list)
@@ -90,7 +89,7 @@ Move SearchRootNode(Game &game)
             SearchSingleMove(game, START_DEPTH, 0, ALPHA, BETA, move, principal_variation, move_index).first;
         move.AssignScore(score);
     }
-    SortMoves<true>(move_list);
+    game.SortMoves<true>(move_list);
     Move best_move          = move_list[0];
     best_moves[START_DEPTH] = best_move;
     for (int depth = START_DEPTH + 1; depth != MAX_PLY; ++depth)
@@ -99,7 +98,7 @@ Move SearchRootNode(Game &game)
         {
             break;
         }
-        SortMoves<true>(move_list); // Sort moves based on scores from the previous iteration.
+        game.SortMoves<true>(move_list); // Sort moves based on scores from the previous iteration.
         Variation child_pv{};
         int       alpha  = ALPHA;
         game.node_count_ = 0;

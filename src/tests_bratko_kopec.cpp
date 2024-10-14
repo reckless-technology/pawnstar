@@ -3,7 +3,6 @@
 #include "game.h"
 #include "position.h"
 #include "search.h"
-#include "sort_moves.h"
 #include "transposition_table.h"
 
 #include <array>
@@ -56,8 +55,8 @@ void RunPositionTests(int depth)
         DebugXClear();
         SearchRootNode(game);
 #if DEBUGX
-        auto [count, percent]  = game.Table().UsageStats();
-        auto max_history_count = MaxHistoryCount();
+        auto [count, percent]  = game.transposition_table.UsageStats();
+        auto max_history_count = game.history_table.MaxCount();
         ASSIGN("history move max count", max_history_count);
         ASSIGN("table usage count", count);
         ASSIGN("table usage percent", percent);

@@ -4,7 +4,6 @@
 #include "game.h"
 #include "position.h"
 #include "search.h"
-#include "sort_moves.h"
 #include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
@@ -130,7 +129,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     }
     // Determine if there is an entry in the transposition table for this position. If so, see if it is sufficient for
     // us to avoid the search entirely.
-    const auto transposition = game.Table().FindTransposition(game.CurrentPosition().Hash());
+    const auto transposition = game.transposition_table.FindTransposition(game.CurrentPosition().Hash());
     if (transposition && transposition->depth >= depth)
     {
         switch (transposition->node_type)
@@ -201,9 +200,9 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            game.Table().RecordTransposition(Transposition{game.CurrentPosition().Hash(), transposition->move, score,
-                                                           depth, Transposition::NodeType::CUT});
-            RecordGoodMove(ply, transposition->move);
+            game.transposition_table.RecordTransposition(Transposition{
+                game.CurrentPosition().Hash(), transposition->move, score, depth, Transposition::NodeType::CUT});
+            game.history_table.RecordGoodMove(ply, transposition->move);
             return score;
         }
         best_score = score;
@@ -212,7 +211,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             INCREMENT("table move raised alpha");
             alpha            = score;
             has_raised_alpha = true;
-            RecordGoodMove(ply, transposition->move);
+            game.history_table.RecordGoodMove(ply, transposition->move);
         }
     }
     // We didn't get a cutoff from the transposition table so proceed with generating and searching moves.
@@ -233,7 +232,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     }
 
     // Assign provisional scores to each move and sort them best first.
-    ScoreAndSortMoves(game, move_list, ply);
+    game.ScoreAndSortMoves(move_list, ply);
 
     // Start of the main loop.
     for (const Move &move : move_list)
@@ -275,9 +274,9 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            game.Table().RecordTransposition(
+            game.transposition_table.RecordTransposition(
                 Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::CUT});
-            RecordGoodMove(ply, move);
+            game.history_table.RecordGoodMove(ply, move);
             return score;
         }
         if (score > best_score)
@@ -290,7 +289,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
                 INCREMENT("pv changed");
                 alpha            = score;
                 has_raised_alpha = true;
-                RecordGoodMove(ply, move);
+                game.history_table.RecordGoodMove(ply, move);
             }
         }
     }
@@ -300,16 +299,16 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         // We raised alpha but did not cutoff; this was a PV node (these are rare) so copy the PV up the tree to our
         // parent node.
         INCREMENT("pv nodes");
-        game.Table().RecordTransposition(
+        game.transposition_table.RecordTransposition(
             Transposition{game.CurrentPosition().Hash(), best_move, alpha, depth, Transposition::NodeType::PV});
-        RecordGoodMove(ply, best_move);
+        game.history_table.RecordGoodMove(ply, best_move);
         CopyVariation(parent_pv, pv, best_move);
     }
     else
     {
         // We tried every move but did not raise alpha; this was an all node.
         INCREMENT("all nodes");
-        game.Table().RecordTransposition(
+        game.transposition_table.RecordTransposition(
             Transposition{game.CurrentPosition().Hash(), best_move, best_score, depth, Transposition::NodeType::ALL});
     }
     return best_score;
