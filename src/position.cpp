@@ -16,9 +16,9 @@ using std::vector;
 #include "transposition_table.h"
 
 /// @brief Make a null move: don't actually move any pieces on the board.
-/// # Flip side to move
-/// # Clear en passant capture availablity
-/// # Set the flag indicating this position is the result of a null move
+/// Flip side to move.
+/// Clear en passant capture availablity.
+/// Set the flag indicating this position is the result of a null move.
 /// @return new position.
 Position Position::MakeNullMove() const
 {
