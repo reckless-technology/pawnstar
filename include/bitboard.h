@@ -35,26 +35,41 @@ class Bitboard
     static constexpr uint64_t NOT_FILE_H = 0x7F7F7F7F7F7F7F7Full; ///< Mask off the h file.
 
   public:
+    /// @brief Defeault constructor.
     constexpr Bitboard()
     {
     }
+    /// @brief Constructor.
+    /// @param v Value to assign.
     constexpr Bitboard(uint64_t v) : v(v)
     {
     }
+    /// @brief Constructor.
+    /// @param location Square index to convert to Bitboard.
     constexpr Bitboard(Square location) : v(1ull << location)
     {
     }
+    /// @brief Constructor.
+    /// @param x File index (0,7)
+    /// @param y Rank index (0,7)
     constexpr Bitboard(int x, int y) : v(1ull << (x + 8 * y))
     {
     }
+    /// @brief Copy constructor.
+    /// @param that Bitboard to be copied.
     constexpr Bitboard(const Bitboard &that) : v(that.v)
     {
     }
+    /// @brief Assignment operator.
+    /// @param that Source Bitboard.
+    /// @return Assignee.
     constexpr Bitboard &operator=(Bitboard that)
     {
         v = that.v;
         return *this;
     }
+    /// @brief Convert Bitboard to 8 x 8 string for debug purposes.
+    /// @return Chess board string containing 1s and 0s.
     constexpr std::string ToString() const
     {
         std::string result;
@@ -75,107 +90,161 @@ class Bitboard
         }
         return result;
     }
+    /// @brief Clear all but the LSB, i.e. make unique square.
     constexpr void IsolateLsb()
     {
         v &= -v;
     }
+    /// @brief Equality operator.
+    /// @param that Comparee.
+    /// @return true if Bitboards are equal.
     constexpr bool operator==(Bitboard that) const
     {
         return v == that.v;
     }
+    /// @brief Inequality operator.
+    /// @param that Comparee.
+    /// @return true if Bitboards are not equal.
     constexpr bool operator!=(Bitboard that) const
     {
         return v != that.v;
     }
+    /// @brief Bitwise AND assignment.
+    /// @param that Source
+    /// @return Assignee.
     constexpr Bitboard &operator&=(Bitboard that)
     {
         v &= that.v;
         return *this;
     }
+    /// @brief Bitwise OR assignment.
+    /// @param that Source
+    /// @return Assignee.
     constexpr Bitboard &operator|=(Bitboard that)
     {
         v |= that.v;
         return *this;
     }
+    /// @brief Bitwise XOR assignment.
+    /// @param that Source
+    /// @return Assignee.
     constexpr Bitboard &operator^=(Bitboard that)
     {
         v ^= that.v;
         return *this;
     }
+    /// @brief Bitwise AND operator
+    /// @param that Source
+    /// @return Result.
     constexpr Bitboard operator&(Bitboard that) const
     {
         return Bitboard{v & that.v};
     }
+    /// @brief Bitwise OR operator
+    /// @param that Source
+    /// @return Result.
     constexpr Bitboard operator|(Bitboard that) const
     {
         return Bitboard{v | that.v};
     }
+    /// @brief Bitwise XOR operator
+    /// @param that Source
+    /// @return Result.
     constexpr Bitboard operator^(Bitboard that) const
     {
         return Bitboard{v ^ that.v};
     }
+    /// @brief Bitwise complement operator
+    /// @return Result.
     constexpr Bitboard operator~() const
     {
         return Bitboard{~v};
     }
+    /// @brief Least significant bit.
+    /// @return Square index of LSB.
     constexpr Square Lsb() const
     {
         return (Square)__builtin_ctzll(v);
     }
+    /// @brief Most significant bit.
+    /// @return Square index of MSB.
     constexpr Square Msb() const
     {
         return (Square)(63 - __builtin_clzll(v));
     }
+    /// @brief Population count.
+    /// @return Number of bits set.
     constexpr int PopCount() const
     {
         return __builtin_popcountll(v);
     }
+    /// @brief Check if bitboard is empty.
+    /// @return true if no bits are set.
     constexpr bool IsEmpty() const
     {
         return v == 0;
     }
+    /// @brief Check if bitboard is not empty.
+    /// @return true if at least 1 bit is set.
     constexpr bool IsNotEmpty() const
     {
         return v != 0;
     }
+    /// @brief Convert to native uint64_t
     constexpr explicit operator uint64_t() const
     {
         return v;
     }
+    /// @brief Shift one square to the North.
+    /// @return shifted Bitboard.
     constexpr Bitboard ShiftNorth() const
     {
         return Bitboard{v << 8};
     }
+    /// @brief Shift one square to the Northeast.
+    /// @return shifted Bitboard.
     constexpr Bitboard ShiftNortheast() const
     {
         return Bitboard{(v & NOT_FILE_H) << 9};
     }
+    /// @brief Shift one square to the East.
+    /// @return shifted Bitboard.
     constexpr Bitboard ShiftEast() const
     {
         return Bitboard{(v & NOT_FILE_H) << 1};
     }
+    /// @brief Shift one square to the Southeast.
+    /// @return shifted Bitboard.
     constexpr Bitboard ShiftSoutheast() const
     {
         return Bitboard{(v & NOT_FILE_H) >> 7};
     }
+    /// @brief Shift one square to the South.
+    /// @return shifted Bitboard.
     constexpr Bitboard ShiftSouth() const
     {
         return Bitboard{v >> 8};
     }
+    /// @brief Shift one square to the Southwest.
+    /// @return shifted Bitboard.
     constexpr Bitboard ShiftSouthwest() const
     {
         return Bitboard{(v & NOT_FILE_A) >> 9};
     }
+    /// @brief Shift one square to the West.
+    /// @return shifted Bitboard.
     constexpr Bitboard ShiftWest() const
     {
         return Bitboard{(v & NOT_FILE_A) >> 1};
     }
+    /// @brief Shift one square to the Northwest.
+    /// @return shifted Bitboard.n
     constexpr Bitboard ShiftNorthwest() const
     {
         return Bitboard{(v & NOT_FILE_A) << 7};
     }
 
-    /// @brief Dummy sentinel for end of input iterator range.
+    /// @brief Dummy sentinel class for end of input iterator range.
     class Sentinel
     {
     };
@@ -186,6 +255,9 @@ class Bitboard
     /// This allows nice clean semantics like: "for (Square s : b)" when iterating over the bits set in a bitboard.
     class Iterator
     {
+      private:
+        uint64_t i;
+
       public:
         using value_type = Square;
         constexpr Iterator(Bitboard bb) : i(bb.v)
@@ -193,20 +265,17 @@ class Bitboard
         }
         constexpr bool operator==(const Sentinel &) const
         {
-            return i == 0;
+            return i == 0; ///< No more bits to iterate over.
         }
         constexpr Square operator*() const
         {
-            return (Square)__builtin_ctzll(i);
+            return (Square)__builtin_ctzll(i); ///< Least significant bit.
         }
         constexpr Iterator &operator++()
         {
-            i &= i - 1;
+            i &= i - 1; ///< Clear LSB.
             return *this;
         }
-
-      private:
-        uint64_t i;
     };
 
     constexpr Iterator begin() const
