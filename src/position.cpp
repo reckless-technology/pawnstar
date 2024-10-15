@@ -23,8 +23,8 @@ using std::vector;
 Position Position::MakeNullMove() const
 {
     Position position{*this};
-    position.flags_ |= IS_NULL_MOVE;
-    position.flags_ ^= IS_BLACK_TO_MOVE;
+    position.state_flags_ |= IS_NULL_MOVE;
+    position.state_flags_ ^= IS_BLACK_TO_MOVE;
     position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
     position.hash_ ^= BLACK_MOVE_HASH;
     position.en_passant_square_ = NO_SQUARE;
@@ -84,10 +84,9 @@ Position Position::MakeMove(const Move &move) const
     const Piece  piece = PieceAt(from);
 
     Position position{*this};
-    position.flags_ &= ~IS_NULL_MOVE;
-    position.flags_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
-    position.hash_ ^= CASTLING_RIGHTS_HASHES[CASTLING_RIGHTS_MASK & position.flags_] ^
-                      CASTLING_RIGHTS_HASHES[CASTLING_RIGHTS_MASK & this->flags_];
+    position.state_flags_ &= ~IS_NULL_MOVE;
+    position.castling_rights_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
+    position.hash_ ^= CASTLING_RIGHTS_HASHES[position.castling_rights_] ^ CASTLING_RIGHTS_HASHES[castling_rights_];
     position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
     position.en_passant_square_ = NO_SQUARE;
 
@@ -156,7 +155,7 @@ Position Position::MakeMove(const Move &move) const
         }
         break;
     }
-    position.flags_ ^= IS_BLACK_TO_MOVE;
+    position.state_flags_ ^= IS_BLACK_TO_MOVE;
     position.hash_ ^= BLACK_MOVE_HASH;
     position.full_move_count_ += color; // Increments after black's move.
     position.king_location_[color] = (position.kings_ & position.PiecesOfColor(color)).Lsb();
@@ -213,7 +212,7 @@ Position Position::FromString(std::string_view fen_string)
     ss >> color_to_move;
     if (color_to_move == "b")
     {
-        position.flags_ |= IS_BLACK_TO_MOVE;
+        position.state_flags_ |= IS_BLACK_TO_MOVE;
     }
     position.king_location_[WHITE] = (position.kings_ & position.white_pieces_).Lsb();
     position.king_location_[BLACK] = (position.kings_ & position.black_pieces_).Lsb();
@@ -222,7 +221,7 @@ Position Position::FromString(std::string_view fen_string)
     ss >> castling_rights;
     if (castling_rights == "-")
     {
-        position.flags_ &= ~CASTLING_RIGHTS_MASK;
+        position.castling_rights_ = 0;
     }
     else
     {
@@ -231,16 +230,16 @@ Position Position::FromString(std::string_view fen_string)
             switch (c)
             {
             case 'K':
-                position.flags_ |= MAY_WHITE_CASTLE_KINGSIDE;
+                position.castling_rights_ |= MAY_WHITE_CASTLE_KINGSIDE;
                 break;
             case 'Q':
-                position.flags_ |= MAY_WHITE_CASTLE_QUEENSIDE;
+                position.castling_rights_ |= MAY_WHITE_CASTLE_QUEENSIDE;
                 break;
             case 'k':
-                position.flags_ |= MAY_BLACK_CASTLE_KINGSIDE;
+                position.castling_rights_ |= MAY_BLACK_CASTLE_KINGSIDE;
                 break;
             case 'q':
-                position.flags_ |= MAY_BLACK_CASTLE_QUEENSIDE;
+                position.castling_rights_ |= MAY_BLACK_CASTLE_QUEENSIDE;
                 break;
             default:
                 break;
@@ -317,27 +316,27 @@ std::string Position::ToString() const
         }
     }
     // Side to move
-    ss << ' ' << (flags_ & IS_BLACK_TO_MOVE ? 'b' : 'w') << ' ';
+    ss << ' ' << (state_flags_ & IS_BLACK_TO_MOVE ? 'b' : 'w') << ' ';
     // Castling rights
-    if (!(flags_ & CASTLING_RIGHTS_MASK))
+    if (castling_rights_ == 0)
     {
         ss << '-';
     }
     else
     {
-        if (flags_ & MAY_WHITE_CASTLE_KINGSIDE)
+        if (castling_rights_ & MAY_WHITE_CASTLE_KINGSIDE)
         {
             ss << 'K';
         }
-        if (flags_ & MAY_WHITE_CASTLE_QUEENSIDE)
+        if (castling_rights_ & MAY_WHITE_CASTLE_QUEENSIDE)
         {
             ss << 'Q';
         }
-        if (flags_ & MAY_BLACK_CASTLE_KINGSIDE)
+        if (castling_rights_ & MAY_BLACK_CASTLE_KINGSIDE)
         {
             ss << 'k';
         }
-        if (flags_ & MAY_BLACK_CASTLE_QUEENSIDE)
+        if (castling_rights_ & MAY_BLACK_CASTLE_QUEENSIDE)
         {
             ss << 'q';
         }
@@ -445,8 +444,8 @@ bool Position::IsLegal() const
 /// @return the 64 bit hash
 uint64_t Position::ComputeHash() const
 {
-    uint64_t hash = flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
-    hash ^= CASTLING_RIGHTS_HASHES[flags_ & CASTLING_RIGHTS_MASK];
+    uint64_t hash = state_flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
+    hash ^= CASTLING_RIGHTS_HASHES[castling_rights_];
     hash ^= EN_PASSANT_HASHES[en_passant_square_];
     for (Piece piece = PAWN; piece <= KING; piece = (Piece)(piece + 1))
     {
