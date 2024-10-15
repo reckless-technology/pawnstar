@@ -119,8 +119,8 @@ constexpr std::array<int, 64> PASSED_PAWN_SQUARE
 };
 
 /// @brief Scores for bishop and rook mobility based on number of squares attacked.
-constexpr std::array<int, 14>     BISHOP_ATTACK_SCORES  {-20, -15, -10, -5, 0, 5, 10, 15, 20, 20, 20, 20, 20, 20    };
-constexpr std::array<int, 15>     ROOK_ATTACK_SCORES    {-10, -10, -10, -5, 0, 5, 10, 15, 20, 20, 20, 20, 20, 20, 20};
+constexpr std::array<int, 14>     BISHOP_ATTACK_SCORES  {-20,-10, -5, -5,  0,  5, 10, 15, 20, 20, 20, 20, 20, 20    };
+constexpr std::array<int, 15>     ROOK_ATTACK_SCORES    {-10,-10, -5, -5,  0,  5, 10, 15, 20, 20, 20, 20, 20, 20, 20};
 constexpr std::array<Bitboard, 8> FILE_BITBOARDS        {FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H};
 
 // clang-format on
@@ -213,10 +213,10 @@ template <Color color> int EvaluateMaterial(const Position &position)
     const Bitboard rooks           = position.Rooks() & friendly_pieces;
     const Bitboard queens          = position.Queens() & friendly_pieces;
     // clang-format off
-    int score = pawns.PopCount()   * 100 + 
-                knights.PopCount() * 400 + 
-                bishops.PopCount() * 400 + 
-                rooks.PopCount()   * 600 +
+    int score = pawns.PopCount()   *  100 + 
+                knights.PopCount() *  400 + 
+                bishops.PopCount() *  400 + 
+                rooks.PopCount()   *  600 +
                 queens.PopCount()  * 1200;
     // clang-format on
     // Bonus for the bishop pair.
@@ -322,13 +322,14 @@ template <Color color> int EvaluateKing(const Position &position)
     const Bitboard    enemy_pieces    = position.PiecesOfColor(EnemyOf(color));
     const Bitboard    friendly_pawns  = friendly_pieces & position.Pawns();
     const Bitboard    enemy_pawns     = enemy_pieces & position.Pawns();
+    const bool        is_endgame =
+        position.Queens().IsEmpty() && (position.OccupiedSquares() ^ position.Pawns()).PopCount() < 8;
 
-    const int piece_square_score = position.Queens().IsEmpty()
-                                       ? KING_SQUARE_ENDGAME[position.KingLocation(color) ^ rank_flip]
-                                       : KING_SQUARE_MIDGAME[position.KingLocation(color) ^ rank_flip];
+    const int piece_square_score = is_endgame ? KING_SQUARE_ENDGAME[position.KingLocation(color) ^ rank_flip]
+                                              : KING_SQUARE_MIDGAME[position.KingLocation(color) ^ rank_flip];
 
     int safety_score = 0;
-    if (position.Queens().IsNotEmpty())
+    if (!is_endgame)
     {
         // Consider pawns in front of the king and approaching enemy pawns.
         const Bitboard pawn_shelter_1 = SETS[position.KingLocation(color)].KingPawnShelter(color);
@@ -346,29 +347,29 @@ template <Color color> int EvaluateKing(const Position &position)
         }
         // clang-format off
         safety_score =
-            25 * (friendly_pawns & pawn_shelter_1).PopCount() + 
+            15 * (friendly_pawns & pawn_shelter_1).PopCount() + 
             10 * (friendly_pawns & pawn_shelter_2).PopCount() +
-            5 * (friendly_pawns & pawn_shelter_3).PopCount() - 
-            25 * (enemy_pawns & pawn_shelter_1).PopCount() -
-            15 * (enemy_pawns & pawn_shelter_2).PopCount() - 
-            10 * (enemy_pawns & pawn_shelter_3).PopCount();
+             5 * (friendly_pawns & pawn_shelter_3).PopCount() - 
+            15 * (enemy_pawns & pawn_shelter_1).PopCount() -
+            10 * (enemy_pawns & pawn_shelter_2).PopCount() - 
+             5 * (enemy_pawns & pawn_shelter_3).PopCount();
         // clang-format on
 
         // Penalty for open files near our king.
         const Bitboard king_file = FILE_BITBOARDS[FileOf(position.KingLocation(color))];
         if ((king_file & friendly_pawns).IsEmpty())
         {
-            safety_score -= 20;
+            safety_score -= 15;
         }
         Bitboard adjacent_file = king_file.ShiftWest();
         if (adjacent_file.IsNotEmpty() && (adjacent_file & friendly_pawns).IsEmpty())
         {
-            safety_score -= 15;
+            safety_score -= 10;
         }
         adjacent_file = king_file.ShiftEast();
         if (adjacent_file.IsNotEmpty() && (adjacent_file & friendly_pawns).IsEmpty())
         {
-            safety_score -= 15;
+            safety_score -= 10;
         }
     }
     // Bonus for friendly pieces near to our king
