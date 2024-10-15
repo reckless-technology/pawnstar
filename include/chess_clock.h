@@ -1,19 +1,20 @@
 #pragma once
+/// @file Chess clock.
 #include <cstdint>
 
 /// @brief Time control chess clock types.
 enum ClockType
 {
-    CHESS_CLOCK_STANDARD,    ///< N moves to be made in M minutes
-    CHESS_CLOCK_FIXED_DEPTH, ///< Search to depth D on every move
-    CHESS_CLOCK_FIXED_TIME,  ///< Search for N milliseconds on every move
-    CHESS_CLOCK_INFINITE,    ///< Keep searching until told to stop
+    CHESS_CLOCK_STANDARD,    ///< N moves to be made in a specified time.
+    CHESS_CLOCK_FIXED_DEPTH, ///< Search to depth D on every move.
+    CHESS_CLOCK_FIXED_TIME,  ///< Search for N milliseconds on every move.
+    CHESS_CLOCK_INFINITE,    ///< Keep searching until told to stop.
 };
 
 /// @brief Clock and time controls.
 struct TimeControl
 {
-    ClockType clock_type;          ///< standard chess clock, incremental clock, fixed time or fixed depth
+    ClockType clock_type;          ///< stThe current clock type.
     int       hard_stop_ms;        ///< Wall clock time to hard stop searching and move
     int       ms_remaining;        ///< Number of ms remaining in this clock period.
     int       num_moves_remaining; ///< Number of moves remaining in this clock period.

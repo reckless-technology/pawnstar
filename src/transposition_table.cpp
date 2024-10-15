@@ -40,11 +40,7 @@ std::optional<Transposition> TranspositionTable::FindTransposition(uint64_t hash
 }
 
 /// @brief Insert a new entry into the table.
-/// @param hash Zobrist hash of position.
-/// @param depth Search depth.
-/// @param score Score for this position.
-/// @param move Best move found.
-/// @param node_type Node type.
+/// @param transposition Transposition to be inserted.
 void TranspositionTable::RecordTransposition(const Transposition &transposition)
 {
     Transposition &t = table_[transposition.hash % table_.size()];

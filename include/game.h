@@ -45,24 +45,7 @@ class Game
     bool IsGameOver() const;
     bool IsDrawByRepetition() const;
     bool IsDrawByFiftyMoves() const;
-
-    /// @brief Assign provisional scores to each move and then sort them best first.
-    /// Use MVV/LVA plus history table counts to score moves. This is primitive, but way faster than static exchange
-    /// evaluation, and seems to work pretty well in practice.
-    /// @param game Game being searched
-    /// @param moves List of legal moves to evaluate.
-    /// @param ply Current search ply.
-    constexpr void ScoreAndSortMoves(MoveList &moves, int ply)
-    {
-
-        const Position &position = CurrentPosition();
-        for (Move &move : moves)
-        {
-            move.AssignScore(piece_values[position.PieceAt(move.to())] * 10000 -
-                             piece_values[position.PieceAt(move.from())] * 1000 + history_table.GetCount(ply, move));
-        }
-        SortMoves<false>(moves);
-    }
+    void ScoreAndSortMoves(MoveList &moves, int ply);
 
   private:
     void                     SearchThreadEntry(); ///< Entry point of worker thread.

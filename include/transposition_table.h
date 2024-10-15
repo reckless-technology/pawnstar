@@ -36,6 +36,7 @@ struct Transposition
 
 static_assert(sizeof(Transposition) == 24);
 
+/// @brief Class to hold the transposition table.
 class TranspositionTable
 {
   public:
@@ -46,5 +47,5 @@ class TranspositionTable
     std::pair<std::size_t, int>  UsageStats() const;
 
   private:
-    std::vector<Transposition> table_;
+    std::vector<Transposition> table_; ///< Vector of Transpositions, indexed using Zorbist hash.
 };

@@ -12,28 +12,28 @@
 
 /// @brief Bishop sliding attacks.
 /// @param occupied_squares Squares with a piece on them.
-/// @param location Bishop location.
+/// @param s Bishop location.
 /// @return Set of squares attacked by a bishop on location.
-constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
+constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square s)
 {
-    const MagicBitboard &m = BISHOP_MAGICS[location];
+    const MagicBitboard &m = BISHOP_MAGICS[s];
     return m.attacks[m.indices[(((uint64_t)occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
 }
 
 /// @brief Rook sliding attacks.
 /// @param occupied_squares Squares with a piece on them.
-/// @param location Rook location.
+/// @param s Rook location.
 /// @return Set of squares attacked by a rook on location.
-constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
+constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square s)
 {
-    const MagicBitboard &m = ROOK_MAGICS[location];
+    const MagicBitboard &m = ROOK_MAGICS[s];
     return m.attacks[m.indices[(((uint64_t)occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
 }
 
 #else
 
-/// Alternate sliding piece attacks using traditional approach instead of magic bitboards. This is slower, and only used
-/// for regression testing purposes.
+// Alternate sliding piece attacks using traditional approach instead of magic bitboards. This is slower, and only used
+// for regression testing purposes.
 
 constexpr Square LsbX(Bitboard b)
 {
@@ -73,7 +73,7 @@ constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 /// @param occupied_squares Squares with a piece on them.
 /// @param location Queen location.
 /// @return Set of squares attacked by a queen on location.
-constexpr Bitboard QueenAttacks(Bitboard occupied_squares, Square location)
+constexpr Bitboard QueenAttacks(Bitboard occupied_squares, Square s)
 {
-    return BishopAttacks(occupied_squares, location) | RookAttacks(occupied_squares, location);
+    return BishopAttacks(occupied_squares, s) | RookAttacks(occupied_squares, s);
 }
