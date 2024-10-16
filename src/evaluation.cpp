@@ -1,5 +1,6 @@
 #include "evaluation.h"
 #include "debug_hashtable.h"
+#include "game.h"
 #include "position.h"
 #include "transposition_table.h"
 

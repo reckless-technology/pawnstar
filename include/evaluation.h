@@ -4,9 +4,9 @@
 #include <array>
 #include <cstdint>
 
-#include "bitboard.h"
-#include "game.h"
 #include "position.h"
+
+class Game;
 
 int EvaluatePosition(const Game &game, int alpha, int beta);
 

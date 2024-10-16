@@ -87,7 +87,7 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
         INCREMENT("null move");
         Variation dummy{};
         game.MakeNullMove();
-        int score = -Search(game, depth - 4, ply + 1, -beta, -alpha, dummy);
+        int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
         game.UndoMove();
         if (game.is_cancel_pending)
         {
@@ -121,6 +121,10 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         // Out of time; stop searching immediately.
         game.is_cancel_pending = true;
         return SEARCH_CANCELLED_SCORE;
+    }
+    if (game.CurrentPosition().IsInCheck())
+    {
+        ++depth;
     }
     if (ply == MAX_PLY)
     {
@@ -242,7 +246,20 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         {
             continue; // We already searched this move.
         }
-        // Maybe try late move depth reduction, if all the conditions are met.
+        // Maybe try frontier node pruning.
+        if (depth == 1 &&                          // frontier node
+            move_index > 3 &&                      // we already tried several moves
+            !game.CurrentPosition().IsInCheck() && // we are not in check
+            beta == alpha + 1)                     // it is not a PV node
+        {
+            auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
+            if (see_score < 0 && !is_checking) // move loses material and does not check
+            {
+                INCREMENT("frontier prune");
+                continue;
+            }
+        }
+        // Maybe try late move depth reduction.
         int lmr_depth = depth;
         if (move_index > 3 &&                      // we already tried several moves
             !game.CurrentPosition().IsInCheck() && // we are not in check
@@ -261,6 +278,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
                 }
             }
         }
+
         int score = SearchSingleMove(game, lmr_depth, ply, alpha, beta, move, pv, move_index).first;
         if (score > alpha && lmr_depth < depth)
         {

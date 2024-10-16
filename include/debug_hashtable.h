@@ -7,9 +7,24 @@
 
 #if DEBUGX
 
+/// @brief FNV-1a 64 hash. Simple, fast, and constexpr.
+struct string_hasher
+{
+    constexpr std::size_t operator()(std::string_view str) const
+    {
+        std::size_t result = 14695981039346656037ull;
+        for (char c : str)
+        {
+            result ^= c;
+            result *= 1099511628211ull;
+        }
+        return result;
+    }
+};
+
 /// @brief Maps a literal string to a count value.
-typedef std::unordered_map<std::string_view, int64_t> DebugTable;
-extern DebugTable                                     debug_dictionary;
+typedef std::unordered_map<std::string_view, int64_t, string_hasher> DebugTable;
+extern DebugTable                                                    debug_dictionary;
 
 void DebugXClear();
 void DebugXWrite();

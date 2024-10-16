@@ -527,7 +527,7 @@ constexpr std::array<Generator, 4> pawn_generators_black = {{
 /// @brief Generate the generic sets for each square.
 static void GenerateSets()
 {
-    std::cout << std::format("inline constexpr Sets SETS[64] = \n{{");
+    std::cout << std::format("extern const Sets SETS[64] = \n{{");
     for (uint8_t sq = 0; sq != 64; ++sq)
     {
         std::cout << std::format("\n    {{ // square {}", SquareName(sq));
@@ -544,7 +544,7 @@ static void GenerateSets()
 /// @brief Generate pawn structure sets for each color for each square.
 static void GeneratePawnSets()
 {
-    std::cout << std::format("inline constexpr PawnSets PAWN_SETS[2][64] = \n{{");
+    std::cout << std::format("extern const PawnSets PAWN_SETS[2][64] = \n{{");
     for (int color = 0; color != 2; ++color)
     {
         std::cout << std::format("\n    {{");
@@ -568,7 +568,7 @@ static void GeneratePawnSets()
 /// @brief Generate the intervening squares array.
 static void GenerateInterveningSquares()
 {
-    std::cout << std::format("inline constexpr Bitboard INTERVENING_SQUARES[64][64] = \n{{");
+    std::cout << std::format("extern const Bitboard INTERVENING_SQUARES[64][64] = \n{{");
     for (uint8_t i = 0; i != 64; ++i)
     {
         std::cout << std::format("\n    {{ // square {}", SquareName(i));
@@ -588,7 +588,7 @@ static void GenerateInterveningSquares()
 /// @brief Generate Zobrist hash keys for pieces, castling rights and en passant capture.
 static void GenerateHashes()
 {
-    std::cout << std::format("inline constexpr uint64_t PIECE_SQUARE_HASHES[2][6][64] = \n{{");
+    std::cout << std::format("extern const uint64_t PIECE_SQUARE_HASHES[2][6][64] = \n{{");
     for (int color = 0; color != 2; ++color)
     {
         std::cout << std::format("\n    {{");
@@ -608,7 +608,7 @@ static void GenerateHashes()
         std::cout << std::format("\n    }},");
     }
     std::cout << std::format("\n}};\n");
-    std::cout << std::format("inline constexpr uint64_t CASTLING_RIGHTS_HASHES[16] = \n{{");
+    std::cout << std::format("extern const uint64_t CASTLING_RIGHTS_HASHES[16] = \n{{");
     for (uint8_t i = 0; i != 16; ++i)
     {
         if ((i & 7) == 0)
@@ -618,7 +618,7 @@ static void GenerateHashes()
         std::cout << std::format("0x{:016X},", NextRandomKey());
     }
     std::cout << std::format("\n}};\n");
-    std::cout << std::format("inline constexpr uint64_t EN_PASSANT_HASHES[64] = \n{{");
+    std::cout << std::format("extern const uint64_t EN_PASSANT_HASHES[64] = \n{{");
     for (uint8_t i = 0; i != 64; ++i)
     {
         if ((i & 7) == 0)
@@ -629,7 +629,6 @@ static void GenerateHashes()
         std::cout << std::format("0x{:016X},", rank == 2 || rank == 5 ? NextRandomKey() : 0);
     }
     std::cout << std::format("\n}};\n");
-    std::cout << std::format("constexpr uint64_t BLACK_MOVE_HASH=0x{:016X};\n", NextRandomKey());
 }
 
 /// @brief Generate magic bitboards for bishop and rook sliding attacks.
@@ -647,7 +646,7 @@ static void GenerateMagics(void)
         for (uint8_t sq = 0; sq != 64; ++sq)
         {
             const int num_attacks = 1 << (64 - magics[sq].shift);
-            std::cout << std::format("inline constexpr uint8_t {}_MAGIC_INDICES_{}[{}] = \n{{", pm.name, SquareName(sq),
+            std::cout << std::format("static const uint8_t {}_MAGIC_INDICES_{}[{}] = \n{{", pm.name, SquareName(sq),
                                      num_attacks);
             for (int j = 0; j != num_attacks; ++j)
             {
@@ -658,8 +657,8 @@ static void GenerateMagics(void)
                 std::cout << std::format("0x{:02X}, ", magics[sq].indices[j]);
             }
             std::cout << std::format("\n}};\n");
-            std::cout << std::format("inline constexpr uint64_t {}_MAGIC_ATTACKS_{}[{}] = \n{{", pm.name,
-                                     SquareName(sq), magics[sq].attacks.size());
+            std::cout << std::format("static const uint64_t {}_MAGIC_ATTACKS_{}[{}] = \n{{", pm.name, SquareName(sq),
+                                     magics[sq].attacks.size());
             for (std::size_t j = 0; j != magics[sq].attacks.size(); ++j)
             {
                 if (j % 4 == 0)
@@ -671,7 +670,7 @@ static void GenerateMagics(void)
             std::cout << std::format("\n}};\n");
         }
         // Next print the MagicBitboard for this piece / square combination.
-        std::cout << std::format("inline constexpr MagicBitboard {}_MAGICS[64] = \n{{\n", pm.name);
+        std::cout << std::format("extern const MagicBitboard {}_MAGICS[64] = \n{{\n", pm.name);
         for (uint8_t i = 0; i != 64; ++i)
         {
             std::cout << std::format("    {{\n");
@@ -691,6 +690,7 @@ static void GenerateMagics(void)
 int main()
 {
     std::cout << "// This file was generated on " __DATE__ " at " __TIME__ "\n";
+    std::cout << "#include \"generated_data.h\"\n";
     GenerateSets();
     GeneratePawnSets();
     GenerateInterveningSquares();

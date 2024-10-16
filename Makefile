@@ -6,7 +6,7 @@ CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20
 DEBUG_DIR           = debug
 RELEASE_DIR         = release
 
-GENERATED_DATA      = include/generated_data.inc
+GENERATED_DATA      = src/generated_data.cpp
 GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
 GENERATOR_EXE       = generate_constants/gen_constants
 
@@ -28,7 +28,8 @@ SOURCES             = \
 	tests_move_generation.cpp \
 	tests_static_exchange.cpp \
 	timer.cpp \
-	transposition_table.cpp
+	transposition_table.cpp \
+	$(notdir $(GENERATED_DATA))
 
 OBJECTS             = $(SOURCES:.cpp=.o)
 
