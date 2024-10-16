@@ -87,7 +87,7 @@ static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int
         INCREMENT("null move");
         Variation dummy{};
         game.MakeNullMove();
-        int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
+        int score = -Search(game, depth - 4, ply + 1, -beta, -alpha, dummy);
         game.UndoMove();
         if (game.is_cancel_pending)
         {
@@ -244,10 +244,10 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         }
         // Maybe try late move depth reduction, if all the conditions are met.
         int lmr_depth = depth;
-        if (!game.CurrentPosition().IsInCheck() && // we are not in check
+        if (move_index > 3 &&                      // we already tried several moves
+            !game.CurrentPosition().IsInCheck() && // we are not in check
             depth > 2 &&                           // do not drop directly into quiescence
-            beta == alpha + 1 &&                   // it is not a PV node
-            move_index > 3)                        // we already tried a few moves without cutoff
+            beta == alpha + 1)                     // it is not a PV node
         {
             auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
             if (!is_checking && see_score <= 0) // move does not give check and does not win material

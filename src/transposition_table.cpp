@@ -23,7 +23,7 @@ TranspositionTable::TranspositionTable(std::size_t megabytes)
     {
         num_entries -= 2;
     }
-    table_.assign(num_entries, Transposition{0, Move::None(), 0, 0, Transposition::NodeType::CUT});
+    table_.assign(num_entries, Transposition{});
 }
 
 /// @brief Find an entry in the TT if one exists for this position.
@@ -56,7 +56,7 @@ void TranspositionTable::RecordTransposition(const Transposition &transposition)
 /// @return The number of transpositions and percentage full of the table.
 std::pair<std::size_t, int> TranspositionTable::UsageStats() const
 {
-    const std::size_t count = std::ranges::count_if(table_, [](const Transposition &t) { return t.hash != 0; });
+    std::size_t count = std::ranges::count_if(table_, [](const Transposition &t) { return t.hash != 0; });
     return {count, (count * 100) / table_.size()};
 }
 

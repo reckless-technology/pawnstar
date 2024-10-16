@@ -8,6 +8,7 @@
 #include "chess_clock.h"
 #include "constants.h"
 #include "history_table.h"
+#include "opening_book.h"
 #include "position.h"
 #include "transposition_table.h"
 
@@ -18,6 +19,7 @@ class Game
     TranspositionTable transposition_table; ///< The transposition table.
     HistoryTable       history_table;       ///< The history table.
     TimeControl        time_control;        ///< Clock controls for the current game.
+    OpeningBook        book;                ///< The opening book.
     int                node_count;          ///< Number of nodes (positions) during search.
     bool               is_cancel_pending;   ///< Set to true when time for this search is expired.
 

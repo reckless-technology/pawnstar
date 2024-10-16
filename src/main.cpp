@@ -36,12 +36,14 @@ int main()
                  "Pawnstar: a UCI compatible chess engine\n"
                  "(C) Jonny Reckless 2009 - 2024\n"
                  "Compiled: " __DATE__ " " __TIME__ "\n";
-    if (!InitializeOpeningBookFromFile("pawnstar.book"))
+
+    Game game{};
+    if (!game.book.Initialize("pawnstar.book"))
     {
         std::cout << "info string Unable to open book file.\n";
     }
-    Game game{};
     DebugXClear();
+    std::cout << "ready\n";
     for (std::string line; std::getline(std::cin, line);)
     {
         ProcessInput(game, line);

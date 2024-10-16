@@ -9,6 +9,7 @@
 #include <format>
 #include <functional>
 #include <iostream>
+#include <random>
 #include <set>
 #include <string_view>
 #include <vector>
@@ -86,15 +87,11 @@ constexpr int PopCount(uint64_t x)
 }
 
 /// @brief Generate a 64 bit pseudo random number Zobrist hash key.
-/// Uses XORshift* algorithm.
 /// @return Next value in sequence.
 uint64_t NextRandomKey()
 {
-    static uint64_t x = 0xAA55AA55AA55AA55ull;
-    x ^= x >> 12;
-    x ^= x << 25;
-    x ^= x >> 27;
-    return x * 0x2545F4914F6CDD1Dull;
+    static std::mt19937_64 prng{0xAA55AA55AA55AA55};
+    return prng();
 }
 
 /// @brief Generate a ray from a square in a single compass direction.

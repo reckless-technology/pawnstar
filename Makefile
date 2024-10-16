@@ -20,7 +20,6 @@ SOURCES             = \
 	opening_book.cpp \
 	perft_results.cpp \
 	position.cpp \
-	random.cpp \
 	search_alphabeta.cpp \
 	search_quiescent.cpp \
 	search_root_node.cpp \

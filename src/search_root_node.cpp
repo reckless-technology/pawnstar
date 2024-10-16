@@ -23,7 +23,7 @@ using std::stringstream;
 Move SearchRootNode(Game &game)
 {
     // If there is a book move for this position, do not bother with search.
-    Move book_move = GetBookMove(game.CurrentPosition().Hash());
+    Move book_move = game.book.GetMove(game.CurrentPosition().Hash());
     if (book_move)
     {
         return book_move;

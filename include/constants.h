@@ -3,7 +3,7 @@
 
 #include <cstdint>
 
-constexpr int HASHTABLE_MEGABYTES         = 512;       ///< default transposition table size in MB
+constexpr int HASHTABLE_MEGABYTES         = 8;         ///< default transposition table size in MB
 constexpr int MAX_MOVES_PER_POSITION      = 512;       ///< maximum possible number of moves for a chess position
 constexpr int BETA                        = 11000;     ///< greater than any possible evaluation score
 constexpr int ALPHA                       = -11000;    ///< smaller than any possible evaluation score

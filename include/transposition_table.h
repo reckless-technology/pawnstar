@@ -47,5 +47,5 @@ class TranspositionTable
     std::pair<std::size_t, int>  UsageStats() const;
 
   private:
-    std::vector<Transposition> table_; ///< Vector of Transpositions, indexed using Zorbist hash.
+    std::vector<Transposition> table_; ///< Indexed using Zobrist hash.
 };

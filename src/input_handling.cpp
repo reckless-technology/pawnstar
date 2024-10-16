@@ -50,12 +50,12 @@ void handle_postests(Game &, std::span<std::string> args)
 
 void handle_bookmoves(Game &game, std::span<std::string>)
 {
-    DisplayAvailableBookMoves(game.CurrentPosition());
+    game.book.DisplayAvailableMoves(game.CurrentPosition());
 }
 
-void handle_freebook(Game &, std::span<std::string>)
+void handle_freebook(Game &game, std::span<std::string>)
 {
-    FreeOpeningBook();
+    game.book.Free();
 }
 
 void handle_eval(Game &game, std::span<std::string>)
