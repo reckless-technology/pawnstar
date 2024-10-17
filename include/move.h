@@ -339,7 +339,7 @@ class alignas(8) Move
 static_assert(sizeof(Move) == sizeof(uint64_t));
 
 /// @brief A list of moves, typically used to hold the list of legal moves available from a given position.
-/// A StackList is much faster than a std::vector, and more convenient than a std::array.
+/// A StackList is much faster than a std::vector, and more convenient than a raw std::array.
 typedef StackList<Move, MAX_MOVES_PER_POSITION> MoveList;
 
 /// @brief Sort moves best first, i.e. in descending score order.
@@ -349,11 +349,10 @@ template <bool is_stable_sort> constexpr void SortMoves(MoveList &moves)
 {
     if constexpr (is_stable_sort)
     {
-        std::stable_sort(moves.begin(), moves.end(),
-                         [](const Move &a, const Move &b) { return a.score() > b.score(); });
+        std::ranges::stable_sort(moves, [](const Move &a, const Move &b) { return a.score() > b.score(); });
     }
     else
     {
-        std::sort(moves.begin(), moves.end(), [](const Move &a, const Move &b) { return a.score() > b.score(); });
+        std::ranges::sort(moves, [](const Move &a, const Move &b) { return a.score() > b.score(); });
     }
 }

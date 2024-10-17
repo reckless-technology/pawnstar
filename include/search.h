@@ -29,8 +29,5 @@ constexpr void CopyVariation(Variation &dst, const Variation &src, const Move &b
 {
     dst.clear();
     dst.push_back(best_move);
-    for (const auto &move : src)
-    {
-        dst.push_back(move);
-    }
+    std::copy(src.begin(), src.end(), std::back_inserter(dst));
 }

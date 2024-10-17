@@ -10,6 +10,7 @@
 template <typename T, int N> class StackList
 {
   public:
+    using value_type = T;
     constexpr StackList()
     {
         end_ = data_.begin();
