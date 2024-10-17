@@ -57,19 +57,19 @@ template <typename T, int N> class StackList
     {
         return end_ - data_.begin();
     }
-    constexpr T *begin()
+    constexpr std::array<T, N>::iterator begin()
     {
         return data_.begin();
     }
-    constexpr T *end()
+    constexpr std::array<T, N>::iterator end()
     {
         return end_;
     }
-    constexpr const T *begin() const
+    constexpr std::array<T, N>::const_iterator begin() const
     {
         return data_.begin();
     }
-    constexpr const T *end() const
+    constexpr std::array<T, N>::const_iterator end() const
     {
         return end_;
     }

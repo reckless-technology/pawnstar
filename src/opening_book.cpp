@@ -76,9 +76,8 @@ void OpeningBook::DisplayAvailableMoves(const Position &position)
     }
 }
 
-/// @brief Parse a single line of play (PGN line) and add it to the book. Moves ending with a '?' are bad moves and will
-/// not be played by pawnstar. '#' denotes a comment and the rest of the line will be ignored. Move numbers are ignored
-/// (the line is in PGN format).
+/// @brief Parse a single line of play and add it to the book. '#' denotes a comment and the rest of the line
+/// will be ignored. Move numbers are ignored.
 /// @param line The line of play
 /// @return true on success
 bool OpeningBook::ParseLineOfPlay(std::string_view line)
@@ -98,22 +97,18 @@ bool OpeningBook::ParseLineOfPlay(std::string_view line)
         {
             return true; // Done with this line.
         }
-        const uint64_t hash          = position.Hash();
-        auto           moves         = position.GenerateLegalMoves();
-        bool           is_move_legal = false;
-        for (Move move : moves)
+        const uint64_t hash  = position.Hash();
+        auto           moves = position.GenerateLegalMoves();
+        auto           i =
+            std::ranges::find_if(moves, [&move_string](const Move &move) { return move.ToString() == move_string; });
+        if (i != moves.end())
         {
-            if (move.ToString() == move_string)
-            {
-                book_[hash].push_back(move);
-                position      = position.MakeMove(move);
-                is_move_legal = true;
-                break;
-            }
+            book_[hash].push_back(*i);
+            position = position.MakeMove(*i);
         }
-        if (!is_move_legal)
+        else
         {
-            std::cout << "ERROR found in book line " << line << " move " << move_string << std::endl;
+            std::cout << std::format("Error found in book line {} move {}.\n", line, move_string);
             return false;
         }
     }
