@@ -21,6 +21,12 @@ int EvaluatePosition(const Game &game, int alpha, int beta)
     // Phase 1: Evaluate material values alone.
     scores[WHITE] = EvaluateMaterial<WHITE>(position);
     scores[BLACK] = EvaluateMaterial<BLACK>(position);
+    int score     = position.ColorToMove() == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];
+    if (score > beta + 200 || score < alpha - 200)
+    {
+        INCREMENT("eval material cutoff");
+        return score;
+    }
     // Piece square tables
     scores[WHITE] += EvaluatePieceSquare<WHITE>(position);
     scores[BLACK] += EvaluatePieceSquare<BLACK>(position);
@@ -35,9 +41,7 @@ int EvaluatePosition(const Game &game, int alpha, int beta)
     // Kings
     scores[WHITE] += EvaluateKing<WHITE>(position);
     scores[BLACK] += EvaluateKing<BLACK>(position);
-    const int score = position.ColorToMove() == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];
+    score = position.ColorToMove() == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];
     // Round to nearest 5
     return (score / 5) * 5;
-    (void)alpha;
-    (void)beta;
 }

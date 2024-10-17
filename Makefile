@@ -53,7 +53,7 @@ $(DEBUG_EXE): $(DEBUG_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(DEBUG_EXE) $(DEBUG_OBJECTS)
 
 # Compile a debug object from source
-$(DEBUG_DIR)/%.o: src/%.cpp $(HEADERS) $(GENERATED_DATA)
+$(DEBUG_DIR)/%.o: src/%.cpp $(HEADERS)
 	$(CXX) -c $(CXXFLAGS) $(DEBUG_FLAGS) -o $@ $<
 
 release: prep $(RELEASE_EXE)
@@ -62,7 +62,7 @@ $(RELEASE_EXE): $(RELEASE_OBJECTS)
 	$(CXX) $(CXXFLAGS) $(RELEASE_FLAGS) -o $(RELEASE_EXE) $(RELEASE_OBJECTS)
 
 # Compile a release object from source
-$(RELEASE_DIR)/%.o: src/%.cpp $(HEADERS) $(GENERATED_DATA)
+$(RELEASE_DIR)/%.o: src/%.cpp $(HEADERS)
 	$(CXX) -c $(CXXFLAGS) $(RELEASE_FLAGS) -o $@ $<
 
 $(GENERATED_DATA) : $(GENERATOR_EXE)

@@ -19,8 +19,8 @@
 /// @param pv Parent's principal variation
 /// @param move_index Move number (0 is first move).
 /// @return Score for this move, and whether move is checking.
-std::pair<int, bool> SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv,
-                                      int move_index)
+SingleMoveResult SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv,
+                                  int move_index)
 {
     const Position &position     = game.CurrentPosition();
     const bool      was_in_check = position.IsInCheck();
@@ -66,41 +66,51 @@ std::pair<int, bool> SearchSingleMove(Game &game, int depth, int ply, int alpha,
     return {score, is_checking};
 }
 
+struct NullMoveResult
+{
+    int score;
+    int eval_score;
+};
+
 /// @brief Try null move pruning.
 /// @param game Current game.
 /// @param depth Current search depth.
 /// @param ply Distance from root node.
 /// @param alpha Alpha value.
 /// @param beta Beta value.
-/// @return beta on success, alpha on failure.
-static inline int AttemptNullMove(Game &game, int depth, int ply, int alpha, int beta)
+/// @return null move score plus maybe evaluation score (or ALPHA if evaluation was not called)
+static inline NullMoveResult AttemptNullMove(Game &game, int depth, int ply, int alpha, int beta)
 {
     const Position &position = game.CurrentPosition();
     const Color     color    = position.ColorToMove();
     // Only try null move pruning if all conditions are met.
-    if (!position.IsNullMove() &&                       // previous move was not a null move
-        !position.IsInCheck() &&                        // we are not in check
-        beta == alpha + 1 &&                            // this is not a PV node
-        position.PiecesOfColor(color).PopCount() > 4 && // we have at least 5 friendly pieces
-        EvaluatePosition(game, alpha, beta) >= beta)    // static evaluation is at least beta
+    if (!position.IsNullMove() &&                     // previous move was not a null move
+        !position.IsInCheck() &&                      // we are not in check
+        beta == alpha + 1 &&                          // this is not a PV node
+        position.PiecesOfColor(color).PopCount() > 3) // we have at least 4 friendly pieces
+
     {
-        INCREMENT("null move");
-        Variation dummy{};
-        game.MakeNullMove();
-        int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
-        game.UndoMove();
-        if (game.is_cancel_pending)
+        const int eval_score = EvaluatePosition(game, alpha, beta);
+        if (eval_score >= beta)
         {
-            return SEARCH_CANCELLED_SCORE;
+            INCREMENT("null move");
+            Variation dummy{};
+            game.MakeNullMove();
+            int score = -Search(game, depth - 3, ply + 1, -beta, -alpha, dummy);
+            game.UndoMove();
+            if (game.is_cancel_pending)
+            {
+                return {SEARCH_CANCELLED_SCORE, eval_score};
+            }
+            if (score >= beta)
+            {
+                return {beta, eval_score};
+            }
+            INCREMENT("null move fails");
+            return {alpha, eval_score};
         }
-        if (score >= beta)
-        {
-            return beta;
-        }
-        INCREMENT("null move fails");
-        return alpha;
     }
-    return alpha;
+    return {alpha, ALPHA};
 }
 
 /// @brief Alpha beta main search algorithm.
@@ -122,8 +132,13 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         game.is_cancel_pending = true;
         return SEARCH_CANCELLED_SCORE;
     }
+    if (game.CurrentPosition().IsDrawByMaterial() || game.IsDrawByFiftyMoves() || game.IsDrawByRepetition())
+    {
+        return DRAW_SCORE;
+    }
     if (game.CurrentPosition().IsInCheck())
     {
+        INCREMENT("checks");
         ++depth;
     }
     if (ply == MAX_PLY)
@@ -176,7 +191,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     }
 
     // Try null move pruning.
-    const int null_move_score = AttemptNullMove(game, depth, ply, alpha, beta);
+    auto [null_move_score, eval_score] = AttemptNullMove(game, depth, ply, alpha, beta);
     if (game.is_cancel_pending)
     {
         return SEARCH_CANCELLED_SCORE;
@@ -196,7 +211,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     {
         INCREMENT("table move");
         best_move = transposition->move;
-        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition->move, pv, 0).first;
+        int score = SearchSingleMove(game, depth, ply, alpha, beta, transposition->move, pv, 0).score;
         if (game.is_cancel_pending)
         {
             return SEARCH_CANCELLED_SCORE;
@@ -218,6 +233,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             game.history_table.RecordGoodMove(ply, transposition->move);
         }
     }
+
     // We didn't get a cutoff from the transposition table so proceed with generating and searching moves.
     MoveList move_list{game.CurrentPosition().GenerateLegalMoves()};
     if (move_list.size() == 0)
@@ -246,22 +262,9 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         {
             continue; // We already searched this move.
         }
-        // Maybe try frontier node pruning.
-        if (depth == 1 &&                          // frontier node
-            move_index > 3 &&                      // we already tried several moves
-            !game.CurrentPosition().IsInCheck() && // we are not in check
-            beta == alpha + 1)                     // it is not a PV node
-        {
-            auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
-            if (see_score < 0 && !is_checking) // move loses material and does not check
-            {
-                INCREMENT("frontier prune");
-                continue;
-            }
-        }
         // Maybe try late move depth reduction.
         int lmr_depth = depth;
-        if (move_index > 3 &&                      // we already tried several moves
+        if (move_index > 0 &&                      // we already tried at least one move
             !game.CurrentPosition().IsInCheck() && // we are not in check
             depth > 2 &&                           // do not drop directly into quiescence
             beta == alpha + 1)                     // it is not a PV node
@@ -271,7 +274,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             {
                 INCREMENT("late move reduction");
                 --lmr_depth;
-                if (see_score < 0 && move_index > 6) // Move loses material and is very late; reduce further.
+                if (see_score < 0 && depth > 3) // Move loses material and is very late; reduce further.
                 {
                     INCREMENT("late move reduction extreme");
                     --lmr_depth;
@@ -279,11 +282,11 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
             }
         }
 
-        int score = SearchSingleMove(game, lmr_depth, ply, alpha, beta, move, pv, move_index).first;
+        int score = SearchSingleMove(game, lmr_depth, ply, alpha, beta, move, pv, move_index).score;
         if (score > alpha && lmr_depth < depth)
         {
             INCREMENT("late move reduction fails");
-            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index).first;
+            score = SearchSingleMove(game, depth, ply, alpha, beta, move, pv, move_index).score;
         }
         if (game.is_cancel_pending)
         {
