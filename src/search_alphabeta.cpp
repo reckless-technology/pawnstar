@@ -264,24 +264,21 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         }
         // Maybe try late move depth reduction.
         int lmr_depth = depth;
-        if (move_index > 0 &&                      // we already tried at least one move
-            !game.CurrentPosition().IsInCheck() && // we are not in check
-            depth > 2 &&                           // do not drop directly into quiescence
-            beta == alpha + 1)                     // it is not a PV node
+        if (move_index > 3 &&                                        // we already tried a few moves
+            !game.CurrentPosition().IsInCheck() &&                   // we are not in check
+            depth > 2 &&                                             // do not drop directly into quiescence
+            beta == alpha + 1 &&                                     // it is not a PV node
+            game.CurrentPosition().PieceAt(move.to()) == NO_PIECE && // not a capture
+            game.CurrentPosition().PieceAt(move.from()) != PAWN)     // not a pawn move
         {
-            auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
-            if (!is_checking && see_score <= 0) // move does not give check and does not win material
+            INCREMENT("late move reduction");
+            --lmr_depth;
+            if (depth > 3 && move_index > 6)
             {
-                INCREMENT("late move reduction");
+                INCREMENT("late move reduction extreme");
                 --lmr_depth;
-                if (see_score < 0 && depth > 3) // Move loses material and is very late; reduce further.
-                {
-                    INCREMENT("late move reduction extreme");
-                    --lmr_depth;
-                }
             }
         }
-
         int score = SearchSingleMove(game, lmr_depth, ply, alpha, beta, move, pv, move_index).score;
         if (score > alpha && lmr_depth < depth)
         {

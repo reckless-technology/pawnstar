@@ -39,11 +39,43 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
-    int      best_score = score;
+    int  best_score    = score;
+    auto transposition = game.transposition_table.FindTransposition(game.CurrentPosition().Hash());
+    if (transposition && transposition->move)
+    {
+        INCREMENT("quiescent table move");
+        game.PlayMove(transposition->move);
+        score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
+        game.UndoMove();
+        if (game.is_cancel_pending)
+        {
+            return SEARCH_CANCELLED_SCORE;
+        }
+        if (score >= beta)
+        {
+            INCREMENT("quiescent table move beta cutoffs");
+            game.history_table.RecordGoodMove(ply, transposition->move);
+            return score;
+        }
+        if (score > best_score)
+        {
+            best_score = score;
+            if (score > alpha)
+            {
+                alpha = score;
+                INCREMENT("quiescent table move raise alpha");
+                game.history_table.RecordGoodMove(ply, transposition->move);
+            }
+        }
+    }
     MoveList move_list{game.CurrentPosition().GenerateLegalCaptures()};
     game.ScoreAndSortMoves(move_list, ply);
     for (Move &move : move_list)
     {
+        if (transposition && transposition->move == move)
+        {
+            continue;
+        }
         const auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
         if (see_score < 0 && !is_checking)
         {
