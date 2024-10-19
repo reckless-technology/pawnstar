@@ -7,22 +7,11 @@
 #include "position.h"
 #include "transposition_table.h"
 
-constexpr static bool IsPrime(std::size_t x);
-
 /// @brief Create the transposition table.
 /// @param megabytes Approx max size of the table in megabytes. May be slightly smaller (table is prime size).
 TranspositionTable::TranspositionTable(std::size_t megabytes)
 {
     std::size_t num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
-    // Find the next smallest prime number and make the table that size.
-    if ((num_entries & 1) == 0)
-    {
-        --num_entries;
-    }
-    while (!IsPrime(num_entries))
-    {
-        num_entries -= 2;
-    }
     table_.assign(num_entries, Transposition{});
 }
 
@@ -65,24 +54,4 @@ std::pair<std::size_t, int> TranspositionTable::UsageStats() const
 void TranspositionTable::Age()
 {
     std::ranges::for_each(table_, [](Transposition &t) { t.is_old = true; });
-}
-
-/// @brief determine if a number is a prime number. We get marginally better hash dispersion when the hashtable size is
-/// a prime number.
-/// @param x candidate
-/// @return true if x is prime
-constexpr static bool IsPrime(std::size_t x)
-{
-    if (x < 3)
-    {
-        return false;
-    }
-    for (std::size_t i = 2; i * i <= x; ++i)
-    {
-        if (x % i == 0)
-        {
-            return false;
-        }
-    }
-    return true;
 }
