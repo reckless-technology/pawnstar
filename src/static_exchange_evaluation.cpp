@@ -135,6 +135,13 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         scores[ply]     = piece_values[piece_on_square];
         piece_on_square = capturing_piece;
         color           = EnemyOf(color);
+        // Handle special case of pawn capture promotion
+        if (piece_on_square == PAWN && (square & (RANK_1 | RANK_8)).IsNotEmpty())
+        {
+            piece_on_square = QUEEN;
+            bb.pawns ^= square;
+            bb.queens ^= square;
+        }
     }
     // Second pass: unwind the capture stack and propagate values back to the top for material winning sequences.
     for (--ply; ply >= 0; --ply)
