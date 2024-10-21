@@ -217,7 +217,7 @@ class alignas(8) Move
     /// @brief Return true if this is an actual move, false if it is a list terminator, null move, or no move.
     constexpr operator bool() const
     {
-        return to_ != 0 || from_ != 0;
+        return to_ != Square::NO_SQUARE || from_ != Square::NO_SQUARE;
     }
 
     /// @brief Null move.

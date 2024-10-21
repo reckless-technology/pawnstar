@@ -28,10 +28,18 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         Variation dummy{};
         return Search(game, depth, ply, alpha, beta, dummy);
     }
+    auto transposition = game.quiescent_table.FindTransposition(game.CurrentPosition().Hash());
+    if (transposition && transposition->score >= beta)
+    {
+        INCREMENT("quiescent table beta cutoffs");
+        return transposition->score;
+    }
     int score = EvaluatePosition(game, alpha, beta);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
+        game.quiescent_table.RecordTransposition(
+            Transposition{game.CurrentPosition().Hash(), Move::None(), score, depth, Transposition::NodeType::CUT});
         return score;
     }
     if (score > alpha)
@@ -39,8 +47,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         INCREMENT("quiescent eval raises alpha");
         alpha = score;
     }
-    int  best_score    = score;
-    auto transposition = game.quiescent_table.FindTransposition(game.CurrentPosition().Hash());
+    int best_score = score;
     if (transposition && transposition->move)
     {
         INCREMENT("quiescent table move");
@@ -76,6 +83,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         {
             continue;
         }
+#if 0
         const auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
         if (see_score < 0 && !is_checking)
         {
@@ -83,6 +91,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
             INCREMENT("quiescent negative see");
             continue;
         }
+#endif
         game.PlayMove(move);
         score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
         game.UndoMove();
@@ -95,7 +104,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
             INCREMENT("quiescent beta cutoffs");
             game.history_table.RecordGoodMove(ply, move);
             game.quiescent_table.RecordTransposition(
-                Transposition{game.CurrentPosition().Hash(), move, 0, 0, Transposition::NodeType::CUT});
+                Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::CUT});
             return score;
         }
         if (score > best_score)
@@ -107,7 +116,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
                 INCREMENT("quiescent pv changed");
                 game.history_table.RecordGoodMove(ply, move);
                 game.quiescent_table.RecordTransposition(
-                    Transposition{game.CurrentPosition().Hash(), move, 0, 0, Transposition::NodeType::CUT});
+                    Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::CUT});
             }
         }
     }
