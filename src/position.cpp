@@ -81,7 +81,7 @@ Position Position::MakeMove(const Move &move) const
     const Color  color = ColorToMove();
     const Square from  = move.from();
     const Square to    = move.to();
-    const Piece  piece = PieceAt(from);
+    const Piece  piece = move.piece();
 
     Position position{*this};
     position.state_flags_ &= ~IS_NULL_MOVE;
@@ -99,7 +99,7 @@ Position Position::MakeMove(const Move &move) const
 
     case Move::Type::CAPTURE:
         position.reversible_move_count_ = 0;
-        position.RemovePiece(EnemyOf(color), PieceAt(to), to);
+        position.RemovePiece(EnemyOf(color), move.captured(), to);
         position.MovePiece(color, piece, from, to);
         break;
 
@@ -108,9 +108,9 @@ Position Position::MakeMove(const Move &move) const
     case Move::Type::PROMOTION_ROOK:
     case Move::Type::PROMOTION_QUEEN:
         position.reversible_move_count_ = 0;
-        if (PieceAt(to) != NO_PIECE)
+        if (move.captured() != NO_PIECE)
         {
-            position.RemovePiece(EnemyOf(color), PieceAt(to), to);
+            position.RemovePiece(EnemyOf(color), move.captured(), to);
         }
         position.RemovePiece(color, PAWN, from);
         position.AddPiece(color, move.promoted(), to);

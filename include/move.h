@@ -89,8 +89,20 @@ constexpr std::string SquareName(Square locn)
 
 /// @brief Class for representing a chess move.
 /// A move is 64 bits in size.
+/// Bits are as follows:
+///  0 -  5: to square
+///  6 - 11: from square
+/// 12 - 14: moving piece
+/// 15 - 17: captured piece (in the case of capture moves)
+/// 18 - 21: move type
+/// 22 - 22: is checking flag (move gives check)
+/// 32 - 63: score (when move has score assigned)
 class alignas(8) Move
 {
+  private:
+    static constexpr uint32_t IS_CHECKING = 1 << 22;
+    int64_t                   val;
+
   public:
     /// @brief Move types.
     enum Type : uint8_t
@@ -116,7 +128,7 @@ class alignas(8) Move
     /// @param that Move to construct from.
     constexpr Move(const Move &that)
     {
-        *(uint64_t *)this = *(uint64_t *)(&that);
+        val = that.val;
     }
 
     /// @brief Assignment. Treat the move object as a 64 bit int for efficiency.
@@ -124,44 +136,58 @@ class alignas(8) Move
     /// @return Assignee move.
     constexpr Move &operator=(const Move &that)
     {
-        *(uint64_t *)this = *(uint64_t *)(&that);
+        val = that.val;
         return *this;
     }
 
-    /// @brief Equality operator; only consider from, to and move type when testing for equality.
+    /// @brief Equality operator. Compare from, to, piece, captured, type fields (22 bits).
     /// @param that Other move to compare.
     /// @return true if moves are equivalent.
     constexpr bool operator==(const Move &that) const
     {
-        return to_ == that.to_ && from_ == that.from_ && type_ == that.type_;
+        return (val & 0x3FFFFF) == (that.val & 0x3FFFFF);
     }
 
     /// @brief Destination square.
     /// @return Square index of move to.
     constexpr Square to() const
     {
-        return to_;
+        return (Square)(val & 0x3F);
     }
 
     /// @brief Source square.
     /// @return Square index of move from.
     constexpr Square from() const
     {
-        return from_;
+        return (Square)((val >> 6) & 0x3F);
     }
 
     /// @brief Type.
     /// @return Move type.
     constexpr Type type() const
     {
-        return type_;
+        return (Type)((val >> 18) & 0x0F);
+    }
+
+    /// @brief Moving piece
+    /// @return the piece.
+    constexpr Piece piece() const
+    {
+        return (Piece)((val >> 12) & 0x07);
+    }
+
+    /// @brief Captured piece.
+    /// @return the captured piece or NO_PIECE if not a capture move.
+    constexpr Piece captured() const
+    {
+        return (Piece)((val >> 15) & 0x07);
     }
 
     /// @brief Promoted piece.
     /// @return In the case of a pawn promotion, the piece to be promoted.
     constexpr Piece promoted() const
     {
-        switch (type_)
+        switch (type())
         {
         case NON_CAPTURE:
         case CAPTURE:
@@ -184,75 +210,85 @@ class alignas(8) Move
     /// @return Move score (usually in centipawns).
     constexpr int score() const
     {
-        return score_;
+        return (int)(val >> 32);
     }
 
     /// @brief Create a from-to bits value for indexing into history tables.
     /// @return 12 bit from-to combination.
     constexpr int from_to() const
     {
-        return to_ | ((int)from_ << 6);
+        return val & 0xFFF;
     }
 
     /// @brief Does this move give check?
     /// @return true if move is checking.
     constexpr bool IsChecking() const
     {
-        return flags_ & IS_CHECKING;
+        return !!(val & IS_CHECKING);
     }
 
     /// @brief Assign the score to the move.
     /// @param score Score to be assigned.
     constexpr void AssignScore(int score)
     {
-        score_ = score;
+        val = (val & 0xFFFFFFFF) | (int64_t)(score) << 32;
     }
 
     /// @brief Set the flag that indicates this move gives check.
     constexpr void GivesCheck()
     {
-        flags_ = IS_CHECKING;
+        val |= IS_CHECKING;
     }
 
     /// @brief Return true if this is an actual move, false if it is a list terminator, null move, or no move.
     constexpr operator bool() const
     {
-        return to_ != Square::NO_SQUARE || from_ != Square::NO_SQUARE;
+        return val != 0;
     }
 
     /// @brief Null move.
     /// @return Special sentinel move that indicates not a move.
     constexpr static Move None()
     {
-        return Move{(Square)0, (Square)0};
+        return Move{0};
     }
 
     /// @brief Create a non capture move.
     /// @param from From square.
     /// @param to To square.
     /// @return The move.
-    constexpr static Move NonCapture(Square from, Square to)
+    constexpr static Move NonCapture(Square from, Square to, Piece piece)
     {
-        return Move{from, to};
+        return Move{from, to, piece};
     }
 
     /// @brief Create a capture move.
     /// @param from From square.
     /// @param to To square.
     /// @return The move.
-    constexpr static Move Capture(Square from, Square to)
+    constexpr static Move Capture(Square from, Square to, Piece piece, Piece captured)
     {
-        return Move{from, to, CAPTURE};
+        return Move{from, to, piece, Type::CAPTURE, captured};
     }
 
-    /// @brief Create a pawn promotion move.
+    /// @brief Create a pawn promotion capture move.
+    /// @param from From square.
+    /// @param to To square.
+    /// @param promoted Piece to be promoted to.
+    /// @return The move.
+    constexpr static Move Promotion(Square from, Square to, Piece promoted, Piece captured)
+    {
+        return Move{from, to, PAWN, (Type)promoted, captured};
+    }
+
+    /// @brief Create a pawn promotion non capture move.
     /// @param from From square.
     /// @param to To square.
     /// @param promoted Piece to be promoted to.
     /// @return The move.
     constexpr static Move Promotion(Square from, Square to, Piece promoted)
     {
-        return Move{from, to, (Type)promoted};
+        return Move{from, to, PAWN, (Type)promoted};
     }
 
     /// @brief Create a castling move.
@@ -261,7 +297,7 @@ class alignas(8) Move
     /// @return The move.
     constexpr static Move Castling(Square from, Square to)
     {
-        return Move{from, to, CASTLING};
+        return Move{from, to, KING, Type::CASTLING};
     }
 
     /// @brief Create an en passant capture move.
@@ -270,7 +306,7 @@ class alignas(8) Move
     /// @return The move.
     constexpr static Move EpCapture(Square from, Square to)
     {
-        return Move{from, to, EP_CAPTURE};
+        return Move{from, to, PAWN, Type::EP_CAPTURE, PAWN};
     }
 
     /// @brief Create a pawn double push move.
@@ -279,7 +315,7 @@ class alignas(8) Move
     /// @return The move.
     constexpr static Move DoublePush(Square from, Square to)
     {
-        return Move{from, to, PAWN_DOUBLE_PUSH};
+        return Move{from, to, PAWN, Type::PAWN_DOUBLE_PUSH};
     }
 
     /// @brief Used for putting moves in std library hashed containers.
@@ -287,7 +323,7 @@ class alignas(8) Move
     /// @return Hashed value of move.
     constexpr std::size_t operator()(const Move &move) const
     {
-        return (std::size_t) * (uint64_t *)&move;
+        return (std::size_t)move.val;
     }
 
     /// @brief Convert a move to an algebraic notation string, e.g. "e1g1", "a7a8q".
@@ -307,31 +343,21 @@ class alignas(8) Move
     }
 
   private:
-    /// @brief Move flags.
-    enum MoveFlags : uint8_t
-    {
-        NO_FLAG     = 0,
-        IS_CHECKING = 1, ///< Move gives check.
-    };
-
-    Square    to_;    ///< To square.
-    Square    from_;  ///< From square.
-    Type      type_;  ///< Move type.
-    MoveFlags flags_; ///< Move flags.
-    int       score_; ///< Assigned score, if any.
-
-    /// @brief Construct a non capture move.
-    /// @param from From square.
-    /// @param to To square.
-    constexpr Move(Square from, Square to) : to_(to), from_(from), type_(NON_CAPTURE), flags_(NO_FLAG), score_(0)
+    constexpr Move(Square from, Square to, Piece piece) : val(to | (from << 6) | (piece << 12))
     {
     }
 
-    /// @brief Construct a move with the specified type.
-    /// @param from From square.
-    /// @param to To Square.
-    /// @param type The move type.
-    constexpr Move(Square from, Square to, Type type) : to_(to), from_(from), type_(type), flags_(NO_FLAG), score_(0)
+    constexpr Move(Square from, Square to, Piece piece, Type type)
+        : val(to | (from << 6) | (piece << 12) | (type << 18))
+    {
+    }
+
+    constexpr Move(Square from, Square to, Piece piece, Type type, Piece captured)
+        : val(to | (from << 6) | (piece << 12) | (captured << 15) | (type << 18))
+    {
+    }
+
+    constexpr Move(int64_t v) : val(v)
     {
     }
 };
