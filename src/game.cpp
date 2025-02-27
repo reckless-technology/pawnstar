@@ -88,8 +88,8 @@ bool Game::IsDrawByFiftyMoves() const
 /// @return true if draw by repetition.
 bool Game::IsDrawByRepetition() const
 {
-    int            repetitions = 2;
-    const uint64_t hash        = CurrentPosition().Hash();
+    int             repetitions = 2;
+    const zobrist_t hash        = CurrentPosition().Hash();
     // Start looking 4 half moves back, i.e. 2 moves ago, for repeated positions.
     for (auto pos = positions_.end() - 5; pos >= positions_.begin(); pos -= 2)
     {

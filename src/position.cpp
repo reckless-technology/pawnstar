@@ -64,8 +64,8 @@ void Position::RemovePiece(Color color, Piece piece, Square from)
 /// @param to Destination square
 void Position::MovePiece(Color color, Piece piece, Square from, Square to)
 {
-    const Bitboard        from_to_bb = Bitboard(from) | Bitboard(to);
-    const uint64_t *const hash       = &PIECE_SQUARE_HASHES[color][piece - 1][0];
+    const Bitboard         from_to_bb = Bitboard(from) | Bitboard(to);
+    const zobrist_t *const hash       = &PIECE_SQUARE_HASHES[color][piece - 1][0];
     PiecesOfType(piece) ^= from_to_bb;
     PiecesOfColor(color) ^= from_to_bb;
     hash_ ^= hash[to] ^ hash[from];
@@ -85,7 +85,7 @@ Position Position::MakeMove(const Move &move) const
 
     Position position{*this};
     position.state_flags_ &= ~IS_NULL_MOVE;
-    position.castling_rights_ &= CASTLING_RIGHTS_MASKS[from] & CASTLING_RIGHTS_MASKS[to];
+    position.castling_rights_ &= castling_rights_masks[from] & castling_rights_masks[to];
     position.hash_ ^= CASTLING_RIGHTS_HASHES[position.castling_rights_] ^ CASTLING_RIGHTS_HASHES[castling_rights_];
     position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
     position.en_passant_square_ = NO_SQUARE;
@@ -442,9 +442,9 @@ bool Position::IsLegal() const
 
 /// @brief Compute the Zobrist hash for a chess position.
 /// @return the 64 bit hash
-uint64_t Position::ComputeHash() const
+zobrist_t Position::ComputeHash() const
 {
-    uint64_t hash = state_flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
+    zobrist_t hash = state_flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
     hash ^= CASTLING_RIGHTS_HASHES[castling_rights_];
     hash ^= EN_PASSANT_HASHES[en_passant_square_];
     for (Piece piece = PAWN; piece <= KING; piece = (Piece)(piece + 1))

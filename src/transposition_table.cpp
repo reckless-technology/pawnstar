@@ -18,7 +18,7 @@ TranspositionTable::TranspositionTable(std::size_t megabytes)
 /// @brief Find an entry in the TT if one exists for this position.
 /// @param hash Zobrist hash of position
 /// @return If a transposition was found in the table, then return it
-std::optional<Transposition> TranspositionTable::FindTransposition(uint64_t hash) const
+std::optional<Transposition> TranspositionTable::FindTransposition(zobrist_t hash) const
 {
     const Transposition &t = table_[hash % table_.size()];
     if (t.hash == hash)

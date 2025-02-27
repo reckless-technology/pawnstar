@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "generated_data.h"
 #include "move.h"
 
 class Position;
@@ -20,12 +21,12 @@ class OpeningBook
     OpeningBook();
     bool Initialize(std::string_view filename);
     void DisplayAvailableMoves(const Position &position);
-    Move GetMove(uint64_t hash);
+    Move GetMove(zobrist_t hash);
     void Free();
 
   private:
-    bool                                  InitializeFromStream(std::istream &ss);
-    bool                                  ParseLineOfPlay(std::string_view line);
-    std::map<uint64_t, std::vector<Move>> book_;
-    std::mt19937                          prng_;
+    bool                                   InitializeFromStream(std::istream &ss);
+    bool                                   ParseLineOfPlay(std::string_view line);
+    std::map<zobrist_t, std::vector<Move>> book_;
+    std::mt19937                           prng_;
 };

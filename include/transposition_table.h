@@ -17,18 +17,18 @@ struct Transposition
         PV,  ///< Principal variation node.
     };
 
-    uint64_t hash;      ///< Zobrist hash of this position.
-    Move     move;      ///< Best move from this position.
-    int      score;     ///< The score computed from this position.
-    int16_t  depth;     ///< The depth to which this position was searched.
-    NodeType node_type; ///< What type of result was this.
-    bool     is_old;    ///< This entry is from a previous search and can thus be replaced.
+    zobrist_t hash;      ///< Zobrist hash of this position.
+    Move      move;      ///< Best move from this position.
+    int       score;     ///< The score computed from this position.
+    int16_t   depth;     ///< The depth to which this position was searched.
+    NodeType  node_type; ///< What type of result was this.
+    bool      is_old;    ///< This entry is from a previous search and can thus be replaced.
 
     constexpr Transposition() : hash(0)
     {
     }
 
-    constexpr Transposition(uint64_t hash, const Move &move, int score, int depth, NodeType type)
+    constexpr Transposition(zobrist_t hash, const Move &move, int score, int depth, NodeType type)
         : hash(hash), move(move), score(score), depth((int16_t)depth), node_type(type), is_old(false)
     {
     }
@@ -41,7 +41,7 @@ class TranspositionTable
 {
   public:
     TranspositionTable(std::size_t megabytes);
-    std::optional<Transposition> FindTransposition(uint64_t hash) const;
+    std::optional<Transposition> FindTransposition(zobrist_t hash) const;
     void                         RecordTransposition(const Transposition &transposition);
     void                         Age();
     std::pair<std::size_t, int>  UsageStats() const;

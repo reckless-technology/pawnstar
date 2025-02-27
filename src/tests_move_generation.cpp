@@ -90,7 +90,7 @@ void RunPerftTests(void)
     auto     first_start = ElapsedMicroseconds();
     for (const auto &test : tests)
     {
-        Position position = Position::FromString(test.position);
+        Position position{Position::FromString(test.position)};
         string   pos_string{position.ToString()};
         uint64_t num_moves = 0;
         total_nodes += test.count;
@@ -101,7 +101,7 @@ void RunPerftTests(void)
         {
             stop = start + 1; // avoid divide by zero error in positions per second for short tests
         }
-        std::cout << std::format("{:<80} depth:{:2} moves:{:10} Mnps:{:4}\n", pos_string, test.depth, num_moves,
+        std::cout << std::format("{:<75} depth:{:2} moves:{:10} Mnps:{:4}\n", pos_string, test.depth, num_moves,
                                  num_moves / (stop - start));
         if (num_moves != test.count)
         {

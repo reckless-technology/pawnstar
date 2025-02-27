@@ -1,6 +1,6 @@
 /// @file Precomputes, at compile time, constants used by pawnstar.
-/// This program is compiled and then executed by the Makefile to create the "generated_data.inc" include file which is
-/// then used in the compilation of the main program.
+/// This program is compiled and then executed by the Makefile to create the "generated_data.cpp" file which is then
+/// used in the compilation of the main program.
 
 #include <array>
 #include <cctype>
@@ -66,11 +66,11 @@ enum Direction
 };
 
 /// @brief Function pointer for bitboard shift.
-typedef uint64_t (*ShiftFn)(uint64_t);
+using ShiftFn = uint64_t (*)(uint64_t);
 
 /// @brief Shift functions for each compass direction.
-constexpr std::array<ShiftFn, 8> SHIFT_FUNCS{ShiftNorth, ShiftNortheast, ShiftEast, ShiftSoutheast,
-                                             ShiftSouth, ShiftSouthwest, ShiftWest, ShiftNorthwest};
+constexpr std::array<ShiftFn, 8> shift_functions{ShiftNorth, ShiftNortheast, ShiftEast, ShiftSoutheast,
+                                                 ShiftSouth, ShiftSouthwest, ShiftWest, ShiftNorthwest};
 
 /// @brief Population count (number of bits set).
 /// @param x Input value.
@@ -101,7 +101,7 @@ uint64_t NextRandomKey()
 constexpr uint64_t RayFrom(uint8_t sq, Direction direction)
 {
     uint64_t result = 0;
-    ShiftFn  fn     = SHIFT_FUNCS[direction];
+    ShiftFn  fn     = shift_functions[direction];
     for (uint64_t b = fn(Bitboard(sq)); b != 0; b = fn(b))
     {
         result |= b;
@@ -294,7 +294,7 @@ constexpr uint64_t RayOccupancyMask(uint8_t sq, Direction direction)
 {
     uint64_t result      = 0;
     uint64_t last_square = 0;
-    ShiftFn  fn          = SHIFT_FUNCS[direction];
+    ShiftFn  fn          = shift_functions[direction];
     for (uint64_t b = fn(Bitboard(sq)); b != 0; b = fn(b))
     {
         result |= b;
@@ -326,10 +326,10 @@ constexpr uint64_t RookOccupancyMask(uint8_t sq)
 /// @param sq Source square index.
 /// @param direction Compass rose direction.
 /// @return Set of squares attacked in the specified direction.
-constexpr uint64_t RayAttacks(uint64_t occupied_squares, int sq, Direction direction)
+constexpr uint64_t RayAttacks(uint64_t occupied_squares, uint8_t sq, Direction direction)
 {
     uint64_t result = 0;
-    ShiftFn  fn     = SHIFT_FUNCS[direction];
+    ShiftFn  fn     = shift_functions[direction];
     for (uint64_t b = fn(Bitboard(sq)); b != 0; b = fn(b))
     {
         result |= b;
@@ -376,13 +376,7 @@ constexpr std::vector<uint64_t> EnumerateMaskCombinations(uint64_t mask)
     return result;
 }
 
-/// Maps location to an occupancy mask for that square.
-typedef uint64_t (*MaskFn)(uint8_t);
-
-/// Maps occupied squares set and location to attacked targets by a sliding piece.
-typedef uint64_t (*AttackFn)(uint64_t, uint8_t);
-
-/// @brief Parameters for magic bitboards for a single square.
+/// @brief Parameters for a magic bitboard for a single square and piece type.
 struct Magic
 {
     uint64_t              magic;   ///< The magic multiplicand.
@@ -391,6 +385,12 @@ struct Magic
     std::vector<uint64_t> attacks; ///< The discrete (unique) attack vectors.
     std::vector<uint8_t>  indices; ///< Indices into the discrete attack vector array.
 };
+
+/// @brief Maps a squera to an occupancy mask for that square.
+using MaskFn = uint64_t (*)(uint8_t);
+
+/// @brief Maps occupied squares and location to attacked targets by a sliding piece.
+using AttackFn = uint64_t (*)(uint64_t, uint8_t);
 
 /// @brief Trial and error search for a magic bitboard entry, for one sliding piece type at one location.
 /// @param sq Square index.
@@ -407,6 +407,7 @@ Magic FindMagic(uint8_t sq, MaskFn mask_fn, AttackFn attack_fn)
     std::vector<uint64_t> attacks;
     // Compute the actual attacked squares for each occupancy value.
     for (auto occupancy : occupancies)
+
     {
         attacks.push_back(attack_fn(occupancy, sq));
     }
@@ -442,11 +443,10 @@ Magic FindMagic(uint8_t sq, MaskFn mask_fn, AttackFn attack_fn)
     // magic move entry tables, which helps with cache pressure at the expense of one extra indirection.
     std::set<uint64_t>    attacks_set{magic.attacks.begin(), magic.attacks.end()}; // Make unique.
     std::vector<uint64_t> unique_attacks{attacks_set.begin(), attacks_set.end()};
-    magic.indices.clear();
     for (auto attack : magic.attacks)
     {
-        const auto j = std::find(unique_attacks.begin(), unique_attacks.end(), attack);
-        magic.indices.push_back(j - unique_attacks.begin());
+        const auto index = std::find(unique_attacks.begin(), unique_attacks.end(), attack);
+        magic.indices.push_back(index - unique_attacks.begin());
     }
     magic.magic   = trial_magic;
     magic.attacks = unique_attacks;
@@ -470,7 +470,7 @@ constexpr std::array<PieceMagic, 2> piece_magics =
 // clang-format on
 
 /// Maps a location to a set of squares for that location.
-typedef uint64_t (*GeneratorFn)(uint8_t);
+using GeneratorFn = uint64_t (*)(uint8_t);
 
 /// @brief A generator to map a square index to a set of target squares for that index, e.g. "All squares north of
 /// here", "Squares attacked by a queen standing here" etc.
@@ -588,7 +588,7 @@ static void GenerateInterveningSquares()
 /// @brief Generate Zobrist hash keys for pieces, castling rights and en passant capture.
 static void GenerateHashes()
 {
-    std::cout << std::format("extern const uint64_t PIECE_SQUARE_HASHES[2][6][64] = \n{{");
+    std::cout << std::format("extern const zobrist_t PIECE_SQUARE_HASHES[2][6][64] = \n{{");
     for (int color = 0; color != 2; ++color)
     {
         std::cout << std::format("\n    {{");
@@ -608,7 +608,7 @@ static void GenerateHashes()
         std::cout << std::format("\n    }},");
     }
     std::cout << std::format("\n}};\n");
-    std::cout << std::format("extern const uint64_t CASTLING_RIGHTS_HASHES[16] = \n{{");
+    std::cout << std::format("extern const zobrist_t CASTLING_RIGHTS_HASHES[16] = \n{{");
     for (uint8_t i = 0; i != 16; ++i)
     {
         if ((i & 7) == 0)
@@ -618,7 +618,7 @@ static void GenerateHashes()
         std::cout << std::format("0x{:016X},", NextRandomKey());
     }
     std::cout << std::format("\n}};\n");
-    std::cout << std::format("extern const uint64_t EN_PASSANT_HASHES[64] = \n{{");
+    std::cout << std::format("extern const zobrist_t EN_PASSANT_HASHES[64] = \n{{");
     for (uint8_t i = 0; i != 64; ++i)
     {
         if ((i & 7) == 0)
@@ -657,7 +657,7 @@ static void GenerateMagics(void)
                 std::cout << std::format("0x{:02X}, ", magics[sq].indices[j]);
             }
             std::cout << std::format("\n}};\n");
-            std::cout << std::format("static const uint64_t {}_MAGIC_ATTACKS_{}[{}] = \n{{", pm.name, SquareName(sq),
+            std::cout << std::format("static const Bitboard {}_MAGIC_ATTACKS_{}[{}] = \n{{", pm.name, SquareName(sq),
                                      magics[sq].attacks.size());
             for (std::size_t j = 0; j != magics[sq].attacks.size(); ++j)
             {

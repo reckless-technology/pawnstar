@@ -27,8 +27,8 @@ class Position
     bool            IsLegal() const;                                ///< Is this a legal chess position.
     bool            IsCheckmate() const;                            ///< Is this position checkmate.
     bool            IsStalemate() const;                            ///< Is this position stalemate.
-    bool            IsDrawByMaterial() const; ///< Is this position a draw by insufficient material.
-    std::string     ToString() const;         ///< Return the FEN string for this position.
+    bool            IsDrawByMaterial() const;                       ///< Is this position material draw.
+    std::string     ToString() const;                               ///< Return the FEN string for this position.
 
     // clang-format off
     // Const accessors.
@@ -54,7 +54,7 @@ class Position
     constexpr Bitboard  PiecesOfColor(Color color) const    {return (&white_pieces_)[color];}
     constexpr Bitboard  PiecesOfType(Piece piece) const     {return (&pawns_)[piece - PAWN];}
     constexpr Square    KingLocation(Color color) const     {return king_location_[color];}
-    constexpr uint64_t  Hash() const                        {return hash_;}
+    constexpr zobrist_t Hash() const                        {return hash_;}
     constexpr bool      IsInCheck() const                   {return checkers_.IsNotEmpty();}
     constexpr uint8_t   MoveCount() const                   {return full_move_count_;}
     constexpr uint8_t   ReversibleMoveCount() const         {return reversible_move_count_;}
@@ -65,11 +65,11 @@ class Position
     // clang-format on
 
   private:
-    void     AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
-    void     RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board.
-    void     MovePiece(Color color, Piece piece, Square from, Square to); ///< Move a piece on the board.
-    uint64_t ComputeHash() const;                                         ///< Compute the Zobrist hash from scratch.
-    template <Color, bool> constexpr MoveList GenMoves() const;           ///< Generate legal moves.
+    void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
+    void      RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board.
+    void      MovePiece(Color color, Piece piece, Square from, Square to); ///< Move a piece on the board.
+    zobrist_t ComputeHash() const;                                         ///< Compute the Zobrist hash from scratch.
+    template <Color, bool> constexpr MoveList GenMoves() const;            ///< Generate legal moves.
 
     Bitboard              pawns_;                 ///< Squares with a pawn on them.
     Bitboard              knights_;               ///< Squares with a knight on them.
@@ -81,7 +81,7 @@ class Position
     Bitboard              black_pieces_;          ///< Squares with a black piece on them.
     std::array<Piece, 64> squares_;               ///< Squares array for fast piece lookup.
     Bitboard              checkers_;              ///< Set of squares which attack the king.
-    uint64_t              hash_;                  ///< Zobrist hash of this position, maintained incrementally.
+    zobrist_t             hash_;                  ///< Zobrist hash of this position, maintained incrementally.
     std::array<Square, 2> king_location_;         ///< Square index of white and black kings.
     Square                en_passant_square_;     ///< En passant capture availability square.
     uint8_t               reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
@@ -90,40 +90,34 @@ class Position
     uint8_t               state_flags_;           ///< Position state flags.
 
     /// @brief Bit values for castling rights.
-    enum CastlingRights : uint8_t
-    {
-        MAY_WHITE_CASTLE_KINGSIDE  = 0x01,
-        MAY_WHITE_CASTLE_QUEENSIDE = 0x02,
-        MAY_BLACK_CASTLE_KINGSIDE  = 0x04,
-        MAY_BLACK_CASTLE_QUEENSIDE = 0x08,
-        OK                         = 0x0F,
-        A1M                        = (uint8_t) ~(MAY_WHITE_CASTLE_QUEENSIDE),
-        E1M                        = (uint8_t) ~(MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE),
-        H1M                        = (uint8_t) ~(MAY_WHITE_CASTLE_KINGSIDE),
-        A8M                        = (uint8_t) ~(MAY_BLACK_CASTLE_QUEENSIDE),
-        E8M                        = (uint8_t) ~(MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE),
-        H8M                        = (uint8_t) ~(MAY_BLACK_CASTLE_KINGSIDE),
-    };
+    constexpr static uint8_t MAY_WHITE_CASTLE_KINGSIDE  = 0x01;
+    constexpr static uint8_t MAY_WHITE_CASTLE_QUEENSIDE = 0x02;
+    constexpr static uint8_t MAY_BLACK_CASTLE_KINGSIDE  = 0x04;
+    constexpr static uint8_t MAY_BLACK_CASTLE_QUEENSIDE = 0x08;
+    constexpr static uint8_t OKM                        = 0x0F; ///< Default castling rights.
+    constexpr static uint8_t A1M                        = ~MAY_WHITE_CASTLE_QUEENSIDE;
+    constexpr static uint8_t E1M                        = ~(MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE);
+    constexpr static uint8_t H1M                        = ~MAY_WHITE_CASTLE_KINGSIDE;
+    constexpr static uint8_t A8M                        = ~MAY_BLACK_CASTLE_QUEENSIDE;
+    constexpr static uint8_t E8M                        = ~(MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE);
+    constexpr static uint8_t H8M                        = ~MAY_BLACK_CASTLE_KINGSIDE;
 
     /// @brief Bit values for state flags.
-    enum StateFlags : uint8_t
-    {
-        IS_BLACK_TO_MOVE = 0x01, ///< It is black's turn to move.
-        IS_NULL_MOVE     = 0x02, ///< Position was the result of a null move.
-    };
+    constexpr static uint8_t IS_BLACK_TO_MOVE = 0x01;
+    constexpr static uint8_t IS_NULL_MOVE     = 0x02;
 
     // clang-format off
-    /// AND bit masks applied to move from and to, determining new castling rights.
-    constexpr static std::array<uint8_t, 64> CASTLING_RIGHTS_MASKS
+    /// @brief AND bit masks applied to move from and to, determining new castling rights following a move.
+    constexpr static std::array<uint8_t, 64> castling_rights_masks
     {
-    A1M, OK, OK, OK,E1M, OK, OK,H1M, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-     OK, OK, OK, OK, OK, OK, OK, OK, 
-    A8M, OK, OK, OK,E8M, OK, OK,H8M,
+        A1M, OKM, OKM, OKM, E1M, OKM, OKM, H1M, 
+        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
+        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
+        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
+        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
+        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
+        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
+        A8M, OKM, OKM, OKM, E8M, OKM, OKM, H8M,
     };
     // clang-format on
 };

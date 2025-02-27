@@ -2,6 +2,8 @@
 #include "bitboard.h"
 #include <cstdint>
 
+using zobrist_t = uint64_t;
+
 /// @file Declares data which is generated at compile time by the program "generate_constants.cpp" and contains various
 /// precomputed constants that are used by pawnstar to speed up positional hashing, move generation, attack detection
 /// and pawn structure analysis.
@@ -72,18 +74,18 @@ struct PawnSets
 struct MagicBitboard
 {
     uint64_t        magic;          ///< Magic multiplier.
-    uint64_t        occupancy_mask; ///< Occupancy mask (excludes final target square).
+    Bitboard        occupancy_mask; ///< Occupancy mask (excludes final target square).
     int             shift;          ///< Number of bits to right shift to get indices.
-    const uint64_t *attacks;        ///< Discrete attack vectors (move sets).
+    const Bitboard *attacks;        ///< Discrete attack vectors (move sets).
     const uint8_t  *indices;        ///< Indices into the discrete attack vector array.
 };
 
 extern const Sets          SETS[64];
 extern const PawnSets      PAWN_SETS[2][64];
 extern const Bitboard      INTERVENING_SQUARES[64][64];
-extern const uint64_t      PIECE_SQUARE_HASHES[2][6][64];
-extern const uint64_t      CASTLING_RIGHTS_HASHES[16];
-extern const uint64_t      EN_PASSANT_HASHES[64];
+extern const zobrist_t     PIECE_SQUARE_HASHES[2][6][64];
+extern const zobrist_t     CASTLING_RIGHTS_HASHES[16];
+extern const zobrist_t     EN_PASSANT_HASHES[64];
 extern const MagicBitboard BISHOP_MAGICS[64];
 extern const MagicBitboard ROOK_MAGICS[64];
-constexpr uint64_t         BLACK_MOVE_HASH = 0x28AB74D640E50602;
+constexpr zobrist_t        BLACK_MOVE_HASH = 0x28AB74D640E50602;
