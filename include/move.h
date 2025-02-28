@@ -54,37 +54,23 @@ enum Square : uint8_t
 /// @brief Return the file of a square.
 /// @param locn Square index.
 /// @return File number (0,7)
-constexpr uint8_t FileOf(Square locn)
+constexpr uint8_t FileOf(Square s)
 {
-    return locn & 7;
+    return s & 7;
 }
 /// @brief Return the rank of a square.
 /// @param locn Square index.
 /// @return Rank number (0,7)
-constexpr uint8_t RankOf(Square locn)
+constexpr uint8_t RankOf(Square s)
 {
-    return locn >> 3;
-}
-/// @brief Return the name of a file.
-/// @param locn Square index.
-/// @return Square file name.
-constexpr char FileChar(Square locn)
-{
-    return 'a' + FileOf(locn);
-}
-/// @brief Return the name of a rank.
-/// @param locn Square index.
-/// @return Square rank name.
-constexpr char RankChar(Square locn)
-{
-    return '1' + RankOf(locn);
+    return s >> 3;
 }
 /// @brief Return the name of a square.
 /// @param locn Square index.
 /// @return Square name.
-constexpr std::string SquareName(Square locn)
+constexpr std::string SquareName(Square s)
 {
-    return {FileChar(locn), RankChar(locn)};
+    return std::string{(char)('a' + FileOf(s)), (char)('1' + RankOf(s))};
 }
 
 /// @brief Class for representing a chess move.
@@ -126,9 +112,8 @@ class alignas(8) Move
 
     /// @brief Copy constructor. Treat the move object as a 64 bit int for efficiency.
     /// @param that Move to construct from.
-    constexpr Move(const Move &that)
+    constexpr Move(const Move &that) : val(that.val)
     {
-        val = that.val;
     }
 
     /// @brief Assignment. Treat the move object as a 64 bit int for efficiency.
@@ -330,11 +315,7 @@ class alignas(8) Move
     /// @return Move string.
     constexpr const std::string ToString() const
     {
-        std::string result;
-        result.push_back(FileChar(from()));
-        result.push_back(RankChar(from()));
-        result.push_back(FileChar(to()));
-        result.push_back(RankChar(to()));
+        std::string result = SquareName(from()) + SquareName(to());
         if (promoted() != NO_PIECE)
         {
             result.push_back(" pnbrqk"[promoted()]);

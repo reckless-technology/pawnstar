@@ -349,7 +349,7 @@ std::string Position::ToString() const
     }
     else
     {
-        ss << FileChar(en_passant_square_) << RankChar(en_passant_square_);
+        ss << SquareName(en_passant_square_);
     }
     ss << ' ';
     // Half move clock and full move number
