@@ -14,7 +14,7 @@ class Pins
     /// @param position Position to analyze.
     constexpr Pins(const Position &position)
     {
-        pinned_pieces                          = NO_SQUARES;
+        pinned_pieces_                         = NO_SQUARES;
         const Color           color            = position.ColorToMove();
         const Bitboard        occupied_squares = position.OccupiedSquares();
         const Bitboard        friendly_pieces  = position.PiecesOfColor(color);
@@ -33,8 +33,8 @@ class Pins
             {
                 // There is only a single piece between the sliding enemy attacker and the king so this piece is pinned
                 // along the attack ray. The pinned piece is also allowed to capture the pinning piece.
-                pinned_pieces |= intervening_friendly_piece;
-                allowed_squares[intervening_friendly_piece.Lsb()] = intervening_squares | Bitboard{s};
+                pinned_pieces_ |= intervening_friendly_piece;
+                allowed_squares_[intervening_friendly_piece.Lsb()] = intervening_squares | Bitboard{s};
             }
         }
     }
@@ -44,10 +44,10 @@ class Pins
     /// @return Set of allowed destination squares.
     constexpr Bitboard AllowedSquares(Square s) const
     {
-        return (Bitboard{s} & pinned_pieces).IsNotEmpty() ? allowed_squares[s] : ALL_SQUARES;
+        return (Bitboard{s} & pinned_pieces_).IsNotEmpty() ? allowed_squares_[s] : ALL_SQUARES;
     }
 
   private:
-    Bitboard                 pinned_pieces;   ///< Set of squares which are pinned.
-    std::array<Bitboard, 64> allowed_squares; ///< Allowed squares per source.
+    Bitboard                 pinned_pieces_;   ///< Set of squares which are pinned.
+    std::array<Bitboard, 64> allowed_squares_; ///< Allowed squares per source.
 };

@@ -39,7 +39,7 @@ bool OpeningBook::Initialize(std::string_view filename)
 /// @brief Pseudo randomly select from available book moves
 /// @param hash the position hash
 /// @return Move selected from book, or Move::None if no move found
-Move OpeningBook::GetMove(uint64_t hash)
+Move OpeningBook::GetMove(zobrist_t hash)
 {
     if (book_.count(hash))
     {
@@ -97,9 +97,9 @@ bool OpeningBook::ParseLineOfPlay(std::string_view line)
         {
             return true; // Done with this line.
         }
-        const uint64_t hash  = position.Hash();
-        auto           moves = position.GenerateLegalMoves();
-        auto           i =
+        const zobrist_t hash  = position.Hash();
+        auto            moves = position.GenerateLegalMoves();
+        auto            i =
             std::ranges::find_if(moves, [&move_string](const Move &move) { return move.ToString() == move_string; });
         if (i != moves.end())
         {
