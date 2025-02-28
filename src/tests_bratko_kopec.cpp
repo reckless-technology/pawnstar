@@ -41,7 +41,7 @@ constexpr std::array POSITION_TESTS{
 };
 
 /// @brief Run the Bratko Kopec position tests.
-/// @param depth Saerch depth.
+/// @param depth Search depth.
 void RunPositionTests(int depth)
 {
     const auto start_ms = ElapsedMilliseconds();

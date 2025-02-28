@@ -14,8 +14,8 @@
 class HistoryTable
 {
   private:
-    typedef std::array<uint32_t, MAX_PLY * 4096> Table;
-    std::unique_ptr<Table>                       data_;
+    using Table = std::array<uint32_t, MAX_PLY * 4096>;
+    std::unique_ptr<Table> data_;
 
   public:
     HistoryTable()
@@ -30,7 +30,7 @@ class HistoryTable
     uint32_t MaxCount(void) const
     {
         const auto &table = *data_;
-        return *std::ranges::max_element(table);
+        return std::ranges::max(table);
     }
     void RecordGoodMove(int ply, const Move &move)
     {
