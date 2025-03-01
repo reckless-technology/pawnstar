@@ -27,7 +27,7 @@ Position Position::MakeNullMove() const
     position.state_flags_ ^= IS_BLACK_TO_MOVE;
     position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
     position.hash_ ^= BLACK_MOVE_HASH;
-    position.en_passant_square_ = NO_SQUARE;
+    position.en_passant_square_ = Square{(uint8_t)0};
     return position;
 }
 
@@ -73,6 +73,11 @@ void Position::MovePiece(Color color, Piece piece, Square from, Square to)
     squares_[to]   = piece;
 }
 
+static constexpr Square G1{"G1"};
+static constexpr Square C1{"C1"};
+static constexpr Square G8{"G8"};
+static constexpr Square C8{"C8"};
+
 /// @brief Make a move and return the new position.
 /// @param move The move to be made.
 /// @return new Position following the move.
@@ -88,7 +93,7 @@ Position Position::MakeMove(const Move &move) const
     position.castling_rights_ &= castling_rights_masks[from] & castling_rights_masks[to];
     position.hash_ ^= CASTLING_RIGHTS_HASHES[position.castling_rights_] ^ CASTLING_RIGHTS_HASHES[castling_rights_];
     position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
-    position.en_passant_square_ = NO_SQUARE;
+    position.en_passant_square_ = Square{(uint8_t)0};
 
     switch (move.type())
     {
@@ -135,20 +140,20 @@ Position Position::MakeMove(const Move &move) const
         switch (to)
         {
         case G1:
-            position.MovePiece(WHITE, KING, E1, G1);
-            position.MovePiece(WHITE, ROOK, H1, F1);
+            position.MovePiece(WHITE, KING, "E1", "G1");
+            position.MovePiece(WHITE, ROOK, "H1", "F1");
             break;
         case C1:
-            position.MovePiece(WHITE, KING, E1, C1);
-            position.MovePiece(WHITE, ROOK, A1, D1);
+            position.MovePiece(WHITE, KING, "E1", "C1");
+            position.MovePiece(WHITE, ROOK, "A1", "D1");
             break;
         case G8:
-            position.MovePiece(BLACK, KING, E8, G8);
-            position.MovePiece(BLACK, ROOK, H8, F8);
+            position.MovePiece(BLACK, KING, "E8", "G8");
+            position.MovePiece(BLACK, ROOK, "H8", "F8");
             break;
         case C8:
-            position.MovePiece(BLACK, KING, E8, C8);
-            position.MovePiece(BLACK, ROOK, A8, D8);
+            position.MovePiece(BLACK, KING, "E8", "C8");
+            position.MovePiece(BLACK, ROOK, "A8", "D8");
             break;
         default:
             break;
@@ -251,11 +256,11 @@ Position Position::FromString(std::string_view fen_string)
     ss >> ep_square;
     if (ep_square == "-")
     {
-        position.en_passant_square_ = NO_SQUARE;
+        position.en_passant_square_ = Square{(uint8_t)0};
     }
     else
     {
-        position.en_passant_square_ = (Square)((ep_square[0] - 'a') + 8 * (ep_square[1] - '1'));
+        position.en_passant_square_ = Square{ep_square.c_str()};
     }
     if (ss)
     {
@@ -349,7 +354,7 @@ std::string Position::ToString() const
     }
     else
     {
-        ss << SquareName(en_passant_square_);
+        ss << en_passant_square_.ToString();
     }
     ss << ' ';
     // Half move clock and full move number

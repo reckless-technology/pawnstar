@@ -273,30 +273,30 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         {
             if constexpr (color == WHITE)
             {
-                if (MayWhiteCastleKingside() && (occupied_squares & (Bitboard(F1) | Bitboard(G1))).IsEmpty() &&
-                    !IsAttacked(F1, BLACK) && !IsAttacked(G1, BLACK))
+                if (MayWhiteCastleKingside() && (occupied_squares & (Bitboard("F1") | Bitboard("G1"))).IsEmpty() &&
+                    !IsAttacked("F1", BLACK) && !IsAttacked("G1", BLACK))
                 {
-                    moves.push_back(Move::Castling(E1, G1));
+                    moves.push_back(Move::Castling("E1", "G1"));
                 }
                 if (MayWhiteCastleQueenside() &&
-                    (occupied_squares & (Bitboard(B1) | Bitboard(C1) | Bitboard(D1))).IsEmpty() &&
-                    !IsAttacked(D1, BLACK) && !IsAttacked(C1, BLACK))
+                    (occupied_squares & (Bitboard("B1") | Bitboard("C1") | Bitboard("D1"))).IsEmpty() &&
+                    !IsAttacked("D1", BLACK) && !IsAttacked("C1", BLACK))
                 {
-                    moves.push_back(Move::Castling(E1, C1));
+                    moves.push_back(Move::Castling("E1", "C1"));
                 }
             }
             else
             {
-                if (MayBlackCastleKingside() && (occupied_squares & (Bitboard(F8) | Bitboard(G8))).IsEmpty() &&
-                    !IsAttacked(F8, WHITE) && !IsAttacked(G8, WHITE))
+                if (MayBlackCastleKingside() && (occupied_squares & (Bitboard("F8") | Bitboard("G8"))).IsEmpty() &&
+                    !IsAttacked("F8", WHITE) && !IsAttacked("G8", WHITE))
                 {
-                    moves.push_back(Move::Castling(E8, G8));
+                    moves.push_back(Move::Castling("E8", "G8"));
                 }
                 if (MayBlackCastleQueenside() &&
-                    (occupied_squares & (Bitboard(B8) | Bitboard(C8) | Bitboard(D8))).IsEmpty() &&
-                    !IsAttacked(D8, WHITE) && !IsAttacked(C8, WHITE))
+                    (occupied_squares & (Bitboard("B8") | Bitboard("C8") | Bitboard("D8"))).IsEmpty() &&
+                    !IsAttacked("D8", WHITE) && !IsAttacked("C8", WHITE))
                 {
-                    moves.push_back(Move::Castling(E8, C8));
+                    moves.push_back(Move::Castling("E8", "C8"));
                 }
             }
         }
@@ -438,7 +438,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         {
             // Test for the weird check that occurs when there is an enemy rook or queen on the same rank as our king
             // which is only discovered after removing both pawns from the rank during an en passant capture.
-            if (RankOf(king_locn) == RankOf(from))
+            if (king_locn.Rank() == from.Rank())
             {
                 // Remove the capturing and ep captured pawns from the occupied squares set and test for horizontal ray
                 // attacks.

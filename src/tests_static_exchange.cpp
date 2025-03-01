@@ -26,9 +26,9 @@ struct SeeTest
 /// @brief SEE test vectors.
 // clang-format off
 constexpr std::array<SeeTest, 2> tests{{
-    // Position                                                 Move to evaluate                      Score
-    {"1k1r4/1pp4p/p7/4p3/8/P5P1/1PP4P/2K1R3 w - -",             Move::Capture(E1, E5, ROOK, PAWN),     100},
-    {"1k1r3q/1ppn3p/p4b2/4p3/8/P2N2P1/1PP1R1BP/2K1Q3 w - -",    Move::Capture(D3, E5, KNIGHT, PAWN),  -200},
+    // Position                                                 Move to evaluate                         Score
+    {"1k1r4/1pp4p/p7/4p3/8/P5P1/1PP4P/2K1R3 w - -",             Move::Capture("E1", "E5", ROOK, PAWN),     100},
+    {"1k1r3q/1ppn3p/p4b2/4p3/8/P2N2P1/1PP1R1BP/2K1Q3 w - -",    Move::Capture("D3", "E5", KNIGHT, PAWN),  -200},
 }};
 // clang-format on
 

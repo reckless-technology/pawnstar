@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 #include "constants.h"
 #include "stack_list.h"
@@ -27,7 +28,7 @@ enum Color : uint8_t
     BLACK,
 };
 
-/// @brief Return the enemy of a color
+/// @brief Return the enemy of a color.
 /// @param color the color
 /// @return The opposite color
 constexpr Color EnemyOf(Color color)
@@ -35,43 +36,51 @@ constexpr Color EnemyOf(Color color)
     return color == WHITE ? BLACK : WHITE;
 }
 
-// clang-format off
-/// @brief Chess board square indices.
-enum Square : uint8_t
+/// @brief A square on the chess board.
+class Square
 {
-    A1, B1, C1, D1, E1, F1, G1, H1,
-    A2, B2, C2, D2, E2, F2, G2, H2,
-    A3, B3, C3, D3, E3, F3, G3, H3,
-    A4, B4, C4, D4, E4, F4, G4, H4,
-    A5, B5, C5, D5, E5, F5, G5, H5,
-    A6, B6, C6, D6, E6, F6, G6, H6,
-    A7, B7, C7, D7, E7, F7, G7, H7,
-    A8, B8, C8, D8, E8, F8, G8, H8,
-    NO_SQUARE = 0,
-};
-// clang-format on
+  public:
+    /// @brief Default constructor - does nothing.
+    constexpr Square()
+    {
+    }
+    /// @brief Constructor
+    /// @param x Square index in LERF mapping.
+    constexpr Square(uint8_t x) : s(x)
+    {
+    }
+    /// @brief Constructor
+    /// @param str Name of square e.g. "e4"
+    constexpr Square(const char *str) : s((str[0] | 0x20) - 'a' + 8 * (str[1] - '1'))
+    {
+    }
+    /// @brief Convert to square index.
+    constexpr operator uint8_t() const
+    {
+        return s;
+    }
+    /// @brief File.
+    /// @return File on board (0 thru 7 -> a thru h)
+    constexpr uint8_t File() const
+    {
+        return s & 7;
+    }
+    /// @brief Rank.
+    /// @return Rank on board (zero indexed 0 thru 7).
+    constexpr uint8_t Rank() const
+    {
+        return s >> 3;
+    }
+    /// @brief Square name.
+    /// @return String containing name of square e.g. "e4"
+    constexpr std::string ToString() const
+    {
+        return std::string{(char)('a' + File()), (char)('1' + Rank())};
+    }
 
-/// @brief Return the file of a square.
-/// @param locn Square index.
-/// @return File number (0,7)
-constexpr uint8_t FileOf(Square s)
-{
-    return s & 7;
-}
-/// @brief Return the rank of a square.
-/// @param locn Square index.
-/// @return Rank number (0,7)
-constexpr uint8_t RankOf(Square s)
-{
-    return s >> 3;
-}
-/// @brief Return the name of a square.
-/// @param locn Square index.
-/// @return Square name.
-constexpr std::string SquareName(Square s)
-{
-    return std::string{(char)('a' + FileOf(s)), (char)('1' + RankOf(s))};
-}
+  private:
+    uint8_t s;
+};
 
 /// @brief Class for representing a chess move.
 /// A move is 64 bits in size.
@@ -104,8 +113,8 @@ class alignas(8) Move
         CASTLING,                  ///< Castling.
     };
 
-    /// @brief Default constructor; does not initialize the move object, so that arrays of moves can be quickly created
-    /// without having to construct initialize each move.
+    /// @brief Default constructor; does not initialize the move object, so that arrays of moves can be quickly
+    /// created without having to construct initialize each move.
     constexpr Move()
     {
     }
@@ -137,14 +146,14 @@ class alignas(8) Move
     /// @return Square index of move to.
     constexpr Square to() const
     {
-        return (Square)(val & 0x3F);
+        return Square{(uint8_t)(val & 0x3F)};
     }
 
     /// @brief Source square.
     /// @return Square index of move from.
     constexpr Square from() const
     {
-        return (Square)((val >> 6) & 0x3F);
+        return Square{(uint8_t)((val >> 6) & 0x3F)};
     }
 
     /// @brief Type.
@@ -315,7 +324,7 @@ class alignas(8) Move
     /// @return Move string.
     constexpr const std::string ToString() const
     {
-        std::string result = SquareName(from()) + SquareName(to());
+        std::string result = from().ToString() + to().ToString();
         if (promoted() != NO_PIECE)
         {
             result.push_back(" pnbrqk"[promoted()]);

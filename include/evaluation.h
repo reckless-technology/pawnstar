@@ -356,7 +356,7 @@ template <Color color> int EvaluateKing(const Position &position)
         // clang-format on
 
         // Penalty for open files near our king.
-        const Bitboard king_file = FILE_BITBOARDS[FileOf(position.KingLocation(color))];
+        const Bitboard king_file = FILE_BITBOARDS[position.KingLocation(color).File()];
         if ((king_file & friendly_pawns).IsEmpty())
         {
             safety_score -= 15;
