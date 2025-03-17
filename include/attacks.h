@@ -1,14 +1,16 @@
 #pragma once
-/// @file Sliding piece bitboard attacks. Uses precomputed magic bitboards to lookup sliding piece attacks without loops
+/// @file Sliding piece bitboard attacks. Uses precomputed pext bitboards to lookup sliding piece attacks without loops
 /// or branches.
 
 #include "generated_data.h"
 
-#ifndef USE_MAGIC_BITBOARDS
-#define USE_MAGIC_BITBOARDS 1
+#include <immintrin.h>
+
+#ifndef USE_PEXT_BITBOARDS
+#define USE_PEXT_BITBOARDS 1
 #endif
 
-#if USE_MAGIC_BITBOARDS
+#if USE_PEXT_BITBOARDS
 
 /// @brief Bishop sliding attacks.
 /// @param occupied_squares Squares with a piece on them.
@@ -16,8 +18,8 @@
 /// @return Set of squares attacked by a bishop on location.
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square s)
 {
-    const MagicBitboard &m = BISHOP_MAGICS[s];
-    return m.attacks[m.indices[((uint64_t)(occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
+    const PextBitboard &p = BISHOP_PEXTS[s];
+    return p.attacks[p.indices[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask)]];
 }
 
 /// @brief Rook sliding attacks.
@@ -26,13 +28,13 @@ constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square s)
 /// @return Set of squares attacked by a rook on location.
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square s)
 {
-    const MagicBitboard &m = ROOK_MAGICS[s];
-    return m.attacks[m.indices[((uint64_t)(occupied_squares & m.occupancy_mask) * m.magic) >> m.shift]];
+    const PextBitboard &p = ROOK_PEXTS[s];
+    return p.attacks[p.indices[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask)]];
 }
 
 #else
 
-// Alternate sliding piece attacks using traditional approach instead of magic bitboards. This is slower, and only used
+// Alternate sliding piece attacks using traditional approach instead of pext bitboards. This is slower, and only used
 // for regression testing purposes.
 
 constexpr Square LsbX(Bitboard b)

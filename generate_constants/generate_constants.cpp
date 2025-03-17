@@ -9,7 +9,9 @@
 #include <cstdio>
 #include <format>
 #include <functional>
+#include <immintrin.h>
 #include <iostream>
+#include <map>
 #include <random>
 #include <set>
 #include <string_view>
@@ -354,14 +356,12 @@ constexpr std::vector<uint64_t> EnumerateMaskCombinations(uint64_t mask)
     return result;
 }
 
-/// @brief Parameters for a magic bitboard for a single square and piece type.
-struct Magic
+/// @brief Parameters for a pext bitboard for a single square and piece type.
+struct PextBitboard
 {
-    uint64_t              multiplier; ///< The magic value.
-    uint64_t              mask;       ///< Occupancy mask.
-    int                   shift;      ///< Number of bits to right shift to get indices.
-    std::vector<uint64_t> attacks;    ///< The discrete (unique) attack vectors.
-    std::vector<uint8_t>  indices;    ///< Indices into the discrete attack vector array.
+    uint64_t              mask;    ///< Occupancy mask.
+    std::vector<uint64_t> attacks; ///< The discrete (unique) attack vectors.
+    std::vector<uint8_t>  indices; ///< Indices into the discrete attack vector array.
 };
 
 /// @brief Maps a square to an occupancy mask for that square.
@@ -370,63 +370,43 @@ using MaskFn = uint64_t (*)(uint8_t);
 /// @brief Maps occupied squares and location to attacked targets by a sliding piece.
 using AttackFn = uint64_t (*)(uint64_t, uint8_t);
 
-/// @brief Trial and error search for a magic bitboard entry, for one sliding piece type at one location.
+/// @brief Compute a pext bitboard entry, for one sliding piece type at one location.
 /// @param sq Square index.
-/// @param mask_fn Occupancy mask function for this slider.
-/// @param attack_fn Attacked squares function for this slider.
-/// @return The magic values for this slider for this location.
-Magic FindMagic(uint8_t sq, MaskFn mask_fn, AttackFn attack_fn)
+/// @param mask_fn Occupancy mask function for this piece.
+/// @param attack_fn Attacked squares function for this piece.
+/// @return The sliding move targets for this piece at this location considering all relevant occupancies.
+PextBitboard ComputePext(uint8_t sq, MaskFn mask_fn, AttackFn attack_fn)
 {
-    Magic magic;
-    magic.mask                        = mask_fn(sq);
-    magic.shift                       = 64 - std::popcount(magic.mask);
-    const auto            occupancies = EnumerateMaskCombinations(magic.mask);
-    std::vector<uint64_t> attacks;
+    PextBitboard pext_bb;
+    pext_bb.mask                             = mask_fn(sq);
+    const auto                   occupancies = EnumerateMaskCombinations(pext_bb.mask);
+    std::map<uint64_t, uint64_t> attacks; // maps occupancy to attacked squares
     for (auto occupancy : occupancies)
     {
-        attacks.push_back(attack_fn(occupancy, sq));
+        attacks[occupancy] = attack_fn(occupancy, sq);
     }
-    bool is_hash_collision;
-    do
+    pext_bb.attacks.assign(occupancies.size(), 0);
+    for (auto occupancy : occupancies)
     {
-        is_hash_collision = false;
-        // Magics are typically fairly sparse, so AND a few random numbers together.
-        magic.multiplier = prng() & prng() & prng();
-        // Use ALL_SQUARES to indicate a vacant slot since NO_SQUARES is a valid attack vector.
-        magic.attacks.assign(occupancies.size(), ~0ull);
-        for (std::size_t i = 0; i != occupancies.size(); ++i)
-        {
-            const auto index = (occupancies[i] * magic.multiplier) >> magic.shift;
-            if (magic.attacks[index] == ~0ull)
-            {
-                // This slot is vacant so store the actual attack.
-                magic.attacks[index] = attacks[i];
-                continue;
-            }
-            if (magic.attacks[index] != attacks[i])
-            {
-                // There is a collision with a previous entry; this trial magic is no good.
-                is_hash_collision = true;
-                break;
-            }
-        }
-    } while (is_hash_collision);
-    // We found a magic value which works. Compress the actual attacks set down to a set of indices into unique attacks.
+        const auto index       = _pext_u64(occupancy, pext_bb.mask);
+        pext_bb.attacks[index] = attacks[occupancy];
+    }
+    // Compress the actual attacks set down to a set of indices into unique attacks.
     // Since the indices are only 1 byte each and the attacks are 8 bytes each, this saves a ton of space in the final
-    // magic move entry tables, which helps with cache pressure at the expense of one extra indirection.
-    std::set<uint64_t>    attacks_set{magic.attacks.begin(), magic.attacks.end()}; // Make unique.
+    // move entry tables, which helps with cache pressure at the expense of one extra indirection.
+    std::set<uint64_t>    attacks_set{pext_bb.attacks.begin(), pext_bb.attacks.end()}; // Make unique.
     std::vector<uint64_t> unique_attacks{attacks_set.begin(), attacks_set.end()};
-    for (auto attack : magic.attacks)
+    for (auto attack : pext_bb.attacks)
     {
         const auto iter = std::ranges::find(unique_attacks, attack);
-        magic.indices.push_back(iter - unique_attacks.begin());
+        pext_bb.indices.push_back(iter - unique_attacks.begin());
     }
-    magic.attacks = unique_attacks;
-    return magic;
+    pext_bb.attacks = unique_attacks;
+    return pext_bb;
 }
 
-/// @brief A magic Bitboard search vector entry.
-struct PieceMagic
+/// @brief A pext Bitboard search vector entry.
+struct PiecePextGenerator
 {
     std::string_view name;      ///< Piece name (bishop or rook).
     AttackFn         attack_fn; ///< Attacked squares function.
@@ -434,7 +414,7 @@ struct PieceMagic
 };
 
 // clang-format off
-constexpr std::array<PieceMagic, 2> piece_magics = 
+constexpr std::array<PiecePextGenerator, 2> piece_generators = 
 {{
     { "BISHOP", BishopAttacks, BishopOccupancyMask }, 
     { "ROOK",   RookAttacks,   RookOccupancyMask   },
@@ -604,54 +584,50 @@ static void GenerateHashes()
     std::cout << std::format("\n}};\n");
 }
 
-/// @brief Generate magic bitboards for bishop and rook sliding attacks.
-static void GenerateMagics(void)
+/// @brief Generate pext bitboards for bishop and rook sliding attacks.
+static void GeneratePextBitboards(void)
 {
-    for (const PieceMagic &pm : piece_magics)
+    for (const PiecePextGenerator &piece : piece_generators)
     {
-        std::vector<Magic> magics;
-        // Find magic values for each square on the board.
+        std::vector<PextBitboard> pexts;
         for (uint8_t sq = 0; sq != 64; ++sq)
         {
-            magics.push_back(FindMagic(sq, pm.mask_fn, pm.attack_fn));
+            pexts.push_back(ComputePext(sq, piece.mask_fn, piece.attack_fn));
         }
         // First print the arrays for the discrete attacks and the attack indices.
         for (uint8_t sq = 0; sq != 64; ++sq)
         {
-            const int num_attacks = 1 << (64 - magics[sq].shift);
-            std::cout << std::format("static const uint8_t {}_MAGIC_INDICES_{}[{}] = \n{{", pm.name, SquareName(sq),
-                                     num_attacks);
-            for (int j = 0; j != num_attacks; ++j)
+            std::cout << std::format("static const uint8_t {}_PEXT_INDICES_{}[{}] = \n{{", piece.name, SquareName(sq),
+                                     pexts[sq].indices.size());
+            for (std::size_t j = 0; j != pexts[sq].indices.size(); ++j)
             {
                 if (j % 16 == 0)
                 {
                     std::cout << std::format("\n    ");
                 }
-                std::cout << std::format("0x{:02X}, ", magics[sq].indices[j]);
+                std::cout << std::format("0x{:02X}, ", pexts[sq].indices[j]);
             }
             std::cout << std::format("\n}};\n");
-            std::cout << std::format("static const Bitboard {}_MAGIC_ATTACKS_{}[{}] = \n{{", pm.name, SquareName(sq),
-                                     magics[sq].attacks.size());
-            for (std::size_t j = 0; j != magics[sq].attacks.size(); ++j)
+            std::cout << std::format("static const Bitboard {}_PEXT_ATTACKS_{}[{}] = \n{{", piece.name, SquareName(sq),
+                                     pexts[sq].attacks.size());
+            for (std::size_t j = 0; j != pexts[sq].attacks.size(); ++j)
             {
                 if (j % 4 == 0)
                 {
                     std::cout << std::format("\n    ");
                 }
-                std::cout << std::format("0x{:016X},", magics[sq].attacks[j]);
+                std::cout << std::format("0x{:016X},", pexts[sq].attacks[j]);
             }
             std::cout << std::format("\n}};\n");
         }
-        // Next print the MagicBitboard for this piece / square combination.
-        std::cout << std::format("extern const MagicBitboard {}_MAGICS[64] = \n{{\n", pm.name);
+        // Next print the PextBitboard for this piece / square combination.
+        std::cout << std::format("extern const PextBitboard {}_PEXTS[64] = \n{{\n", piece.name);
         for (uint8_t i = 0; i != 64; ++i)
         {
             std::cout << std::format("    {{\n");
-            std::cout << std::format("        .magic          = 0x{:016X},\n", magics[i].multiplier);
-            std::cout << std::format("        .occupancy_mask = 0x{:016X},\n", magics[i].mask);
-            std::cout << std::format("        .shift          = {},\n", magics[i].shift);
-            std::cout << std::format("        .attacks        = {}_MAGIC_ATTACKS_{},\n", pm.name, SquareName(i));
-            std::cout << std::format("        .indices        = {}_MAGIC_INDICES_{},\n", pm.name, SquareName(i));
+            std::cout << std::format("        .occupancy_mask = 0x{:016X},\n", pexts[i].mask);
+            std::cout << std::format("        .attacks        = {}_PEXT_ATTACKS_{},\n", piece.name, SquareName(i));
+            std::cout << std::format("        .indices        = {}_PEXT_INDICES_{},\n", piece.name, SquareName(i));
             std::cout << std::format("    }},\n");
         }
         std::cout << std::format("}};\n");
@@ -668,6 +644,6 @@ int main()
     GeneratePawnSets();
     GenerateInterveningSquares();
     GenerateHashes();
-    GenerateMagics();
+    GeneratePextBitboards();
     return 0;
 }

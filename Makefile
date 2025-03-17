@@ -1,7 +1,7 @@
 PROGRAM             = pawnstar
 CXX                 = clang++
 CPPFLAGS            = -I include -D DEBUGX=1
-CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20
+CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2 
 
 DEBUG_DIR           = debug
 RELEASE_DIR         = release
