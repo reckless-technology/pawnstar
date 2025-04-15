@@ -2,16 +2,13 @@ PROGRAM             = pawnstar
 CXX                 = clang++
 CPPFLAGS            = -I include -D DEBUGX=1
 CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2 
-
-DEBUG_DIR           = debug
-RELEASE_DIR         = release
-
+BUILD_DIR           = build
+PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
 GENERATED_DATA      = src/generated_data.cpp
 GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
 GENERATOR_EXE       = generate_constants/gen_constants
-
 HEADERS             = $(wildcard include/*.h)
-
+OBJECTS             = $(addprefix $(BUILD_DIR)/, $(SOURCES:.cpp=.o))
 SOURCES             = \
 	debug_hashtable.cpp \
 	evaluation.cpp game.cpp \
@@ -31,50 +28,37 @@ SOURCES             = \
 	transposition_table.cpp \
 	$(notdir $(GENERATED_DATA))
 
-OBJECTS             = $(SOURCES:.cpp=.o)
+ifeq ($(DEBUG), 1)
+	CXXFLAGS += -g -O0 -D DEBUG -fsanitize=undefined -fsanitize=address
+else
+	CXXFLAGS += -g -O3 -D NDEBUG
+endif
 
-DEBUG_EXE           = $(DEBUG_DIR)/$(PROGRAM)
-DEBUG_OBJECTS       = $(addprefix $(DEBUG_DIR)/,$(OBJECTS))
-DEBUG_FLAGS         = -g -O0 -D DEBUG -fsanitize=undefined -fsanitize=address
+.PHONY: all prep clean gen
 
-RELEASE_EXE         = $(RELEASE_DIR)/$(PROGRAM)
-RELEASE_OBJECTS     = $(addprefix $(RELEASE_DIR)/, $(OBJECTS))
-RELEASE_FLAGS       = -g -O3 -D NDEBUG
+all: prep $(PROGRAM_EXE)
 
-.PHONY: all clean debug prep release remake gen
+prep:
+	mkdir -p $(BUILD_DIR)
 
-all: release
+clean:
+	rm -f $(PROGRAM_EXE) $(OBJECTS) $(GENERATED_DATA) $(GENERATOR_EXE)
 
 gen: $(GENERATOR_EXE)
 
-debug: prep $(DEBUG_EXE)
+# Compile an object from source.
+$(BUILD_DIR)/%.o: src/%.cpp $(HEADERS)
+	$(CXX) -c $(CXXFLAGS)  -o $@ $<
 
-$(DEBUG_EXE): $(DEBUG_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(DEBUG_EXE) $(DEBUG_OBJECTS)
+# Link the executable.
+$(PROGRAM_EXE): $(OBJECTS)
+	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS)
 
-# Compile a debug object from source
-$(DEBUG_DIR)/%.o: src/%.cpp $(HEADERS)
-	$(CXX) -c $(CXXFLAGS) $(DEBUG_FLAGS) -o $@ $<
+# Compile the generator executable.
+$(GENERATOR_EXE) : $(GENERATOR_SOURCE)
+	$(CXX) $(CXXFLAGS) -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
 
-release: prep $(RELEASE_EXE)
-
-$(RELEASE_EXE): $(RELEASE_OBJECTS)
-	$(CXX) $(CXXFLAGS) $(RELEASE_FLAGS) -o $(RELEASE_EXE) $(RELEASE_OBJECTS)
-
-# Compile a release object from source
-$(RELEASE_DIR)/%.o: src/%.cpp $(HEADERS)
-	$(CXX) -c $(CXXFLAGS) $(RELEASE_FLAGS) -o $@ $<
-
+# Invoke the generator executable to create the generated data source file.
 $(GENERATED_DATA) : $(GENERATOR_EXE)
 	$(GENERATOR_EXE) > $(GENERATED_DATA)
 
-$(GENERATOR_EXE) : $(GENERATOR_SOURCE)
-	$(CXX) -g -Og $(CXXFLAGS) -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
-	
-prep:
-	mkdir -p $(DEBUG_DIR) $(RELEASE_DIR)
-
-remake: clean all
-
-clean:
-	rm -f $(RELEASE_EXE) $(RELEASE_OBJECTS) $(DEBUG_EXE) $(DEBUG_OBJECTS) $(GENERATED_DATA) $(GENERATOR_EXE)
