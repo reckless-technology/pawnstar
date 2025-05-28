@@ -199,7 +199,7 @@ Position Position::FromString(std::string_view fen_string)
         if (a != string::npos)
         {
             const Piece piece = (Piece)(a + 1);
-            position.AddPiece(WHITE, piece, (Square)(x + 8 * y));
+            position.AddPiece(WHITE, piece, Square{(uint8_t)x, (uint8_t)y});
             ++x;
             continue;
         }
@@ -207,7 +207,7 @@ Position Position::FromString(std::string_view fen_string)
         if (a != string::npos)
         {
             const Piece piece = (Piece)(a + 1);
-            position.AddPiece(BLACK, piece, (Square)(x + 8 * y));
+            position.AddPiece(BLACK, piece, Square{(uint8_t)x, (uint8_t)y});
             ++x;
             continue;
         }
@@ -369,7 +369,7 @@ std::string Position::ToString() const
 Bitboard Position::AttacksTo(Square location, Color color) const
 {
     const Sets    &sets             = SETS[location];
-    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
+    const Bitboard occupied_squares = OccupiedSquares();
     Bitboard       result =
         ((sets.PawnAttacks(EnemyOf(color)) & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_));
     result |= RookAttacks(occupied_squares, location) & (rooks_ | queens_);

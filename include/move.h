@@ -50,6 +50,12 @@ class Square
     {
     }
     /// @brief Constructor
+    /// @param x file
+    /// @param y rank
+    constexpr Square(uint8_t x, uint8_t y) : s(x + 8 * y)
+    {
+    }
+    /// @brief Constructor
     /// @param str Name of square e.g. "e4"
     constexpr Square(const char *str) : s((str[0] | 0x20) - 'a' + 8 * (str[1] - '1'))
     {
