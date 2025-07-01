@@ -95,8 +95,12 @@ constexpr uint64_t RayFrom(uint8_t sq, Direction direction)
 constexpr uint64_t KnightAttacks(uint8_t sq)
 {
     // The 8 directions in which a knight can jump (dx,dy)
-    constexpr std::array<std::pair<int, int>, 8> knight_vectors = {
-        {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}}};
+    // clang-format off
+    constexpr std::array<std::pair<int, int>, 8> knight_vectors = 
+    {
+        { {-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1} }
+    };
+    // clang-format on
     uint64_t result = 0;
     for (const auto &[dx, dy] : knight_vectors)
     {
@@ -377,32 +381,27 @@ using AttackFn = uint64_t (*)(uint64_t, uint8_t);
 /// @return The sliding move targets for this piece at this location considering all relevant occupancies.
 PextBitboard ComputePext(uint8_t sq, MaskFn mask_fn, AttackFn attack_fn)
 {
-    PextBitboard pext_bb;
-    pext_bb.mask                             = mask_fn(sq);
-    const auto                   occupancies = EnumerateMaskCombinations(pext_bb.mask);
-    std::map<uint64_t, uint64_t> attacks; // maps occupancy to attacked squares
+    PextBitboard result;
+    result.mask            = mask_fn(sq);
+    const auto occupancies = EnumerateMaskCombinations(result.mask);
+    result.attacks.assign(occupancies.size(), 0);
     for (auto occupancy : occupancies)
     {
-        attacks[occupancy] = attack_fn(occupancy, sq);
-    }
-    pext_bb.attacks.assign(occupancies.size(), 0);
-    for (auto occupancy : occupancies)
-    {
-        const auto index       = _pext_u64(occupancy, pext_bb.mask);
-        pext_bb.attacks[index] = attacks[occupancy];
+        const auto index      = _pext_u64(occupancy, result.mask);
+        result.attacks[index] = attack_fn(occupancy, sq);
     }
     // Compress the actual attacks set down to a set of indices into unique attacks.
     // Since the indices are only 1 byte each and the attacks are 8 bytes each, this saves a ton of space in the final
     // move entry tables, which helps with cache pressure at the expense of one extra indirection.
-    std::set<uint64_t>    attacks_set{pext_bb.attacks.begin(), pext_bb.attacks.end()}; // Make unique.
+    std::set<uint64_t>    attacks_set{result.attacks.begin(), result.attacks.end()}; // Make unique.
     std::vector<uint64_t> unique_attacks{attacks_set.begin(), attacks_set.end()};
-    for (auto attack : pext_bb.attacks)
+    for (auto attack : result.attacks)
     {
         const auto iter = std::ranges::find(unique_attacks, attack);
-        pext_bb.indices.push_back(iter - unique_attacks.begin());
+        result.indices.push_back(iter - unique_attacks.begin());
     }
-    pext_bb.attacks = unique_attacks;
-    return pext_bb;
+    result.attacks = unique_attacks;
+    return result;
 }
 
 /// @brief A pext Bitboard search vector entry.
