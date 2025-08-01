@@ -368,10 +368,9 @@ std::string Position::ToString() const
 /// @return Set of squares of color containing a piece attacking location.
 Bitboard Position::AttacksTo(Square location, Color color) const
 {
-    const Sets    &sets             = SETS[location];
     const Bitboard occupied_squares = OccupiedSquares();
-    Bitboard       result =
-        ((sets.PawnAttacks(EnemyOf(color)) & pawns_) | (sets.knight_attacks & knights_) | (sets.king_attacks & kings_));
+    Bitboard result = color == WHITE ? PAWN_ATTACKS_BLACK[location] & pawns_ : PAWN_ATTACKS_WHITE[location] & pawns_;
+    result |= (KNIGHT_ATTACKS[location] & knights_) | (KING_ATTACKS[location] & kings_);
     result |= RookAttacks(occupied_squares, location) & (rooks_ | queens_);
     result |= BishopAttacks(occupied_squares, location) & (bishops_ | queens_);
     result &= PiecesOfColor(color);
@@ -441,7 +440,7 @@ bool Position::IsLegal() const
     const Bitboard white_king = kings_ & white_pieces_;
     const Bitboard black_king = kings_ & black_pieces_;
     return white_king.PopCount() == 1 && black_king.PopCount() == 1 && white_king != black_king &&
-           (SETS[white_king.Lsb()].king_attacks & black_king).IsEmpty() &&
+           (KING_ATTACKS[white_king.Lsb()] & black_king).IsEmpty() &&
            !IsAttacked(king_location_[EnemyOf(color)], color);
 }
 

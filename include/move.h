@@ -12,7 +12,7 @@
 /// @brief Chess pieces.
 enum Piece : uint8_t
 {
-    NO_PIECE, ///< Used to indicate absence of a piece.
+    NO_PIECE,
     PAWN,
     KNIGHT,
     BISHOP,
@@ -101,8 +101,8 @@ class Square
 class alignas(8) Move
 {
   private:
-    static constexpr uint32_t IS_CHECKING = 1 << 22;
-    int64_t                   val;
+    static const int64_t IS_CHECKING = 1 << 22;
+    int64_t              val;
 
   public:
     /// @brief Move types.

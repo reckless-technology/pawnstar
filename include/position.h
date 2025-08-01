@@ -151,7 +151,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     Bitboard b = knights_ & enemy_pieces;
     for (Square s : b)
     {
-        forbidden_king_squares |= SETS[s].knight_attacks;
+        forbidden_king_squares |= KNIGHT_ATTACKS[s];
     }
     // Temporarily remove our king to detect X-ray attacks from enemy sliding pieces.
     const Bitboard occupied_except_king = occupied_squares ^ Bitboard(king_locn);
@@ -167,10 +167,10 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         forbidden_king_squares |= RookAttacks(occupied_except_king, s);
     }
     // King cannot move to squares controlled by the enemy king.
-    forbidden_king_squares |= SETS[enemy_king_locn].king_attacks;
+    forbidden_king_squares |= KING_ATTACKS[enemy_king_locn];
 
     // The king may only safely move to squares which are not forbidden.
-    const Bitboard king_move_targets = SETS[king_locn].king_attacks & ~forbidden_king_squares;
+    const Bitboard king_move_targets = KING_ATTACKS[king_locn] & ~forbidden_king_squares;
 
     // Generate King moves.
     Bitboard king_captures = king_move_targets & enemy_pieces;
@@ -213,7 +213,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     b = knights_ & friendly_pieces;
     for (Square from : b)
     {
-        const Bitboard attacks         = SETS[from].knight_attacks & pins.AllowedSquares(from);
+        const Bitboard attacks         = KNIGHT_ATTACKS[from] & pins.AllowedSquares(from);
         Bitboard       capture_targets = attacks & allowed_captures;
         for (Square to : capture_targets)
         {
@@ -323,7 +323,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         double_pushes      = single_pushes.ShiftNorth() & ~occupied_squares & RANK_4;
         captures_west      = pawns.ShiftNorthwest() & black_pieces_;
         captures_east      = pawns.ShiftNortheast() & black_pieces_;
-        en_passant_sources = en_passant_square_ ? SETS[en_passant_square_].pawn_attacks_black & pawns : NO_SQUARES;
+        en_passant_sources = en_passant_square_ ? PAWN_ATTACKS_BLACK[en_passant_square_] & pawns : NO_SQUARES;
         promotions         = single_pushes & RANK_8;
         promotions_west    = captures_west & RANK_8;
         promotions_east    = captures_east & RANK_8;
@@ -338,7 +338,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         double_pushes      = single_pushes.ShiftSouth() & ~occupied_squares & RANK_5;
         captures_west      = pawns.ShiftSouthwest() & white_pieces_;
         captures_east      = pawns.ShiftSoutheast() & white_pieces_;
-        en_passant_sources = en_passant_square_ ? SETS[en_passant_square_].pawn_attacks_white & pawns : NO_SQUARES;
+        en_passant_sources = en_passant_square_ ? PAWN_ATTACKS_WHITE[en_passant_square_] & pawns : NO_SQUARES;
         promotions         = single_pushes & RANK_1;
         promotions_west    = captures_west & RANK_1;
         promotions_east    = captures_east & RANK_1;
@@ -445,7 +445,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
                 const Bitboard pseudo_occupied_squares =
                     occupied_squares ^ Bitboard(captured_pawn_locn) ^ Bitboard(from);
                 const Bitboard horizontal_attacks =
-                    RookAttacks(pseudo_occupied_squares, king_locn) & (SETS[king_locn].west | SETS[king_locn].east);
+                    RookAttacks(pseudo_occupied_squares, king_locn) & (WEST[king_locn] | EAST[king_locn]);
                 if ((horizontal_attacks & enemy_pieces & (rooks_ | queens_)).IsEmpty())
                 {
                     // We can make this move since it's not a discovered check.

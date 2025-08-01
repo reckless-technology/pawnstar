@@ -69,9 +69,11 @@ std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move m
 /// @return int swap off (static exchange) score
 static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece piece_on_square)
 {
-    const Sets    &sets     = SETS[location];
-    const Bitboard square   = Bitboard(location);
-    Bitboard       occupied = bb.white_pieces | bb.black_pieces;
+    const Bitboard pawn_attacks   = color == WHITE ? PAWN_ATTACKS_BLACK[location] : PAWN_ATTACKS_WHITE[location];
+    const Bitboard knight_attacks = KNIGHT_ATTACKS[location];
+    const Bitboard king_attacks   = KING_ATTACKS[location];
+    const Bitboard square         = Bitboard(location);
+    Bitboard       occupied       = bb.white_pieces | bb.black_pieces;
     int            scores[32];
     int            ply;
     // First pass: perform all the captures onto the square least valuable piece first.
@@ -82,13 +84,13 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         Bitboard       bishop_attacks;
         Bitboard       rook_attacks;
         const Bitboard attacking_pieces = bb.PiecesOfColor(color);
-        Bitboard       attackers        = sets.PawnAttacks(EnemyOf(color)) & attacking_pieces & bb.pawns;
+        Bitboard       attackers        = pawn_attacks & attacking_pieces & bb.pawns;
         if (attackers.IsNotEmpty())
         {
             capturing_piece = PAWN;
             goto FoundAttacker;
         }
-        attackers = sets.knight_attacks & attacking_pieces & bb.knights;
+        attackers = knight_attacks & attacking_pieces & bb.knights;
         if (attackers.IsNotEmpty())
         {
             capturing_piece = KNIGHT;
@@ -114,7 +116,7 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
             capturing_piece = QUEEN;
             goto FoundAttacker;
         }
-        attackers = sets.king_attacks & attacking_pieces & bb.kings;
+        attackers = king_attacks & attacking_pieces & bb.kings;
         if (attackers.IsNotEmpty())
         {
             capturing_piece = KING;

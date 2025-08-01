@@ -149,6 +149,12 @@ template <Color color> PawnStructure DeterminePawnStructure(const Position &posi
     const Bitboard friendly_pawns = position.Pawns() & position.PiecesOfColor(color);
     const Bitboard enemy_pawns    = position.Pawns() ^ friendly_pawns;
     PawnStructure  ps;
+    // clang-format off
+    const std::array<Bitboard, 64> &passed_pawn_mask    = color == WHITE ? PASSED_PAWN_MASK_WHITE    : PASSED_PAWN_MASK_BLACK;
+    const std::array<Bitboard, 64> &isolated_pawn_mask  = color == WHITE ? ISOLATED_PAWN_MASK_WHITE  : ISOLATED_PAWN_MASK_BLACK;
+    const std::array<Bitboard, 64> &supported_pawn_mask = color == WHITE ? SUPPORTED_PAWN_MASK_WHITE : SUPPORTED_PAWN_MASK_BLACK;
+    const std::array<Bitboard, 64> &doubled_pawn_mask   = color == WHITE ? DOUBLED_PAWN_MASK_WHITE   : DOUBLED_PAWN_MASK_BLACK;
+    // clang-format on
     if constexpr (color == WHITE)
     {
         ps.defended_pawns = friendly_pawns & (friendly_pawns.ShiftNorthwest() | friendly_pawns.ShiftNortheast());
@@ -159,21 +165,20 @@ template <Color color> PawnStructure DeterminePawnStructure(const Position &posi
     }
     for (Square s : friendly_pawns)
     {
-        const Bitboard  b    = Bitboard(s);
-        const PawnSets &sets = PAWN_SETS[color][s];
-        if ((sets.passed_pawn_mask & enemy_pawns).IsEmpty())
+        const Bitboard b = Bitboard(s);
+        if ((passed_pawn_mask[s] & enemy_pawns).IsEmpty())
         {
             ps.passed_pawns |= b;
         }
-        if ((sets.doubled_pawn_mask & friendly_pawns).IsNotEmpty())
+        if ((doubled_pawn_mask[s] & friendly_pawns).IsNotEmpty())
         {
             ps.doubled_pawns |= b;
         }
-        if ((sets.isolated_pawn_mask & friendly_pawns).IsEmpty())
+        if ((isolated_pawn_mask[s] & friendly_pawns).IsEmpty())
         {
             ps.isolated_pawns |= b;
         }
-        if ((sets.supported_pawn_mask & friendly_pawns).IsEmpty())
+        if ((supported_pawn_mask[s] & friendly_pawns).IsEmpty())
         {
             if constexpr (color == WHITE)
             {
@@ -332,9 +337,9 @@ template <Color color> int EvaluateKing(const Position &position)
     if (!is_endgame)
     {
         // Consider pawns in front of the king and approaching enemy pawns.
-        const Bitboard pawn_shelter_1 = SETS[position.KingLocation(color)].KingPawnShelter(color);
-        Bitboard       pawn_shelter_2;
-        Bitboard       pawn_shelter_3;
+        const Bitboard pawn_shelter_1 = color == WHITE ? KING_PAWN_SHELTER_WHITE[position.KingLocation(color)]
+                                                       : KING_PAWN_SHELTER_BLACK[position.KingLocation(color)];
+        Bitboard       pawn_shelter_2, pawn_shelter_3;
         if constexpr (color == WHITE)
         {
             pawn_shelter_2 = pawn_shelter_1.ShiftNorth();
@@ -373,8 +378,8 @@ template <Color color> int EvaluateKing(const Position &position)
         }
     }
     // Bonus for friendly pieces near to our king
-    const Bitboard adjacent1 = SETS[position.KingLocation(color)].king_attacks;
-    const Bitboard adjacent2 = SETS[position.KingLocation(color)].king_attacks2 ^ adjacent1;
+    const Bitboard adjacent1 = KING_ATTACKS[position.KingLocation(color)];
+    const Bitboard adjacent2 = KING_ATTACKS_2[position.KingLocation(color)] ^ adjacent1;
     const Bitboard non_pawns = friendly_pieces ^ friendly_pawns;
     safety_score += 10 * (adjacent1 & non_pawns).PopCount() + 5 * (adjacent2 & non_pawns).PopCount();
     return piece_square_score + safety_score;

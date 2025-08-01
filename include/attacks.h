@@ -49,23 +49,21 @@ constexpr Square MsbX(Bitboard b)
 
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 {
-    const Sets &s      = SETS[location];
-    Bitboard    result = s.bishop_attacks;
-    result ^= SETS[LsbX(s.northeast & occupied_squares)].northeast;
-    result ^= SETS[LsbX(s.northwest & occupied_squares)].northwest;
-    result ^= SETS[MsbX(s.southwest & occupied_squares)].southwest;
-    result ^= SETS[MsbX(s.southeast & occupied_squares)].southeast;
+    Bitboard result = BISHOP_ATTACKS[location];
+    result ^= NORTHEAST[LsbX(NORTHEAST[location] & occupied_squares)];
+    result ^= NORTHWEST[LsbX(NORTHWEST[location] & occupied_squares)];
+    result ^= SOUTHWEST[MsbX(SOUTHWEST[location] & occupied_squares)];
+    result ^= SOUTHEAST[MsbX(SOUTHEAST[location] & occupied_squares)];
     return result;
 }
 
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 {
-    const Sets &s      = SETS[location];
-    Bitboard    result = s.rook_attacks;
-    result ^= SETS[LsbX(s.north & occupied_squares)].north;
-    result ^= SETS[MsbX(s.south & occupied_squares)].south;
-    result ^= SETS[LsbX(s.east & occupied_squares)].east;
-    result ^= SETS[MsbX(s.west & occupied_squares)].west;
+    Bitboard result = ROOK_ATTACKS[location];
+    result ^= NORTH[LsbX(NORTH[location] & occupied_squares)];
+    result ^= SOUTH[MsbX(SOUTH[location] & occupied_squares)];
+    result ^= EAST[LsbX(EAST[location] & occupied_squares)];
+    result ^= WEST[MsbX(WEST[location] & occupied_squares)];
     return result;
 }
 

@@ -432,89 +432,50 @@ struct Generator
 };
 
 /// @brief Generators for the main precomputed Bitboard arrays.
-constexpr std::array<Generator, 18> bitboard_generators = {{
+constexpr std::array<Generator, 26> bitboard_generators = {{
     // clang-format off
-    {"north",                   [](uint8_t sq) constexpr { return RayFrom(sq, NORTH);                                          }  },
-    {"northeast",               [](uint8_t sq) constexpr { return RayFrom(sq, NORTHEAST);                                      }  },
-    {"east",                    [](uint8_t sq) constexpr { return RayFrom(sq, EAST);                                           }  },
-    {"southeast",               [](uint8_t sq) constexpr { return RayFrom(sq, SOUTHEAST);                                      }  },
-    {"south",                   [](uint8_t sq) constexpr { return RayFrom(sq, SOUTH);                                          }  },
-    {"southwest",               [](uint8_t sq) constexpr { return RayFrom(sq, SOUTHWEST);                                      }  },
-    {"west",                    [](uint8_t sq) constexpr { return RayFrom(sq, WEST);                                           }  },
-    {"northwest",               [](uint8_t sq) constexpr { return RayFrom(sq, NORTHWEST);                                      }  },
-    {"pawn_attacks_white",      [](uint8_t sq) constexpr { return ShiftNorthwest(Bitboard(sq)) | ShiftNortheast(Bitboard(sq)); }  },
-    {"pawn_attacks_black",      [](uint8_t sq) constexpr { return ShiftSouthwest(Bitboard(sq)) | ShiftSoutheast(Bitboard(sq)); }  },
-    {"knight_attacks",          KnightAttacks                                                                                     },
-    {"bishop_attacks",          BishopAttacksOnEmptyBoard                                                                         },
-    {"rook_attacks",            RookAttacksOnEmptyBoard                                                                           },
-    {"queen_attacks",           QueenAttacksOnEmptyBoard                                                                          },
-    {"king_attacks",            KingAttacks                                                                                       },
-    {"king_attacks2",           KingAttacks2                                                                                      },
-    {"king_pawn_shelter_white", KingPawnShelterWhite                                                                              },
-    {"king_pawn_shelter_black", KingPawnShelterBlack                                                                              },
+    { "NORTH",                       [](uint8_t sq) constexpr { return RayFrom(sq, NORTH);                                          }  },
+    { "NORTHEAST",                   [](uint8_t sq) constexpr { return RayFrom(sq, NORTHEAST);                                      }  },
+    { "EAST",                        [](uint8_t sq) constexpr { return RayFrom(sq, EAST);                                           }  },
+    { "SOUTHEAST",                   [](uint8_t sq) constexpr { return RayFrom(sq, SOUTHEAST);                                      }  },
+    { "SOUTH",                       [](uint8_t sq) constexpr { return RayFrom(sq, SOUTH);                                          }  },
+    { "SOUTHWEST",                   [](uint8_t sq) constexpr { return RayFrom(sq, SOUTHWEST);                                      }  },
+    { "WEST",                        [](uint8_t sq) constexpr { return RayFrom(sq, WEST);                                           }  },
+    { "NORTHWEST",                   [](uint8_t sq) constexpr { return RayFrom(sq, NORTHWEST);                                      }  },
+    { "PAWN_ATTACKS_WHITE",          [](uint8_t sq) constexpr { return ShiftNorthwest(Bitboard(sq)) | ShiftNortheast(Bitboard(sq)); }  },
+    { "PAWN_ATTACKS_BLACK",          [](uint8_t sq) constexpr { return ShiftSouthwest(Bitboard(sq)) | ShiftSoutheast(Bitboard(sq)); }  },
+    { "KNIGHT_ATTACKS",              KnightAttacks                                                                                     },
+    { "BISHOP_ATTACKS",              BishopAttacksOnEmptyBoard                                                                         },
+    { "ROOK_ATTACKS",                RookAttacksOnEmptyBoard                                                                           },
+    { "QUEEN_ATTACKS",               QueenAttacksOnEmptyBoard                                                                          },
+    { "KING_ATTACKS",                KingAttacks                                                                                       },
+    { "KING_ATTACKS_2",              KingAttacks2                                                                                      },
+    { "KING_PAWN_SHELTER_WHITE",     KingPawnShelterWhite                                                                              },
+    { "KING_PAWN_SHELTER_BLACK",     KingPawnShelterBlack                                                                              },
+    { "PASSED_PAWN_MASK_WHITE",      PassedPawnMaskWhite,                                                                              },
+    { "ISOLATED_PAWN_MASK_WHITE",    IsolatedPawnMaskWhite,                                                                            },
+    { "SUPPORTED_PAWN_MASK_WHITE",   SupportedPawnMaskWhite,                                                                           },
+    { "DOUBLED_PAWN_MASK_WHITE",     DoubledPawnMaskWhite,                                                                             },
+    { "PASSED_PAWN_MASK_BLACK",      PassedPawnMaskBlack,                                                                              },
+    { "ISOLATED_PAWN_MASK_BLACK",    IsolatedPawnMaskBlack,                                                                            },
+    { "SUPPORTED_PAWN_MASK_BLACK",   SupportedPawnMaskBlack,                                                                           },
+    { "DOUBLED_PAWN_MASK_BLACK",     DoubledPawnMaskBlack,                                                                             },
     // clang-format on
 }};
 
-/// @brief Generators for white pawn structure squares.
-constexpr std::array<Generator, 4> pawn_generators_white = {{
-    // clang-format off
-    {"passed_pawn_mask",    PassedPawnMaskWhite,    },
-    {"isolated_pawn_mask",  IsolatedPawnMaskWhite,  },
-    {"supported_pawn_mask", SupportedPawnMaskWhite, },
-    {"doubled_pawn_mask",   DoubledPawnMaskWhite,   },
-    // clang-format on
-}};
-
-/// @brief Generators for black pawn structure squares.
-constexpr std::array<Generator, 4> pawn_generators_black = {{
-    // clang-format off
-    {"passed_pawn_mask",    PassedPawnMaskBlack,    },
-    {"isolated_pawn_mask",  IsolatedPawnMaskBlack,  },
-    {"supported_pawn_mask", SupportedPawnMaskBlack, },
-    {"doubled_pawn_mask",   DoubledPawnMaskBlack,   },
-    // clang-format on
-}};
-
-/// @brief Generate the generic sets for each square.
-static void GenerateSets()
+/// @brief Generate the constant bitboard arrays.
+static void GenerateBitboards()
 {
-    std::cout << std::format("extern const Sets SETS[64] = \n{{");
-    for (uint8_t sq = 0; sq != 64; ++sq)
+    for (const auto &generator : bitboard_generators)
     {
-        std::cout << std::format("\n    {{ // square {}", SquareName(sq));
-        for (const auto &generator : bitboard_generators)
-        {
-            const uint64_t b = generator.function(sq);
-            std::cout << std::format("\n        .{:<25} = 0x{:016X}, // popcnt {:2}", generator.name, b,
-                                     std::popcount(b));
-        }
-        std::cout << std::format("\n    }},");
-    }
-    std::cout << std::format("\n}};\n");
-}
-
-/// @brief Generate pawn structure sets for each color for each square.
-static void GeneratePawnSets()
-{
-    std::cout << std::format("extern const PawnSets PAWN_SETS[2][64] = \n{{");
-    for (int color = 0; color != 2; ++color)
-    {
-        std::cout << std::format("\n    {{");
+        std::cout << std::format("extern const std::array<Bitboard, 64> {} = \n{{", generator.name);
         for (uint8_t sq = 0; sq != 64; ++sq)
         {
-            std::cout << std::format("\n        {{ // {} {}", color_names[color], SquareName(sq));
-            auto &generators{color == 0 ? pawn_generators_white : pawn_generators_black};
-            for (const auto &generator : generators)
-            {
-                const uint64_t b = generator.function(sq);
-                std::cout << std::format("\n            .{:<20} = 0x{:016X}, // popcnt {:2}", generator.name, b,
-                                         std::popcount(b));
-            }
-            std::cout << std::format("\n        }},");
+            const uint64_t b = generator.function(sq);
+            std::cout << std::format("\n    0x{:016X}, // {} popcnt {:2}", b, SquareName(sq), std::popcount(b));
         }
-        std::cout << std::format("\n    }},");
+        std::cout << std::format("\n}};\n");
     }
-    std::cout << std::format("\n}};\n");
 }
 
 /// @brief Generate the intervening squares array.
@@ -560,7 +521,7 @@ static void GenerateHashes()
         std::cout << std::format("\n    }},");
     }
     std::cout << std::format("\n}};\n");
-    std::cout << std::format("extern const zobrist_t CASTLING_RIGHTS_HASHES[16] = \n{{");
+    std::cout << std::format("extern const std::array<zobrist_t, 16> CASTLING_RIGHTS_HASHES = \n{{");
     for (uint8_t i = 0; i != 16; ++i)
     {
         if ((i & 7) == 0)
@@ -570,7 +531,7 @@ static void GenerateHashes()
         std::cout << std::format("0x{:016X},", prng());
     }
     std::cout << std::format("\n}};\n");
-    std::cout << std::format("extern const zobrist_t EN_PASSANT_HASHES[64] = \n{{");
+    std::cout << std::format("extern const std::array<zobrist_t, 64> EN_PASSANT_HASHES = \n{{");
     for (uint8_t i = 0; i != 64; ++i)
     {
         if ((i & 7) == 0)
@@ -620,7 +581,7 @@ static void GeneratePextBitboards(void)
             std::cout << std::format("\n}};\n");
         }
         // Next print the PextBitboard for this piece / square combination.
-        std::cout << std::format("extern const PextBitboard {}_PEXTS[64] = \n{{\n", piece.name);
+        std::cout << std::format("extern const std::array<PextBitboard, 64> {}_PEXTS = \n{{ {{\n", piece.name);
         for (uint8_t i = 0; i != 64; ++i)
         {
             std::cout << std::format("    {{\n");
@@ -629,7 +590,7 @@ static void GeneratePextBitboards(void)
             std::cout << std::format("        .indices        = {}_PEXT_INDICES_{},\n", piece.name, SquareName(i));
             std::cout << std::format("    }},\n");
         }
-        std::cout << std::format("}};\n");
+        std::cout << std::format("}} }};\n");
     }
 }
 
@@ -639,8 +600,7 @@ int main()
 {
     std::cout << "// This file was generated on " __DATE__ " at " __TIME__ "\n";
     std::cout << "#include \"generated_data.h\"\n";
-    GenerateSets();
-    GeneratePawnSets();
+    GenerateBitboards();
     GenerateInterveningSquares();
     GenerateHashes();
     GeneratePextBitboards();
