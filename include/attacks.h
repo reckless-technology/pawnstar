@@ -12,6 +12,11 @@
 
 #if USE_PEXT_BITBOARDS
 
+#if __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Winvalid-constexpr"
+#endif
+
 /// @brief Bishop sliding attacks.
 /// @param occupied_squares Squares with a piece on them.
 /// @param s Bishop location.
@@ -31,6 +36,10 @@ constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square s)
     const PextBitboard &p = ROOK_PEXTS[s];
     return p.attacks[p.indices[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask)]];
 }
+
+#if __GNUC__
+#pragma GCC diagnostic pop
+#endif
 
 #else
 

@@ -20,7 +20,7 @@
 /// @brief Chess piece types.
 enum Piece
 {
-    NO_PIECE,
+    NONE,
     PAWN,
     KNIGHT,
     BISHOP,
@@ -481,10 +481,10 @@ static void GenerateBitboards()
 /// @brief Generate the intervening squares array.
 static void GenerateInterveningSquares()
 {
-    std::cout << std::format("extern const Bitboard INTERVENING_SQUARES[64][64] = \n{{");
+    std::cout << std::format("extern const MultiDimArray<Bitboard, 64, 64>::type INTERVENING_SQUARES = \n{{ {{");
     for (uint8_t i = 0; i != 64; ++i)
     {
-        std::cout << std::format("\n    {{ // square {}", SquareName(i));
+        std::cout << std::format("\n    {{ {{// square {}", SquareName(i));
         for (uint8_t j = 0; j != 64; ++j)
         {
             if ((j & 7) == 0)
@@ -493,21 +493,21 @@ static void GenerateInterveningSquares()
             }
             std::cout << std::format("0x{:016X},", InterveningSquares(i, j));
         }
-        std::cout << std::format("\n    }},");
+        std::cout << std::format("\n    }} }},");
     }
-    std::cout << std::format("\n}};\n");
+    std::cout << std::format("\n}} }};\n");
 }
 
 /// @brief Generate Zobrist hash keys for pieces, castling rights and en passant capture.
 static void GenerateHashes()
 {
-    std::cout << std::format("extern const zobrist_t PIECE_SQUARE_HASHES[2][6][64] = \n{{");
+    std::cout << std::format("extern const MultiDimArray<zobrist_t, 2, 6, 64>::type PIECE_SQUARE_HASHES = \n{{ {{");
     for (int color = 0; color != 2; ++color)
     {
-        std::cout << std::format("\n    {{");
+        std::cout << std::format("\n    {{ {{");
         for (int piece = PAWN; piece <= KING; ++piece)
         {
-            std::cout << std::format("\n        {{   // {} {}", color_names[color], piece_names[piece]);
+            std::cout << std::format("\n        {{ {{   // {} {}", color_names[color], piece_names[piece]);
             for (uint8_t i = 0; i != 64; ++i)
             {
                 if ((i & 7) == 0)
@@ -516,11 +516,11 @@ static void GenerateHashes()
                 }
                 std::cout << std::format("0x{:016X},", prng());
             }
-            std::cout << std::format("\n        }},");
+            std::cout << std::format("\n        }} }},");
         }
-        std::cout << std::format("\n    }},");
+        std::cout << std::format("\n    }} }},");
     }
-    std::cout << std::format("\n}};\n");
+    std::cout << std::format("\n}} }};\n");
     std::cout << std::format("extern const std::array<zobrist_t, 16> CASTLING_RIGHTS_HASHES = \n{{");
     for (uint8_t i = 0; i != 16; ++i)
     {

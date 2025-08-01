@@ -264,12 +264,12 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
         }
         // Maybe try late move depth reduction.
         int lmr_depth = depth;
-        if (move_index > 3 &&                                        // we already tried a few moves
-            !game.CurrentPosition().IsInCheck() &&                   // we are not in check
-            depth > 2 &&                                             // do not drop directly into quiescence
-            beta == alpha + 1 &&                                     // it is not a PV node
-            game.CurrentPosition().PieceAt(move.to()) == NO_PIECE && // not a capture
-            game.CurrentPosition().PieceAt(move.from()) != PAWN)     // not a pawn move
+        if (move_index > 3 &&                                           // we already tried a few moves
+            !game.CurrentPosition().IsInCheck() &&                      // we are not in check
+            depth > 2 &&                                                // do not drop directly into quiescence
+            beta == alpha + 1 &&                                        // it is not a PV node
+            game.CurrentPosition().PieceAt(move.to()) == Piece::NONE && // not a capture
+            game.CurrentPosition().PieceAt(move.from()) != PAWN)        // not a pawn move
         {
             INCREMENT("late move reduction");
             --lmr_depth;

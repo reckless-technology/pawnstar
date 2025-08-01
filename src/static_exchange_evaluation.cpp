@@ -20,18 +20,18 @@ struct SeeBoard
     Bitboard white_pieces;
     Bitboard black_pieces;
 
-    SeeBoard(const Position &p)
+    constexpr SeeBoard(const Position &p)
         : pawns(p.Pawns()), knights(p.Knights()), bishops(p.Bishops()), rooks(p.Rooks()), queens(p.Queens()),
           kings(p.Kings()), white_pieces(p.WhitePieces()), black_pieces(p.BlackPieces())
     {
     }
 
-    Bitboard &PiecesOfType(Piece piece)
+    constexpr Bitboard &PiecesOfType(Piece piece)
     {
         return (&pawns)[piece - PAWN];
     }
 
-    Bitboard &PiecesOfColor(Color color)
+    constexpr Bitboard &PiecesOfColor(Color color)
     {
         return (&white_pieces)[color];
     }
@@ -52,7 +52,7 @@ std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move m
     const Piece piece    = src_position.PieceAt(move.from());
     const Piece captured = move.type() == Move::EP_CAPTURE ? PAWN : src_position.PieceAt(move.to());
     const Piece promoted = move.promoted();
-    if (promoted != NO_PIECE)
+    if (promoted != Piece::NONE)
     {
         return {piece_values[captured] + piece_values[promoted] - piece_values[PAWN] -
                     EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.promoted()),

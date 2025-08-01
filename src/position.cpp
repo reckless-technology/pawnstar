@@ -54,7 +54,7 @@ void Position::RemovePiece(Color color, Piece piece, Square from)
     PiecesOfType(piece) ^= from_bb;
     PiecesOfColor(color) ^= from_bb;
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
-    squares_[from] = NO_PIECE;
+    squares_[from] = Piece::NONE;
 }
 
 /// @brief Move a piece on the board.
@@ -69,7 +69,7 @@ void Position::MovePiece(Color color, Piece piece, Square from, Square to)
     PiecesOfType(piece) ^= from_to_bb;
     PiecesOfColor(color) ^= from_to_bb;
     hash_ ^= hash[to] ^ hash[from];
-    squares_[from] = NO_PIECE;
+    squares_[from] = Piece::NONE;
     squares_[to]   = piece;
 }
 
@@ -113,7 +113,7 @@ Position Position::MakeMove(const Move &move) const
     case Move::Type::PROMOTION_ROOK:
     case Move::Type::PROMOTION_QUEEN:
         position.reversible_move_count_ = 0;
-        if (move.captured() != NO_PIECE)
+        if (move.captured() != Piece::NONE)
         {
             position.RemovePiece(EnemyOf(color), move.captured(), to);
         }
@@ -173,7 +173,7 @@ Position Position::MakeMove(const Move &move) const
 Position Position::FromString(std::string_view fen_string)
 {
     Position position;
-    std::memset(&position, 0, sizeof(position));
+    std::memset((void *)&position, 0, sizeof(position));
     constexpr string_view white_piece_names{"PNBRQK"};
     constexpr string_view black_piece_names{"pnbrqk"};
     stringstream          ss;

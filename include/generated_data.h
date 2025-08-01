@@ -52,6 +52,25 @@ extern const std::array<zobrist_t, 16>    CASTLING_RIGHTS_HASHES;
 extern const std::array<zobrist_t, 64>    EN_PASSANT_HASHES;
 extern const std::array<PextBitboard, 64> BISHOP_PEXTS;
 extern const std::array<PextBitboard, 64> ROOK_PEXTS;
-extern const Bitboard                     INTERVENING_SQUARES[64][64];
-extern const zobrist_t                    PIECE_SQUARE_HASHES[2][6][64];
-constexpr zobrist_t                       BLACK_MOVE_HASH = 0x28AB74D640E50602;
+constexpr zobrist_t                       BLACK_MOVE_HASH = 0x28AB74D640E50602; ///< Just a big random number.
+
+/// @brief Meta template - syntactic sugar for multi dim std::array types.
+/// Refer to https://cpptruths.blogspot.com/2011/10/multi-dimensional-arrays-in-c11.html
+/// @tparam T Type of object to store in array.
+/// @tparam I Size of first dimension.
+/// @tparam ...J Remaining dimensions.
+template <class T, size_t I, size_t... J> struct MultiDimArray
+{
+    using Nested = typename MultiDimArray<T, J...>::type;
+    using type   = std::array<Nested, I>;
+};
+/// @brief Specialization for a single dimension MultiDimArray.
+/// @tparam T Type of object to store in array.
+/// @tparam I Number of elements.
+template <class T, size_t I> struct MultiDimArray<T, I>
+{
+    using type = std::array<T, I>;
+};
+
+extern const MultiDimArray<Bitboard, 64, 64>::type    INTERVENING_SQUARES;
+extern const MultiDimArray<zobrist_t, 2, 6, 64>::type PIECE_SQUARE_HASHES;

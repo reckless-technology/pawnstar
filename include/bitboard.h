@@ -35,7 +35,7 @@ class Bitboard
     static constexpr uint64_t NOT_FILE_H = 0x7F7F7F7F7F7F7F7Full; ///< Mask off the h file.
 
   public:
-    /// @brief Defeault constructor.
+    /// @brief Default constructor.
     constexpr Bitboard()
     {
     }
@@ -164,13 +164,13 @@ class Bitboard
     /// @return Square index of LSB.
     constexpr Square Lsb() const
     {
-        return (Square)__builtin_ctzll(v);
+        return Square{(uint8_t)__builtin_ctzll(v)};
     }
     /// @brief Most significant bit.
     /// @return Square index of MSB.
     constexpr Square Msb() const
     {
-        return (Square)(63 - __builtin_clzll(v));
+        return Square{(uint8_t)(63 - __builtin_clzll(v))};
     }
     /// @brief Population count.
     /// @return Number of bits set.
@@ -269,7 +269,7 @@ class Bitboard
         }
         constexpr Square operator*() const
         {
-            return (Square)__builtin_ctzll(i); ///< Least significant bit.
+            return Square{(uint8_t)__builtin_ctzll(i)}; ///< Least significant bit.
         }
         constexpr Iterator &operator++()
         {

@@ -24,7 +24,7 @@ struct Transposition
     NodeType  node_type; ///< What type of result was this.
     bool      is_old;    ///< This entry is from a previous search and can thus be replaced.
 
-    constexpr Transposition() : hash(0)
+    constexpr Transposition() : hash(0), move(Move::None()), score(0), depth(0), node_type(NodeType::CUT), is_old(false)
     {
     }
 

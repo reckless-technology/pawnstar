@@ -86,7 +86,7 @@ void RunPerftTests(void)
     }
     bool     is_good     = true;
     uint64_t total_nodes = 0;
-    int64_t  stop;
+    int64_t  stop        = 0;
     auto     first_start = ElapsedMicroseconds();
     for (const auto &test : tests)
     {

@@ -12,7 +12,7 @@
 /// @brief Chess pieces.
 enum Piece : uint8_t
 {
-    NO_PIECE,
+    NONE,
     PAWN,
     KNIGHT,
     BISHOP,
@@ -36,7 +36,7 @@ constexpr Color EnemyOf(Color color)
     return color == WHITE ? BLACK : WHITE;
 }
 
-/// @brief A square on the chess board.
+/// @brief An index of a square on the chess board.
 class Square
 {
   public:
@@ -166,21 +166,21 @@ class alignas(8) Move
     /// @return Move type.
     constexpr Type type() const
     {
-        return (Type)((val >> 18) & 0x0F);
+        return Type{(uint8_t)((val >> 18) & 0x0F)};
     }
 
     /// @brief Moving piece
     /// @return the piece.
     constexpr Piece piece() const
     {
-        return (Piece)((val >> 12) & 0x07);
+        return Piece{(uint8_t)((val >> 12) & 0x07)};
     }
 
     /// @brief Captured piece.
-    /// @return the captured piece or NO_PIECE if not a capture move.
+    /// @return the captured piece or NONE if not a capture move.
     constexpr Piece captured() const
     {
-        return (Piece)((val >> 15) & 0x07);
+        return Piece{(uint8_t)((val >> 15) & 0x07)};
     }
 
     /// @brief Promoted piece.
@@ -194,7 +194,7 @@ class alignas(8) Move
         case PAWN_DOUBLE_PUSH:
         case EP_CAPTURE:
         case CASTLING:
-            return NO_PIECE;
+            return Piece::NONE;
         case PROMOTION_KNIGHT:
             return KNIGHT;
         case PROMOTION_BISHOP:
@@ -204,6 +204,7 @@ class alignas(8) Move
         case PROMOTION_QUEEN:
             return QUEEN;
         }
+        return Piece::NONE;
     }
 
     /// @brief The move score.
@@ -331,7 +332,7 @@ class alignas(8) Move
     constexpr const std::string ToString() const
     {
         std::string result = from().ToString() + to().ToString();
-        if (promoted() != NO_PIECE)
+        if (promoted() != Piece::NONE)
         {
             result.push_back(" pnbrqk"[promoted()]);
         }
