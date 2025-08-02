@@ -1,92 +1,16 @@
 #pragma once
-/// @file Types and functions for using chess pieces, colors and moves on the board.
+/// @file Types and functions for using chess moves.
 
 #include <algorithm>
 #include <cstdint>
 #include <string>
 #include <string_view>
 
+#include "color.h"
 #include "constants.h"
+#include "piece.h"
+#include "square.h"
 #include "stack_list.h"
-
-/// @brief Chess pieces.
-enum Piece : uint8_t
-{
-    NONE,
-    PAWN,
-    KNIGHT,
-    BISHOP,
-    ROOK,
-    QUEEN,
-    KING,
-};
-
-/// @brief Piece colors.
-enum Color : uint8_t
-{
-    WHITE,
-    BLACK,
-};
-
-/// @brief Return the enemy of a color.
-/// @param color the color
-/// @return The opposite color
-constexpr Color EnemyOf(Color color)
-{
-    return color == WHITE ? BLACK : WHITE;
-}
-
-/// @brief An index of a square on the chess board.
-class Square
-{
-  public:
-    /// @brief Default constructor - does nothing.
-    constexpr Square()
-    {
-    }
-    /// @brief Constructor
-    /// @param x Square index in LERF mapping.
-    constexpr Square(uint8_t x) : s(x)
-    {
-    }
-    /// @brief Constructor
-    /// @param x file
-    /// @param y rank
-    constexpr Square(uint8_t x, uint8_t y) : s(x + 8 * y)
-    {
-    }
-    /// @brief Constructor
-    /// @param str Name of square e.g. "e4"
-    constexpr Square(const char *str) : s((str[0] | 0x20) - 'a' + 8 * (str[1] - '1'))
-    {
-    }
-    /// @brief Convert to square index.
-    constexpr operator uint8_t() const
-    {
-        return s;
-    }
-    /// @brief File.
-    /// @return File on board (0 thru 7 -> a thru h)
-    constexpr uint8_t File() const
-    {
-        return s & 7;
-    }
-    /// @brief Rank.
-    /// @return Rank on board (zero indexed 0 thru 7).
-    constexpr uint8_t Rank() const
-    {
-        return s >> 3;
-    }
-    /// @brief Square name.
-    /// @return String containing name of square e.g. "e4"
-    constexpr std::string ToString() const
-    {
-        return std::string{(char)('a' + File()), (char)('1' + Rank())};
-    }
-
-  private:
-    uint8_t s;
-};
 
 /// @brief Class for representing a chess move.
 /// A move is 64 bits in size.
@@ -98,7 +22,7 @@ class Square
 /// 18 - 21: move type
 /// 22 - 22: is checking flag (move gives check)
 /// 32 - 63: score (when move has score assigned)
-class alignas(8) Move
+class Move
 {
   private:
     static const int64_t IS_CHECKING = 1 << 22;
