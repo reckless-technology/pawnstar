@@ -23,7 +23,7 @@ using std::string_view;
 /// @brief Structure to hold a basic perft test.
 struct PerftTest
 {
-    std::string position; ///< FEN string of starting position
+    string_view position; ///< FEN string view of starting position
     int         depth;    ///< perft search depth
     uint64_t    count;    ///< total number of leaf node moves
 };
@@ -47,20 +47,21 @@ static void Perft(const Position &src_position, int depth, uint64_t &num_moves)
     num_moves += move_list.size();
 }
 
-extern const std::vector<std::string> perft_results;
+// Standard Perft test position set.
+extern const std::array<string_view, 133> perft_results;
 
-/// @brief Rund the set of perft tests.
+/// @brief Run the suite of perft tests.
 void RunPerftTests(void)
 {
     std::vector<PerftTest> tests;
     for (auto test_str : perft_results)
     {
         // Split into tokens separated by semicolons
-        std::vector<std::string> tokens;
+        std::vector<string_view> tokens;
         for (;;)
         {
             const auto i = test_str.find(';');
-            if (i == std::string::npos)
+            if (i == string_view::npos)
             {
                 tokens.push_back(test_str);
                 break;
@@ -69,7 +70,7 @@ void RunPerftTests(void)
             test_str = test_str.substr(i + 1);
         }
         // First token is FEN position
-        std::string fen = tokens[0];
+        auto fen = tokens[0];
         tokens.erase(tokens.begin());
         // Remaining tokens are depth and counts
         for (auto token : tokens)
@@ -77,7 +78,7 @@ void RunPerftTests(void)
             // Format is "Dxx NNNN"
             int      depth;
             uint64_t count;
-            if (std::sscanf(token.c_str(), " D%d %" PRIu64, &depth, &count) != 2)
+            if (std::sscanf(token.data(), " D%d %" PRIu64, &depth, &count) != 2)
             {
                 std::cout << std::format("ERROR: unable to scan perft test {}\n", test_str);
             }

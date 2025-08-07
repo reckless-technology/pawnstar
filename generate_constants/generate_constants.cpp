@@ -42,8 +42,8 @@ enum Direction
     NORTHWEST,
 };
 
-constexpr uint64_t                        FILE_A = 0x0101010101010101; ///< Using LERF bitboard mapping.
-constexpr uint64_t                        FILE_H = FILE_A << 7;
+constexpr uint64_t                        file_a = 0x0101010101010101; ///< Using LERF bitboard mapping.
+constexpr uint64_t                        file_h = file_a << 7;
 constexpr std::array<std::string_view, 7> piece_names{"none", "pawn", "knight", "bishop", "rook", "queen", "king"};
 constexpr std::array<std::string_view, 2> color_names{"white", "black"};
 std::mt19937_64                           prng{0xAA55AA55AA55AA55};
@@ -58,13 +58,13 @@ constexpr uint64_t      Bitboard(uint8_t sq)        { return 1ull << sq; }      
 constexpr uint64_t      Bitboard(int x, int y)      { return 1ull << (x + 8 * y); }             ///< Convert square (file,rank) co-ords to Bitboard.
 constexpr bool          IsInBoard(int x, int y)     { return x == (x & 7) && y == (y & 7); }    ///< Is this square on the board.
 constexpr uint64_t      ShiftNorth(uint64_t b)      { return b << 8; }                          ///< Shift a Bitboard one square to the north.
-constexpr uint64_t      ShiftNortheast(uint64_t b)  { return (b & ~FILE_H) << 9; }              ///< Shift a Bitboard one square to the northeast.
-constexpr uint64_t      ShiftEast(uint64_t b)       { return (b & ~FILE_H) << 1; }              ///< Shift a Bitboard one square to the east.
-constexpr uint64_t      ShiftSoutheast(uint64_t b)  { return (b & ~FILE_H) >> 7; }              ///< Shift a Bitboard one square to the southeast.
+constexpr uint64_t      ShiftNortheast(uint64_t b)  { return (b & ~file_h) << 9; }              ///< Shift a Bitboard one square to the northeast.
+constexpr uint64_t      ShiftEast(uint64_t b)       { return (b & ~file_h) << 1; }              ///< Shift a Bitboard one square to the east.
+constexpr uint64_t      ShiftSoutheast(uint64_t b)  { return (b & ~file_h) >> 7; }              ///< Shift a Bitboard one square to the southeast.
 constexpr uint64_t      ShiftSouth(uint64_t b)      { return b >> 8; }                          ///< Shift a Bitboard one square to the south.
-constexpr uint64_t      ShiftSouthwest(uint64_t b)  { return (b & ~FILE_A) >> 9; }              ///< Shift a Bitboard one square to the southwest.
-constexpr uint64_t      ShiftWest(uint64_t b)       { return (b & ~FILE_A) >> 1; }              ///< Shift a Bitboard one square to the west.
-constexpr uint64_t      ShiftNorthwest(uint64_t b)  { return (b & ~FILE_A) << 7; }              ///< Shift a Bitboard one square to the northwest.
+constexpr uint64_t      ShiftSouthwest(uint64_t b)  { return (b & ~file_a) >> 9; }              ///< Shift a Bitboard one square to the southwest.
+constexpr uint64_t      ShiftWest(uint64_t b)       { return (b & ~file_a) >> 1; }              ///< Shift a Bitboard one square to the west.
+constexpr uint64_t      ShiftNorthwest(uint64_t b)  { return (b & ~file_a) << 7; }              ///< Shift a Bitboard one square to the northwest.
 // clang-format on
 
 /// @brief Function pointer for bitboard shift.
@@ -81,7 +81,7 @@ constexpr std::array<ShiftFn, 8> shift_functions{ShiftNorth, ShiftNortheast, Shi
 constexpr uint64_t RayFrom(uint8_t sq, Direction direction)
 {
     uint64_t result = 0;
-    ShiftFn  fn     = shift_functions[direction];
+    auto     fn     = shift_functions[direction];
     for (uint64_t b = fn(Bitboard(sq)); b != 0; b = fn(b))
     {
         result |= b;
@@ -89,7 +89,7 @@ constexpr uint64_t RayFrom(uint8_t sq, Direction direction)
     return result;
 }
 
-/// @brief Knight attacks from square sq.
+/// @brief Knight attacks.
 /// @param sq Square index.
 /// @return Squares attacked by a knight standing on sq.
 constexpr uint64_t KnightAttacks(uint8_t sq)
@@ -204,7 +204,7 @@ constexpr uint64_t PassedPawnMaskBlack(uint8_t sq)
 /// @return Squares which must contain at least one white pawn else the pawn on sq is isolated.
 constexpr uint64_t IsolatedPawnMaskWhite(uint8_t sq)
 {
-    const uint64_t b = FILE_A << FileOf(sq);
+    const uint64_t b = file_a << FileOf(sq);
     return ShiftWest(b) | ShiftEast(b);
 }
 
@@ -278,7 +278,7 @@ constexpr uint64_t RayOccupancyMask(uint8_t sq, Direction direction)
 {
     uint64_t result      = 0;
     uint64_t last_square = 0;
-    ShiftFn  fn          = shift_functions[direction];
+    auto     fn          = shift_functions[direction];
     for (uint64_t b = fn(Bitboard(sq)); b != 0; b = fn(b))
     {
         result |= b;
@@ -313,7 +313,7 @@ constexpr uint64_t RookOccupancyMask(uint8_t sq)
 constexpr uint64_t RayAttacks(uint64_t occupied_squares, uint8_t sq, Direction direction)
 {
     uint64_t result = 0;
-    ShiftFn  fn     = shift_functions[direction];
+    auto     fn     = shift_functions[direction];
     for (uint64_t b = fn(Bitboard(sq)); b != 0; b = fn(b))
     {
         result |= b;
@@ -434,32 +434,32 @@ struct Generator
 /// @brief Generators for the main precomputed Bitboard arrays.
 constexpr std::array<Generator, 26> bitboard_generators = {{
     // clang-format off
-    { "NORTH",                       [](uint8_t sq) constexpr { return RayFrom(sq, NORTH);                                          }  },
-    { "NORTHEAST",                   [](uint8_t sq) constexpr { return RayFrom(sq, NORTHEAST);                                      }  },
-    { "EAST",                        [](uint8_t sq) constexpr { return RayFrom(sq, EAST);                                           }  },
-    { "SOUTHEAST",                   [](uint8_t sq) constexpr { return RayFrom(sq, SOUTHEAST);                                      }  },
-    { "SOUTH",                       [](uint8_t sq) constexpr { return RayFrom(sq, SOUTH);                                          }  },
-    { "SOUTHWEST",                   [](uint8_t sq) constexpr { return RayFrom(sq, SOUTHWEST);                                      }  },
-    { "WEST",                        [](uint8_t sq) constexpr { return RayFrom(sq, WEST);                                           }  },
-    { "NORTHWEST",                   [](uint8_t sq) constexpr { return RayFrom(sq, NORTHWEST);                                      }  },
-    { "PAWN_ATTACKS_WHITE",          [](uint8_t sq) constexpr { return ShiftNorthwest(Bitboard(sq)) | ShiftNortheast(Bitboard(sq)); }  },
-    { "PAWN_ATTACKS_BLACK",          [](uint8_t sq) constexpr { return ShiftSouthwest(Bitboard(sq)) | ShiftSoutheast(Bitboard(sq)); }  },
-    { "KNIGHT_ATTACKS",              KnightAttacks                                                                                     },
-    { "BISHOP_ATTACKS",              BishopAttacksOnEmptyBoard                                                                         },
-    { "ROOK_ATTACKS",                RookAttacksOnEmptyBoard                                                                           },
-    { "QUEEN_ATTACKS",               QueenAttacksOnEmptyBoard                                                                          },
-    { "KING_ATTACKS",                KingAttacks                                                                                       },
-    { "KING_ATTACKS_2",              KingAttacks2                                                                                      },
-    { "KING_PAWN_SHELTER_WHITE",     KingPawnShelterWhite                                                                              },
-    { "KING_PAWN_SHELTER_BLACK",     KingPawnShelterBlack                                                                              },
-    { "PASSED_PAWN_MASK_WHITE",      PassedPawnMaskWhite,                                                                              },
-    { "ISOLATED_PAWN_MASK_WHITE",    IsolatedPawnMaskWhite,                                                                            },
-    { "SUPPORTED_PAWN_MASK_WHITE",   SupportedPawnMaskWhite,                                                                           },
-    { "DOUBLED_PAWN_MASK_WHITE",     DoubledPawnMaskWhite,                                                                             },
-    { "PASSED_PAWN_MASK_BLACK",      PassedPawnMaskBlack,                                                                              },
-    { "ISOLATED_PAWN_MASK_BLACK",    IsolatedPawnMaskBlack,                                                                            },
-    { "SUPPORTED_PAWN_MASK_BLACK",   SupportedPawnMaskBlack,                                                                           },
-    { "DOUBLED_PAWN_MASK_BLACK",     DoubledPawnMaskBlack,                                                                             },
+    { "NORTH",                       [](uint8_t sq) constexpr { return RayFrom(sq, NORTH);                                          }   },
+    { "NORTHEAST",                   [](uint8_t sq) constexpr { return RayFrom(sq, NORTHEAST);                                      }   },
+    { "EAST",                        [](uint8_t sq) constexpr { return RayFrom(sq, EAST);                                           }   },
+    { "SOUTHEAST",                   [](uint8_t sq) constexpr { return RayFrom(sq, SOUTHEAST);                                      }   },
+    { "SOUTH",                       [](uint8_t sq) constexpr { return RayFrom(sq, SOUTH);                                          }   },
+    { "SOUTHWEST",                   [](uint8_t sq) constexpr { return RayFrom(sq, SOUTHWEST);                                      }   },
+    { "WEST",                        [](uint8_t sq) constexpr { return RayFrom(sq, WEST);                                           }   },
+    { "NORTHWEST",                   [](uint8_t sq) constexpr { return RayFrom(sq, NORTHWEST);                                      }   },
+    { "PAWN_ATTACKS_WHITE",          [](uint8_t sq) constexpr { return ShiftNorthwest(Bitboard(sq)) | ShiftNortheast(Bitboard(sq)); }   },
+    { "PAWN_ATTACKS_BLACK",          [](uint8_t sq) constexpr { return ShiftSouthwest(Bitboard(sq)) | ShiftSoutheast(Bitboard(sq)); }   },
+    { "KNIGHT_ATTACKS",              KnightAttacks                                                                                      },
+    { "BISHOP_ATTACKS",              BishopAttacksOnEmptyBoard                                                                          },
+    { "ROOK_ATTACKS",                RookAttacksOnEmptyBoard                                                                            },
+    { "QUEEN_ATTACKS",               QueenAttacksOnEmptyBoard                                                                           },
+    { "KING_ATTACKS",                KingAttacks                                                                                        },
+    { "KING_ATTACKS_2",              KingAttacks2                                                                                       },
+    { "KING_PAWN_SHELTER_WHITE",     KingPawnShelterWhite                                                                               },
+    { "KING_PAWN_SHELTER_BLACK",     KingPawnShelterBlack                                                                               },
+    { "PASSED_PAWN_MASK_WHITE",      PassedPawnMaskWhite,                                                                               },
+    { "ISOLATED_PAWN_MASK_WHITE",    IsolatedPawnMaskWhite,                                                                             },
+    { "SUPPORTED_PAWN_MASK_WHITE",   SupportedPawnMaskWhite,                                                                            },
+    { "DOUBLED_PAWN_MASK_WHITE",     DoubledPawnMaskWhite,                                                                              },
+    { "PASSED_PAWN_MASK_BLACK",      PassedPawnMaskBlack,                                                                               },
+    { "ISOLATED_PAWN_MASK_BLACK",    IsolatedPawnMaskBlack,                                                                             },
+    { "SUPPORTED_PAWN_MASK_BLACK",   SupportedPawnMaskBlack,                                                                            },
+    { "DOUBLED_PAWN_MASK_BLACK",     DoubledPawnMaskBlack,                                                                              },
     // clang-format on
 }};
 
@@ -484,7 +484,7 @@ static void GenerateInterveningSquares()
     std::cout << std::format("extern const MultiDimArray<Bitboard, 64, 64>::type INTERVENING_SQUARES = \n{{ {{");
     for (uint8_t i = 0; i != 64; ++i)
     {
-        std::cout << std::format("\n    {{ {{// square {}", SquareName(i));
+        std::cout << std::format("\n    {{ {{ // square {}", SquareName(i));
         for (uint8_t j = 0; j != 64; ++j)
         {
             if ((j & 7) == 0)
@@ -549,34 +549,32 @@ static void GeneratePextBitboards(void)
 {
     for (const PiecePextGenerator &piece : piece_generators)
     {
-        std::vector<PextBitboard> pexts;
-        for (uint8_t sq = 0; sq != 64; ++sq)
-        {
-            pexts.push_back(ComputePext(sq, piece.mask_fn, piece.attack_fn));
-        }
         // First print the arrays for the discrete attacks and the attack indices.
+        std::vector<uint64_t> masks;
         for (uint8_t sq = 0; sq != 64; ++sq)
         {
+            auto pext = ComputePext(sq, piece.mask_fn, piece.attack_fn);
+            masks.push_back(pext.mask);
             std::cout << std::format("static const uint8_t {}_PEXT_INDICES_{}[{}] = \n{{", piece.name, SquareName(sq),
-                                     pexts[sq].indices.size());
-            for (std::size_t j = 0; j != pexts[sq].indices.size(); ++j)
+                                     pext.indices.size());
+            for (std::size_t i = 0; i != pext.indices.size(); ++i)
             {
-                if (j % 16 == 0)
+                if (i % 16 == 0)
                 {
                     std::cout << std::format("\n    ");
                 }
-                std::cout << std::format("0x{:02X}, ", pexts[sq].indices[j]);
+                std::cout << std::format("0x{:02X}, ", pext.indices[i]);
             }
             std::cout << std::format("\n}};\n");
             std::cout << std::format("static const Bitboard {}_PEXT_ATTACKS_{}[{}] = \n{{", piece.name, SquareName(sq),
-                                     pexts[sq].attacks.size());
-            for (std::size_t j = 0; j != pexts[sq].attacks.size(); ++j)
+                                     pext.attacks.size());
+            for (std::size_t i = 0; i != pext.attacks.size(); ++i)
             {
-                if (j % 4 == 0)
+                if (i % 8 == 0)
                 {
                     std::cout << std::format("\n    ");
                 }
-                std::cout << std::format("0x{:016X},", pexts[sq].attacks[j]);
+                std::cout << std::format("0x{:016X},", pext.attacks[i]);
             }
             std::cout << std::format("\n}};\n");
         }
@@ -585,7 +583,7 @@ static void GeneratePextBitboards(void)
         for (uint8_t i = 0; i != 64; ++i)
         {
             std::cout << std::format("    {{\n");
-            std::cout << std::format("        .occupancy_mask = 0x{:016X},\n", pexts[i].mask);
+            std::cout << std::format("        .occupancy_mask = 0x{:016X},\n", masks[i]);
             std::cout << std::format("        .attacks        = {}_PEXT_ATTACKS_{},\n", piece.name, SquareName(i));
             std::cout << std::format("        .indices        = {}_PEXT_INDICES_{},\n", piece.name, SquareName(i));
             std::cout << std::format("    }},\n");
