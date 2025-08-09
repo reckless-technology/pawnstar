@@ -17,7 +17,7 @@
 #include "tests.h"
 #include "transposition_table.h"
 
-typedef void (*HandlerFn)(Game &game, std::span<std::string> args);
+using HandlerFn = void (*)(Game &game, std::span<std::string> args);
 
 /// @brief Structure to hold a hander for an input command.
 struct Handler
