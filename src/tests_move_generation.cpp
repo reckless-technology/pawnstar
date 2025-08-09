@@ -37,7 +37,7 @@ static void Perft(const Position &src_position, int depth, uint64_t &num_moves)
     MoveList move_list{src_position.GenerateLegalMoves()};
     if (depth > 1)
     {
-        for (Move move : move_list)
+        for (const auto &move : move_list)
         {
             Position position{src_position.MakeMove(move)};
             Perft(position, depth - 1, num_moves);
