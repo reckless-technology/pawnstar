@@ -43,7 +43,7 @@ Move SearchRootNode(Game &game)
     int ms_allocated = 0; // Soft allocated time for the move.
     switch (game.time_control.clock_type)
     {
-    case CHESS_CLOCK_STANDARD:
+    case ChessClock::STANDARD:
     default:
         if (game.time_control.num_moves_remaining != 0)
         {
@@ -55,27 +55,27 @@ Move SearchRootNode(Game &game)
             ms_allocated                       = game.time_control.ms_remaining / num_moves_to_go_estimate;
         }
         ms_timeout = std::max(100, std::min(ms_allocated * 2, game.time_control.ms_remaining - 1000));
-        game.time_control.hard_stop_ms = ElapsedMilliseconds() + ms_timeout;
+        game.time_control.hard_stop_ms = game.time_control.ElapsedMilliseconds() + ms_timeout;
         break;
 
-    case CHESS_CLOCK_FIXED_DEPTH:
+    case ChessClock::FIXED_DEPTH:
         ms_timeout                     = 0;
         ms_allocated                   = 0;
         game.time_control.hard_stop_ms = 0;
         break;
 
-    case CHESS_CLOCK_FIXED_TIME:
+    case ChessClock::FIXED_TIME:
         ms_timeout                     = game.time_control.ms_remaining;
-        game.time_control.hard_stop_ms = ElapsedMilliseconds() + ms_timeout;
+        game.time_control.hard_stop_ms = game.time_control.ElapsedMilliseconds() + ms_timeout;
         ms_allocated                   = 0;
         break;
 
-    case CHESS_CLOCK_INFINITE:
+    case ChessClock::INFINITE:
         game.time_control.hard_stop_ms = 0;
         break;
     }
 
-    int start_ms           = ElapsedMilliseconds();
+    int start_ms           = game.time_control.ElapsedMilliseconds();
     game.is_cancel_pending = false;
     // For first pass move ordering before we do any search, just use a shallow search with wide open alpha beta window.
     // Subsequent passes will use the results of the previous iteration to sort the moves (the merge sort is stable).
@@ -95,7 +95,7 @@ Move SearchRootNode(Game &game)
     Move best_move = move_list[0];
     for (int depth = START_DEPTH + 1; depth != MAX_PLY; ++depth)
     {
-        if (game.time_control.clock_type == CHESS_CLOCK_FIXED_DEPTH && depth > game.time_control.depth)
+        if (game.time_control.clock_type == ChessClock::FIXED_DEPTH && depth > game.time_control.depth)
         {
             break;
         }
@@ -127,15 +127,16 @@ Move SearchRootNode(Game &game)
                 }
                 pv_string.pop_back(); // Remove trailing space.
                 std::cout << std::format("info depth {:2} score cp {:5} time {:5} nodes {:8} pv {}\n", depth, alpha,
-                                         ElapsedMilliseconds() - start_ms, game.node_count, pv_string);
+                                         game.time_control.ElapsedMilliseconds() - start_ms, game.node_count,
+                                         pv_string);
             }
         }
-        int stop_ms = ElapsedMilliseconds();
+        int stop_ms = game.time_control.ElapsedMilliseconds();
         if (alpha > WIN_THRESHOLD || alpha < LOSE_THRESHOLD)
         {
             break;
         }
-        if (game.time_control.clock_type == CHESS_CLOCK_STANDARD)
+        if (game.time_control.clock_type == ChessClock::STANDARD)
         {
             // Plan our use of the time with some care. If both the score we find and the best move are consistent
             // between successive iterations, we can probably stop searching before our allocated time is elapsed and

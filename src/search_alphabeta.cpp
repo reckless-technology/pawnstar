@@ -126,7 +126,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
 {
     INCREMENT("alpha beta calls");
     if ((++game.node_count & 0xFFFF) == 0 && game.time_control.hard_stop_ms != 0 &&
-        ElapsedMilliseconds() >= game.time_control.hard_stop_ms)
+        game.time_control.ElapsedMilliseconds() >= game.time_control.hard_stop_ms)
     {
         // Out of time; stop searching immediately.
         game.is_cancel_pending = true;

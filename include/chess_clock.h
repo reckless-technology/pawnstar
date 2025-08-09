@@ -1,30 +1,43 @@
 #pragma once
 /// @file Chess clock.
+#include <chrono>
 #include <cstdint>
 
-/// @brief Time control chess clock types.
-enum ClockType
-{
-    CHESS_CLOCK_STANDARD,    ///< N moves to be made in a specified time.
-    CHESS_CLOCK_FIXED_DEPTH, ///< Search to depth D on every move.
-    CHESS_CLOCK_FIXED_TIME,  ///< Search for N milliseconds on every move.
-    CHESS_CLOCK_INFINITE,    ///< Keep searching until told to stop.
-};
-
 /// @brief Clock and time controls.
-struct TimeControl
+class ChessClock
 {
-    ClockType clock_type;          ///< stThe current clock type.
-    int       hard_stop_ms;        ///< Wall clock time to hard stop searching and move
+  public:
+    /// @brief Time control chess clock types.
+    enum ClockType
+    {
+        STANDARD,    ///< N moves to be made in a specified time.
+        FIXED_DEPTH, ///< Search to depth D on every move.
+        FIXED_TIME,  ///< Search for N milliseconds on every move.
+        INFINITE,    ///< Keep searching until told to stop.
+    };
+
+    ChessClock()
+        : clock_type{STANDARD}, hard_stop_ms{0}, ms_remaining{5 * 60 * 1000}, num_moves_remaining{0}, depth{10},
+          start_time_{std::chrono::system_clock::now()}
+    {
+    }
+
+    ClockType clock_type;          ///< The current clock type.
+    int64_t   hard_stop_ms;        ///< Wall clock time to hard stop searching and move
     int       ms_remaining;        ///< Number of ms remaining in this clock period.
     int       num_moves_remaining; ///< Number of moves remaining in this clock period.
     int       depth;               ///< Search depth (when CLOCK_FIXED_DEPTH is used).
+
+    int64_t ElapsedMicroseconds()
+    {
+        return duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start_time_).count();
+    }
+
+    int64_t ElapsedMilliseconds()
+    {
+        return ElapsedMicroseconds() / 1000;
+    }
+
+  private:
+    std::chrono::system_clock::time_point start_time_;
 };
-
-/// @brief Get elapsed milliseconds.
-/// @return Milliseconds since first invocation.
-int64_t ElapsedMilliseconds();
-
-/// @brief Get elapsed microseconds.
-/// @return Microseconds since first invocation.
-int64_t ElapsedMicroseconds();

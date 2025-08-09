@@ -1,8 +1,6 @@
 #pragma once
 /// @file Program configuration constants.
 
-#include <cstdint>
-
 constexpr int HASHTABLE_MEGABYTES         = 64;        ///< default transposition table size in MB
 constexpr int Q_HASHTABLE_MB              = 8;         ///< quiescent hash table default size
 constexpr int MAX_MOVES_PER_POSITION      = 256;       ///< maximum possible number of moves for a chess position

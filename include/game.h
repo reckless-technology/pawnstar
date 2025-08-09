@@ -19,7 +19,7 @@ class Game
     TranspositionTable transposition_table; ///< The transposition table.
     TranspositionTable quiescent_table;     ///< Special TT for quiescence search.
     HistoryTable       history_table;       ///< The history table.
-    TimeControl        time_control;        ///< Clock controls for the current game.
+    ChessClock         time_control;        ///< Clock controls for the current game.
     OpeningBook        book;                ///< The opening book.
     int                node_count;          ///< Number of nodes (positions) during search.
     bool               is_cancel_pending;   ///< Set to true when time for this search is expired.

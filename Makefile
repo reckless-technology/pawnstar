@@ -24,7 +24,6 @@ SOURCES             = \
 	tests_bratko_kopec.cpp \
 	tests_move_generation.cpp \
 	tests_static_exchange.cpp \
-	timer.cpp \
 	transposition_table.cpp \
 	$(notdir $(GENERATED_DATA))
 

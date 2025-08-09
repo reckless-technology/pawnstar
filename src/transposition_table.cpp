@@ -8,7 +8,7 @@
 #include "transposition_table.h"
 
 /// @brief Create the transposition table.
-/// @param megabytes Approx max size of the table in megabytes. May be slightly smaller (table is prime size).
+/// @param megabytes Approx max size of the table in megabytes..
 TranspositionTable::TranspositionTable(std::size_t megabytes)
 {
     std::size_t num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);

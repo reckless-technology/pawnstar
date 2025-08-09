@@ -5,41 +5,39 @@
 #include "move.h"
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
-#include <memory>
+#include <vector>
 
 /// @brief Class for managing history of which moves raised alpha or caused a cutoff, at each ply of search.
 /// Moves are indexed per ply, by from and to square.
 class HistoryTable
 {
-  private:
-    using Table = std::array<uint32_t, MAX_PLY * 4096>;
-    std::unique_ptr<Table> data_;
-
   public:
-    HistoryTable()
+    constexpr HistoryTable()
     {
-        data_ = std::make_unique<Table>();
+        counts_.assign(MAX_PLY * 4096, 0);
     }
-    void Reset()
+
+    constexpr void Reset()
     {
-        auto &table = *data_;
-        std::ranges::fill(table, 0);
+        std::ranges::fill(counts_, 0);
     }
-    uint32_t MaxCount(void) const
+
+    constexpr uint32_t MaxCount(void) const
     {
-        const auto &table = *data_;
-        return std::ranges::max(table);
+        return std::ranges::max(counts_);
     }
-    void RecordGoodMove(int ply, const Move &move)
+
+    constexpr void RecordGoodMove(int ply, const Move &move)
     {
-        auto &table = *data_;
-        ++table[ply * 4096 + move.from_to()];
+        ++counts_[ply * 4096 + move.from_to()];
     }
-    uint32_t GetCount(int ply, const Move &move) const
+
+    constexpr uint32_t GetCount(int ply, const Move &move) const
     {
-        const auto &table = *data_;
-        return table[ply * 4096 + move.from_to()];
+        return counts_[ply * 4096 + move.from_to()];
     }
+
+  private:
+    std::vector<uint32_t> counts_;
 };

@@ -75,6 +75,7 @@
         "timer": "cpp",
         "future": "cpp",
         "ranges": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "text_encoding": "cpp"
     }
 }

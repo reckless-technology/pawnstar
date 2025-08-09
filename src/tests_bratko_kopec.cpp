@@ -44,12 +44,13 @@ constexpr std::array POSITION_TESTS{
 /// @param depth Search depth.
 void RunPositionTests(int depth)
 {
-    const auto start_ms = ElapsedMilliseconds();
+    Game       game;
+    const auto start_ms = game.time_control.ElapsedMilliseconds();
     for (string_view test_pos : POSITION_TESTS)
     {
         Game game;
         game.NewGame(test_pos);
-        game.time_control.clock_type = CHESS_CLOCK_FIXED_DEPTH;
+        game.time_control.clock_type = ChessClock::FIXED_DEPTH;
         game.time_control.depth      = depth;
         std::cout << std::format("\n{}\n", game.CurrentPosition().ToString());
         DebugXClear();
@@ -63,5 +64,6 @@ void RunPositionTests(int depth)
 #endif
         DebugXWrite();
     }
-    std::cout << std::format("{:<40}{:10}\n", "total elapsed milliseconds", ElapsedMilliseconds() - start_ms);
+    std::cout << std::format("{:<40}{:10}\n", "total elapsed milliseconds",
+                             game.time_control.ElapsedMilliseconds() - start_ms);
 }

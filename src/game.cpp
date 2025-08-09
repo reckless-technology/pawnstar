@@ -17,13 +17,9 @@ using std::string_view;
 /// @param fen_string Initial position.
 void Game::NewGame(std::string_view fen_string)
 {
-    time_control.hard_stop_ms        = 0;
-    time_control.clock_type          = CHESS_CLOCK_STANDARD;
-    time_control.ms_remaining        = 5 * 60 * 1000; // 5 minutes
-    time_control.num_moves_remaining = 0;
-    time_control.depth               = 10;
-    node_count                       = 0;
-    is_cancel_pending                = false;
+    time_control      = ChessClock{};
+    node_count        = 0;
+    is_cancel_pending = false;
     positions_.clear();
     positions_.push_back(Position::FromString(fen_string));
 }

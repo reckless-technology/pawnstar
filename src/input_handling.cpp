@@ -104,25 +104,25 @@ void handle_go(Game &game, std::span<std::string> args)
         if ((args[i] == "wtime" && game.CurrentPosition().ColorToMove() == WHITE) ||
             (args[i] == "btime" && game.CurrentPosition().ColorToMove() == BLACK))
         {
-            game.time_control.clock_type   = CHESS_CLOCK_STANDARD;
+            game.time_control.clock_type   = ChessClock::STANDARD;
             game.time_control.ms_remaining = stoi(args[++i]);
             continue;
         }
         if (args[i] == "depth")
         {
-            game.time_control.clock_type = CHESS_CLOCK_FIXED_DEPTH;
+            game.time_control.clock_type = ChessClock::FIXED_DEPTH;
             game.time_control.depth      = stoi(args[++i]);
             continue;
         }
         if (args[i] == "movetime")
         {
-            game.time_control.clock_type   = CHESS_CLOCK_FIXED_TIME;
+            game.time_control.clock_type   = ChessClock::FIXED_TIME;
             game.time_control.ms_remaining = stoi(args[++i]);
             continue;
         }
         if (args[i] == "infinite")
         {
-            game.time_control.clock_type   = CHESS_CLOCK_INFINITE;
+            game.time_control.clock_type   = ChessClock::INFINITE;
             game.time_control.ms_remaining = 0;
         }
         if (args[i] == "movestogo")

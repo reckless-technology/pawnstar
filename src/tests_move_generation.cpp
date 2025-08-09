@@ -23,9 +23,9 @@ using std::string_view;
 /// @brief Structure to hold a basic perft test.
 struct PerftTest
 {
-    string_view position; ///< FEN string view of starting position
-    int         depth;    ///< perft search depth
-    uint64_t    count;    ///< total number of leaf node moves
+    string   position; ///< FEN string view of starting position
+    int      depth;    ///< perft search depth
+    uint64_t count;    ///< total number of leaf node moves
 };
 
 /// @brief Run standard perft test - recursive search.
@@ -48,29 +48,25 @@ static void Perft(const Position &src_position, int depth, uint64_t &num_moves)
 }
 
 // Standard Perft test position set.
-extern const std::array<string_view, 133> perft_results;
+extern const std::array<const char *, 133> perft_results;
 
 /// @brief Run the suite of perft tests.
 void RunPerftTests(void)
 {
     std::vector<PerftTest> tests;
-    for (auto test_str : perft_results)
+    for (const char *line : perft_results)
     {
         // Split into tokens separated by semicolons
-        std::vector<string_view> tokens;
-        for (;;)
+        std::vector<string> tokens;
+        string              test_str{line};
+        for (std::size_t i = test_str.find(';'); i != string::npos; i = test_str.find(';'))
         {
-            const auto i = test_str.find(';');
-            if (i == string_view::npos)
-            {
-                tokens.push_back(test_str);
-                break;
-            }
             tokens.push_back(test_str.substr(0, i));
             test_str = test_str.substr(i + 1);
         }
+        tokens.push_back(test_str);
         // First token is FEN position
-        auto fen = tokens[0];
+        const auto fen = tokens[0];
         tokens.erase(tokens.begin());
         // Remaining tokens are depth and counts
         for (auto token : tokens)
@@ -78,41 +74,44 @@ void RunPerftTests(void)
             // Format is "Dxx NNNN"
             int      depth;
             uint64_t count;
-            if (std::sscanf(token.data(), " D%d %" PRIu64, &depth, &count) != 2)
+            if (std::sscanf(token.c_str(), " D%d %" PRIu64, &depth, &count) != 2)
             {
                 std::cout << std::format("ERROR: unable to scan perft test {}\n", test_str);
             }
             tests.push_back(PerftTest{fen, depth, count});
         }
     }
-    bool     is_good     = true;
-    uint64_t total_nodes = 0;
-    int64_t  stop        = 0;
-    auto     first_start = ElapsedMicroseconds();
+    bool       is_good     = true;
+    uint64_t   total_nodes = 0;
+    const auto first_start = std::chrono::system_clock::now();
     for (const auto &test : tests)
     {
         Position position{Position::FromString(test.position)};
         string   pos_string{position.ToString()};
         uint64_t num_moves = 0;
         total_nodes += test.count;
-        auto start = ElapsedMicroseconds();
+        const auto start = std::chrono::system_clock::now();
         Perft(position, test.depth, num_moves);
-        stop = ElapsedMicroseconds();
-        if (stop == start)
+        const auto stop       = std::chrono::system_clock::now();
+        auto       elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
+        if (elapsed_us == 0)
         {
-            stop = start + 1; // avoid divide by zero error in positions per second for short tests
+            elapsed_us = 1;
         }
         std::cout << std::format("{:<75} depth:{:2} moves:{:10} Mnps:{:4}\n", pos_string, test.depth, num_moves,
-                                 num_moves / (stop - start));
+                                 num_moves / elapsed_us);
         if (num_moves != test.count)
         {
             std::cout << "************* ERROR on this position *************\n";
             is_good = false;
         }
     }
-    std::cout << std::format("{:<40}{:10}\n", "total elapsed milliseconds", (stop - first_start) / 1000);
-    std::cout << std::format("{:<40}{:10}\n", "mean positions per second",
-                             total_nodes * 1000000 / (stop - first_start));
+    const auto last_stop = std::chrono::system_clock::now();
+    std::cout << std::format("{:<40}{:10}\n", "total elapsed milliseconds",
+                             std::chrono::duration_cast<std::chrono::milliseconds>(last_stop - first_start).count());
+    std::cout << std::format(
+        "{:<40}{:10}\n", "mean positions per second",
+        total_nodes * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(last_stop - first_start).count());
     if (is_good)
     {
         std::cout << "******************* PERFT PASS *******************\n";
