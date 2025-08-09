@@ -231,7 +231,8 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     }
 
     // Generate bishop, rook and queen moves.
-    typedef Bitboard (*AttackFn)(Bitboard occupied_squares, Square locn);
+    using AttackFn = Bitboard (*)(Bitboard occupied_squares, Square locn);
+
     // clang-format off
     constexpr std::array<std::pair<Piece, AttackFn>, 3> sliding_attackers 
     {{

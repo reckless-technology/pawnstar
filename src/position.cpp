@@ -64,8 +64,8 @@ void Position::RemovePiece(Color color, Piece piece, Square from)
 /// @param to Destination square
 void Position::MovePiece(Color color, Piece piece, Square from, Square to)
 {
-    const Bitboard         from_to_bb = Bitboard(from) | Bitboard(to);
-    const zobrist_t *const hash       = &PIECE_SQUARE_HASHES[color][piece - 1][0];
+    const Bitboard                   from_to_bb = Bitboard(from) | Bitboard(to);
+    const std::array<zobrist_t, 64> &hash       = PIECE_SQUARE_HASHES[color][piece - 1];
     PiecesOfType(piece) ^= from_to_bb;
     PiecesOfColor(color) ^= from_to_bb;
     hash_ ^= hash[to] ^ hash[from];
@@ -301,7 +301,7 @@ std::string Position::ToString() const
             {
                 if (num_empty_squares)
                 {
-                    ss << (char)('0' + num_empty_squares);
+                    ss << num_empty_squares;
                     num_empty_squares = 0;
                 }
                 const char piece = (white_pieces_ & Bitboard(x, y)).IsNotEmpty()
@@ -312,7 +312,7 @@ std::string Position::ToString() const
         }
         if (num_empty_squares)
         {
-            ss << (char)('0' + num_empty_squares);
+            ss << num_empty_squares;
             num_empty_squares = 0;
         }
         if (y)
@@ -451,7 +451,8 @@ zobrist_t Position::ComputeHash() const
     zobrist_t hash = state_flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
     hash ^= CASTLING_RIGHTS_HASHES[castling_rights_];
     hash ^= EN_PASSANT_HASHES[en_passant_square_];
-    for (Piece piece = PAWN; piece <= KING; piece = (Piece)(piece + 1))
+    constexpr std::array pieces{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
+    for (auto piece : pieces)
     {
         Bitboard b = PiecesOfType(piece) & white_pieces_;
         for (Square s : b)
