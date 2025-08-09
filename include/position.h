@@ -31,9 +31,9 @@ class Position
     std::string     ToString() const;                               ///< Return the FEN string for this position.
 
     // clang-format off
-    // Const accessors.
     MoveList            GenerateLegalMoves() const          {return ColorToMove() == WHITE ? GenMoves<WHITE, true>() : GenMoves<BLACK, true>();}
     MoveList            GenerateLegalCaptures() const       {return ColorToMove() == WHITE ? GenMoves<WHITE, false>() : GenMoves<BLACK, false>();}
+    // Const accessors.
     constexpr bool      MayWhiteCastleKingside() const      {return !!(castling_rights_ & MAY_WHITE_CASTLE_KINGSIDE);}
     constexpr bool      MayWhiteCastleQueenside() const     {return !!(castling_rights_ & MAY_WHITE_CASTLE_QUEENSIDE);}
     constexpr bool      MayBlackCastleKingside() const      {return !!(castling_rights_ & MAY_BLACK_CASTLE_KINGSIDE);}
@@ -71,6 +71,7 @@ class Position
     zobrist_t ComputeHash() const;                                         ///< Compute the Zobrist hash from scratch.
     template <Color, bool> constexpr MoveList GenMoves() const;            ///< Generate legal moves.
 
+    // State variables.
     Bitboard              pawns_;                 ///< Squares with a pawn on them.
     Bitboard              knights_;               ///< Squares with a knight on them.
     Bitboard              bishops_;               ///< Squares with a bishop on them.
@@ -132,13 +133,13 @@ static_assert(sizeof(Position) == 152);
 /// @return list of moves generated
 template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves() const
 {
-    constexpr Color enemy_color      = EnemyOf(color);
-    const Bitboard  occupied_squares = white_pieces_ | black_pieces_;
-    const Bitboard  friendly_pieces  = PiecesOfColor(color);
-    const Bitboard  enemy_pieces     = occupied_squares ^ friendly_pieces;
-    const Bitboard  enemy_pawns      = pawns_ & enemy_pieces;
-    const Square    king_locn        = king_location_[color];
-    const Square    enemy_king_locn  = king_location_[enemy_color];
+    const Color    enemy_color      = EnemyOf(color);
+    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
+    const Bitboard friendly_pieces  = PiecesOfColor(color);
+    const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
+    const Bitboard enemy_pawns      = pawns_ & enemy_pieces;
+    const Square   king_locn        = king_location_[color];
+    const Square   enemy_king_locn  = king_location_[enemy_color];
 
     MoveList moves;
 

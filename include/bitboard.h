@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include "move.h"
+#include "square.h"
 
 /// @brief Class to represent a bitboard.
 /// A Bitboard is a set-wise interpretation of a 64-bit unsigned integer, with each bit mapping to a square on the

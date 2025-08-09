@@ -14,15 +14,16 @@ class Pins
     /// @param position Position to analyze.
     constexpr Pins(const Position &position)
     {
-        pinned_pieces_                         = NO_SQUARES;
-        const Color           color            = position.ColorToMove();
-        const Bitboard        occupied_squares = position.OccupiedSquares();
-        const Bitboard        friendly_pieces  = position.PiecesOfColor(color);
-        const Square          king_location    = position.KingLocation(color);
-        const Bitboard *const intervening      = &INTERVENING_SQUARES[king_location][0];
-        Bitboard enemy_sliding_pieces = ((BISHOP_ATTACKS[king_location] & (position.Bishops() | position.Queens())) |
-                                         (ROOK_ATTACKS[king_location] & (position.Rooks() | position.Queens()))) &
-                                        ~friendly_pieces;
+        pinned_pieces_                                   = NO_SQUARES;
+        const Color                     color            = position.ColorToMove();
+        const Bitboard                  occupied_squares = position.OccupiedSquares();
+        const Bitboard                  friendly_pieces  = position.PiecesOfColor(color);
+        const Square                    king_location    = position.KingLocation(color);
+        const std::array<Bitboard, 64> &intervening      = INTERVENING_SQUARES[king_location];
+        const Bitboard                  enemy_sliding_pieces =
+            ((BISHOP_ATTACKS[king_location] & (position.Bishops() | position.Queens())) |
+             (ROOK_ATTACKS[king_location] & (position.Rooks() | position.Queens()))) &
+            ~friendly_pieces;
         for (Square s : enemy_sliding_pieces)
         {
             const Bitboard intervening_squares        = intervening[s];
