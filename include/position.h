@@ -11,29 +11,28 @@
 #include "bitboard.h"
 #include "move.h"
 
-/// @brief Class to represent a chess position.
-/// This is the primary class that holds the state of the board and represents the rules of chess.
+/// @brief Class to represent a chess position. This is the primary class that holds the state of the board and
+/// represents the rules of chess.
 class Position
 {
   public:
     Position()                                      = default;
     Position(const Position &that)                  = default;
     Position       &operator=(const Position &that) = default;
-    static Position FromString(std::string_view fen_string);        ///< Construct a position from a FEN string.
-    Position        MakeMove(const Move &move) const;               ///< Create a position by making a regular move.
-    Position        MakeNullMove() const;                           ///< Create a position by making a null move.
-    bool            IsAttacked(Square location, Color color) const; ///< Determine if location is attacked by color.
-    Bitboard        AttacksTo(Square location, Color color) const;  ///< Find all attackers to specified square.
-    bool            IsLegal() const;                                ///< Is this a legal chess position.
-    bool            IsCheckmate() const;                            ///< Is this position checkmate.
-    bool            IsStalemate() const;                            ///< Is this position stalemate.
-    bool            IsDrawByMaterial() const;                       ///< Is this position material draw.
-    std::string     ToString() const;                               ///< Return the FEN string for this position.
-
+    static Position FromString(std::string_view fen_string);
+    Position        MakeMove(const Move &move) const;
+    Position        MakeNullMove() const;
+    bool            IsLegal() const;
+    bool            IsCheckmate() const;
+    bool            IsStalemate() const;
+    bool            IsDrawByMaterial() const;
+    std::string     ToString() const;
     // clang-format off
-    MoveList            GenerateLegalMoves() const          {return ColorToMove() == WHITE ? GenMoves<WHITE, true>() : GenMoves<BLACK, true>();}
-    MoveList            GenerateLegalCaptures() const       {return ColorToMove() == WHITE ? GenMoves<WHITE, false>() : GenMoves<BLACK, false>();}
     // Const accessors.
+    constexpr Bitboard  AttacksTo(Square s, Color c) const;
+    constexpr MoveList  GenerateLegalMoves() const          {return ColorToMove() == WHITE ? GenMoves<WHITE, true>()  : GenMoves<BLACK, true>();}
+    constexpr MoveList  GenerateLegalCaptures() const       {return ColorToMove() == WHITE ? GenMoves<WHITE, false>() : GenMoves<BLACK, false>();}
+    constexpr bool      IsAttacked(Square s, Color c) const {return AttacksTo(s, c).IsNotEmpty();}
     constexpr bool      MayWhiteCastleKingside() const      {return !!(castling_rights_ & MAY_WHITE_CASTLE_KINGSIDE);}
     constexpr bool      MayWhiteCastleQueenside() const     {return !!(castling_rights_ & MAY_WHITE_CASTLE_QUEENSIDE);}
     constexpr bool      MayBlackCastleKingside() const      {return !!(castling_rights_ & MAY_BLACK_CASTLE_KINGSIDE);}
@@ -125,6 +124,21 @@ class Position
 
 static_assert(sizeof(Position) == 152);
 
+/// @brief Determine attacks to a square by a color.
+/// @param location Square index.
+/// @param color Attacking color.
+/// @return Set of squares of color containing a piece attacking location.
+constexpr Bitboard Position::AttacksTo(Square location, Color color) const
+{
+    const Bitboard occupied_squares = OccupiedSquares();
+    Bitboard result = color == WHITE ? PAWN_ATTACKS_BLACK[location] & pawns_ : PAWN_ATTACKS_WHITE[location] & pawns_;
+    result |= (KNIGHT_ATTACKS[location] & knights_) | (KING_ATTACKS[location] & kings_);
+    result |= RookAttacks(occupied_squares, location) & (rooks_ | queens_);
+    result |= BishopAttacks(occupied_squares, location) & (bishops_ | queens_);
+    result &= PiecesOfColor(color);
+    return result;
+}
+
 #include "pins.h"
 
 /// @brief Generate legal moves for this position.
@@ -141,19 +155,6 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     MoveList moves;
 
-    using AttackFn = Bitboard (*)(Bitboard occupied_squares, Square locn);
-
-    // clang-format off
-    constexpr std::array<std::pair<Piece, AttackFn>, 5> attackers 
-    {{
-        { KNIGHT,   KnightAttacks   }, 
-        { BISHOP,   BishopAttacks   }, 
-        { ROOK,     RookAttacks     }, 
-        { QUEEN,    QueenAttacks    },
-        { KING,     KingAttacks     }
-    }};
-    // clang-format on
-
     // Determine the squares which our king cannot move to, i.e. any square which is attacked or X-ray attacked by any
     // enemy piece.
     Bitboard forbidden_king_squares = color == WHITE ? enemy_pawns.ShiftSouthwest() | enemy_pawns.ShiftSoutheast()
@@ -162,7 +163,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // Temporarily remove our king to detect X-ray attacks from enemy sliding pieces.
     const Bitboard occupied_except_king = occupied_squares ^ Bitboard(king_locn);
 
-    for (auto &[piece, attack_fn] : attackers)
+    for (auto &[piece, attack_fn] : piece_attackers)
     {
         Bitboard b = PiecesOfType(piece) & enemy_pieces;
         for (Square s : b)
@@ -214,17 +215,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     const Pins pins{*this}; // Determine pinned pieces and their allowed destination squares.
 
     // Generate knight, bishop, rook and queen moves.
-
-    // clang-format off
-    constexpr std::array<std::pair<Piece, AttackFn>, 4> pieces 
-    {{
-        { KNIGHT,   KnightAttacks   },
-        { BISHOP,   BishopAttacks   }, 
-        { ROOK,     RookAttacks     }, 
-        { QUEEN,    QueenAttacks    }
-    }};
-    // clang-format on
-    for (auto &[piece, attack_fn] : pieces)
+    for (auto &[piece, attack_fn] : piece_attackers_except_king)
     {
         const Bitboard b = PiecesOfType(piece) & friendly_pieces;
         for (Square from : b)

@@ -251,19 +251,7 @@ static constexpr MoveList GeneratePseudoLegalMoves(const Position &position)
         }
     }
 
-    // Generate moves for non pawn pieces.
-    using AttackFn = Bitboard (*)(Bitboard occupied, Square from);
-    // clang-format off
-    constexpr std::array<std::pair<Piece, AttackFn>, 5> pieces {{
-        { KNIGHT,   KnightAttacks   },
-        { BISHOP,   BishopAttacks   }, 
-        { ROOK,     RookAttacks     }, 
-        { QUEEN,    QueenAttacks    },
-        { KING,     KingAttacks     },
-    }};
-    // clang-format on
-
-    for (auto &[piece, fn] : pieces)
+    for (auto &[piece, fn] : piece_attackers)
     {
         const Bitboard b = position.PiecesOfType(piece) & friendly_pieces;
         for (Square from : b)

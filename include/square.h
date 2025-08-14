@@ -14,13 +14,13 @@ class Square
     }
     /// @brief Constructor
     /// @param x Square index in LERF mapping.
-    constexpr Square(uint8_t x) : val(x)
+    constexpr Square(int x) : val(x)
     {
     }
     /// @brief Constructor
     /// @param x file
     /// @param y rank
-    constexpr Square(uint8_t x, uint8_t y) : val(x + 8 * y)
+    constexpr Square(int x, int y) : val(x + 8 * y)
     {
     }
     /// @brief Constructor

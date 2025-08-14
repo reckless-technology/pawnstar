@@ -37,7 +37,7 @@ Position Position::MakeNullMove() const
 /// @param to Target square
 constexpr void Position::AddPiece(Color color, Piece piece, Square to)
 {
-    const Bitboard to_bb = Bitboard(to);
+    const Bitboard to_bb = Bitboard{to};
     PiecesOfType(piece) ^= to_bb;
     PiecesOfColor(color) ^= to_bb;
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
@@ -50,7 +50,7 @@ constexpr void Position::AddPiece(Color color, Piece piece, Square to)
 /// @param from Target square
 constexpr void Position::RemovePiece(Color color, Piece piece, Square from)
 {
-    const Bitboard from_bb = Bitboard(from);
+    const Bitboard from_bb = Bitboard{from};
     PiecesOfType(piece) ^= from_bb;
     PiecesOfColor(color) ^= from_bb;
     hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
@@ -64,7 +64,7 @@ constexpr void Position::RemovePiece(Color color, Piece piece, Square from)
 /// @param to Destination square
 constexpr void Position::MovePiece(Color color, Piece piece, Square from, Square to)
 {
-    const Bitboard                   from_to_bb = Bitboard(from) | Bitboard(to);
+    const Bitboard                   from_to_bb = Bitboard{from} | Bitboard{to};
     const std::array<zobrist_t, 64> &hash       = PIECE_SQUARE_HASHES[color][piece - 1];
     PiecesOfType(piece) ^= from_to_bb;
     PiecesOfColor(color) ^= from_to_bb;
@@ -124,14 +124,14 @@ Position Position::MakeMove(const Move &move) const
     case Move::Type::PAWN_DOUBLE_PUSH:
         position.reversible_move_count_ = 0;
         position.MovePiece(color, PAWN, from, to);
-        position.en_passant_square_ = (Square)((from + to) >> 1);
+        position.en_passant_square_ = Square{(from + to) >> 1};
         position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
         break;
 
     case Move::Type::EP_CAPTURE:
         position.reversible_move_count_ = 0;
         // En passant capture: capture location is source rank, destination file.
-        position.RemovePiece(EnemyOf(color), PAWN, (Square)((from & 0x38) | (to & 0x07)));
+        position.RemovePiece(EnemyOf(color), PAWN, Square{(from & 0x38) | (to & 0x07)});
         position.MovePiece(color, PAWN, from, to);
         break;
 
@@ -256,7 +256,7 @@ Position Position::FromString(std::string_view fen_string)
     ss >> ep_square;
     if (ep_square == "-")
     {
-        position.en_passant_square_ = Square{(uint8_t)0};
+        position.en_passant_square_ = Square{0};
     }
     else
     {
@@ -360,30 +360,6 @@ std::string Position::ToString() const
     // Half move clock and full move number
     ss << (int)reversible_move_count_ << ' ' << (int)(full_move_count_ + 1);
     return ss.str();
-}
-
-/// @brief Determine attacks to a square by a color.
-/// @param location Square index.
-/// @param color Attacking color.
-/// @return Set of squares of color containing a piece attacking location.
-Bitboard Position::AttacksTo(Square location, Color color) const
-{
-    const Bitboard occupied_squares = OccupiedSquares();
-    Bitboard result = color == WHITE ? PAWN_ATTACKS_BLACK[location] & pawns_ : PAWN_ATTACKS_WHITE[location] & pawns_;
-    result |= (KNIGHT_ATTACKS[location] & knights_) | (KING_ATTACKS[location] & kings_);
-    result |= RookAttacks(occupied_squares, location) & (rooks_ | queens_);
-    result |= BishopAttacks(occupied_squares, location) & (bishops_ | queens_);
-    result &= PiecesOfColor(color);
-    return result;
-}
-
-/// @brief Determine if a square is attacked.
-/// @param location Square index
-/// @param color Attacking color.
-/// @return True if square is attacked by color.
-bool Position::IsAttacked(Square location, Color color) const
-{
-    return AttacksTo(location, color).IsNotEmpty();
 }
 
 /// @brief Determine if the position is draw by insufficient material.

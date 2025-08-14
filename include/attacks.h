@@ -3,22 +3,13 @@
 /// or branches.
 
 #include "generated_data.h"
+#include "piece.h"
 
 #include <immintrin.h>
 
 #ifndef USE_PEXT_BITBOARDS
 #define USE_PEXT_BITBOARDS 1
 #endif
-
-constexpr Bitboard KnightAttacks(Bitboard, Square s)
-{
-    return KNIGHT_ATTACKS[s];
-}
-
-constexpr Bitboard KingAttacks(Bitboard, Square s)
-{
-    return KING_ATTACKS[s];
-}
 
 #if USE_PEXT_BITBOARDS
 
@@ -96,3 +87,23 @@ constexpr Bitboard QueenAttacks(Bitboard occupied_squares, Square s)
 {
     return BishopAttacks(occupied_squares, s) | RookAttacks(occupied_squares, s);
 }
+
+using AttackFn = Bitboard (*)(Bitboard occupied_squares, Square locn);
+// clang-format off
+constexpr std::array<std::pair<Piece, AttackFn>, 5> piece_attackers 
+{{
+    { KNIGHT,   [](Bitboard, Square s){ return KNIGHT_ATTACKS[s]; } }, 
+    { BISHOP,   BishopAttacks                                       }, 
+    { ROOK,     RookAttacks                                         }, 
+    { QUEEN,    QueenAttacks                                        },
+    { KING,     [](Bitboard, Square s){ return KING_ATTACKS[s]; }   }
+}};
+
+constexpr std::array<std::pair<Piece, AttackFn>, 4> piece_attackers_except_king 
+{{
+    { KNIGHT,   [](Bitboard, Square s){ return KNIGHT_ATTACKS[s]; } },
+    { BISHOP,   BishopAttacks                                       }, 
+    { ROOK,     RookAttacks                                         }, 
+    { QUEEN,    QueenAttacks                                        }
+}};
+// clang-format on
