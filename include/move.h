@@ -72,6 +72,14 @@ class Move
         return (val & 0x3FFFFF) == (that.val & 0x3FFFFF);
     }
 
+    /// @brief Less than operator. Used to put moves into a set.
+    /// @param that Other move to compare.
+    /// @return true if move is less than that.
+    constexpr bool operator<(const Move &that) const
+    {
+        return val < that.val;
+    }
+
     /// @brief Destination square.
     /// @return Square index of move to.
     constexpr Square to() const
@@ -163,12 +171,6 @@ class Move
     constexpr void GivesCheck()
     {
         val |= IS_CHECKING;
-    }
-
-    /// @brief Return true if this is an actual move, false if it is a list terminator, null move, or no move.
-    constexpr operator bool() const
-    {
-        return val != 0;
     }
 
     /// @brief Null move.

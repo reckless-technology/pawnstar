@@ -48,7 +48,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         alpha = score;
     }
     int best_score = score;
-    if (transposition && transposition->move)
+    if (transposition && transposition->move != Move::None())
     {
         INCREMENT("quiescent table move");
         game.PlayMove(transposition->move);

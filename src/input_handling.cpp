@@ -32,9 +32,10 @@ struct Handler
     }
 };
 
-void handle_perft(Game &, std::span<std::string>)
+void handle_perft(Game &, std::span<std::string> args)
 {
-    RunPerftTests();
+    const bool do_regression = args.size() == 2 && args[1] == "x";
+    RunPerftTests(do_regression);
 }
 
 void handle_postests(Game &, std::span<std::string> args)

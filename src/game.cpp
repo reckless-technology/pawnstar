@@ -156,7 +156,7 @@ bool Game::IsGameOver() const
 void Game::SearchThreadEntry()
 {
     Move move = SearchRootNode(*this);
-    if (move)
+    if (move != Move::None())
     {
         PlayMove(move);
         std::cout << std::format("bestmove {}\n", move.ToString());

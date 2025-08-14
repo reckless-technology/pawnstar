@@ -207,7 +207,7 @@ int Search(Game &game, int depth, int ply, int alpha, int beta, Variation &paren
     Move      best_move        = Move::None();
     int       best_score       = ALPHA;
     bool      has_raised_alpha = false;
-    if (transposition && transposition->move)
+    if (transposition && transposition->move != Move::None())
     {
         INCREMENT("table move");
         best_move = transposition->move;

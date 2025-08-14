@@ -3,9 +3,9 @@
 
 // clang-format off
 /// @brief Standard set of Perft tests from https://github.com/AndyGrant/Ethereal/blob/master/src/perft/standard.epd
-extern const std::array<const char*, 133> perft_results 
+extern const std::array<const char*, 132> perft_results 
 {
-    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1;D1 20;D2 400;D3 8902;D4 197281;D5 4865609;D6 119060324",
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1;D1 20;D2 400;D3 8902;D4 197281;D5 4865609;D6 119060324;D7 3195901860",
     "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1;D1 48;D2 2039;D3 97862;D4 4085603;D5 193690690",
     "4k3/8/8/8/8/8/8/4K2R w K - 0 1;D1 15;D2 66;D3 1197;D4 7059;D5 133987;D6 764643",
     "4k3/8/8/8/8/8/8/R3K3 w Q - 0 1;D1 16;D2 71;D3 1287;D4 7626;D5 145232;D6 846648",
@@ -133,9 +133,8 @@ extern const std::array<const char*, 133> perft_results
     "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1;D1 24;D2 496;D3 9483;D4 182838;D5 3605103;D6 71179139",
     "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1;D4 43238;D5 674624;D6 11030083;D8 3009794393",
     "rnbqkb1r/ppppp1pp/7n/4Pp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3;D5 11139762",
-    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -;D7 3195901860",
-    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -;D6 8031647685",
-    "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq -;D6 706045033",
-    "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ -;D5 89941194",
+    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -;D1 48;D2 2039;D3 97862;D4 4085603;D5 193690690;D6 8031647685",
+    "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq -;D1 6;D2 264;D3 9467;D4 422333;D5 15833292;D6 706045033",
+    "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ -;D1 44;D2 1486;D3 62379;D4 2103487;D5 89941194",
     "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - -;D5 164075551;D6 6923051137",
 };

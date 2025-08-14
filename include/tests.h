@@ -1,5 +1,5 @@
 #pragma once
 
-void RunPerftTests(void);
+void RunPerftTests(bool do_regression);
 void RunPositionTests(int depth);
 void RunStaticExchangeTests(void);
