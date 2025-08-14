@@ -50,13 +50,19 @@ static void Perft(const Position &src_position, int depth, uint64_t &num_moves)
     num_moves += move_list.size();
 }
 
+/// @brief Run a comprehensive perft test and regression check every node against a pseudo legal move generator -
+/// recursive. This is very slow compared with the standard perft test.
+/// @param src_position Starting position.
+/// @param depth search depth.
+/// @param num_moves total number of moves at terminal / leaf nodes
 static void PerftRegression(const Position &src_position, int depth, uint64_t &num_moves)
 {
-    MoveList       move_list{src_position.GenerateLegalMoves()};
+    MoveList       move_list{src_position.GenerateLegalMoves()}; // Legal moves only - main generator.
     std::set<Move> move_set{move_list.begin(), move_list.end()};
-    MoveList       pseudo_legal_moves{GeneratePseudoLegalMoves(src_position)};
+    MoveList       pseudo_legal_moves{GeneratePseudoLegalMoves(src_position)}; // Pseudo legal moves.
     const Color    color = src_position.ColorToMove();
     std::set<Move> legal_move_set;
+    // Test pseudo legal moves for legality.
     for (auto move : pseudo_legal_moves)
     {
         Position dst_position{src_position.MakeMove(move)};
@@ -169,18 +175,6 @@ void RunPerftTests(bool do_regression)
     }
 }
 
-static constexpr Bitboard KnightAttacks(Bitboard, Square from)
-{
-    return KNIGHT_ATTACKS[from];
-}
-
-static constexpr Bitboard KingAttacks(Bitboard, Square from)
-{
-    return KING_ATTACKS[from];
-}
-
-using SquareArray = std::array<Bitboard, 64>;
-
 static constexpr std::array<uint8_t, 2> double_push_rank{3, 4};
 static constexpr std::array<uint8_t, 2> promotion_rank{7, 0};
 
@@ -260,7 +254,7 @@ static constexpr MoveList GeneratePseudoLegalMoves(const Position &position)
     // Generate moves for non pawn pieces.
     using AttackFn = Bitboard (*)(Bitboard occupied, Square from);
     // clang-format off
-    constexpr std::array<std::pair<Piece, AttackFn>, 5> pieces = {{
+    constexpr std::array<std::pair<Piece, AttackFn>, 5> pieces {{
         { KNIGHT,   KnightAttacks   },
         { BISHOP,   BishopAttacks   }, 
         { ROOK,     RookAttacks     }, 

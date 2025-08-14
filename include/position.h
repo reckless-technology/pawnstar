@@ -65,11 +65,11 @@ class Position
     // clang-format on
 
   private:
-    void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
-    void      RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board.
-    void      MovePiece(Color color, Piece piece, Square from, Square to); ///< Move a piece on the board.
-    zobrist_t ComputeHash() const;                                         ///< Compute the Zobrist hash from scratch.
-    template <Color, bool> constexpr MoveList GenMoves() const;            ///< Generate legal moves.
+    constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
+    constexpr void      RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board.
+    constexpr void      MovePiece(Color color, Piece piece, Square from, Square to); ///< Move a piece on the board.
+    constexpr zobrist_t ComputeHash() const;                    ///< Compute the Zobrist hash from scratch.
+    template <Color, bool> constexpr MoveList GenMoves() const; ///< Generate legal moves.
 
     // State variables.
     Bitboard              pawns_;                 ///< Squares with a pawn on them.
@@ -133,55 +133,56 @@ static_assert(sizeof(Position) == 152);
 /// @return list of moves generated
 template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves() const
 {
-    const Color    enemy_color      = EnemyOf(color);
     const Bitboard occupied_squares = white_pieces_ | black_pieces_;
     const Bitboard friendly_pieces  = PiecesOfColor(color);
     const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
     const Bitboard enemy_pawns      = pawns_ & enemy_pieces;
     const Square   king_locn        = king_location_[color];
-    const Square   enemy_king_locn  = king_location_[enemy_color];
 
     MoveList moves;
 
+    using AttackFn = Bitboard (*)(Bitboard occupied_squares, Square locn);
+
+    // clang-format off
+    constexpr std::array<std::pair<Piece, AttackFn>, 5> attackers 
+    {{
+        { KNIGHT,   KnightAttacks   }, 
+        { BISHOP,   BishopAttacks   }, 
+        { ROOK,     RookAttacks     }, 
+        { QUEEN,    QueenAttacks    },
+        { KING,     KingAttacks     }
+    }};
+    // clang-format on
+
     // Determine the squares which our king cannot move to, i.e. any square which is attacked or X-ray attacked by any
     // enemy piece.
-
     Bitboard forbidden_king_squares = color == WHITE ? enemy_pawns.ShiftSouthwest() | enemy_pawns.ShiftSoutheast()
                                                      : enemy_pawns.ShiftNorthwest() | enemy_pawns.ShiftNortheast();
 
-    Bitboard b = knights_ & enemy_pieces;
-    for (Square s : b)
-    {
-        forbidden_king_squares |= KNIGHT_ATTACKS[s];
-    }
     // Temporarily remove our king to detect X-ray attacks from enemy sliding pieces.
     const Bitboard occupied_except_king = occupied_squares ^ Bitboard(king_locn);
 
-    b = (bishops_ | queens_) & enemy_pieces;
-    for (Square s : b)
+    for (auto &[piece, attack_fn] : attackers)
     {
-        forbidden_king_squares |= BishopAttacks(occupied_except_king, s);
+        Bitboard b = PiecesOfType(piece) & enemy_pieces;
+        for (Square s : b)
+        {
+            forbidden_king_squares |= attack_fn(occupied_except_king, s);
+        }
     }
-    b = (rooks_ | queens_) & enemy_pieces;
-    for (Square s : b)
-    {
-        forbidden_king_squares |= RookAttacks(occupied_except_king, s);
-    }
-    // King cannot move to squares controlled by the enemy king.
-    forbidden_king_squares |= KING_ATTACKS[enemy_king_locn];
 
     // The king may only safely move to squares which are not forbidden.
     const Bitboard king_move_targets = KING_ATTACKS[king_locn] & ~forbidden_king_squares;
 
     // Generate King moves.
-    Bitboard king_captures = king_move_targets & enemy_pieces;
+    const Bitboard king_captures = king_move_targets & enemy_pieces;
     for (Square to : king_captures)
     {
         moves.push_back(Move::Capture(king_locn, to, KING, PieceAt(to)));
     }
     if constexpr (do_all_moves)
     {
-        Bitboard king_non_captures = king_move_targets & ~occupied_squares;
+        const Bitboard king_non_captures = king_move_targets & ~occupied_squares;
         for (Square to : king_non_captures)
         {
             moves.push_back(Move::NonCapture(king_locn, to, KING));
@@ -191,18 +192,20 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     Bitboard allowed_captures     = enemy_pieces;      // The set of pieces we may capture.
     Bitboard allowed_non_captures = ~occupied_squares; // The set of empty squares we may move to.
 
-    // If we are in check then the set of possible captures and empty squares that are legal is much smaller.
+    // If we are in check then the set of possible captures and empty squares that are legal is much smaller, since we
+    // must immediately get out of check.
     if (IsInCheck())
     {
         if (checkers_.PopCount() > 1)
         {
-            // Multiple check: only moving the king is possible so we are done with move generation.
+            // Multiple check: in the case of multiple check, only moving the king is possible so we are done with move
+            // generation.
             return moves;
         }
-        // We are in single check, the options are:
+        // We are in check, the options are:
         // a) Capture the checking piece, OR
         // b) If checked by a sliding piece, interpose a piece between the checker and our king.
-        // NB: This includes an en passant capture if the en passant square is between the king and the sliding checker.
+        // This includes an en passant capture if the en passant square is between the king and the sliding checker.
         const Square checker_locn = checkers_.Lsb();
         allowed_captures          = checkers_;
         allowed_non_captures      = INTERVENING_SQUARES[king_locn][checker_locn];
@@ -210,51 +213,31 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     const Pins pins{*this}; // Determine pinned pieces and their allowed destination squares.
 
-    // Generate knight moves.
-    b = knights_ & friendly_pieces;
-    for (Square from : b)
-    {
-        const Bitboard attacks         = KNIGHT_ATTACKS[from] & pins.AllowedSquares(from);
-        Bitboard       capture_targets = attacks & allowed_captures;
-        for (Square to : capture_targets)
-        {
-            moves.push_back(Move::Capture(from, to, KNIGHT, PieceAt(to)));
-        }
-        if constexpr (do_all_moves)
-        {
-            Bitboard non_capture_targets = attacks & allowed_non_captures;
-            for (Square to : non_capture_targets)
-            {
-                moves.push_back(Move::NonCapture(from, to, KNIGHT));
-            }
-        }
-    }
-
-    // Generate bishop, rook and queen moves.
-    using AttackFn = Bitboard (*)(Bitboard occupied_squares, Square locn);
+    // Generate knight, bishop, rook and queen moves.
 
     // clang-format off
-    constexpr std::array<std::pair<Piece, AttackFn>, 3> sliding_attackers 
+    constexpr std::array<std::pair<Piece, AttackFn>, 4> pieces 
     {{
-        { BISHOP,   BishopAttacks }, 
-        { ROOK,     RookAttacks   }, 
-        { QUEEN,    QueenAttacks  }
+        { KNIGHT,   KnightAttacks   },
+        { BISHOP,   BishopAttacks   }, 
+        { ROOK,     RookAttacks     }, 
+        { QUEEN,    QueenAttacks    }
     }};
     // clang-format on
-    for (auto &[piece, attack_fn] : sliding_attackers)
+    for (auto &[piece, attack_fn] : pieces)
     {
-        b = PiecesOfType(piece) & friendly_pieces;
+        const Bitboard b = PiecesOfType(piece) & friendly_pieces;
         for (Square from : b)
         {
             const Bitboard attacks         = attack_fn(occupied_squares, from) & pins.AllowedSquares(from);
-            Bitboard       capture_targets = attacks & allowed_captures;
+            const Bitboard capture_targets = attacks & allowed_captures;
             for (Square to : capture_targets)
             {
                 moves.push_back(Move::Capture(from, to, piece, PieceAt(to)));
             }
             if constexpr (do_all_moves)
             {
-                Bitboard non_capture_targets = attacks & allowed_non_captures;
+                const Bitboard non_capture_targets = attacks & allowed_non_captures;
                 for (Square to : non_capture_targets)
                 {
                     moves.push_back(Move::NonCapture(from, to, piece));
@@ -361,7 +344,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // clang-format on
     for (auto &[bb, delta] : capture_promotions)
     {
-        b = bb & allowed_captures;
+        const Bitboard b = bb & allowed_captures;
         for (Square to : b)
         {
             const Square from = (Square)(to - delta);
@@ -374,7 +357,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             }
         }
     }
-    b = promotions & allowed_non_captures;
+    const Bitboard b = promotions & allowed_non_captures;
     for (Square to : b)
     {
         const Square from = (Square)(to - push_delta);
@@ -395,7 +378,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // clang-format on
     for (auto &[bb, delta] : captures)
     {
-        b = bb & allowed_captures;
+        const Bitboard b = bb & allowed_captures;
         for (Square to : b)
         {
             const Square from = (Square)(to - delta);
@@ -407,7 +390,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     }
     if constexpr (do_all_moves)
     {
-        b = single_pushes & allowed_non_captures;
+        Bitboard b = single_pushes & allowed_non_captures;
         for (Square to : b)
         {
             const Square from = (Square)(to - push_delta);
@@ -430,8 +413,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // is in the capture mask. We also have to test for the special case of discovered horizontal check when removing
     // both pawns from the king's rank, if the king is on the same rank as the capturing and captured pawns, and there
     // is also an enemy rook or queen on the same rank.
-    b = en_passant_sources;
-    for (Square from : b)
+    for (Square from : en_passant_sources)
     {
         const Square to                 = en_passant_square_;
         const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));

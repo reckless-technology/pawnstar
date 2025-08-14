@@ -10,6 +10,16 @@
 #define USE_PEXT_BITBOARDS 1
 #endif
 
+constexpr Bitboard KnightAttacks(Bitboard, Square s)
+{
+    return KNIGHT_ATTACKS[s];
+}
+
+constexpr Bitboard KingAttacks(Bitboard, Square s)
+{
+    return KING_ATTACKS[s];
+}
+
 #if USE_PEXT_BITBOARDS
 
 #if __GNUC__
