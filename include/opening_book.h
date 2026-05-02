@@ -27,6 +27,7 @@ class OpeningBook
   private:
     bool                                   InitializeFromStream(std::istream &ss);
     bool                                   ParseLineOfPlay(std::string_view line);
+    bool                                   ParsePgn(std::istream &is);
     std::map<zobrist_t, std::vector<Move>> book_;
     std::mt19937                           prng_;
 };
