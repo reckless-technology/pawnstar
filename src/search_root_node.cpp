@@ -43,7 +43,7 @@ Move SearchRootNode(Game &game)
     int ms_allocated = 0; // Soft allocated time for the move.
     switch (game.time_control.clock_type)
     {
-    case ChessClock::STANDARD:
+    case ChessClock::kStandard:
     default:
         if (game.time_control.num_moves_remaining != 0)
         {
@@ -58,19 +58,19 @@ Move SearchRootNode(Game &game)
         game.time_control.hard_stop_ms = game.time_control.ElapsedMilliseconds() + ms_timeout;
         break;
 
-    case ChessClock::FIXED_DEPTH:
+    case ChessClock::kFixedDepth:
         ms_timeout                     = 0;
         ms_allocated                   = 0;
         game.time_control.hard_stop_ms = 0;
         break;
 
-    case ChessClock::FIXED_TIME:
+    case ChessClock::kFixedTime:
         ms_timeout                     = game.time_control.ms_remaining;
         game.time_control.hard_stop_ms = game.time_control.ElapsedMilliseconds() + ms_timeout;
         ms_allocated                   = 0;
         break;
 
-    case ChessClock::INFINITE:
+    case ChessClock::kInfinite:
         game.time_control.hard_stop_ms = 0;
         break;
     }
@@ -88,26 +88,26 @@ Move SearchRootNode(Game &game)
     {
         const int move_index = &move - move_list.begin();
         const int score =
-            SearchSingleMove(game, START_DEPTH, 0, ALPHA, BETA, move, principal_variation, move_index).score;
+            SearchSingleMove(game, kStartDepth, 0, kAlpha, kBeta, move, principal_variation, move_index).score;
         move.AssignScore(score);
     }
     SortMoves<true>(move_list);
     Move best_move = move_list[0];
-    for (int depth = START_DEPTH + 1; depth != MAX_PLY; ++depth)
+    for (int depth = kStartDepth + 1; depth != kMaxPly; ++depth)
     {
-        if (game.time_control.clock_type == ChessClock::FIXED_DEPTH && depth > game.time_control.depth)
+        if (game.time_control.clock_type == ChessClock::kFixedDepth && depth > game.time_control.depth)
         {
             break;
         }
         SortMoves<true>(move_list); // Sort moves based on scores from the previous iteration (stable sort).
         Variation child_pv{};
-        int       alpha = ALPHA;
+        int       alpha = kAlpha;
         game.node_count = 0;
         best_moves.push_back(best_move);
         for (auto &move : move_list)
         {
             const int move_index = &move - move_list.begin();
-            const int score      = SearchSingleMove(game, depth, 0, alpha, BETA, move, child_pv, move_index).score;
+            const int score      = SearchSingleMove(game, depth, 0, alpha, kBeta, move, child_pv, move_index).score;
             move.AssignScore(score);
             if (game.is_cancel_pending)
             {
@@ -132,11 +132,11 @@ Move SearchRootNode(Game &game)
             }
         }
         int stop_ms = game.time_control.ElapsedMilliseconds();
-        if (alpha > WIN_THRESHOLD || alpha < LOSE_THRESHOLD)
+        if (alpha > kWinThreshold || alpha < kLoseThreshold)
         {
             break;
         }
-        if (game.time_control.clock_type == ChessClock::STANDARD)
+        if (game.time_control.clock_type == ChessClock::kStandard)
         {
             // Plan our use of the time with some care. If both the score we find and the best move are consistent
             // between successive iterations, we can probably stop searching before our allocated time is elapsed and
@@ -147,7 +147,7 @@ Move SearchRootNode(Game &game)
             const bool is_best_move_consistent = 
                 std::ranges::all_of(best_moves, [best_move](const Move& m){return m == best_move;});
             const bool is_score_stable = 
-                std::ranges::all_of(best_moves, [best_move](const Move& m){return std::abs(m.score() - best_move.score()) <= SCORE_INSTABILITY_THRESHOLD;});
+                std::ranges::all_of(best_moves, [best_move](const Move& m){return std::abs(m.score() - best_move.score()) <= kScoreInstabilityThreshold;});
             // clang-format on
             if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 4) > ms_allocated)
             {

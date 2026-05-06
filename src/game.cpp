@@ -126,7 +126,7 @@ bool Game::IsGameOver() const
 {
     if (CurrentPosition().IsCheckmate())
     {
-        std::cout << (CurrentPosition().ColorToMove() == BLACK ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
+        std::cout << (CurrentPosition().ColorToMove() == kBlack ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
         return true;
     }
     if (CurrentPosition().IsStalemate())

@@ -12,9 +12,9 @@ struct Transposition
     /// @brief Alpha beta search tree node types.
     enum NodeType : uint8_t
     {
-        CUT, ///< Beta cutoff occurred.
-        ALL, ///< No move exceeded alpha.
-        PV,  ///< Principal variation node.
+        kCut, ///< Beta cutoff occurred.
+        kAll, ///< No move exceeded alpha.
+        kPv,  ///< Principal variation node.
     };
 
     zobrist_t hash;      ///< Zobrist hash of this position.
@@ -24,7 +24,8 @@ struct Transposition
     NodeType  node_type; ///< What type of result was this.
     bool      is_old;    ///< This entry is from a previous search and can thus be replaced.
 
-    constexpr Transposition() : hash(0), move(Move::None()), score(0), depth(0), node_type(NodeType::CUT), is_old(false)
+    constexpr Transposition()
+        : hash(0), move(Move::None()), score(0), depth(0), node_type(NodeType::kCut), is_old(false)
     {
     }
 

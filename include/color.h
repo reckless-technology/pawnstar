@@ -6,8 +6,8 @@
 /// @brief Piece colors.
 enum Color : uint8_t
 {
-    WHITE,
-    BLACK,
+    kWhite,
+    kBlack,
 };
 
 /// @brief Return the enemy of a color.
@@ -15,5 +15,5 @@ enum Color : uint8_t
 /// @return The opposite color
 constexpr Color EnemyOf(Color color)
 {
-    return color == Color::WHITE ? Color::BLACK : Color::WHITE;
+    return color == Color::kWhite ? Color::kBlack : Color::kWhite;
 }

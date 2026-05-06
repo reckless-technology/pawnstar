@@ -50,7 +50,7 @@ void RunPositionTests(int depth)
     {
         Game game;
         game.NewGame(test_pos);
-        game.time_control.clock_type = ChessClock::FIXED_DEPTH;
+        game.time_control.clock_type = ChessClock::kFixedDepth;
         game.time_control.depth      = depth;
         std::cout << std::format("\n{}\n", game.CurrentPosition().ToString());
         DebugXClear();

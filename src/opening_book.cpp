@@ -125,8 +125,7 @@ static Move ParseSan(const Position &pos, std::string_view san_view)
     std::string san{san_view};
 
     // Strip trailing check, checkmate, and annotation symbols.
-    while (!san.empty() &&
-           (san.back() == '+' || san.back() == '#' || san.back() == '!' || san.back() == '?'))
+    while (!san.empty() && (san.back() == '+' || san.back() == '#' || san.back() == '!' || san.back() == '?'))
     {
         san.pop_back();
     }
@@ -140,35 +139,46 @@ static Move ParseSan(const Position &pos, std::string_view san_view)
     if (san == "O-O-O" || san == "0-0-0")
     {
         const auto it = std::ranges::find_if(
-            moves, [](const Move &m) { return m.type() == Move::CASTLING && m.to().File() == 2; });
+            moves, [](const Move &m) { return m.type() == Move::kCastling && m.to().File() == 2; });
         return it != moves.end() ? *it : Move::None();
     }
     if (san == "O-O" || san == "0-0")
     {
         const auto it = std::ranges::find_if(
-            moves, [](const Move &m) { return m.type() == Move::CASTLING && m.to().File() == 6; });
+            moves, [](const Move &m) { return m.type() == Move::kCastling && m.to().File() == 6; });
         return it != moves.end() ? *it : Move::None();
     }
 
     // An uppercase letter prefix denotes a non-pawn piece.
-    Piece  moving_piece = PAWN;
+    Piece  moving_piece = kPawn;
     size_t i            = 0;
     if (isupper(static_cast<unsigned char>(san[0])))
     {
         switch (san[0])
         {
-        case 'N': moving_piece = KNIGHT; break;
-        case 'B': moving_piece = BISHOP; break;
-        case 'R': moving_piece = ROOK;   break;
-        case 'Q': moving_piece = QUEEN;  break;
-        case 'K': moving_piece = KING;   break;
-        default:  return Move::None();
+        case 'N':
+            moving_piece = kKnight;
+            break;
+        case 'B':
+            moving_piece = kBishop;
+            break;
+        case 'R':
+            moving_piece = kRook;
+            break;
+        case 'Q':
+            moving_piece = kQueen;
+            break;
+        case 'K':
+            moving_piece = kKing;
+            break;
+        default:
+            return Move::None();
         }
         i = 1;
     }
 
     // Detect pawn promotion piece ("e8=Q" style).
-    Piece      promo_piece = Piece::NONE;
+    Piece      promo_piece = Piece::kNone;
     const auto eq_pos      = san.find('=');
     if (eq_pos != std::string::npos)
     {
@@ -176,11 +186,20 @@ static Move ParseSan(const Position &pos, std::string_view san_view)
         {
             switch (san[eq_pos + 1])
             {
-            case 'Q': promo_piece = QUEEN;  break;
-            case 'R': promo_piece = ROOK;   break;
-            case 'B': promo_piece = BISHOP; break;
-            case 'N': promo_piece = KNIGHT; break;
-            default:  return Move::None();
+            case 'Q':
+                promo_piece = kQueen;
+                break;
+            case 'R':
+                promo_piece = kRook;
+                break;
+            case 'B':
+                promo_piece = kBishop;
+                break;
+            case 'N':
+                promo_piece = kKnight;
+                break;
+            default:
+                return Move::None();
             }
         }
         san.erase(eq_pos); // Drop "=X" suffix.
@@ -204,20 +223,22 @@ static Move ParseSan(const Position &pos, std::string_view san_view)
     for (size_t j = i; j + 2 < san.size(); ++j)
     {
         const char c = san[j];
-        if      (c >= 'a' && c <= 'h') disambig_file = c - 'a';
-        else if (c >= '1' && c <= '8') disambig_rank = c - '1';
+        if (c >= 'a' && c <= 'h')
+            disambig_file = c - 'a';
+        else if (c >= '1' && c <= '8')
+            disambig_rank = c - '1';
     }
 
     // Search legal moves for a match.
     for (const Move &m : moves)
     {
         // clang-format off
-        if (m.piece()     != moving_piece)                                      continue;
-        if (m.to()        != to_sq)                                             continue;
+        if (m.piece()     != moving_piece)                                     continue;
+        if (m.to()        != to_sq)                                            continue;
         if (disambig_file >= 0 && m.from().File() != (uint8_t)disambig_file)   continue;
         if (disambig_rank >= 0 && m.from().Rank() != (uint8_t)disambig_rank)   continue;
-        if (promo_piece   != Piece::NONE && m.promoted() != promo_piece)        continue;
-        if (promo_piece   == Piece::NONE && m.promoted() != Piece::NONE)        continue;
+        if (promo_piece   != Piece::kNone && m.promoted() != promo_piece)       continue;
+        if (promo_piece   == Piece::kNone && m.promoted() != Piece::kNone)       continue;
         // clang-format on
         return m;
     }
@@ -239,12 +260,16 @@ bool OpeningBook::ParsePgn(std::istream &is)
 
     const auto skip_through = [&](char end) {
         char c;
-        while (is.get(c) && c != end) {}
+        while (is.get(c) && c != end)
+        {
+        }
     };
 
     const auto skip_to_eol = [&]() {
         char c;
-        while (is.get(c) && c != '\n') {}
+        while (is.get(c) && c != '\n')
+        {
+        }
     };
 
     const auto process_token = [&]() {
@@ -280,8 +305,7 @@ bool OpeningBook::ParsePgn(std::istream &is)
             return;
         }
         const char first        = san[0];
-        const bool is_san_token = (first >= 'a' && first <= 'h') ||
-                                  first == 'N' || first == 'B' || first == 'R' ||
+        const bool is_san_token = (first >= 'a' && first <= 'h') || first == 'N' || first == 'B' || first == 'R' ||
                                   first == 'Q' || first == 'K' || first == 'O';
         if (!is_san_token)
         {

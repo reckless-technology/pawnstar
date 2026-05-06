@@ -11,7 +11,7 @@
 /// @param megabytes Approx max size of the table in megabytes..
 TranspositionTable::TranspositionTable(std::size_t megabytes)
 {
-    std::size_t num_entries = (megabytes * MEGABYTE) / sizeof(Transposition);
+    std::size_t num_entries = (megabytes * kMegabyte) / sizeof(Transposition);
     table_.assign(num_entries, Transposition{});
 }
 
@@ -35,7 +35,7 @@ void TranspositionTable::RecordTransposition(const Transposition &transposition)
     Transposition &t = table_[transposition.hash % table_.size()];
     // If the new entry is more valuable than any previous entry then replace it.
     if (t.hash == 0 || t.is_old || t.depth <= transposition.depth ||
-        transposition.node_type == Transposition::NodeType::PV)
+        transposition.node_type == Transposition::NodeType::kPv)
     {
         t = transposition;
     }

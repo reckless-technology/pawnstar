@@ -14,34 +14,34 @@ int EvaluatePosition(const Game &game, int alpha, int beta)
     INCREMENT("eval calls");
     if (game.CurrentPosition().IsDrawByMaterial() || game.IsDrawByFiftyMoves() || game.IsDrawByRepetition())
     {
-        return DRAW_SCORE;
+        return kDrawScore;
     }
     int             scores[2];
     const Position &position = game.CurrentPosition();
     // Phase 1: Evaluate material values alone.
-    scores[WHITE] = EvaluateMaterial<WHITE>(position);
-    scores[BLACK] = EvaluateMaterial<BLACK>(position);
-    int score     = position.ColorToMove() == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];
+    scores[kWhite] = EvaluateMaterial<kWhite>(position);
+    scores[kBlack] = EvaluateMaterial<kBlack>(position);
+    int score = position.ColorToMove() == kWhite ? scores[kWhite] - scores[kBlack] : scores[kBlack] - scores[kWhite];
     if (score > beta + 200 || score < alpha - 200)
     {
         INCREMENT("eval material cutoff");
         return score;
     }
     // Piece square tables
-    scores[WHITE] += EvaluatePieceSquare<WHITE>(position);
-    scores[BLACK] += EvaluatePieceSquare<BLACK>(position);
+    scores[kWhite] += EvaluatePieceSquare<kWhite>(position);
+    scores[kBlack] += EvaluatePieceSquare<kBlack>(position);
     // Pawn structure
-    const std::array<PawnStructure, 2> ps{DeterminePawnStructure<WHITE>(position),
-                                          DeterminePawnStructure<BLACK>(position)};
-    scores[WHITE] += EvaluatePawnStructure<WHITE>(ps[WHITE]);
-    scores[BLACK] += EvaluatePawnStructure<BLACK>(ps[BLACK]);
+    const std::array<PawnStructure, 2> ps{DeterminePawnStructure<kWhite>(position),
+                                          DeterminePawnStructure<kBlack>(position)};
+    scores[kWhite] += EvaluatePawnStructure<kWhite>(ps[kWhite]);
+    scores[kBlack] += EvaluatePawnStructure<kBlack>(ps[kBlack]);
     // Mobility
-    scores[WHITE] += EvaluateMobility<WHITE>(position, ps);
-    scores[BLACK] += EvaluateMobility<BLACK>(position, ps);
+    scores[kWhite] += EvaluateMobility<kWhite>(position, ps);
+    scores[kBlack] += EvaluateMobility<kBlack>(position, ps);
     // Kings
-    scores[WHITE] += EvaluateKing<WHITE>(position);
-    scores[BLACK] += EvaluateKing<BLACK>(position);
-    score = position.ColorToMove() == WHITE ? scores[WHITE] - scores[BLACK] : scores[BLACK] - scores[WHITE];
+    scores[kWhite] += EvaluateKing<kWhite>(position);
+    scores[kBlack] += EvaluateKing<kBlack>(position);
+    score = position.ColorToMove() == kWhite ? scores[kWhite] - scores[kBlack] : scores[kBlack] - scores[kWhite];
     // Round to nearest 5
     return (score / 5) * 5;
 }

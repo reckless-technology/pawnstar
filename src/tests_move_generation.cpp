@@ -196,23 +196,23 @@ static constexpr MoveList GeneratePseudoLegalMoves(const Position &position)
     for (Square from : pawns)
     {
         // Single pawn push.
-        Square to = color == WHITE ? from + 8 : from - 8;
+        Square to = color == kWhite ? from + 8 : from - 8;
         if ((Bitboard{to} & occupied_squares).IsEmpty())
         {
             if (to.Rank() == promotion_rank[color])
             {
                 // Push promotion.
-                moves.push_back(Move::Promotion(from, to, QUEEN));
-                moves.push_back(Move::Promotion(from, to, ROOK));
-                moves.push_back(Move::Promotion(from, to, BISHOP));
-                moves.push_back(Move::Promotion(from, to, KNIGHT));
+                moves.push_back(Move::Promotion(from, to, kQueen));
+                moves.push_back(Move::Promotion(from, to, kRook));
+                moves.push_back(Move::Promotion(from, to, kBishop));
+                moves.push_back(Move::Promotion(from, to, kKnight));
             }
             else
             {
                 // Regular single push.
-                moves.push_back(Move::NonCapture(from, to, PAWN));
+                moves.push_back(Move::NonCapture(from, to, kPawn));
                 // Double pawn push.
-                to = color == WHITE ? from + 16 : from - 16;
+                to = color == kWhite ? from + 16 : from - 16;
                 if (to.Rank() == double_push_rank[color])
                 {
                     if ((Bitboard{to} & occupied_squares).IsEmpty())
@@ -223,22 +223,22 @@ static constexpr MoveList GeneratePseudoLegalMoves(const Position &position)
             }
         }
         // Pawn captures
-        const Bitboard pawn_attacks = color == WHITE ? PAWN_ATTACKS_WHITE[from] : PAWN_ATTACKS_BLACK[from];
+        const Bitboard pawn_attacks = color == kWhite ? kPawnAttacksWhite[from] : kPawnAttacksBlack[from];
         const Bitboard captures     = pawn_attacks & enemy_pieces;
         for (Square to : captures)
         {
             if (to.Rank() == promotion_rank[color])
             {
                 // Capture promotion.
-                moves.push_back(Move::Promotion(from, to, QUEEN, position.PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, ROOK, position.PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, BISHOP, position.PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, KNIGHT, position.PieceAt(to)));
+                moves.push_back(Move::Promotion(from, to, kQueen, position.PieceAt(to)));
+                moves.push_back(Move::Promotion(from, to, kRook, position.PieceAt(to)));
+                moves.push_back(Move::Promotion(from, to, kBishop, position.PieceAt(to)));
+                moves.push_back(Move::Promotion(from, to, kKnight, position.PieceAt(to)));
             }
             else
             {
                 // Regular capture.
-                moves.push_back(Move::Capture(from, to, PAWN, position.PieceAt(to)));
+                moves.push_back(Move::Capture(from, to, kPawn, position.PieceAt(to)));
             }
         }
         // En passant capture.
@@ -273,16 +273,16 @@ static constexpr MoveList GeneratePseudoLegalMoves(const Position &position)
     // Generate castling moves
     if (!position.IsInCheck())
     {
-        if (color == WHITE)
+        if (color == kWhite)
         {
             if (position.MayWhiteCastleKingside() && (occupied_squares & (Bitboard("F1") | Bitboard("G1"))).IsEmpty() &&
-                !position.IsAttacked("F1", BLACK) && !position.IsAttacked("G1", BLACK))
+                !position.IsAttacked("F1", kBlack) && !position.IsAttacked("G1", kBlack))
             {
                 moves.push_back(Move::Castling("E1", "G1"));
             }
             if (position.MayWhiteCastleQueenside() &&
                 (occupied_squares & (Bitboard("B1") | Bitboard("C1") | Bitboard("D1"))).IsEmpty() &&
-                !position.IsAttacked("D1", BLACK) && !position.IsAttacked("C1", BLACK))
+                !position.IsAttacked("D1", kBlack) && !position.IsAttacked("C1", kBlack))
             {
                 moves.push_back(Move::Castling("E1", "C1"));
             }
@@ -290,13 +290,13 @@ static constexpr MoveList GeneratePseudoLegalMoves(const Position &position)
         else
         {
             if (position.MayBlackCastleKingside() && (occupied_squares & (Bitboard("F8") | Bitboard("G8"))).IsEmpty() &&
-                !position.IsAttacked("F8", WHITE) && !position.IsAttacked("G8", WHITE))
+                !position.IsAttacked("F8", kWhite) && !position.IsAttacked("G8", kWhite))
             {
                 moves.push_back(Move::Castling("E8", "G8"));
             }
             if (position.MayBlackCastleQueenside() &&
                 (occupied_squares & (Bitboard("B8") | Bitboard("C8") | Bitboard("D8"))).IsEmpty() &&
-                !position.IsAttacked("D8", WHITE) && !position.IsAttacked("C8", WHITE))
+                !position.IsAttacked("D8", kWhite) && !position.IsAttacked("C8", kWhite))
             {
                 moves.push_back(Move::Castling("E8", "C8"));
             }

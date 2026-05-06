@@ -28,7 +28,7 @@ struct SeeBoard
 
     constexpr Bitboard &PiecesOfType(Piece piece)
     {
-        return (&pawns)[piece - PAWN];
+        return (&pawns)[piece - kPawn];
     }
 
     constexpr Bitboard &PiecesOfColor(Color color)
@@ -50,11 +50,11 @@ std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move m
     const bool  is_checking = dst_position.IsInCheck();
     SeeBoard    bb{dst_position};
     const Piece piece    = src_position.PieceAt(move.from());
-    const Piece captured = move.type() == Move::EP_CAPTURE ? PAWN : src_position.PieceAt(move.to());
+    const Piece captured = move.type() == Move::kEpCapture ? kPawn : src_position.PieceAt(move.to());
     const Piece promoted = move.promoted();
-    if (promoted != Piece::NONE)
+    if (promoted != Piece::kNone)
     {
-        return {piece_values[captured] + piece_values[promoted] - piece_values[PAWN] -
+        return {piece_values[captured] + piece_values[promoted] - piece_values[kPawn] -
                     EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.promoted()),
                 is_checking};
     }
@@ -69,9 +69,9 @@ std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move m
 /// @return int swap off (static exchange) score
 static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece piece_on_square)
 {
-    const Bitboard pawn_attacks   = color == WHITE ? PAWN_ATTACKS_BLACK[location] : PAWN_ATTACKS_WHITE[location];
-    const Bitboard knight_attacks = KNIGHT_ATTACKS[location];
-    const Bitboard king_attacks   = KING_ATTACKS[location];
+    const Bitboard pawn_attacks   = color == kWhite ? kPawnAttacksBlack[location] : kPawnAttacksWhite[location];
+    const Bitboard knight_attacks = kKnightAttacks[location];
+    const Bitboard king_attacks   = kKingAttacks[location];
     const Bitboard square         = Bitboard(location);
     Bitboard       occupied       = bb.white_pieces | bb.black_pieces;
     int            scores[32];
@@ -87,39 +87,39 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         Bitboard       attackers        = pawn_attacks & attacking_pieces & bb.pawns;
         if (attackers.IsNotEmpty())
         {
-            capturing_piece = PAWN;
+            capturing_piece = kPawn;
             goto FoundAttacker;
         }
         attackers = knight_attacks & attacking_pieces & bb.knights;
         if (attackers.IsNotEmpty())
         {
-            capturing_piece = KNIGHT;
+            capturing_piece = kKnight;
             goto FoundAttacker;
         }
         bishop_attacks = BishopAttacks(occupied, location);
         attackers      = bishop_attacks & attacking_pieces & bb.bishops;
         if (attackers.IsNotEmpty())
         {
-            capturing_piece = BISHOP;
+            capturing_piece = kBishop;
             goto FoundAttacker;
         }
         rook_attacks = RookAttacks(occupied, location);
         attackers    = rook_attacks & attacking_pieces & bb.rooks;
         if (attackers.IsNotEmpty())
         {
-            capturing_piece = ROOK;
+            capturing_piece = kRook;
             goto FoundAttacker;
         }
         attackers = (bishop_attacks | rook_attacks) & attacking_pieces & bb.queens;
         if (attackers.IsNotEmpty())
         {
-            capturing_piece = QUEEN;
+            capturing_piece = kQueen;
             goto FoundAttacker;
         }
         attackers = king_attacks & attacking_pieces & bb.kings;
         if (attackers.IsNotEmpty())
         {
-            capturing_piece = KING;
+            capturing_piece = kKing;
             goto FoundAttacker;
         }
 
@@ -138,9 +138,9 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         piece_on_square = capturing_piece;
         color           = EnemyOf(color);
         // Handle special case of pawn capture promotion
-        if (piece_on_square == PAWN && (square & (RANK_1 | RANK_8)).IsNotEmpty())
+        if (piece_on_square == kPawn && (square & (kRank1 | kRank8)).IsNotEmpty())
         {
-            piece_on_square = QUEEN;
+            piece_on_square = kQueen;
             bb.pawns ^= square;
             bb.queens ^= square;
         }

@@ -6,11 +6,11 @@
 /// @brief Chess pieces.
 enum Piece : uint8_t
 {
-    NONE,
-    PAWN,
-    KNIGHT,
-    BISHOP,
-    ROOK,
-    QUEEN,
-    KING,
+    kNone,
+    kPawn,
+    kKnight,
+    kBishop,
+    kRook,
+    kQueen,
+    kKing,
 };

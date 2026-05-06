@@ -31,8 +31,8 @@ class Bitboard
   private:
     uint64_t v; ///< The bitboard value.
 
-    static constexpr uint64_t NOT_FILE_A = 0xFEFEFEFEFEFEFEFEull; ///< Mask off the a file.
-    static constexpr uint64_t NOT_FILE_H = 0x7F7F7F7F7F7F7F7Full; ///< Mask off the h file.
+    static constexpr uint64_t kNotFileA = 0xFEFEFEFEFEFEFEFEull; ///< Mask off the a file.
+    static constexpr uint64_t kNotFileH = 0x7F7F7F7F7F7F7F7Full; ///< Mask off the h file.
 
   public:
     /// @brief Default constructor.
@@ -205,19 +205,19 @@ class Bitboard
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftNortheast() const
     {
-        return Bitboard{(v & NOT_FILE_H) << 9};
+        return Bitboard{(v & kNotFileH) << 9};
     }
     /// @brief Shift one square to the East.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftEast() const
     {
-        return Bitboard{(v & NOT_FILE_H) << 1};
+        return Bitboard{(v & kNotFileH) << 1};
     }
     /// @brief Shift one square to the Southeast.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftSoutheast() const
     {
-        return Bitboard{(v & NOT_FILE_H) >> 7};
+        return Bitboard{(v & kNotFileH) >> 7};
     }
     /// @brief Shift one square to the South.
     /// @return shifted Bitboard.
@@ -229,19 +229,19 @@ class Bitboard
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftSouthwest() const
     {
-        return Bitboard{(v & NOT_FILE_A) >> 9};
+        return Bitboard{(v & kNotFileA) >> 9};
     }
     /// @brief Shift one square to the West.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftWest() const
     {
-        return Bitboard{(v & NOT_FILE_A) >> 1};
+        return Bitboard{(v & kNotFileA) >> 1};
     }
     /// @brief Shift one square to the Northwest.
     /// @return shifted Bitboard.n
     constexpr Bitboard ShiftNorthwest() const
     {
-        return Bitboard{(v & NOT_FILE_A) << 7};
+        return Bitboard{(v & kNotFileA) << 7};
     }
 
     /// @brief Dummy sentinel class for end of input iterator range.
@@ -291,24 +291,24 @@ class Bitboard
 
 // Useful Bitboard constant values.
 // clang-format off
-static constexpr Bitboard NO_SQUARES        {0ull};
-static constexpr Bitboard ALL_SQUARES       {~NO_SQUARES};
-static constexpr Bitboard RANK_1            {0xFFull};
-static constexpr Bitboard RANK_2            {RANK_1.ShiftNorth()};
-static constexpr Bitboard RANK_3            {RANK_2.ShiftNorth()};
-static constexpr Bitboard RANK_4            {RANK_3.ShiftNorth()};
-static constexpr Bitboard RANK_5            {RANK_4.ShiftNorth()};
-static constexpr Bitboard RANK_6            {RANK_5.ShiftNorth()};
-static constexpr Bitboard RANK_7            {RANK_6.ShiftNorth()};
-static constexpr Bitboard RANK_8            {RANK_7.ShiftNorth()};
-static constexpr Bitboard FILE_A            {0x0101010101010101ull};
-static constexpr Bitboard FILE_B            {FILE_A.ShiftEast()};
-static constexpr Bitboard FILE_C            {FILE_B.ShiftEast()};
-static constexpr Bitboard FILE_D            {FILE_C.ShiftEast()};
-static constexpr Bitboard FILE_E            {FILE_D.ShiftEast()};
-static constexpr Bitboard FILE_F            {FILE_E.ShiftEast()};
-static constexpr Bitboard FILE_G            {FILE_F.ShiftEast()};
-static constexpr Bitboard FILE_H            {FILE_G.ShiftEast()};
-static constexpr Bitboard WHITE_SQUARES     {0x55AA55AA55AA55AAull};
-static constexpr Bitboard BLACK_SQUARES     {~WHITE_SQUARES};
+static constexpr Bitboard kNoSquares        {0ull};
+static constexpr Bitboard kAllSquares       {~kNoSquares};
+static constexpr Bitboard kRank1            {0xFFull};
+static constexpr Bitboard kRank2            {kRank1.ShiftNorth()};
+static constexpr Bitboard kRank3            {kRank2.ShiftNorth()};
+static constexpr Bitboard kRank4            {kRank3.ShiftNorth()};
+static constexpr Bitboard kRank5            {kRank4.ShiftNorth()};
+static constexpr Bitboard kRank6            {kRank5.ShiftNorth()};
+static constexpr Bitboard kRank7            {kRank6.ShiftNorth()};
+static constexpr Bitboard kRank8            {kRank7.ShiftNorth()};
+static constexpr Bitboard kFileA            {0x0101010101010101ull};
+static constexpr Bitboard kFileB            {kFileA.ShiftEast()};
+static constexpr Bitboard kFileC            {kFileB.ShiftEast()};
+static constexpr Bitboard kFileD            {kFileC.ShiftEast()};
+static constexpr Bitboard kFileE            {kFileD.ShiftEast()};
+static constexpr Bitboard kFileF            {kFileE.ShiftEast()};
+static constexpr Bitboard kFileG            {kFileF.ShiftEast()};
+static constexpr Bitboard kFileH            {kFileG.ShiftEast()};
+static constexpr Bitboard kWhiteSquares     {0x55AA55AA55AA55AAull};
+static constexpr Bitboard kBlackSquares     {~kWhiteSquares};
 // clang-format on

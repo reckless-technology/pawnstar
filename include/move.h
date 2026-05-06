@@ -25,22 +25,22 @@
 class Move
 {
   private:
-    static const int64_t IS_CHECKING = 1 << 22;
+    static const int64_t kIsChecking = 1 << 22;
     int64_t              val;
 
   public:
     /// @brief Move types.
     enum Type : uint8_t
     {
-        NON_CAPTURE,               ///< Regular non capture move.
-        CAPTURE,                   ///< Capture move.
-        PROMOTION_KNIGHT = KNIGHT, ///< Promotion to knight.
-        PROMOTION_BISHOP = BISHOP, ///< Promotion to bishop.
-        PROMOTION_ROOK   = ROOK,   ///< Promotion to rook.
-        PROMOTION_QUEEN  = QUEEN,  ///< Promotion to queen.
-        PAWN_DOUBLE_PUSH,          ///< Pawn double push (affects en passant).
-        EP_CAPTURE,                ///< En passant capture.
-        CASTLING,                  ///< Castling.
+        kNonCapture,                ///< Regular non capture move.
+        kCapture,                   ///< Capture move.
+        kPromotionKnight = kKnight, ///< Promotion to knight.
+        kPromotionBishop = kBishop, ///< Promotion to bishop.
+        kPromotionRook   = kRook,   ///< Promotion to rook.
+        kPromotionQueen  = kQueen,  ///< Promotion to queen.
+        kPawnDoublePush,            ///< Pawn double push (affects en passant).
+        kEpCapture,                 ///< En passant capture.
+        kCastling,                  ///< Castling.
     };
 
     /// @brief Default constructor; does not initialize the move object, so that arrays of moves can be quickly
@@ -109,7 +109,7 @@ class Move
     }
 
     /// @brief Captured piece.
-    /// @return the captured piece or NONE if not a capture move.
+    /// @return the captured piece or kNone if not a capture move.
     constexpr Piece captured() const
     {
         return Piece{(uint8_t)((val >> 15) & 0x07)};
@@ -121,22 +121,22 @@ class Move
     {
         switch (type())
         {
-        case NON_CAPTURE:
-        case CAPTURE:
-        case PAWN_DOUBLE_PUSH:
-        case EP_CAPTURE:
-        case CASTLING:
-            return Piece::NONE;
-        case PROMOTION_KNIGHT:
-            return KNIGHT;
-        case PROMOTION_BISHOP:
-            return BISHOP;
-        case PROMOTION_ROOK:
-            return ROOK;
-        case PROMOTION_QUEEN:
-            return QUEEN;
+        case kNonCapture:
+        case kCapture:
+        case kPawnDoublePush:
+        case kEpCapture:
+        case kCastling:
+            return Piece::kNone;
+        case kPromotionKnight:
+            return kKnight;
+        case kPromotionBishop:
+            return kBishop;
+        case kPromotionRook:
+            return kRook;
+        case kPromotionQueen:
+            return kQueen;
         }
-        return Piece::NONE;
+        return Piece::kNone;
     }
 
     /// @brief The move score.
@@ -157,7 +157,7 @@ class Move
     /// @return true if move is checking.
     constexpr bool IsChecking() const
     {
-        return !!(val & IS_CHECKING);
+        return !!(val & kIsChecking);
     }
 
     /// @brief Assign the score to the move.
@@ -170,7 +170,7 @@ class Move
     /// @brief Set the flag that indicates this move gives check.
     constexpr void GivesCheck()
     {
-        val |= IS_CHECKING;
+        val |= kIsChecking;
     }
 
     /// @brief Null move.
@@ -195,7 +195,7 @@ class Move
     /// @return The move.
     constexpr static Move Capture(Square from, Square to, Piece piece, Piece captured)
     {
-        return Move{from, to, piece, Type::CAPTURE, captured};
+        return Move{from, to, piece, Type::kCapture, captured};
     }
 
     /// @brief Create a pawn promotion capture move.
@@ -205,7 +205,7 @@ class Move
     /// @return The move.
     constexpr static Move Promotion(Square from, Square to, Piece promoted, Piece captured)
     {
-        return Move{from, to, PAWN, (Type)promoted, captured};
+        return Move{from, to, kPawn, (Type)promoted, captured};
     }
 
     /// @brief Create a pawn promotion non capture move.
@@ -215,7 +215,7 @@ class Move
     /// @return The move.
     constexpr static Move Promotion(Square from, Square to, Piece promoted)
     {
-        return Move{from, to, PAWN, (Type)promoted};
+        return Move{from, to, kPawn, (Type)promoted};
     }
 
     /// @brief Create a castling move.
@@ -224,7 +224,7 @@ class Move
     /// @return The move.
     constexpr static Move Castling(Square from, Square to)
     {
-        return Move{from, to, KING, Type::CASTLING};
+        return Move{from, to, kKing, Type::kCastling};
     }
 
     /// @brief Create an en passant capture move.
@@ -233,7 +233,7 @@ class Move
     /// @return The move.
     constexpr static Move EpCapture(Square from, Square to)
     {
-        return Move{from, to, PAWN, Type::EP_CAPTURE, PAWN};
+        return Move{from, to, kPawn, Type::kEpCapture, kPawn};
     }
 
     /// @brief Create a pawn double push move.
@@ -242,7 +242,7 @@ class Move
     /// @return The move.
     constexpr static Move DoublePush(Square from, Square to)
     {
-        return Move{from, to, PAWN, Type::PAWN_DOUBLE_PUSH};
+        return Move{from, to, kPawn, Type::kPawnDoublePush};
     }
 
     /// @brief Used for putting moves in std library hashed containers.
@@ -258,7 +258,7 @@ class Move
     constexpr const std::string ToString() const
     {
         std::string result = from().ToString() + to().ToString();
-        if (promoted() != Piece::NONE)
+        if (promoted() != Piece::kNone)
         {
             result.push_back(" pnbrqk"[promoted()]);
         }
@@ -289,7 +289,7 @@ static_assert(sizeof(Move) == sizeof(uint64_t));
 
 /// @brief A list of moves, typically used to hold the list of legal moves available from a given position.
 /// A StackList is much faster than a std::vector, and more convenient than a raw std::array.
-typedef StackList<Move, MAX_MOVES_PER_POSITION> MoveList;
+typedef StackList<Move, kMaxMovesPerPosition> MoveList;
 
 /// @brief Sort moves best first, i.e. in descending score order.
 /// @tparam is_stable_sort True for stable (slower) sort, only required when processing the root node of the search.

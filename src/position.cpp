@@ -23,10 +23,10 @@ using std::vector;
 Position Position::MakeNullMove() const
 {
     Position position{*this};
-    position.state_flags_ |= IS_NULL_MOVE;
-    position.state_flags_ ^= IS_BLACK_TO_MOVE;
-    position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
-    position.hash_ ^= BLACK_MOVE_HASH;
+    position.state_flags_ |= kIsNullMove;
+    position.state_flags_ ^= kIsBlackToMove;
+    position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
+    position.hash_ ^= kBlackMoveHash;
     position.en_passant_square_ = Square{(uint8_t)0};
     return position;
 }
@@ -40,7 +40,7 @@ constexpr void Position::AddPiece(Color color, Piece piece, Square to)
     const Bitboard to_bb = Bitboard{to};
     PiecesOfType(piece) ^= to_bb;
     PiecesOfColor(color) ^= to_bb;
-    hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][to];
+    hash_ ^= kPieceSquareHashes[color][piece - 1][to];
     squares_[to] = piece;
 }
 
@@ -53,8 +53,8 @@ constexpr void Position::RemovePiece(Color color, Piece piece, Square from)
     const Bitboard from_bb = Bitboard{from};
     PiecesOfType(piece) ^= from_bb;
     PiecesOfColor(color) ^= from_bb;
-    hash_ ^= PIECE_SQUARE_HASHES[color][piece - 1][from];
-    squares_[from] = Piece::NONE;
+    hash_ ^= kPieceSquareHashes[color][piece - 1][from];
+    squares_[from] = Piece::kNone;
 }
 
 /// @brief Move a piece on the board.
@@ -65,11 +65,11 @@ constexpr void Position::RemovePiece(Color color, Piece piece, Square from)
 constexpr void Position::MovePiece(Color color, Piece piece, Square from, Square to)
 {
     const Bitboard                   from_to_bb = Bitboard{from} | Bitboard{to};
-    const std::array<zobrist_t, 64> &hash       = PIECE_SQUARE_HASHES[color][piece - 1];
+    const std::array<zobrist_t, 64> &hash       = kPieceSquareHashes[color][piece - 1];
     PiecesOfType(piece) ^= from_to_bb;
     PiecesOfColor(color) ^= from_to_bb;
     hash_ ^= hash[to] ^ hash[from];
-    squares_[from] = Piece::NONE;
+    squares_[from] = Piece::kNone;
     squares_[to]   = piece;
 }
 
@@ -89,79 +89,79 @@ Position Position::MakeMove(const Move &move) const
     const Piece  piece = move.piece();
 
     Position position{*this};
-    position.state_flags_ &= ~IS_NULL_MOVE;
+    position.state_flags_ &= ~kIsNullMove;
     position.castling_rights_ &= castling_rights_masks[from] & castling_rights_masks[to];
-    position.hash_ ^= CASTLING_RIGHTS_HASHES[position.castling_rights_] ^ CASTLING_RIGHTS_HASHES[castling_rights_];
-    position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
+    position.hash_ ^= kCastlingRightsHashes[position.castling_rights_] ^ kCastlingRightsHashes[castling_rights_];
+    position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
     position.en_passant_square_ = Square{(uint8_t)0};
 
     switch (move.type())
     {
-    case Move::Type::NON_CAPTURE:
+    case Move::Type::kNonCapture:
         ++position.reversible_move_count_;
         position.MovePiece(color, piece, from, to);
         break;
 
-    case Move::Type::CAPTURE:
+    case Move::Type::kCapture:
         position.reversible_move_count_ = 0;
         position.RemovePiece(EnemyOf(color), move.captured(), to);
         position.MovePiece(color, piece, from, to);
         break;
 
-    case Move::Type::PROMOTION_KNIGHT:
-    case Move::Type::PROMOTION_BISHOP:
-    case Move::Type::PROMOTION_ROOK:
-    case Move::Type::PROMOTION_QUEEN:
+    case Move::Type::kPromotionKnight:
+    case Move::Type::kPromotionBishop:
+    case Move::Type::kPromotionRook:
+    case Move::Type::kPromotionQueen:
         position.reversible_move_count_ = 0;
-        if (move.captured() != Piece::NONE)
+        if (move.captured() != Piece::kNone)
         {
             position.RemovePiece(EnemyOf(color), move.captured(), to);
         }
-        position.RemovePiece(color, PAWN, from);
+        position.RemovePiece(color, kPawn, from);
         position.AddPiece(color, move.promoted(), to);
         break;
 
-    case Move::Type::PAWN_DOUBLE_PUSH:
+    case Move::Type::kPawnDoublePush:
         position.reversible_move_count_ = 0;
-        position.MovePiece(color, PAWN, from, to);
+        position.MovePiece(color, kPawn, from, to);
         position.en_passant_square_ = Square{(from + to) >> 1};
-        position.hash_ ^= EN_PASSANT_HASHES[position.en_passant_square_];
+        position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
         break;
 
-    case Move::Type::EP_CAPTURE:
+    case Move::Type::kEpCapture:
         position.reversible_move_count_ = 0;
         // En passant capture: capture location is source rank, destination file.
-        position.RemovePiece(EnemyOf(color), PAWN, Square{(from & 0x38) | (to & 0x07)});
-        position.MovePiece(color, PAWN, from, to);
+        position.RemovePiece(EnemyOf(color), kPawn, Square{(from & 0x38) | (to & 0x07)});
+        position.MovePiece(color, kPawn, from, to);
         break;
 
-    case Move::Type::CASTLING:
+    case Move::Type::kCastling:
         position.reversible_move_count_ = 0;
         switch (to)
         {
         case G1:
-            position.MovePiece(WHITE, KING, "E1", "G1");
-            position.MovePiece(WHITE, ROOK, "H1", "F1");
+            position.MovePiece(kWhite, kKing, "E1", "G1");
+            position.MovePiece(kWhite, kRook, "H1", "F1");
             break;
         case C1:
-            position.MovePiece(WHITE, KING, "E1", "C1");
-            position.MovePiece(WHITE, ROOK, "A1", "D1");
+            position.MovePiece(kWhite, kKing, "E1", "C1");
+            position.MovePiece(kWhite, kRook, "A1", "D1");
             break;
         case G8:
-            position.MovePiece(BLACK, KING, "E8", "G8");
-            position.MovePiece(BLACK, ROOK, "H8", "F8");
+            position.MovePiece(kBlack, kKing, "E8", "G8");
+            position.MovePiece(kBlack, kRook, "H8", "F8");
             break;
         case C8:
-            position.MovePiece(BLACK, KING, "E8", "C8");
-            position.MovePiece(BLACK, ROOK, "A8", "D8");
+            position.MovePiece(kBlack, kKing, "E8", "C8");
+            position.MovePiece(kBlack, kRook, "A8", "D8");
             break;
         default:
             break;
         }
         break;
     }
-    position.state_flags_ ^= IS_BLACK_TO_MOVE;
-    position.hash_ ^= BLACK_MOVE_HASH;
+    position.state_flags_ ^= kIsBlackToMove;
+    position.hash_ ^= kBlackMoveHash;
     position.full_move_count_ += color; // Increments after black's move.
     position.king_location_[color] = (position.kings_ & position.PiecesOfColor(color)).Lsb();
     position.checkers_             = position.AttacksTo(position.king_location_[EnemyOf(color)], color);
@@ -199,7 +199,7 @@ Position Position::FromString(std::string_view fen_string)
         if (a != string::npos)
         {
             const Piece piece = (Piece)(a + 1);
-            position.AddPiece(WHITE, piece, Square{(uint8_t)x, (uint8_t)y});
+            position.AddPiece(kWhite, piece, Square{(uint8_t)x, (uint8_t)y});
             ++x;
             continue;
         }
@@ -207,7 +207,7 @@ Position Position::FromString(std::string_view fen_string)
         if (a != string::npos)
         {
             const Piece piece = (Piece)(a + 1);
-            position.AddPiece(BLACK, piece, Square{(uint8_t)x, (uint8_t)y});
+            position.AddPiece(kBlack, piece, Square{(uint8_t)x, (uint8_t)y});
             ++x;
             continue;
         }
@@ -217,10 +217,10 @@ Position Position::FromString(std::string_view fen_string)
     ss >> color_to_move;
     if (color_to_move == "b")
     {
-        position.state_flags_ |= IS_BLACK_TO_MOVE;
+        position.state_flags_ |= kIsBlackToMove;
     }
-    position.king_location_[WHITE] = (position.kings_ & position.white_pieces_).Lsb();
-    position.king_location_[BLACK] = (position.kings_ & position.black_pieces_).Lsb();
+    position.king_location_[kWhite] = (position.kings_ & position.white_pieces_).Lsb();
+    position.king_location_[kBlack] = (position.kings_ & position.black_pieces_).Lsb();
     // Castling rights
     string castling_rights;
     ss >> castling_rights;
@@ -235,16 +235,16 @@ Position Position::FromString(std::string_view fen_string)
             switch (c)
             {
             case 'K':
-                position.castling_rights_ |= MAY_WHITE_CASTLE_KINGSIDE;
+                position.castling_rights_ |= kMayWhiteCastleKingside;
                 break;
             case 'Q':
-                position.castling_rights_ |= MAY_WHITE_CASTLE_QUEENSIDE;
+                position.castling_rights_ |= kMayWhiteCastleQueenside;
                 break;
             case 'k':
-                position.castling_rights_ |= MAY_BLACK_CASTLE_KINGSIDE;
+                position.castling_rights_ |= kMayBlackCastleKingside;
                 break;
             case 'q':
-                position.castling_rights_ |= MAY_BLACK_CASTLE_QUEENSIDE;
+                position.castling_rights_ |= kMayBlackCastleQueenside;
                 break;
             default:
                 break;
@@ -321,7 +321,7 @@ std::string Position::ToString() const
         }
     }
     // Side to move
-    ss << ' ' << (state_flags_ & IS_BLACK_TO_MOVE ? 'b' : 'w') << ' ';
+    ss << ' ' << (state_flags_ & kIsBlackToMove ? 'b' : 'w') << ' ';
     // Castling rights
     if (castling_rights_ == 0)
     {
@@ -329,19 +329,19 @@ std::string Position::ToString() const
     }
     else
     {
-        if (castling_rights_ & MAY_WHITE_CASTLE_KINGSIDE)
+        if (castling_rights_ & kMayWhiteCastleKingside)
         {
             ss << 'K';
         }
-        if (castling_rights_ & MAY_WHITE_CASTLE_QUEENSIDE)
+        if (castling_rights_ & kMayWhiteCastleQueenside)
         {
             ss << 'Q';
         }
-        if (castling_rights_ & MAY_BLACK_CASTLE_KINGSIDE)
+        if (castling_rights_ & kMayBlackCastleKingside)
         {
             ss << 'k';
         }
-        if (castling_rights_ & MAY_BLACK_CASTLE_QUEENSIDE)
+        if (castling_rights_ & kMayBlackCastleQueenside)
         {
             ss << 'q';
         }
@@ -390,8 +390,8 @@ bool Position::IsDrawByMaterial() const
         {
             const Bitboard white_bishops                   = bishops_ & white_pieces_;
             const Bitboard black_bishops                   = bishops_ & black_pieces_;
-            const bool     is_white_bishop_on_white_square = (white_bishops & WHITE_SQUARES).IsNotEmpty();
-            const bool     is_black_bishop_on_white_square = (black_bishops & WHITE_SQUARES).IsNotEmpty();
+            const bool     is_white_bishop_on_white_square = (white_bishops & kWhiteSquares).IsNotEmpty();
+            const bool     is_black_bishop_on_white_square = (black_bishops & kWhiteSquares).IsNotEmpty();
             if (white_bishops.IsNotEmpty() && black_bishops.IsNotEmpty() &&
                 is_white_bishop_on_white_square == is_black_bishop_on_white_square)
             {
@@ -416,7 +416,7 @@ bool Position::IsLegal() const
     const Bitboard white_king = kings_ & white_pieces_;
     const Bitboard black_king = kings_ & black_pieces_;
     return white_king.PopCount() == 1 && black_king.PopCount() == 1 && white_king != black_king &&
-           (KING_ATTACKS[white_king.Lsb()] & black_king).IsEmpty() &&
+           (kKingAttacks[white_king.Lsb()] & black_king).IsEmpty() &&
            !IsAttacked(king_location_[EnemyOf(color)], color);
 }
 
@@ -424,21 +424,21 @@ bool Position::IsLegal() const
 /// @return the 64 bit hash
 constexpr zobrist_t Position::ComputeHash() const
 {
-    zobrist_t hash = state_flags_ & IS_BLACK_TO_MOVE ? BLACK_MOVE_HASH : 0ull;
-    hash ^= CASTLING_RIGHTS_HASHES[castling_rights_];
-    hash ^= EN_PASSANT_HASHES[en_passant_square_];
-    constexpr std::array pieces{PAWN, KNIGHT, BISHOP, ROOK, QUEEN, KING};
+    zobrist_t hash = state_flags_ & kIsBlackToMove ? kBlackMoveHash : 0ull;
+    hash ^= kCastlingRightsHashes[castling_rights_];
+    hash ^= kEnPassantHashes[en_passant_square_];
+    constexpr std::array pieces{kPawn, kKnight, kBishop, kRook, kQueen, kKing};
     for (auto piece : pieces)
     {
         Bitboard b = PiecesOfType(piece) & white_pieces_;
         for (Square s : b)
         {
-            hash ^= PIECE_SQUARE_HASHES[WHITE][piece - 1][s];
+            hash ^= kPieceSquareHashes[kWhite][piece - 1][s];
         }
         b = PiecesOfType(piece) & black_pieces_;
         for (Square s : b)
         {
-            hash ^= PIECE_SQUARE_HASHES[BLACK][piece - 1][s];
+            hash ^= kPieceSquareHashes[kBlack][piece - 1][s];
         }
     }
     return hash;

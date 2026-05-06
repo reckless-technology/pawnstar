@@ -61,7 +61,7 @@ void handle_freebook(Game &game, std::span<std::string>)
 
 void handle_eval(Game &game, std::span<std::string>)
 {
-    std::cout << std::format("evaluation {}\n", EvaluatePosition(game, ALPHA, BETA));
+    std::cout << std::format("evaluation {}\n", EvaluatePosition(game, kAlpha, kBeta));
 }
 
 void handle_dbg(Game &, std::span<std::string>)
@@ -102,28 +102,28 @@ void handle_go(Game &game, std::span<std::string> args)
 {
     for (std::size_t i = 1; i < args.size(); ++i)
     {
-        if ((args[i] == "wtime" && game.CurrentPosition().ColorToMove() == WHITE) ||
-            (args[i] == "btime" && game.CurrentPosition().ColorToMove() == BLACK))
+        if ((args[i] == "wtime" && game.CurrentPosition().ColorToMove() == kWhite) ||
+            (args[i] == "btime" && game.CurrentPosition().ColorToMove() == kBlack))
         {
-            game.time_control.clock_type   = ChessClock::STANDARD;
+            game.time_control.clock_type   = ChessClock::kStandard;
             game.time_control.ms_remaining = stoi(args[++i]);
             continue;
         }
         if (args[i] == "depth")
         {
-            game.time_control.clock_type = ChessClock::FIXED_DEPTH;
+            game.time_control.clock_type = ChessClock::kFixedDepth;
             game.time_control.depth      = stoi(args[++i]);
             continue;
         }
         if (args[i] == "movetime")
         {
-            game.time_control.clock_type   = ChessClock::FIXED_TIME;
+            game.time_control.clock_type   = ChessClock::kFixedTime;
             game.time_control.ms_remaining = stoi(args[++i]);
             continue;
         }
         if (args[i] == "infinite")
         {
-            game.time_control.clock_type   = ChessClock::INFINITE;
+            game.time_control.clock_type   = ChessClock::kInfinite;
             game.time_control.ms_remaining = 0;
         }
         if (args[i] == "movestogo")

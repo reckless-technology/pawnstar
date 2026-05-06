@@ -16,7 +16,7 @@
 int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
 {
     INCREMENT("quiescent calls");
-    if (ply == MAX_PLY)
+    if (ply == kMaxPly)
     {
         INCREMENT("quiescent max ply");
         return EvaluatePosition(game, alpha, beta);
@@ -39,7 +39,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
         game.quiescent_table.RecordTransposition(
-            Transposition{game.CurrentPosition().Hash(), Move::None(), score, depth, Transposition::NodeType::CUT});
+            Transposition{game.CurrentPosition().Hash(), Move::None(), score, depth, Transposition::NodeType::kCut});
         return score;
     }
     if (score > alpha)
@@ -56,7 +56,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         game.UndoMove();
         if (game.is_cancel_pending)
         {
-            return SEARCH_CANCELLED_SCORE;
+            return kSearchCancelledScore;
         }
         if (score >= beta)
         {
@@ -97,14 +97,14 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
         game.UndoMove();
         if (game.is_cancel_pending)
         {
-            return SEARCH_CANCELLED_SCORE;
+            return kSearchCancelledScore;
         }
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
             game.history_table.RecordGoodMove(ply, move);
             game.quiescent_table.RecordTransposition(
-                Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::CUT});
+                Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
             return score;
         }
         if (score > best_score)
@@ -116,7 +116,7 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
                 INCREMENT("quiescent pv changed");
                 game.history_table.RecordGoodMove(ply, move);
                 game.quiescent_table.RecordTransposition(
-                    Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::CUT});
+                    Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
             }
         }
     }

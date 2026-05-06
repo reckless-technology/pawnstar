@@ -15,7 +15,7 @@ class HistoryTable
   public:
     constexpr HistoryTable()
     {
-        counts_.assign(MAX_PLY * 4096, 0);
+        counts_.assign(kMaxPly * 4096, 0);
     }
 
     constexpr void Reset()

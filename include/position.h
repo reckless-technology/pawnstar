@@ -30,15 +30,15 @@ class Position
     // clang-format off
     // Const accessors.
     constexpr Bitboard  AttacksTo(Square s, Color c) const;
-    constexpr MoveList  GenerateLegalMoves() const          {return ColorToMove() == WHITE ? GenMoves<WHITE, true>()  : GenMoves<BLACK, true>();}
-    constexpr MoveList  GenerateLegalCaptures() const       {return ColorToMove() == WHITE ? GenMoves<WHITE, false>() : GenMoves<BLACK, false>();}
+    constexpr MoveList  GenerateLegalMoves() const          {return ColorToMove() == kWhite ? GenMoves<kWhite, true>()  : GenMoves<kBlack, true>();}
+    constexpr MoveList  GenerateLegalCaptures() const       {return ColorToMove() == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();}
     constexpr bool      IsAttacked(Square s, Color c) const {return AttacksTo(s, c).IsNotEmpty();}
-    constexpr bool      MayWhiteCastleKingside() const      {return !!(castling_rights_ & MAY_WHITE_CASTLE_KINGSIDE);}
-    constexpr bool      MayWhiteCastleQueenside() const     {return !!(castling_rights_ & MAY_WHITE_CASTLE_QUEENSIDE);}
-    constexpr bool      MayBlackCastleKingside() const      {return !!(castling_rights_ & MAY_BLACK_CASTLE_KINGSIDE);}
-    constexpr bool      MayBlackCastleQueenside() const     {return !!(castling_rights_ & MAY_BLACK_CASTLE_QUEENSIDE);}
-    constexpr bool      IsNullMove() const                  {return !!(state_flags_ & IS_NULL_MOVE);}
-    constexpr Color     ColorToMove() const                 {return state_flags_ & IS_BLACK_TO_MOVE ? BLACK : WHITE;}
+    constexpr bool      MayWhiteCastleKingside() const      {return !!(castling_rights_ & kMayWhiteCastleKingside);}
+    constexpr bool      MayWhiteCastleQueenside() const     {return !!(castling_rights_ & kMayWhiteCastleQueenside);}
+    constexpr bool      MayBlackCastleKingside() const      {return !!(castling_rights_ & kMayBlackCastleKingside);}
+    constexpr bool      MayBlackCastleQueenside() const     {return !!(castling_rights_ & kMayBlackCastleQueenside);}
+    constexpr bool      IsNullMove() const                  {return !!(state_flags_ & kIsNullMove);}
+    constexpr Color     ColorToMove() const                 {return state_flags_ & kIsBlackToMove ? kBlack : kWhite;}
     constexpr Bitboard  Pawns() const                       {return pawns_;}
     constexpr Bitboard  Knights() const                     {return knights_;}
     constexpr Bitboard  Bishops() const                     {return bishops_;}
@@ -51,7 +51,7 @@ class Position
     constexpr Bitboard  VacantSquares() const               {return ~(white_pieces_ | black_pieces_);}
     constexpr Piece     PieceAt(Square location) const      {return squares_[location];}
     constexpr Bitboard  PiecesOfColor(Color color) const    {return (&white_pieces_)[color];}
-    constexpr Bitboard  PiecesOfType(Piece piece) const     {return (&pawns_)[piece - PAWN];}
+    constexpr Bitboard  PiecesOfType(Piece piece) const     {return (&pawns_)[piece - kPawn];}
     constexpr Square    KingLocation(Color color) const     {return king_location_[color];}
     constexpr zobrist_t Hash() const                        {return hash_;}
     constexpr bool      IsInCheck() const                   {return checkers_.IsNotEmpty();}
@@ -60,7 +60,7 @@ class Position
     constexpr Square    EnPassantIndex() const              {return en_passant_square_;}
     // Non const accessors.
     constexpr Bitboard& PiecesOfColor(Color color)          {return (&white_pieces_)[color];}
-    constexpr Bitboard& PiecesOfType(Piece piece)           {return (&pawns_)[piece - PAWN];}
+    constexpr Bitboard& PiecesOfType(Piece piece)           {return (&pawns_)[piece - kPawn];}
     // clang-format on
 
   private:
@@ -90,34 +90,34 @@ class Position
     uint8_t               state_flags_;           ///< Position state flags.
 
     /// @brief Bit values for castling rights.
-    constexpr static uint8_t MAY_WHITE_CASTLE_KINGSIDE  = 0x01;
-    constexpr static uint8_t MAY_WHITE_CASTLE_QUEENSIDE = 0x02;
-    constexpr static uint8_t MAY_BLACK_CASTLE_KINGSIDE  = 0x04;
-    constexpr static uint8_t MAY_BLACK_CASTLE_QUEENSIDE = 0x08;
-    constexpr static uint8_t OKM                        = 0x0F; ///< Default castling rights.
-    constexpr static uint8_t A1M                        = ~MAY_WHITE_CASTLE_QUEENSIDE;
-    constexpr static uint8_t E1M                        = ~(MAY_WHITE_CASTLE_KINGSIDE | MAY_WHITE_CASTLE_QUEENSIDE);
-    constexpr static uint8_t H1M                        = ~MAY_WHITE_CASTLE_KINGSIDE;
-    constexpr static uint8_t A8M                        = ~MAY_BLACK_CASTLE_QUEENSIDE;
-    constexpr static uint8_t E8M                        = ~(MAY_BLACK_CASTLE_KINGSIDE | MAY_BLACK_CASTLE_QUEENSIDE);
-    constexpr static uint8_t H8M                        = ~MAY_BLACK_CASTLE_KINGSIDE;
+    constexpr static uint8_t kMayWhiteCastleKingside  = 0x01;
+    constexpr static uint8_t kMayWhiteCastleQueenside = 0x02;
+    constexpr static uint8_t kMayBlackCastleKingside  = 0x04;
+    constexpr static uint8_t kMayBlackCastleQueenside = 0x08;
+    constexpr static uint8_t kOkm                     = 0x0F; ///< Default castling rights.
+    constexpr static uint8_t kA1m                     = ~kMayWhiteCastleQueenside;
+    constexpr static uint8_t kE1m                     = ~(kMayWhiteCastleKingside | kMayWhiteCastleQueenside);
+    constexpr static uint8_t kH1m                     = ~kMayWhiteCastleKingside;
+    constexpr static uint8_t kA8m                     = ~kMayBlackCastleQueenside;
+    constexpr static uint8_t kE8m                     = ~(kMayBlackCastleKingside | kMayBlackCastleQueenside);
+    constexpr static uint8_t kH8m                     = ~kMayBlackCastleKingside;
 
     /// @brief Bit values for state flags.
-    constexpr static uint8_t IS_BLACK_TO_MOVE = 0x01;
-    constexpr static uint8_t IS_NULL_MOVE     = 0x02;
+    constexpr static uint8_t kIsBlackToMove = 0x01;
+    constexpr static uint8_t kIsNullMove    = 0x02;
 
     // clang-format off
     /// @brief AND bit masks applied to move from and to, determining new castling rights following a move.
     constexpr static std::array<uint8_t, 64> castling_rights_masks
     {
-        A1M, OKM, OKM, OKM, E1M, OKM, OKM, H1M, 
-        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
-        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
-        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
-        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
-        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
-        OKM, OKM, OKM, OKM, OKM, OKM, OKM, OKM, 
-        A8M, OKM, OKM, OKM, E8M, OKM, OKM, H8M,
+        kA1m, kOkm, kOkm, kOkm, kE1m, kOkm, kOkm, kH1m, 
+        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
+        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
+        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
+        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
+        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
+        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
+        kA8m, kOkm, kOkm, kOkm, kE8m, kOkm, kOkm, kH8m,
     };
     // clang-format on
 };
@@ -131,8 +131,8 @@ static_assert(sizeof(Position) == 152);
 constexpr Bitboard Position::AttacksTo(Square location, Color color) const
 {
     const Bitboard occupied_squares = OccupiedSquares();
-    Bitboard result = color == WHITE ? PAWN_ATTACKS_BLACK[location] & pawns_ : PAWN_ATTACKS_WHITE[location] & pawns_;
-    result |= (KNIGHT_ATTACKS[location] & knights_) | (KING_ATTACKS[location] & kings_);
+    Bitboard result = color == kWhite ? kPawnAttacksBlack[location] & pawns_ : kPawnAttacksWhite[location] & pawns_;
+    result |= (kKnightAttacks[location] & knights_) | (kKingAttacks[location] & kings_);
     result |= RookAttacks(occupied_squares, location) & (rooks_ | queens_);
     result |= BishopAttacks(occupied_squares, location) & (bishops_ | queens_);
     result &= PiecesOfColor(color);
@@ -157,8 +157,8 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     // Determine the squares which our king cannot move to, i.e. any square which is attacked or X-ray attacked by any
     // enemy piece.
-    Bitboard forbidden_king_squares = color == WHITE ? enemy_pawns.ShiftSouthwest() | enemy_pawns.ShiftSoutheast()
-                                                     : enemy_pawns.ShiftNorthwest() | enemy_pawns.ShiftNortheast();
+    Bitboard forbidden_king_squares = color == kWhite ? enemy_pawns.ShiftSouthwest() | enemy_pawns.ShiftSoutheast()
+                                                      : enemy_pawns.ShiftNorthwest() | enemy_pawns.ShiftNortheast();
 
     // Temporarily remove our king to detect X-ray attacks from enemy sliding pieces.
     const Bitboard occupied_except_king = occupied_squares ^ Bitboard(king_locn);
@@ -173,20 +173,20 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     }
 
     // The king may only safely move to squares which are not forbidden.
-    const Bitboard king_move_targets = KING_ATTACKS[king_locn] & ~forbidden_king_squares;
+    const Bitboard king_move_targets = kKingAttacks[king_locn] & ~forbidden_king_squares;
 
     // Generate King moves.
     const Bitboard king_captures = king_move_targets & enemy_pieces;
     for (Square to : king_captures)
     {
-        moves.push_back(Move::Capture(king_locn, to, KING, PieceAt(to)));
+        moves.push_back(Move::Capture(king_locn, to, kKing, PieceAt(to)));
     }
     if constexpr (do_all_moves)
     {
         const Bitboard king_non_captures = king_move_targets & ~occupied_squares;
         for (Square to : king_non_captures)
         {
-            moves.push_back(Move::NonCapture(king_locn, to, KING));
+            moves.push_back(Move::NonCapture(king_locn, to, kKing));
         }
     }
 
@@ -209,7 +209,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         // This includes an en passant capture if the en passant square is between the king and the sliding checker.
         const Square checker_locn = checkers_.Lsb();
         allowed_captures          = checkers_;
-        allowed_non_captures      = INTERVENING_SQUARES[king_locn][checker_locn];
+        allowed_non_captures      = kInterveningSquares[king_locn][checker_locn];
     }
 
     const Pins pins{*this}; // Determine pinned pieces and their allowed destination squares.
@@ -247,16 +247,16 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     {
         if (!IsInCheck())
         {
-            if constexpr (color == WHITE)
+            if constexpr (color == kWhite)
             {
                 if (MayWhiteCastleKingside() && (occupied_squares & (Bitboard("F1") | Bitboard("G1"))).IsEmpty() &&
-                    !IsAttacked("F1", BLACK) && !IsAttacked("G1", BLACK))
+                    !IsAttacked("F1", kBlack) && !IsAttacked("G1", kBlack))
                 {
                     moves.push_back(Move::Castling("E1", "G1"));
                 }
                 if (MayWhiteCastleQueenside() &&
                     (occupied_squares & (Bitboard("B1") | Bitboard("C1") | Bitboard("D1"))).IsEmpty() &&
-                    !IsAttacked("D1", BLACK) && !IsAttacked("C1", BLACK))
+                    !IsAttacked("D1", kBlack) && !IsAttacked("C1", kBlack))
                 {
                     moves.push_back(Move::Castling("E1", "C1"));
                 }
@@ -264,13 +264,13 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             else
             {
                 if (MayBlackCastleKingside() && (occupied_squares & (Bitboard("F8") | Bitboard("G8"))).IsEmpty() &&
-                    !IsAttacked("F8", WHITE) && !IsAttacked("G8", WHITE))
+                    !IsAttacked("F8", kWhite) && !IsAttacked("G8", kWhite))
                 {
                     moves.push_back(Move::Castling("E8", "G8"));
                 }
                 if (MayBlackCastleQueenside() &&
                     (occupied_squares & (Bitboard("B8") | Bitboard("C8") | Bitboard("D8"))).IsEmpty() &&
-                    !IsAttacked("D8", WHITE) && !IsAttacked("C8", WHITE))
+                    !IsAttacked("D8", kWhite) && !IsAttacked("C8", kWhite))
                 {
                     moves.push_back(Move::Castling("E8", "C8"));
                 }
@@ -292,17 +292,17 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     int8_t   west_delta;         // square index delta for capture west
     int8_t   east_delta;         // square index delta for capture east
 
-    if constexpr (color == WHITE)
+    if constexpr (color == kWhite)
     {
         pawns              = pawns_ & white_pieces_;
         single_pushes      = pawns.ShiftNorth() & ~occupied_squares;
-        double_pushes      = single_pushes.ShiftNorth() & ~occupied_squares & RANK_4;
+        double_pushes      = single_pushes.ShiftNorth() & ~occupied_squares & kRank4;
         captures_west      = pawns.ShiftNorthwest() & black_pieces_;
         captures_east      = pawns.ShiftNortheast() & black_pieces_;
-        en_passant_sources = en_passant_square_ ? PAWN_ATTACKS_BLACK[en_passant_square_] & pawns : NO_SQUARES;
-        promotions         = single_pushes & RANK_8;
-        promotions_west    = captures_west & RANK_8;
-        promotions_east    = captures_east & RANK_8;
+        en_passant_sources = en_passant_square_ ? kPawnAttacksBlack[en_passant_square_] & pawns : kNoSquares;
+        promotions         = single_pushes & kRank8;
+        promotions_west    = captures_west & kRank8;
+        promotions_east    = captures_east & kRank8;
         push_delta         = 8;
         west_delta         = 7;
         east_delta         = 9;
@@ -311,13 +311,13 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     {
         pawns              = pawns_ & black_pieces_;
         single_pushes      = pawns.ShiftSouth() & ~occupied_squares;
-        double_pushes      = single_pushes.ShiftSouth() & ~occupied_squares & RANK_5;
+        double_pushes      = single_pushes.ShiftSouth() & ~occupied_squares & kRank5;
         captures_west      = pawns.ShiftSouthwest() & white_pieces_;
         captures_east      = pawns.ShiftSoutheast() & white_pieces_;
-        en_passant_sources = en_passant_square_ ? PAWN_ATTACKS_WHITE[en_passant_square_] & pawns : NO_SQUARES;
-        promotions         = single_pushes & RANK_1;
-        promotions_west    = captures_west & RANK_1;
-        promotions_east    = captures_east & RANK_1;
+        en_passant_sources = en_passant_square_ ? kPawnAttacksWhite[en_passant_square_] & pawns : kNoSquares;
+        promotions         = single_pushes & kRank1;
+        promotions_west    = captures_west & kRank1;
+        promotions_east    = captures_east & kRank1;
         push_delta         = -8;
         west_delta         = -9;
         east_delta         = -7;
@@ -341,10 +341,10 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             const Square from = (Square)(to - delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::Promotion(from, to, QUEEN, PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, ROOK, PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, BISHOP, PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, KNIGHT, PieceAt(to)));
+                moves.push_back(Move::Promotion(from, to, kQueen, PieceAt(to)));
+                moves.push_back(Move::Promotion(from, to, kRook, PieceAt(to)));
+                moves.push_back(Move::Promotion(from, to, kBishop, PieceAt(to)));
+                moves.push_back(Move::Promotion(from, to, kKnight, PieceAt(to)));
             }
         }
     }
@@ -354,10 +354,10 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         const Square from = (Square)(to - push_delta);
         if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
         {
-            moves.push_back(Move::Promotion(from, to, QUEEN));
-            moves.push_back(Move::Promotion(from, to, ROOK));
-            moves.push_back(Move::Promotion(from, to, BISHOP));
-            moves.push_back(Move::Promotion(from, to, KNIGHT));
+            moves.push_back(Move::Promotion(from, to, kQueen));
+            moves.push_back(Move::Promotion(from, to, kRook));
+            moves.push_back(Move::Promotion(from, to, kBishop));
+            moves.push_back(Move::Promotion(from, to, kKnight));
         }
     }
     // clang-format off
@@ -375,7 +375,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             const Square from = (Square)(to - delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::Capture(from, to, PAWN, PieceAt(to)));
+                moves.push_back(Move::Capture(from, to, kPawn, PieceAt(to)));
             }
         }
     }
@@ -387,7 +387,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             const Square from = (Square)(to - push_delta);
             if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
             {
-                moves.push_back(Move::NonCapture(from, to, PAWN));
+                moves.push_back(Move::NonCapture(from, to, kPawn));
             }
         }
         b = double_pushes & allowed_non_captures;
@@ -420,7 +420,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
                 const Bitboard pseudo_occupied_squares =
                     occupied_squares ^ Bitboard(captured_pawn_locn) ^ Bitboard(from);
                 const Bitboard horizontal_attacks =
-                    RookAttacks(pseudo_occupied_squares, king_locn) & (WEST[king_locn] | EAST[king_locn]);
+                    RookAttacks(pseudo_occupied_squares, king_locn) & (kWest[king_locn] | kEast[king_locn]);
                 if ((horizontal_attacks & enemy_pieces & (rooks_ | queens_)).IsEmpty())
                 {
                     // We can make this move since it's not a discovered check.

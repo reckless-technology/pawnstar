@@ -10,14 +10,14 @@ class ChessClock
     /// @brief Time control chess clock types.
     enum ClockType
     {
-        STANDARD,    ///< N moves to be made in a specified time.
-        FIXED_DEPTH, ///< Search to depth D on every move.
-        FIXED_TIME,  ///< Search for N milliseconds on every move.
-        INFINITE,    ///< Keep searching until told to stop.
+        kStandard,   ///< N moves to be made in a specified time.
+        kFixedDepth, ///< Search to depth D on every move.
+        kFixedTime,  ///< Search for N milliseconds on every move.
+        kInfinite,   ///< Keep searching until told to stop.
     };
 
     ChessClock()
-        : clock_type{STANDARD}, hard_stop_ms{0}, ms_remaining{5 * 60 * 1000}, num_moves_remaining{0}, depth{10},
+        : clock_type{kStandard}, hard_stop_ms{0}, ms_remaining{5 * 60 * 1000}, num_moves_remaining{0}, depth{10},
           start_time_{std::chrono::system_clock::now()}
     {
     }

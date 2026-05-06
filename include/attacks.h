@@ -24,7 +24,7 @@
 /// @return Set of squares attacked by a bishop on location.
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square s)
 {
-    const PextBitboard &p = BISHOP_PEXTS[s];
+    const PextBitboard &p = kBishopPexts[s];
     return p.attacks[p.indices[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask)]];
 }
 
@@ -34,7 +34,7 @@ constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square s)
 /// @return Set of squares attacked by a rook on location.
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square s)
 {
-    const PextBitboard &p = ROOK_PEXTS[s];
+    const PextBitboard &p = kRookPexts[s];
     return p.attacks[p.indices[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask)]];
 }
 
@@ -59,21 +59,21 @@ constexpr Square MsbX(Bitboard b)
 
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 {
-    Bitboard result = BISHOP_ATTACKS[location];
-    result ^= NORTHEAST[LsbX(NORTHEAST[location] & occupied_squares)];
-    result ^= NORTHWEST[LsbX(NORTHWEST[location] & occupied_squares)];
-    result ^= SOUTHWEST[MsbX(SOUTHWEST[location] & occupied_squares)];
-    result ^= SOUTHEAST[MsbX(SOUTHEAST[location] & occupied_squares)];
+    Bitboard result = kBishopAttacks[location];
+    result ^= kNortheast[LsbX(kNortheast[location] & occupied_squares)];
+    result ^= kNorthwest[LsbX(kNorthwest[location] & occupied_squares)];
+    result ^= kSouthwest[MsbX(kSouthwest[location] & occupied_squares)];
+    result ^= kSoutheast[MsbX(kSoutheast[location] & occupied_squares)];
     return result;
 }
 
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 {
-    Bitboard result = ROOK_ATTACKS[location];
-    result ^= NORTH[LsbX(NORTH[location] & occupied_squares)];
-    result ^= SOUTH[MsbX(SOUTH[location] & occupied_squares)];
-    result ^= EAST[LsbX(EAST[location] & occupied_squares)];
-    result ^= WEST[MsbX(WEST[location] & occupied_squares)];
+    Bitboard result = kRookAttacks[location];
+    result ^= kNorth[LsbX(kNorth[location] & occupied_squares)];
+    result ^= kSouth[MsbX(kSouth[location] & occupied_squares)];
+    result ^= kEast[LsbX(kEast[location] & occupied_squares)];
+    result ^= kWest[MsbX(kWest[location] & occupied_squares)];
     return result;
 }
 
@@ -92,18 +92,18 @@ using AttackFn = Bitboard (*)(Bitboard occupied_squares, Square locn);
 // clang-format off
 constexpr std::array<std::pair<Piece, AttackFn>, 5> piece_attackers 
 {{
-    { KNIGHT,   [](Bitboard, Square s){ return KNIGHT_ATTACKS[s]; } }, 
-    { BISHOP,   BishopAttacks                                       }, 
-    { ROOK,     RookAttacks                                         }, 
-    { QUEEN,    QueenAttacks                                        },
-    { KING,     [](Bitboard, Square s){ return KING_ATTACKS[s]; }   }
+    { kKnight,   [](Bitboard, Square s){ return kKnightAttacks[s]; } }, 
+    { kBishop,   BishopAttacks                                       }, 
+    { kRook,     RookAttacks                                         }, 
+    { kQueen,    QueenAttacks                                        },
+    { kKing,     [](Bitboard, Square s){ return kKingAttacks[s]; }   }
 }};
 
 constexpr std::array<std::pair<Piece, AttackFn>, 4> piece_attackers_except_king 
 {{
-    { KNIGHT,   [](Bitboard, Square s){ return KNIGHT_ATTACKS[s]; } },
-    { BISHOP,   BishopAttacks                                       }, 
-    { ROOK,     RookAttacks                                         }, 
-    { QUEEN,    QueenAttacks                                        }
+    { kKnight,   [](Bitboard, Square s){ return kKnightAttacks[s]; } },
+    { kBishop,   BishopAttacks                                       }, 
+    { kRook,     RookAttacks                                         }, 
+    { kQueen,    QueenAttacks                                        }
 }};
 // clang-format on

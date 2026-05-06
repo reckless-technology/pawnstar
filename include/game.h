@@ -24,7 +24,7 @@ class Game
     int                node_count;          ///< Number of nodes (positions) during search.
     bool               is_cancel_pending;   ///< Set to true when time for this search is expired.
 
-    Game() : transposition_table{HASHTABLE_MEGABYTES}, quiescent_table{Q_HASHTABLE_MB}
+    Game() : transposition_table{kHashtableMegabytes}, quiescent_table{kQHashtableMb}
     {
         NewGame();
     }
