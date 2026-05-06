@@ -2,6 +2,7 @@
 #include "bitboard.h"
 #include <array>
 #include <cstdint>
+#include <span>
 
 using zobrist_t = uint64_t;
 
@@ -17,9 +18,9 @@ using zobrist_t = uint64_t;
 /// generated at compile time.
 struct PextBitboard
 {
-    Bitboard        occupancy_mask; ///< Occupancy mask (excludes final target square).
-    const Bitboard *attacks;        ///< Discrete attack vectors (move sets).
-    const uint8_t  *indices;        ///< Indices into the discrete attack vector array.
+    Bitboard                  occupancy_mask; ///< Occupancy mask (excludes final target square).
+    std::span<const Bitboard> attacks;        ///< Discrete attack vectors (move sets).
+    std::span<const uint8_t>  indices;        ///< Indices into the discrete attack vector array.
 };
 
 extern const std::array<Bitboard, 64>     kNorth;
