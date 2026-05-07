@@ -12,129 +12,123 @@
 class CastlingRights
 {
   public:
-    constexpr CastlingRights() : rights_{0}
+    constexpr CastlingRights() : value_{0}
     {
     }
-    constexpr explicit CastlingRights(uint8_t rights) : rights_{rights}
+    constexpr CastlingRights(uint8_t rights) : value_{rights}
     {
     }
 
     constexpr bool MayWhiteCastleKingside() const
     {
-        return !!(rights_ & kWhiteKingside);
+        return !!(value_ & kWhiteKingside);
     }
     constexpr bool MayWhiteCastleQueenside() const
     {
-        return !!(rights_ & kWhiteQueenside);
+        return !!(value_ & kWhiteQueenside);
     }
     constexpr bool MayBlackCastleKingside() const
     {
-        return !!(rights_ & kBlackKingside);
+        return !!(value_ & kBlackKingside);
     }
     constexpr bool MayBlackCastleQueenside() const
     {
-        return !!(rights_ & kBlackQueenside);
-    }
-    constexpr bool IsNone() const
-    {
-        return rights_ == 0;
+        return !!(value_ & kBlackQueenside);
     }
 
-    /// @brief Raw value for use as a Zobrist hash table index (0–15).
-    constexpr uint8_t Value() const
+    /// @brief Zobrist hash associated with these castling rights.
+    constexpr zobrist_t Hash() const
     {
-        return rights_;
-    }
-
-    constexpr CastlingRights &operator&=(uint8_t mask)
-    {
-        rights_ &= mask;
-        return *this;
-    }
-    constexpr CastlingRights &operator|=(uint8_t flags)
-    {
-        rights_ |= flags;
-        return *this;
+        return kCastlingRightsHashes[value_];
     }
 
     /// @brief Return the castling rights that result after making a move.
-    constexpr CastlingRights AfterMove(const Move &move) const
+    constexpr CastlingRights &AfterMove(const Move &move)
     {
-        return CastlingRights{static_cast<uint8_t>(rights_ & kMoveMasks[move.from()] & kMoveMasks[move.to()])};
+        value_ &= kMoveMasks[move.from()] & kMoveMasks[move.to()];
+        return *this;
     }
 
     /// @brief Parse the castling field from a FEN string (e.g. "KQkq" or "-").
     static constexpr CastlingRights FromFen(std::string_view fen)
     {
+        uint8_t result = 0;
         if (fen == "-")
-            return CastlingRights{};
-        CastlingRights rights;
+        {
+            return result;
+        }
         for (char c : fen)
         {
             switch (c)
             {
             case 'K':
-                rights |= kWhiteKingside;
+                result |= kWhiteKingside;
                 break;
             case 'Q':
-                rights |= kWhiteQueenside;
+                result |= kWhiteQueenside;
                 break;
             case 'k':
-                rights |= kBlackKingside;
+                result |= kBlackKingside;
                 break;
             case 'q':
-                rights |= kBlackQueenside;
+                result |= kBlackQueenside;
                 break;
             default:
                 break;
             }
         }
-        return rights;
+        return CastlingRights{result};
     }
 
-    /// @brief Serialize to a FEN castling field (e.g. "KQkq" or "-").
+    /// @brief Serialize castling rights to FEN format.
+    /// @return string containing FEN of castling rights (e.g. "KQkq" or "-").
     std::string ToFenString() const
     {
-        if (rights_ == 0)
+        if (value_ == 0)
             return "-";
         std::string s;
-        if (rights_ & kWhiteKingside)
+        if (value_ & kWhiteKingside)
             s += 'K';
-        if (rights_ & kWhiteQueenside)
+        if (value_ & kWhiteQueenside)
             s += 'Q';
-        if (rights_ & kBlackKingside)
+        if (value_ & kBlackKingside)
             s += 'k';
-        if (rights_ & kBlackQueenside)
+        if (value_ & kBlackQueenside)
             s += 'q';
         return s;
     }
 
   private:
-    uint8_t rights_; ///< The actual flag value.
+    uint8_t value_; ///< The actual flag value.
 
-    static constexpr uint8_t kWhiteKingside  = 0x01;
-    static constexpr uint8_t kWhiteQueenside = 0x02;
-    static constexpr uint8_t kBlackKingside  = 0x04;
-    static constexpr uint8_t kBlackQueenside = 0x08;
-    static constexpr uint8_t kOkm            = ~0;
-    static constexpr uint8_t kA1m            = ~kWhiteQueenside;
-    static constexpr uint8_t kE1m            = ~(kWhiteKingside | kWhiteQueenside);
-    static constexpr uint8_t kH1m            = ~kWhiteKingside;
-    static constexpr uint8_t kA8m            = ~kBlackQueenside;
-    static constexpr uint8_t kE8m            = ~(kBlackKingside | kBlackQueenside);
-    static constexpr uint8_t kH8m            = ~kBlackKingside;
+    enum Flags : uint8_t
+    {
+        kWhiteKingside  = 0x01,
+        kWhiteQueenside = 0x02,
+        kBlackKingside  = 0x04,
+        kBlackQueenside = 0x08,
+        kOK             = (uint8_t)(~0),
+        kA1             = (uint8_t)(~kWhiteQueenside),
+        kE1             = (uint8_t)(~(kWhiteKingside | kWhiteQueenside)),
+        kH1             = (uint8_t)(~kWhiteKingside),
+        kA8             = (uint8_t)(~kBlackQueenside),
+        kE8             = (uint8_t)(~(kBlackKingside | kBlackQueenside)),
+        kH8             = (uint8_t)(~kBlackKingside),
+    };
 
+    /// @brief Mask values ANDed with move from and to squares to determine new castling rights after a move.
+    /// Only squares A1, E1, H1, A8, E8, H8 affect castling rights.
     // clang-format off
     static constexpr std::array<uint8_t, 64> kMoveMasks
     {
-        kA1m, kOkm, kOkm, kOkm, kE1m, kOkm, kOkm, kH1m,
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm,
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm,
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm,
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm,
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm,
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm,
-        kA8m, kOkm, kOkm, kOkm, kE8m, kOkm, kOkm, kH8m,
+        kA1, kOK, kOK, kOK, kE1, kOK, kOK, kH1,
+        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
+        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
+        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
+        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
+        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
+        kOK, kOK, kOK, kOK, kOK, kOK, kOK, kOK,
+        kA8, kOK, kOK, kOK, kE8, kOK, kOK, kH8,
     };
     // clang-format on
 };

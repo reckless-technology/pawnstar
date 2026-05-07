@@ -90,9 +90,8 @@ Position Position::MakeMove(const Move &move) const
 
     Position position{*this};
     position.state_flags_ &= ~kIsNullMove;
-    position.castling_rights_ = castling_rights_.AfterMove(move);
-    position.hash_ ^=
-        kCastlingRightsHashes[position.castling_rights_.Value()] ^ kCastlingRightsHashes[castling_rights_.Value()];
+    position.castling_rights_.AfterMove(move);
+    position.hash_ ^= position.castling_rights_.Hash() ^ castling_rights_.Hash();
     position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
     position.en_passant_square_ = Square{(uint8_t)0};
 
@@ -378,7 +377,7 @@ bool Position::IsLegal() const
 constexpr zobrist_t Position::ComputeHash() const
 {
     zobrist_t hash = state_flags_ & kIsBlackToMove ? kBlackMoveHash : 0ull;
-    hash ^= kCastlingRightsHashes[castling_rights_.Value()];
+    hash ^= castling_rights_.Hash();
     hash ^= kEnPassantHashes[en_passant_square_];
     constexpr std::array pieces{kPawn, kKnight, kBishop, kRook, kQueen, kKing};
     for (auto piece : pieces)
