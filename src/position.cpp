@@ -90,8 +90,9 @@ Position Position::MakeMove(const Move &move) const
 
     Position position{*this};
     position.state_flags_ &= ~kIsNullMove;
-    position.castling_rights_ &= castling_rights_masks[from] & castling_rights_masks[to];
-    position.hash_ ^= kCastlingRightsHashes[position.castling_rights_] ^ kCastlingRightsHashes[castling_rights_];
+    position.castling_rights_ = castling_rights_.AfterMove(move);
+    position.hash_ ^=
+        kCastlingRightsHashes[position.castling_rights_.Value()] ^ kCastlingRightsHashes[castling_rights_.Value()];
     position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
     position.en_passant_square_ = Square{(uint8_t)0};
 
@@ -224,33 +225,7 @@ Position Position::FromString(std::string_view fen_string)
     // Castling rights
     string castling_rights;
     ss >> castling_rights;
-    if (castling_rights == "-")
-    {
-        position.castling_rights_ = 0;
-    }
-    else
-    {
-        for (const char &c : castling_rights)
-        {
-            switch (c)
-            {
-            case 'K':
-                position.castling_rights_ |= kMayWhiteCastleKingside;
-                break;
-            case 'Q':
-                position.castling_rights_ |= kMayWhiteCastleQueenside;
-                break;
-            case 'k':
-                position.castling_rights_ |= kMayBlackCastleKingside;
-                break;
-            case 'q':
-                position.castling_rights_ |= kMayBlackCastleQueenside;
-                break;
-            default:
-                break;
-            }
-        }
-    }
+    position.castling_rights_ = CastlingRights::FromFen(castling_rights);
     // En passant capture square
     string ep_square;
     ss >> ep_square;
@@ -323,29 +298,7 @@ std::string Position::ToString() const
     // Side to move
     ss << ' ' << (state_flags_ & kIsBlackToMove ? 'b' : 'w') << ' ';
     // Castling rights
-    if (castling_rights_ == 0)
-    {
-        ss << '-';
-    }
-    else
-    {
-        if (castling_rights_ & kMayWhiteCastleKingside)
-        {
-            ss << 'K';
-        }
-        if (castling_rights_ & kMayWhiteCastleQueenside)
-        {
-            ss << 'Q';
-        }
-        if (castling_rights_ & kMayBlackCastleKingside)
-        {
-            ss << 'k';
-        }
-        if (castling_rights_ & kMayBlackCastleQueenside)
-        {
-            ss << 'q';
-        }
-    }
+    ss << castling_rights_.ToFenString();
     ss << ' ';
     // En passant capture availability
     if (en_passant_square_ == 0)
@@ -425,7 +378,7 @@ bool Position::IsLegal() const
 constexpr zobrist_t Position::ComputeHash() const
 {
     zobrist_t hash = state_flags_ & kIsBlackToMove ? kBlackMoveHash : 0ull;
-    hash ^= kCastlingRightsHashes[castling_rights_];
+    hash ^= kCastlingRightsHashes[castling_rights_.Value()];
     hash ^= kEnPassantHashes[en_passant_square_];
     constexpr std::array pieces{kPawn, kKnight, kBishop, kRook, kQueen, kKing};
     for (auto piece : pieces)

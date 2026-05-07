@@ -9,6 +9,7 @@
 
 #include "attacks.h"
 #include "bitboard.h"
+#include "castling_rights.h"
 #include "move.h"
 
 /// @brief Class to represent a chess position. This is the primary class that holds the state of the board and
@@ -33,10 +34,10 @@ class Position
     constexpr MoveList  GenerateLegalMoves() const          {return ColorToMove() == kWhite ? GenMoves<kWhite, true>()  : GenMoves<kBlack, true>();}
     constexpr MoveList  GenerateLegalCaptures() const       {return ColorToMove() == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();}
     constexpr bool      IsAttacked(Square s, Color c) const {return AttacksTo(s, c).IsNotEmpty();}
-    constexpr bool      MayWhiteCastleKingside() const      {return !!(castling_rights_ & kMayWhiteCastleKingside);}
-    constexpr bool      MayWhiteCastleQueenside() const     {return !!(castling_rights_ & kMayWhiteCastleQueenside);}
-    constexpr bool      MayBlackCastleKingside() const      {return !!(castling_rights_ & kMayBlackCastleKingside);}
-    constexpr bool      MayBlackCastleQueenside() const     {return !!(castling_rights_ & kMayBlackCastleQueenside);}
+    constexpr bool      MayWhiteCastleKingside() const      {return castling_rights_.MayWhiteCastleKingside();}
+    constexpr bool      MayWhiteCastleQueenside() const     {return castling_rights_.MayWhiteCastleQueenside();}
+    constexpr bool      MayBlackCastleKingside() const      {return castling_rights_.MayBlackCastleKingside();}
+    constexpr bool      MayBlackCastleQueenside() const     {return castling_rights_.MayBlackCastleQueenside();}
     constexpr bool      IsNullMove() const                  {return !!(state_flags_ & kIsNullMove);}
     constexpr Color     ColorToMove() const                 {return state_flags_ & kIsBlackToMove ? kBlack : kWhite;}
     constexpr Bitboard  Pawns() const                       {return pawns_;}
@@ -86,40 +87,12 @@ class Position
     Square                en_passant_square_;     ///< En passant capture availability square.
     uint8_t               reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
     uint8_t               full_move_count_;       ///< Number of full moves (zero indexed).
-    uint8_t               castling_rights_;       ///< Castling rights flags.
+    CastlingRights        castling_rights_;       ///< Castling rights flags.
     uint8_t               state_flags_;           ///< Position state flags.
-
-    /// @brief Bit values for castling rights.
-    constexpr static uint8_t kMayWhiteCastleKingside  = 0x01;
-    constexpr static uint8_t kMayWhiteCastleQueenside = 0x02;
-    constexpr static uint8_t kMayBlackCastleKingside  = 0x04;
-    constexpr static uint8_t kMayBlackCastleQueenside = 0x08;
-    constexpr static uint8_t kOkm                     = 0x0F; ///< Default castling rights.
-    constexpr static uint8_t kA1m                     = ~kMayWhiteCastleQueenside;
-    constexpr static uint8_t kE1m                     = ~(kMayWhiteCastleKingside | kMayWhiteCastleQueenside);
-    constexpr static uint8_t kH1m                     = ~kMayWhiteCastleKingside;
-    constexpr static uint8_t kA8m                     = ~kMayBlackCastleQueenside;
-    constexpr static uint8_t kE8m                     = ~(kMayBlackCastleKingside | kMayBlackCastleQueenside);
-    constexpr static uint8_t kH8m                     = ~kMayBlackCastleKingside;
 
     /// @brief Bit values for state flags.
     constexpr static uint8_t kIsBlackToMove = 0x01;
     constexpr static uint8_t kIsNullMove    = 0x02;
-
-    // clang-format off
-    /// @brief AND bit masks applied to move from and to, determining new castling rights following a move.
-    constexpr static std::array<uint8_t, 64> castling_rights_masks
-    {
-        kA1m, kOkm, kOkm, kOkm, kE1m, kOkm, kOkm, kH1m, 
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
-        kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, kOkm, 
-        kA8m, kOkm, kOkm, kOkm, kE8m, kOkm, kOkm, kH8m,
-    };
-    // clang-format on
 };
 
 static_assert(sizeof(Position) == 152);
