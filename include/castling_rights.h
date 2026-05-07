@@ -55,7 +55,7 @@ class CastlingRights
         uint8_t result = 0;
         if (fen == "-")
         {
-            return result;
+            return CastlingRights{result};
         }
         for (char c : fen)
         {

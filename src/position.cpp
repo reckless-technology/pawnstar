@@ -6,9 +6,10 @@
 #include <string_view>
 #include <vector>
 
+using std::istringstream;
+using std::ostringstream;
 using std::string;
 using std::string_view;
-using std::stringstream;
 using std::vector;
 
 #include "debug_hashtable.h"
@@ -176,9 +177,8 @@ Position Position::FromString(std::string_view fen_string)
     std::memset((void *)&position, 0, sizeof(position));
     constexpr string_view white_piece_names{"PNBRQK"};
     constexpr string_view black_piece_names{"pnbrqk"};
-    stringstream          ss;
-    ss << fen_string;
-    // Pieces on the board
+    istringstream         ss{string{fen_string}};
+    //  Pieces on the board
     string pieces;
     ss >> pieces;
     int x = 0, y = 7;
@@ -199,7 +199,7 @@ Position Position::FromString(std::string_view fen_string)
         if (a != string::npos)
         {
             const Piece piece = (Piece)(a + 1);
-            position.AddPiece(kWhite, piece, Square{(uint8_t)x, (uint8_t)y});
+            position.AddPiece(kWhite, piece, Square{x, y});
             ++x;
             continue;
         }
@@ -207,7 +207,7 @@ Position Position::FromString(std::string_view fen_string)
         if (a != string::npos)
         {
             const Piece piece = (Piece)(a + 1);
-            position.AddPiece(kBlack, piece, Square{(uint8_t)x, (uint8_t)y});
+            position.AddPiece(kBlack, piece, Square{x, y});
             ++x;
             continue;
         }
@@ -259,7 +259,7 @@ Position Position::FromString(std::string_view fen_string)
 
 std::string Position::ToString() const
 {
-    stringstream ss;
+    ostringstream ss;
     // Pieces on the board
     const Bitboard occupied_squares = white_pieces_ | black_pieces_;
     for (int y = 7; y >= 0; --y)

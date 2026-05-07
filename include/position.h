@@ -129,7 +129,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     MoveList moves;
 
     // Determine the squares which our king cannot move to, i.e. any square which is attacked or X-ray attacked by any
-    // enemy piece.
+    // enemy piece. Start with pawns.
     Bitboard forbidden_king_squares = color == kWhite ? enemy_pawns.ShiftSouthwest() | enemy_pawns.ShiftSoutheast()
                                                       : enemy_pawns.ShiftNorthwest() | enemy_pawns.ShiftNortheast();
 
@@ -138,7 +138,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     for (auto &[piece, attack_fn] : piece_attackers)
     {
-        Bitboard b = PiecesOfType(piece) & enemy_pieces;
+        const Bitboard b = PiecesOfType(piece) & enemy_pieces;
         for (Square s : b)
         {
             forbidden_king_squares |= attack_fn(occupied_except_king, s);
@@ -312,7 +312,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         for (Square to : b)
         {
             const Square from = (Square)(to - delta);
-            if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
+            if (pins.IsAllowed(from, to))
             {
                 moves.push_back(Move::Promotion(from, to, kQueen, PieceAt(to)));
                 moves.push_back(Move::Promotion(from, to, kRook, PieceAt(to)));
@@ -325,7 +325,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     for (Square to : b)
     {
         const Square from = (Square)(to - push_delta);
-        if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
+        if (pins.IsAllowed(from, to))
         {
             moves.push_back(Move::Promotion(from, to, kQueen));
             moves.push_back(Move::Promotion(from, to, kRook));
@@ -346,7 +346,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         for (Square to : b)
         {
             const Square from = (Square)(to - delta);
-            if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
+            if (pins.IsAllowed(from, to))
             {
                 moves.push_back(Move::Capture(from, to, kPawn, PieceAt(to)));
             }
@@ -358,7 +358,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         for (Square to : b)
         {
             const Square from = (Square)(to - push_delta);
-            if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
+            if (pins.IsAllowed(from, to))
             {
                 moves.push_back(Move::NonCapture(from, to, kPawn));
             }
@@ -367,7 +367,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         for (Square to : b)
         {
             const Square from = (Square)(to - push_delta * 2);
-            if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty())
+            if (pins.IsAllowed(from, to))
             {
                 moves.push_back(Move::DoublePush(from, to));
             }
@@ -379,10 +379,10 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // is also an enemy rook or queen on the same rank.
     for (Square from : en_passant_sources)
     {
-        const Square to                 = en_passant_square_;
+        const Square to = en_passant_square_;
+        // The captured pawn is on the source rank, destination file.
         const Square captured_pawn_locn = (Square)((from & 0x38) | (to & 0x07));
-        if ((pins.AllowedSquares(from) & Bitboard(to)).IsNotEmpty() &&
-            (allowed_captures & Bitboard(captured_pawn_locn)).IsNotEmpty())
+        if (pins.IsAllowed(from, to) && (allowed_captures & Bitboard(captured_pawn_locn)).IsNotEmpty())
         {
             // Test for the weird check that occurs when there is an enemy rook or queen on the same rank as our king
             // which is only discovered after removing both pawns from the rank during an en passant capture.
