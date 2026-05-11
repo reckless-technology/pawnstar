@@ -1,14 +1,14 @@
 PROGRAM             = pawnstar
 CXX                 = clang++
 CPPFLAGS            = -I include -D DEBUGX=1
-CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2 
+CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2
 BUILD_DIR           = build
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
 GENERATED_DATA      = src/generated_data.cpp
 GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
 GENERATOR_EXE       = generate_constants/gen_constants
-HEADERS             = $(wildcard include/*.h)
 OBJECTS             = $(addprefix $(BUILD_DIR)/, $(SOURCES:.cpp=.o))
+DEPS                = $(OBJECTS:.o=.d)
 SOURCES             = \
 	debug_hashtable.cpp \
 	evaluation.cpp game.cpp \
@@ -41,23 +41,24 @@ prep:
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -f $(PROGRAM_EXE) $(OBJECTS) $(GENERATED_DATA) $(GENERATOR_EXE)
+	rm -f $(PROGRAM_EXE) $(OBJECTS) $(DEPS) $(GENERATED_DATA) $(GENERATOR_EXE)
 
 gen: $(GENERATOR_EXE)
 
-# Compile an object from source.
-$(BUILD_DIR)/%.o: src/%.cpp $(HEADERS)
-	$(CXX) -c $(CXXFLAGS)  -o $@ $<
+# Compile an object from source, generating a .d dependency file alongside it.
+$(BUILD_DIR)/%.o: src/%.cpp
+	$(CXX) -c $(CXXFLAGS) -MMD -MP -o $@ $<
 
 # Link the executable.
 $(PROGRAM_EXE): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS)
 
 # Compile the generator executable.
-$(GENERATOR_EXE) : $(GENERATOR_SOURCE)
+$(GENERATOR_EXE): $(GENERATOR_SOURCE)
 	$(CXX) $(CXXFLAGS) -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
 
 # Invoke the generator executable to create the generated data source file.
-$(GENERATED_DATA) : $(GENERATOR_EXE)
+$(GENERATED_DATA): $(GENERATOR_EXE)
 	$(GENERATOR_EXE) > $(GENERATED_DATA)
 
+-include $(DEPS)
