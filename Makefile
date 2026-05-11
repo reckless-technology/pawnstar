@@ -28,7 +28,7 @@ SOURCES             = \
 	$(notdir $(GENERATED_DATA))
 
 ifeq ($(DEBUG), 1)
-	CXXFLAGS += -g -O0 -D DEBUG -fsanitize=undefined -fsanitize=address
+	CXXFLAGS += -g -Og -D DEBUG -fsanitize=undefined -fsanitize=address
 else
 	CXXFLAGS += -g -O3 -D NDEBUG
 endif
