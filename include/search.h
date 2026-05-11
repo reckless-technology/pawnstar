@@ -7,7 +7,7 @@
 #include "stack_list.h"
 
 /// @brief A variation (typically principal variation) is a line of play or series of moves.
-typedef StackList<Move, kMaxPly> Variation;
+using Variation = StackList<Move, kMaxPly>;
 
 struct SingleMoveResult
 {
@@ -21,9 +21,9 @@ SingleMoveResult SearchSingleMove(Game &game, int depth, int ply, int alpha, int
                                   int move_index);
 int              SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta);
 
-/// @brief When the kPv changes we need to copy the new kPv up the tree recursively.
-/// @param dst Destination kPv.
-/// @param src Source kPv.
+/// @brief When the PV changes we need to copy the new PV up the tree recursively.
+/// @param dst Destination PV.
+/// @param src Source PV.
 /// @param best_move New best move at this position.
 constexpr void CopyVariation(Variation &dst, const Variation &src, const Move &best_move)
 {
