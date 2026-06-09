@@ -27,8 +27,8 @@ SearchState::SearchState(Game &g) : game(g), batch_cutoff(nullptr)
 SearchState::SearchState(const SearchState &parent, std::atomic<bool> *cutoff)
     : game(parent.game), batch_cutoff(cutoff)
 {
-    hash_stack_.reserve(parent.hash_stack_.size() + kMaxPly + 4);
     hash_stack_ = parent.hash_stack_;
+    hash_stack_.reserve(hash_stack_.size() + kMaxPly + 4);
     positions_.push_back(parent.CurrentPosition());
 }
 

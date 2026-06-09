@@ -84,14 +84,12 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
         {
             continue;
         }
-#if 0
         const auto [see_score, is_checking] = EvaluateStaticExchange(state.CurrentPosition(), move);
         if (see_score < 0 && !is_checking)
         {
             INCREMENT("quiescent negative see");
             continue;
         }
-#endif
         state.PlayMove(move);
         score = -SearchQuiescent(state, depth - 1, ply + 1, -beta, -alpha);
         state.UndoMove();

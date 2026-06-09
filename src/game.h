@@ -62,7 +62,4 @@ class Game
     void                     SearchThreadEntry(); ///< Entry point of the search worker thread.
     std::thread              worker_thread_;      ///< Worker thread for searching moves.
     StackList<Position, 256> positions_;          ///< Game position history stack.
-
-    /// @brief Raw material values for MVV/LVA provisional scoring of moves.
-    static constexpr std::array<int, 7> piece_values{0, 100, 300, 300, 500, 900, 10000};
 };

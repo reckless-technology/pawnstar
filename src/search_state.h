@@ -68,6 +68,13 @@ class SearchState
     /// sibling worker in the current batch found a beta cutoff.
     bool IsCancelled() const;
 
+    /// @brief Signal that this worker's batch should be cut off (beta cutoff found).
+    void SignalBatchCutoff()
+    {
+        if (batch_cutoff != nullptr)
+            batch_cutoff->store(true, std::memory_order_relaxed);
+    }
+
   private:
     StackList<Position, kMaxPly + 4> positions_;  ///< Per-thread copy-make position stack.
     std::vector<HashEntry>           hash_stack_;  ///< Hash history from game-start through parent of current node.

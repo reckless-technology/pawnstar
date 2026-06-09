@@ -17,19 +17,30 @@ TranspositionTable::TranspositionTable(std::size_t megabytes)
     locks_ = std::make_unique<std::atomic_flag[]>(num_entries);
 }
 
+namespace
+{
+struct TTLock
+{
+    std::atomic_flag &flag;
+    explicit TTLock(std::atomic_flag &f) : flag(f)
+    {
+        while (flag.test_and_set(std::memory_order_acquire))
+        {
+        }
+    }
+    ~TTLock() { flag.clear(std::memory_order_release); }
+};
+} // namespace
+
 /// @brief Find an entry in the TT if one exists for this position.
 /// Acquires a per-entry spinlock, copies the entry while locked, then releases.
 /// @param hash Zobrist hash of position.
 /// @return The matching transposition if found.
 std::optional<Transposition> TranspositionTable::FindTransposition(zobrist_t hash) const
 {
-    const std::size_t idx = hash % table_.size();
-    // Acquire spinlock.
-    while (locks_[idx].test_and_set(std::memory_order_acquire))
-    {
-    }
-    const Transposition t = table_[idx]; // copy while locked
-    locks_[idx].clear(std::memory_order_release);
+    const std::size_t    idx = hash % table_.size();
+    TTLock               lock{locks_[idx]};
+    const Transposition  t = table_[idx];
     if (t.hash == hash)
         return t;
     return std::nullopt;
@@ -40,20 +51,16 @@ std::optional<Transposition> TranspositionTable::FindTransposition(zobrist_t has
 void TranspositionTable::RecordTransposition(const Transposition &transposition)
 {
     const std::size_t idx = transposition.hash % table_.size();
-    while (locks_[idx].test_and_set(std::memory_order_acquire))
-    {
-    }
-    Transposition &t = table_[idx];
+    TTLock            lock{locks_[idx]};
+    Transposition    &t = table_[idx];
     if (t.hash == 0 || t.is_old || t.depth <= transposition.depth ||
         transposition.node_type == Transposition::NodeType::kPv)
     {
         t = transposition;
     }
-    locks_[idx].clear(std::memory_order_release);
 }
 
-/// @brief Show table occupancy.
-/// @return The number of transpositions and percentage full of the table.
+/// @brief Return the number of occupied entries and percentage full of the table.
 std::pair<std::size_t, int> TranspositionTable::UsageStats() const
 {
     std::size_t count = std::ranges::count_if(table_, [](const Transposition &t) { return t.hash != 0; });

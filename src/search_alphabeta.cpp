@@ -13,6 +13,19 @@
 #include <utility>
 #include <vector>
 
+/// @brief Compute late-move reduction depth. Returns `depth` unchanged when no reduction applies.
+static inline int ComputeLmrDepth(int depth, int move_index, bool in_check, bool is_capture, bool is_pawn)
+{
+    if (move_index > 3 && !in_check && depth > 2 && !is_capture && !is_pawn)
+    {
+        int reduced = depth - 1;
+        if (depth > 3 && move_index > 6)
+            --reduced;
+        return reduced;
+    }
+    return depth;
+}
+
 /// @brief Search a single move and return its alpha-beta score and whether it gives check.
 /// @param state Per-thread search state.
 /// @param depth Depth to search to.
@@ -244,8 +257,9 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
     // ── Sequential phase ─────────────────────────────────────────────────────
     // Search moves one at a time until we get a cutoff or have searched 2 moves
     // at a null-window node, at which point we switch to the parallel phase.
-    int sequential_count  = 0;
-    int parallel_start_mi = -1; // move_list index where the parallel phase begins
+    int       sequential_count  = 0;
+    int       parallel_start_mi = -1; // move_list index where the parallel phase begins
+    const bool in_check_seq     = state.CurrentPosition().IsInCheck();
 
     for (const Move &move : move_list)
     {
@@ -254,19 +268,17 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             continue;
 
         int lmr_depth = depth;
-        if (move_index > 3 &&
-            !state.CurrentPosition().IsInCheck() &&
-            depth > 2 &&
-            beta == alpha + 1 &&
-            state.CurrentPosition().PieceAt(move.to()) == Piece::kNone &&
-            state.CurrentPosition().PieceAt(move.from()) != kPawn)
+        if (beta == alpha + 1)
         {
-            INCREMENT("late move reduction");
-            --lmr_depth;
-            if (depth > 3 && move_index > 6)
+            const int reduced = ComputeLmrDepth(depth, move_index, in_check_seq,
+                                                state.CurrentPosition().PieceAt(move.to()) != Piece::kNone,
+                                                state.CurrentPosition().PieceAt(move.from()) == kPawn);
+            if (reduced < depth)
             {
-                INCREMENT("late move reduction extreme");
-                --lmr_depth;
+                INCREMENT("late move reduction");
+                lmr_depth = reduced;
+                if (lmr_depth < depth - 1)
+                    INCREMENT("late move reduction extreme");
             }
         }
 
@@ -325,22 +337,15 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
         std::vector<ParallelMove> batch;
 
         // Collect remaining non-TT moves and compute their LMR depths.
+        // (Parallel phase is only entered at null-window nodes, so beta == alpha+1 is always true here.)
         for (int mi = parallel_start_mi; mi < (int)move_list.size(); ++mi)
         {
             const Move &mv = move_list[mi];
             if (transposition && mv == transposition->move)
                 continue;
-            int lmr_d = depth;
-            if (mi > 3 &&
-                !state.CurrentPosition().IsInCheck() &&
-                depth > 2 &&
-                state.CurrentPosition().PieceAt(mv.to()) == Piece::kNone &&
-                state.CurrentPosition().PieceAt(mv.from()) != kPawn)
-            {
-                --lmr_d;
-                if (depth > 3 && mi > 6)
-                    --lmr_d;
-            }
+            const int lmr_d = ComputeLmrDepth(depth, mi, in_check_seq,
+                                               state.CurrentPosition().PieceAt(mv.to()) != Piece::kNone,
+                                               state.CurrentPosition().PieceAt(mv.from()) == kPawn);
             batch.push_back({mv, mi, lmr_d});
         }
 
@@ -374,7 +379,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
                         }
                         if (score >= beta)
                         {
-                            worker->batch_cutoff->store(true, std::memory_order_relaxed);
+                            worker->SignalBatchCutoff();
                             worker->game.history_table.RecordGoodMove(ply, mv);
                         }
                         results[bi] = {mv, score};
