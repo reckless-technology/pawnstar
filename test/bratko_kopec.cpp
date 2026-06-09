@@ -7,6 +7,7 @@
 #include "search.h"
 
 #include <array>
+#include <chrono>
 #include <cstdlib>
 #include <format>
 #include <iostream>
@@ -53,7 +54,10 @@ int main(int argc, char *argv[])
     if (argc > 1)
         depth = std::atoi(argv[1]);
 
-    int failures = 0;
+    using Clock = std::chrono::steady_clock;
+    int  failures  = 0;
+    auto t_overall = Clock::now();
+
     for (int i = 0; i < (int)bk_cases.size(); ++i)
     {
         const auto &tc = bk_cases[i];
@@ -63,7 +67,11 @@ int main(int argc, char *argv[])
         game.time_control.clock_type = ChessClock::kFixedDepth;
         game.time_control.depth      = depth;
         DebugXClear();
-        Move        m   = SearchRootNode(game);
+        auto t_start = Clock::now();
+        Move m       = SearchRootNode(game);
+        auto elapsed_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t_start).count();
+        DebugXWrite();
         std::string got = m.ToString();
 
         bool pass = false;
@@ -89,10 +97,11 @@ int main(int argc, char *argv[])
                 valid += a;
             }
         }
-        std::cout << std::format("[{}] pos{:02d} got={} accepted=[{}] {}\n", pass ? "PASS" : "FAIL", i + 1, got, valid,
-                                 tc.fen);
+        std::cout << std::format("[{}] pos{:02d} got={} accepted=[{}] {}ms {}\n", pass ? "PASS" : "FAIL", i + 1, got,
+                                 valid, elapsed_ms, tc.fen);
     }
 
-    std::cout << std::format("\n{}/24 passed\n", 24 - failures);
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t_overall).count();
+    std::cout << std::format("\n{}/24 passed  total {}ms\n", 24 - failures, total_ms);
     return failures > 0 ? 1 : 0;
 }
