@@ -1,3 +1,5 @@
+/// @file Bratko-Kopec search quality test suite.
+
 #include "chess_clock.h"
 #include "debug_hashtable.h"
 #include "game.h"
@@ -6,6 +8,7 @@
 #include "transposition_table.h"
 
 #include <array>
+#include <cstdlib>
 #include <format>
 #include <iostream>
 #include <string_view>
@@ -40,10 +43,12 @@ constexpr std::array POSITION_TESTS{
     "r2qnrnk/p2b2b1/1p1p2pp/2pPpp2/1PP1P3/PRNBB3/3QNPPP/5RK1 w - -",
 };
 
-/// @brief Run the Bratko Kopec position tests.
-/// @param depth Search depth.
-void RunPositionTests(int depth)
+int main(int argc, char *argv[])
 {
+    int depth = 9;
+    if (argc > 1)
+        depth = std::atoi(argv[1]);
+
     Game       game;
     const auto start_ms = game.time_control.ElapsedMilliseconds();
     for (string_view test_pos : POSITION_TESTS)
@@ -66,4 +71,5 @@ void RunPositionTests(int depth)
     }
     std::cout << std::format("{:<40}{:10}\n", "total elapsed milliseconds",
                              game.time_control.ElapsedMilliseconds() - start_ms);
+    return 0;
 }

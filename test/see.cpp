@@ -32,8 +32,7 @@ constexpr std::array<SeeTest, 2> tests{{
 }};
 // clang-format on
 
-/// @brief Run the set of SEE tests.
-void RunStaticExchangeTests(void)
+int main()
 {
     bool is_pass = true;
     for (const SeeTest &test : tests)
@@ -46,4 +45,5 @@ void RunStaticExchangeTests(void)
         is_pass &= (score == test.see_score);
     }
     std::cout << std::format("\n{}\n", is_pass ? "PASSED" : "FAILED");
+    return is_pass ? 0 : 1;
 }

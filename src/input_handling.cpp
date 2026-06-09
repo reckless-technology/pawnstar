@@ -14,7 +14,6 @@
 #include "game.h"
 #include "opening_book.h"
 #include "position.h"
-#include "tests.h"
 #include "transposition_table.h"
 
 using HandlerFn = void (*)(Game &game, std::span<std::string> args);
@@ -31,23 +30,6 @@ struct Handler
     {
     }
 };
-
-void handle_perft(Game &, std::span<std::string> args)
-{
-    const bool do_regression = args.size() == 2 && args[1] == "x";
-    RunPerftTests(do_regression);
-}
-
-void handle_postests(Game &, std::span<std::string> args)
-{
-    int depth = 9;
-    if (args.size() > 1)
-    {
-        const int d = stoi(args[1]);
-        depth       = d;
-    }
-    RunPositionTests(depth);
-}
 
 void handle_bookmoves(Game &game, std::span<std::string>)
 {
@@ -73,11 +55,6 @@ void handle_dbg(Game &, std::span<std::string>)
 void handle_dbgclear(Game &, std::span<std::string>)
 {
     DebugXClear();
-}
-
-void handle_seetests(Game &, std::span<std::string>)
-{
-    RunStaticExchangeTests();
 }
 
 void handle_getboard(Game &game, std::span<std::string>)
@@ -189,11 +166,8 @@ constexpr std::array handlers =
     Handler { COMMAND(go),             "Search the current position"},
     Handler { COMMAND(help),           "Display a summary of commands"},
     Handler { COMMAND(isready),        "Respond with readyok"},
-    Handler { COMMAND(perft),          "Run basic move generation tests"},
     Handler { COMMAND(position),       "Set the position and series of moves"},
-    Handler { COMMAND(postests),       "Search the Bratko Kopec test positions"},
     Handler { COMMAND(quit),           "Exit the program"},
-    Handler { COMMAND(seetests),       "Perform very simple static exchange tests"},
     Handler { COMMAND(stop),           "Stop searching and return best move found"},
     Handler { COMMAND(uci),            "Enter UCI protocol"},
     Handler { COMMAND(ucinewgame),     "UCI mode start new game"}

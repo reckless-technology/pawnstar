@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <chrono>
 #include <cinttypes>
+#include <climits>
+#include <cstdlib>
 #include <cstring>
 #include <format>
 #include <iostream>
@@ -104,7 +106,9 @@ static void PerftRegression(const Position &src_position, int depth, uint64_t &n
 extern const std::array<const char *, 132> perft_results;
 
 /// @brief Run the suite of perft tests.
-void RunPerftTests(bool do_regression)
+/// @param do_regression If true, also cross-check against pseudo-legal move generator.
+/// @param max_depth Skip test cases with depth greater than this value.
+static void RunPerftTests(bool do_regression, int max_depth)
 {
     std::vector<PerftTest> tests;
     for (const char *line : perft_results)
@@ -131,7 +135,8 @@ void RunPerftTests(bool do_regression)
             {
                 std::cout << std::format("ERROR: unable to scan perft test {}\n", test_str);
             }
-            tests.push_back(PerftTest{fen, depth, count});
+            if (depth <= max_depth)
+                tests.push_back(PerftTest{fen, depth, count});
         }
     }
     bool       is_good     = true;
@@ -304,4 +309,19 @@ static constexpr MoveList GeneratePseudoLegalMoves(const Position &position)
     }
 
     return moves;
+}
+
+int main(int argc, char *argv[])
+{
+    bool do_regression = false;
+    int  max_depth     = INT_MAX;
+    for (int i = 1; i < argc; ++i)
+    {
+        if (std::strcmp(argv[i], "x") == 0)
+            do_regression = true;
+        else
+            max_depth = std::atoi(argv[i]);
+    }
+    RunPerftTests(do_regression, max_depth);
+    return 0;
 }
