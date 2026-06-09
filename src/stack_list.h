@@ -58,6 +58,10 @@ template <typename T, int N> class StackList
     {
         return end_ - data_.begin();
     }
+    constexpr void resize(std::size_t s)
+    {
+        end_ = data_.begin() + s;
+    }
     constexpr std::array<T, N>::iterator begin()
     {
         return data_.begin();
