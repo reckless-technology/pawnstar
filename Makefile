@@ -1,6 +1,6 @@
 PROGRAM             = pawnstar
 CXX                 = clang++
-CPPFLAGS            = -I include -D DEBUGX=1
+CPPFLAGS            = -I src -D DEBUGX=1
 CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2
 BUILD_DIR           = build
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
