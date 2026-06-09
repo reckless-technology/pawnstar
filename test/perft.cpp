@@ -166,7 +166,11 @@ struct PerftCase
 static void Perft(const Position &pos, int depth, uint64_t &nodes)
 {
     MoveList moves{pos.GenerateLegalMoves()};
-    if (depth == 1) { nodes += moves.size(); return; }
+    if (depth == 1)
+    {
+        nodes += moves.size();
+        return;
+    }
     for (const auto &m : moves)
         Perft(pos.MakeMove(m), depth - 1, nodes);
 }
@@ -178,17 +182,20 @@ static std::vector<PerftCase> ParseEPD(int max_depth)
     {
         std::string s{perft_epd[i]};
         auto        sep = s.find(';');
-        if (sep == std::string::npos) continue;
-        std::string fen = s.substr(0, sep);
+        if (sep == std::string::npos)
+            continue;
+        std::string fen  = s.substr(0, sep);
         std::string rest = s.substr(sep + 1);
         while (!rest.empty())
         {
-            auto next = rest.find(';');
+            auto        next  = rest.find(';');
             std::string token = next == std::string::npos ? rest : rest.substr(0, next);
-            rest = next == std::string::npos ? "" : rest.substr(next + 1);
-            if (token.size() < 3 || token[0] != 'D') continue;
+            rest              = next == std::string::npos ? "" : rest.substr(next + 1);
+            if (token.size() < 3 || token[0] != 'D')
+                continue;
             auto sp = token.find(' ');
-            if (sp == std::string::npos) continue;
+            if (sp == std::string::npos)
+                continue;
             int      depth = std::atoi(token.c_str() + 1);
             uint64_t nodes = std::strtoull(token.c_str() + sp + 1, nullptr, 10);
             if (depth <= max_depth)
@@ -220,16 +227,16 @@ int main(int argc, char *argv[])
     for (const auto &tc : cases)
     {
         Position pos{Position::FromString(tc.fen)};
-        uint64_t got    = 0;
-        auto     start  = std::chrono::steady_clock::now();
+        uint64_t got   = 0;
+        auto     start = std::chrono::steady_clock::now();
         Perft(pos, tc.depth, got);
-        auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::steady_clock::now() - start).count();
-        if (elapsed_us == 0) elapsed_us = 1;
+        auto elapsed_us =
+            std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
+        if (elapsed_us == 0)
+            elapsed_us = 1;
         total_nodes += got;
 
-        std::cout << std::format("{:<75} d{} nodes={:<12} {:.0f} Mnps\n",
-                                 tc.fen, tc.depth, got,
+        std::cout << std::format("{:<75} d{} nodes={:<12} {:3.0f} Mnps\n", tc.fen, tc.depth, got,
                                  (double)got / elapsed_us);
         if (got != tc.nodes)
         {
@@ -238,8 +245,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - t0).count();
+    auto total_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
     std::cout << std::format("\ntotal nodes={} time={}ms {:.0f} Mnps\n", total_nodes, total_ms,
                              (double)total_nodes / std::max(total_ms * 1000LL, 1LL));
     std::cout << (pass ? "PERFT PASS\n" : "PERFT FAIL\n");
