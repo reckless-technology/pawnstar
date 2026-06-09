@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -10,6 +11,7 @@
 #include "history_table.h"
 #include "opening_book.h"
 #include "position.h"
+#include "thread_pool.h"
 #include "transposition_table.h"
 
 /// @brief Class to represent a game of chess.
@@ -21,13 +23,15 @@ class Game
     HistoryTable       history_table;       ///< The history table.
     ChessClock         time_control;        ///< Clock controls for the current game.
     OpeningBook        book;                ///< The opening book.
-    int                node_count;          ///< Number of nodes (positions) during search.
-    bool               is_cancel_pending;   ///< Set to true when time for this search is expired.
+    std::atomic<bool>  is_cancel_pending;   ///< Set to true when search time is expired.
+    ThreadPool         thread_pool;         ///< Worker thread pool for parallel search.
+    SearchStatePool    state_pool;          ///< Slab allocator for per-worker search states.
 
-    Game() : transposition_table{kHashtableMegabytes}, quiescent_table{kQHashtableMb}
+    Game() : transposition_table{kHashtableMegabytes}, quiescent_table{kQHashtableMb}, is_cancel_pending{false}
     {
         NewGame();
     }
+
     Position &CurrentPosition()
     {
         return positions_.back();
@@ -35,6 +39,11 @@ class Game
     const Position &CurrentPosition() const
     {
         return positions_.back();
+    }
+    /// @brief Read-only view of the full game position stack, used to seed SearchState.
+    const StackList<Position, 256> &Positions() const
+    {
+        return positions_;
     }
 
     void NewGame(std::string_view fen_string);
@@ -48,13 +57,12 @@ class Game
     bool IsGameOver() const;
     bool IsDrawByRepetition() const;
     bool IsDrawByFiftyMoves() const;
-    void ScoreAndSortMoves(MoveList &moves, int ply);
 
   private:
-    void                     SearchThreadEntry(); ///< Entry point of worker thread.
+    void                     SearchThreadEntry(); ///< Entry point of the search worker thread.
     std::thread              worker_thread_;      ///< Worker thread for searching moves.
-    StackList<Position, 256> positions_;          ///< Position stack.
+    StackList<Position, 256> positions_;          ///< Game position history stack.
 
-    /// Raw material values for MVV/LVA provisional scoring of moves.
+    /// @brief Raw material values for MVV/LVA provisional scoring of moves.
     static constexpr std::array<int, 7> piece_values{0, 100, 300, 300, 500, 900, 10000};
 };

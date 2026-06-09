@@ -5,6 +5,7 @@
 #include "opening_book.h"
 #include "position.h"
 #include "search.h"
+#include "search_state.h"
 #include "transposition_table.h"
 
 #include <algorithm>
@@ -17,9 +18,9 @@
 using std::string;
 using std::stringstream;
 
-/// @brief Search the root node and find the best move
-/// @param src_position the position to search
-/// @return the best move found
+/// @brief Search the root node and find the best move.
+/// @param game Game to search.
+/// @return The best move found.
 Move SearchRootNode(Game &game)
 {
     // If there is a book move for this position, do not bother with search.
@@ -75,41 +76,46 @@ Move SearchRootNode(Game &game)
         break;
     }
 
-    int start_ms           = game.time_control.ElapsedMilliseconds();
-    game.is_cancel_pending = false;
-    // For first pass move ordering before we do any search, just use a shallow search with wide open alpha beta window.
-    // Subsequent passes will use the results of the previous iteration to sort the moves (the merge sort is stable).
+    const int64_t start_ms    = game.time_control.ElapsedMilliseconds();
+    game.is_cancel_pending.store(false, std::memory_order_relaxed);
     DebugXClear();
     game.history_table.Reset();
     game.transposition_table.Age();
+
+    // Construct the main-thread search state from the current game position.
+    SearchState state{game};
+
     Variation         principal_variation{};
     std::vector<Move> best_moves; // Best move found at each search depth.
+
+    // Shallow pass for initial move ordering.
     for (auto &move : move_list)
     {
-        const int move_index = &move - move_list.begin();
+        const int move_index = (int)(&move - move_list.begin());
         const int score =
-            SearchSingleMove(game, kStartDepth, 0, kAlpha, kBeta, move, principal_variation, move_index).score;
+            SearchSingleMove(state, kStartDepth, 0, kAlpha, kBeta, move, principal_variation, move_index).score;
         move.AssignScore(score);
     }
     SortMoves<true>(move_list);
     Move best_move = move_list[0];
+
     for (int depth = kStartDepth + 1; depth != kMaxPly; ++depth)
     {
         if (game.time_control.clock_type == ChessClock::kFixedDepth && depth > game.time_control.depth)
         {
             break;
         }
-        SortMoves<true>(move_list); // Sort moves based on scores from the previous iteration (stable sort).
+        SortMoves<true>(move_list); // Sort based on scores from the previous iteration.
         Variation child_pv{};
-        int       alpha = kAlpha;
-        game.node_count = 0;
+        int       alpha     = kAlpha;
+        state.node_count    = 0;
         best_moves.push_back(best_move);
         for (auto &move : move_list)
         {
-            const int move_index = &move - move_list.begin();
-            const int score      = SearchSingleMove(game, depth, 0, alpha, kBeta, move, child_pv, move_index).score;
+            const int move_index = (int)(&move - move_list.begin());
+            const int score = SearchSingleMove(state, depth, 0, alpha, kBeta, move, child_pv, move_index).score;
             move.AssignScore(score);
-            if (game.is_cancel_pending)
+            if (game.is_cancel_pending.load(std::memory_order_relaxed))
             {
                 return best_move;
             }
@@ -117,37 +123,35 @@ Move SearchRootNode(Game &game)
             {
                 alpha     = score;
                 best_move = move;
-                // Show thinking output
+                // Show thinking output.
                 CopyVariation(principal_variation, child_pv, best_move);
                 string pv_string;
-                for (const auto &move : principal_variation)
+                for (const auto &m : principal_variation)
                 {
-                    pv_string.append(move.ToString());
+                    pv_string.append(m.ToString());
                     pv_string.push_back(' ');
                 }
-                pv_string.pop_back(); // Remove trailing space.
+                pv_string.pop_back();
                 std::cout << std::format("info depth {:2} score cp {:5} time {:5} nodes {:8} pv {}\n", depth, alpha,
-                                         game.time_control.ElapsedMilliseconds() - start_ms, game.node_count,
+                                         game.time_control.ElapsedMilliseconds() - start_ms, state.node_count,
                                          pv_string);
             }
         }
-        int stop_ms = game.time_control.ElapsedMilliseconds();
+        const int64_t stop_ms = game.time_control.ElapsedMilliseconds();
         if (alpha > kWinThreshold || alpha < kLoseThreshold)
         {
             break;
         }
         if (game.time_control.clock_type == ChessClock::kStandard)
         {
-            // Plan our use of the time with some care. If both the score we find and the best move are consistent
-            // between successive iterations, we can probably stop searching before our allocated time is elapsed and
-            // save some time for other, potentially more difficult positions. Similarly we can save a smaller amount of
-            // time if either of these conditions but not both are true.
-            const int elapsed_ms = stop_ms - start_ms;
+            const int64_t elapsed_ms = stop_ms - start_ms;
             // clang-format off
-            const bool is_best_move_consistent = 
-                std::ranges::all_of(best_moves, [best_move](const Move& m){return m == best_move;});
-            const bool is_score_stable = 
-                std::ranges::all_of(best_moves, [best_move](const Move& m){return std::abs(m.score() - best_move.score()) <= kScoreInstabilityThreshold;});
+            const bool is_best_move_consistent =
+                std::ranges::all_of(best_moves, [best_move](const Move &m) { return m == best_move; });
+            const bool is_score_stable =
+                std::ranges::all_of(best_moves, [best_move](const Move &m) {
+                    return std::abs(m.score() - best_move.score()) <= kScoreInstabilityThreshold;
+                });
             // clang-format on
             if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 4) > ms_allocated)
             {

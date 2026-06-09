@@ -3,43 +3,44 @@
 #include "game.h"
 #include "position.h"
 #include "search.h"
+#include "search_state.h"
 #include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
-/// @brief Alpha beta quiescence search.
-/// @param game Game to be searched.
-/// @param depth Search depth (<= 0)
+/// @brief Alpha-beta quiescence search.
+/// @param state Per-thread search state.
+/// @param depth Search depth (<= 0).
 /// @param ply Distance from root node.
 /// @param alpha Alpha value.
 /// @param beta Beta value.
 /// @return Quiescent score for this node.
-int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
+int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
 {
     INCREMENT("quiescent calls");
     if (ply == kMaxPly)
     {
         INCREMENT("quiescent max ply");
-        return EvaluatePosition(game, alpha, beta);
+        return EvaluatePosition(state, alpha, beta);
     }
-    if (game.CurrentPosition().IsInCheck())
+    if (state.CurrentPosition().IsInCheck())
     {
         // We can't handle checks in quiescence.
         INCREMENT("quiescent checks");
         Variation dummy{};
-        return Search(game, depth, ply, alpha, beta, dummy);
+        return Search(state, depth, ply, alpha, beta, dummy);
     }
-    auto transposition = game.quiescent_table.FindTransposition(game.CurrentPosition().Hash());
+    auto transposition = state.game.quiescent_table.FindTransposition(state.CurrentPosition().Hash());
     if (transposition && transposition->score >= beta)
     {
         INCREMENT("quiescent table beta cutoffs");
         return transposition->score;
     }
-    int score = EvaluatePosition(game, alpha, beta);
+    int score = EvaluatePosition(state, alpha, beta);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
-        game.quiescent_table.RecordTransposition(
-            Transposition{game.CurrentPosition().Hash(), Move::None(), score, depth, Transposition::NodeType::kCut});
+        state.game.quiescent_table.RecordTransposition(
+            Transposition{state.CurrentPosition().Hash(), Move::None(), score, depth, Transposition::NodeType::kCut});
         return score;
     }
     if (score > alpha)
@@ -51,17 +52,17 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
     if (transposition && transposition->move != Move::None())
     {
         INCREMENT("quiescent table move");
-        game.PlayMove(transposition->move);
-        score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
-        game.UndoMove();
-        if (game.is_cancel_pending)
+        state.PlayMove(transposition->move);
+        score = -SearchQuiescent(state, depth - 1, ply + 1, -beta, -alpha);
+        state.UndoMove();
+        if (state.IsCancelled())
         {
             return kSearchCancelledScore;
         }
         if (score >= beta)
         {
             INCREMENT("quiescent table move beta cutoffs");
-            game.history_table.RecordGoodMove(ply, transposition->move);
+            state.game.history_table.RecordGoodMove(ply, transposition->move);
             return score;
         }
         if (score > best_score)
@@ -71,12 +72,12 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent table move raise alpha");
-                game.history_table.RecordGoodMove(ply, transposition->move);
+                state.game.history_table.RecordGoodMove(ply, transposition->move);
             }
         }
     }
-    MoveList move_list{game.CurrentPosition().GenerateLegalCaptures()};
-    game.ScoreAndSortMoves(move_list, ply);
+    MoveList move_list{state.CurrentPosition().GenerateLegalCaptures()};
+    state.ScoreAndSortMoves(move_list, ply);
     for (Move &move : move_list)
     {
         if (transposition && transposition->move == move)
@@ -84,27 +85,26 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
             continue;
         }
 #if 0
-        const auto [see_score, is_checking] = EvaluateStaticExchange(game.CurrentPosition(), move);
+        const auto [see_score, is_checking] = EvaluateStaticExchange(state.CurrentPosition(), move);
         if (see_score < 0 && !is_checking)
         {
-            // Skip moves with a negative SEE which do not give check; they're most likely futile.
             INCREMENT("quiescent negative see");
             continue;
         }
 #endif
-        game.PlayMove(move);
-        score = -SearchQuiescent(game, depth - 1, ply + 1, -beta, -alpha);
-        game.UndoMove();
-        if (game.is_cancel_pending)
+        state.PlayMove(move);
+        score = -SearchQuiescent(state, depth - 1, ply + 1, -beta, -alpha);
+        state.UndoMove();
+        if (state.IsCancelled())
         {
             return kSearchCancelledScore;
         }
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            game.history_table.RecordGoodMove(ply, move);
-            game.quiescent_table.RecordTransposition(
-                Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
+            state.game.history_table.RecordGoodMove(ply, move);
+            state.game.quiescent_table.RecordTransposition(
+                Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
             return score;
         }
         if (score > best_score)
@@ -114,9 +114,9 @@ int SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent pv changed");
-                game.history_table.RecordGoodMove(ply, move);
-                game.quiescent_table.RecordTransposition(
-                    Transposition{game.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
+                state.game.history_table.RecordGoodMove(ply, move);
+                state.game.quiescent_table.RecordTransposition(
+                    Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
             }
         }
     }

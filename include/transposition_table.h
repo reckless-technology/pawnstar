@@ -1,4 +1,6 @@
 #pragma once
+#include <atomic>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -48,5 +50,6 @@ class TranspositionTable
     std::pair<std::size_t, int>  UsageStats() const;
 
   private:
-    std::vector<Transposition> table_; ///< Indexed using Zobrist hash.
+    std::vector<Transposition>              table_; ///< Indexed using Zobrist hash.
+    mutable std::unique_ptr<std::atomic_flag[]> locks_; ///< Per-entry spinlocks, parallel to table_.
 };

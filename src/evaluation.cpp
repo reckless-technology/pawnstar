@@ -1,23 +1,24 @@
 #include "evaluation.h"
 #include "debug_hashtable.h"
-#include "game.h"
 #include "position.h"
+#include "search_state.h"
 #include "transposition_table.h"
 
 /// @brief Evaluate the current position, assuming neither king is in check and the position is quiet.
-/// @param game game position to evaluate
-/// @param alpha current alpha value
-/// @param beta current beta value
-/// @return score from the perspective of the side to move
-int EvaluatePosition(const Game &game, int alpha, int beta)
+/// @param state Per-thread search state providing the current position and draw-detection.
+/// @param alpha Current alpha value.
+/// @param beta Current beta value.
+/// @return Score from the perspective of the side to move.
+int EvaluatePosition(const SearchState &state, int alpha, int beta)
 {
     INCREMENT("eval calls");
-    if (game.CurrentPosition().IsDrawByMaterial() || game.IsDrawByFiftyMoves() || game.IsDrawByRepetition())
+    if (state.CurrentPosition().IsDrawByMaterial() || state.IsDrawByFiftyMoves() ||
+        state.IsDrawByRepetition())
     {
         return kDrawScore;
     }
     int             scores[2];
-    const Position &position = game.CurrentPosition();
+    const Position &position = state.CurrentPosition();
     // Phase 1: Evaluate material values alone.
     scores[kWhite] = EvaluateMaterial<kWhite>(position);
     scores[kBlack] = EvaluateMaterial<kBlack>(position);

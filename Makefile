@@ -20,10 +20,12 @@ SOURCES             = \
 	search_alphabeta.cpp \
 	search_quiescent.cpp \
 	search_root_node.cpp \
+	search_state.cpp \
 	static_exchange_evaluation.cpp \
 	tests_bratko_kopec.cpp \
 	tests_move_generation.cpp \
 	tests_static_exchange.cpp \
+	thread_pool.cpp \
 	transposition_table.cpp \
 	$(notdir $(GENERATED_DATA))
 

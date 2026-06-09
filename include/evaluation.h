@@ -6,9 +6,9 @@
 
 #include "position.h"
 
-class Game;
+class SearchState;
 
-int EvaluatePosition(const Game &game, int alpha, int beta);
+int EvaluatePosition(const SearchState &state, int alpha, int beta);
 
 // clang-format off
 

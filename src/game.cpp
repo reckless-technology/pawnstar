@@ -17,9 +17,8 @@ using std::string_view;
 /// @param fen_string Initial position.
 void Game::NewGame(std::string_view fen_string)
 {
-    time_control      = ChessClock{};
-    node_count        = 0;
-    is_cancel_pending = false;
+    time_control = ChessClock{};
+    is_cancel_pending.store(false, std::memory_order_relaxed);
     positions_.clear();
     positions_.push_back(Position::FromString(fen_string));
 }
@@ -33,7 +32,6 @@ void Game::NewGame()
 /// @param move The move to be played.
 void Game::PlayMove(Move move)
 {
-
     positions_.push_back(CurrentPosition().MakeMove(move));
 }
 
@@ -49,24 +47,6 @@ void Game::UndoMove()
     positions_.pop_back();
 }
 
-/// @brief Assign provisional scores to each move and then sort them best first.
-/// Use MVV/LVA plus history table counts to score moves. This is primitive, but way faster than static exchange
-/// evaluation, and seems to work pretty well in practice.
-/// @param game Game being searched
-/// @param moves List of legal moves to evaluate.
-/// @param ply Current search ply.
-void Game::ScoreAndSortMoves(MoveList &moves, int ply)
-{
-
-    const Position &position = CurrentPosition();
-    for (Move &move : moves)
-    {
-        move.AssignScore(piece_values[position.PieceAt(move.to())] * 10000 -
-                         piece_values[position.PieceAt(move.from())] * 1000 + history_table.GetCount(ply, move));
-    }
-    SortMoves<false>(moves);
-}
-
 /// @brief Determine if the game is a draw by the 50 move rule.
 /// @return true if 50 move draw.
 bool Game::IsDrawByFiftyMoves() const
@@ -80,7 +60,6 @@ bool Game::IsDrawByFiftyMoves() const
 }
 
 /// @brief Determine if the game is a draw by repetition.
-/// @param is_search true in the main search (single repetition), false for the FIDE rule (double repetition)
 /// @return true if draw by repetition.
 bool Game::IsDrawByRepetition() const
 {
@@ -167,7 +146,7 @@ void Game::SearchThreadEntry()
 /// @brief If currently thinking, stop immediately.
 void Game::StopThinking()
 {
-    is_cancel_pending = true;
+    is_cancel_pending.store(true, std::memory_order_relaxed);
     if (worker_thread_.joinable())
     {
         worker_thread_.join();

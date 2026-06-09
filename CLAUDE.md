@@ -48,4 +48,4 @@ Pawnstar is a UCI chess engine using bitboard board representation and alpha-bet
 
 **UCI protocol** — [input_handling.cpp](src/input_handling.cpp) parses all UCI commands plus engine-specific diagnostics (`eval`, `getboard`, `dbg`) and the test commands above.
 
-**Generated data** — [generate_constants/](generate_constants/) is a standalone program that outputs [src/generated_data.cpp](src/generated_data.cpp). Regenerate only when attack mask logic changes; the output is committed to the repo.
+**Generated data** — [generate_constants/](generate_constants/) is a standalone program that outputs [src/generated_data.cpp](src/generated_data.cpp) at build time. The output is gitignored and regenerated on every `make`. Only modify `generate_constants.cpp` when attack mask logic changes.

@@ -4,6 +4,7 @@
 #include "constants.h"
 #include "game.h"
 #include "move.h"
+#include "search_state.h"
 #include "stack_list.h"
 
 /// @brief A variation (typically principal variation) is a line of play or series of moves.
@@ -11,15 +12,15 @@ using Variation = StackList<Move, kMaxPly>;
 
 struct SingleMoveResult
 {
-    int  score;
-    bool is_checking;
+    int  score;       ///< Alpha-beta score for the move.
+    bool is_checking; ///< True if the move gives check.
 };
 
 Move             SearchRootNode(Game &game);
-int              Search(Game &game, int depth, int ply, int alpha, int beta, Variation &parent_pv);
-SingleMoveResult SearchSingleMove(Game &game, int depth, int ply, int alpha, int beta, Move move, Variation &pv,
-                                  int move_index);
-int              SearchQuiescent(Game &game, int depth, int ply, int alpha, int beta);
+int              Search(SearchState &state, int depth, int ply, int alpha, int beta, Variation &parent_pv);
+SingleMoveResult SearchSingleMove(SearchState &state, int depth, int ply, int alpha, int beta, Move move,
+                                  Variation &pv, int move_index);
+int              SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta);
 
 /// @brief When the PV changes we need to copy the new PV up the tree recursively.
 /// @param dst Destination PV.

@@ -4,40 +4,56 @@
 #include "constants.h"
 #include "move.h"
 
-#include <algorithm>
+#include <atomic>
 #include <cstdint>
-#include <vector>
+#include <memory>
 
-/// @brief Class for managing history of which moves raised alpha or caused a cutoff, at each ply of search.
-/// Moves are indexed per ply, by from and to square.
+/// @brief Thread-safe history table tracking which moves raised alpha or caused a beta cutoff.
+/// Moves are indexed per ply by from/to square. Counts are stored as atomics so that parallel
+/// workers can increment them concurrently without data races.
 class HistoryTable
 {
   public:
-    constexpr HistoryTable()
+    static constexpr int kTableSize = kMaxPly * 4096; ///< Total number of (ply, move) entries.
+
+    HistoryTable() : counts_{new std::atomic<uint32_t>[kTableSize]{}} {}
+
+    /// @brief Reset all counts to zero (call before each root search, single-threaded).
+    void Reset()
     {
-        counts_.assign(kMaxPly * 4096, 0);
+        for (int i = 0; i < kTableSize; ++i)
+            counts_[i].store(0, std::memory_order_relaxed);
     }
 
-    constexpr void Reset()
+    /// @brief Return the maximum count across all entries.
+    uint32_t MaxCount() const
     {
-        std::ranges::fill(counts_, 0);
+        uint32_t max_val = 0;
+        for (int i = 0; i < kTableSize; ++i)
+        {
+            uint32_t v = counts_[i].load(std::memory_order_relaxed);
+            if (v > max_val)
+                max_val = v;
+        }
+        return max_val;
     }
 
-    constexpr uint32_t MaxCount(void) const
+    /// @brief Increment the count for a move that raised alpha or caused a cutoff.
+    /// @param ply Current search ply.
+    /// @param move Move to record.
+    void RecordGoodMove(int ply, const Move &move)
     {
-        return std::ranges::max(counts_);
+        counts_[ply * 4096 + move.from_to()].fetch_add(1, std::memory_order_relaxed);
     }
 
-    constexpr void RecordGoodMove(int ply, const Move &move)
+    /// @brief Retrieve the history count for a move at a given ply.
+    /// @param ply Current search ply.
+    /// @param move Move to look up.
+    uint32_t GetCount(int ply, const Move &move) const
     {
-        ++counts_[ply * 4096 + move.from_to()];
-    }
-
-    constexpr uint32_t GetCount(int ply, const Move &move) const
-    {
-        return counts_[ply * 4096 + move.from_to()];
+        return counts_[ply * 4096 + move.from_to()].load(std::memory_order_relaxed);
     }
 
   private:
-    std::vector<uint32_t> counts_;
+    std::unique_ptr<std::atomic<uint32_t>[]> counts_; ///< Heap-allocated atomic count array.
 };
