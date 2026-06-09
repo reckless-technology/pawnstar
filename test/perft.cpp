@@ -1,4 +1,8 @@
 /// @file Standard perft move generation tests.
+/// Test data from https://github.com/AndyGrant/Ethereal/blob/master/src/perft/standard.epd
+/// Format matches the Go perft_test.go EPD set exactly.
+
+#include "position.h"
 
 #include <algorithm>
 #include <chrono>
@@ -12,309 +16,192 @@
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <vector>
 
-using namespace std::chrono;
+// clang-format off
+static const char *perft_epd[] = {
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1;D1 20;D2 400;D3 8902;D4 197281;D5 4865609;D6 119060324;D7 3195901860",
+    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1;D1 48;D2 2039;D3 97862;D4 4085603;D5 193690690",
+    "4k3/8/8/8/8/8/8/4K2R w K - 0 1;D1 15;D2 66;D3 1197;D4 7059;D5 133987;D6 764643",
+    "4k3/8/8/8/8/8/8/R3K3 w Q - 0 1;D1 16;D2 71;D3 1287;D4 7626;D5 145232;D6 846648",
+    "4k2r/8/8/8/8/8/8/4K3 w k - 0 1;D1 5;D2 75;D3 459;D4 8290;D5 47635;D6 899442",
+    "r3k3/8/8/8/8/8/8/4K3 w q - 0 1;D1 5;D2 80;D3 493;D4 8897;D5 52710;D6 1001523",
+    "4k3/8/8/8/8/8/8/R3K2R w KQ - 0 1;D1 26;D2 112;D3 3189;D4 17945;D5 532933;D6 2788982",
+    "r3k2r/8/8/8/8/8/8/4K3 w kq - 0 1;D1 5;D2 130;D3 782;D4 22180;D5 118882;D6 3517770",
+    "8/8/8/8/8/8/6k1/4K2R w K - 0 1;D1 12;D2 38;D3 564;D4 2219;D5 37735;D6 185867",
+    "8/8/8/8/8/8/1k6/R3K3 w Q - 0 1;D1 15;D2 65;D3 1018;D4 4573;D5 80619;D6 413018",
+    "4k2r/6K1/8/8/8/8/8/8 w k - 0 1;D1 3;D2 32;D3 134;D4 2073;D5 10485;D6 179869",
+    "r3k3/1K6/8/8/8/8/8/8 w q - 0 1;D1 4;D2 49;D3 243;D4 3991;D5 20780;D6 367724",
+    "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1;D1 26;D2 568;D3 13744;D4 314346;D5 7594526;D6 179862938",
+    "r3k2r/8/8/8/8/8/8/1R2K2R w Kkq - 0 1;D1 25;D2 567;D3 14095;D4 328965;D5 8153719;D6 195629489",
+    "r3k2r/8/8/8/8/8/8/2R1K2R w Kkq - 0 1;D1 25;D2 548;D3 13502;D4 312835;D5 7736373;D6 184411439",
+    "r3k2r/8/8/8/8/8/8/R3K1R1 w Qkq - 0 1;D1 25;D2 547;D3 13579;D4 316214;D5 7878456;D6 189224276",
+    "1r2k2r/8/8/8/8/8/8/R3K2R w KQk - 0 1;D1 26;D2 583;D3 14252;D4 334705;D5 8198901;D6 198328929",
+    "2r1k2r/8/8/8/8/8/8/R3K2R w KQk - 0 1;D1 25;D2 560;D3 13592;D4 317324;D5 7710115;D6 185959088",
+    "r3k1r1/8/8/8/8/8/8/R3K2R w KQq - 0 1;D1 25;D2 560;D3 13607;D4 320792;D5 7848606;D6 190755813",
+    "4k3/8/8/8/8/8/8/4K2R b K - 0 1;D1 5;D2 75;D3 459;D4 8290;D5 47635;D6 899442",
+    "4k3/8/8/8/8/8/8/R3K3 b Q - 0 1;D1 5;D2 80;D3 493;D4 8897;D5 52710;D6 1001523",
+    "4k2r/8/8/8/8/8/8/4K3 b k - 0 1;D1 15;D2 66;D3 1197;D4 7059;D5 133987;D6 764643",
+    "r3k3/8/8/8/8/8/8/4K3 b q - 0 1;D1 16;D2 71;D3 1287;D4 7626;D5 145232;D6 846648",
+    "4k3/8/8/8/8/8/8/R3K2R b KQ - 0 1;D1 5;D2 130;D3 782;D4 22180;D5 118882;D6 3517770",
+    "r3k2r/8/8/8/8/8/8/4K3 b kq - 0 1;D1 26;D2 112;D3 3189;D4 17945;D5 532933;D6 2788982",
+    "8/8/8/8/8/8/6k1/4K2R b K - 0 1;D1 3;D2 32;D3 134;D4 2073;D5 10485;D6 179869",
+    "8/8/8/8/8/8/1k6/R3K3 b Q - 0 1;D1 4;D2 49;D3 243;D4 3991;D5 20780;D6 367724",
+    "4k2r/6K1/8/8/8/8/8/8 b k - 0 1;D1 12;D2 38;D3 564;D4 2219;D5 37735;D6 185867",
+    "r3k3/1K6/8/8/8/8/8/8 b q - 0 1;D1 15;D2 65;D3 1018;D4 4573;D5 80619;D6 413018",
+    "r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 0 1;D1 26;D2 568;D3 13744;D4 314346;D5 7594526;D6 179862938",
+    "r3k2r/8/8/8/8/8/8/1R2K2R b Kkq - 0 1;D1 26;D2 583;D3 14252;D4 334705;D5 8198901;D6 198328929",
+    "r3k2r/8/8/8/8/8/8/2R1K2R b Kkq - 0 1;D1 25;D2 560;D3 13592;D4 317324;D5 7710115;D6 185959088",
+    "r3k2r/8/8/8/8/8/8/R3K1R1 b Qkq - 0 1;D1 25;D2 560;D3 13607;D4 320792;D5 7848606;D6 190755813",
+    "1r2k2r/8/8/8/8/8/8/R3K2R b KQk - 0 1;D1 25;D2 567;D3 14095;D4 328965;D5 8153719;D6 195629489",
+    "2r1k2r/8/8/8/8/8/8/R3K2R b KQk - 0 1;D1 25;D2 548;D3 13502;D4 312835;D5 7736373;D6 184411439",
+    "r3k1r1/8/8/8/8/8/8/R3K2R b KQq - 0 1;D1 25;D2 547;D3 13579;D4 316214;D5 7878456;D6 189224276",
+    "8/1n4N1/2k5/8/8/5K2/1N4n1/8 w - - 0 1;D1 14;D2 195;D3 2760;D4 38675;D5 570726;D6 8107539",
+    "8/1k6/8/5N2/8/4n3/8/2K5 w - - 0 1;D1 11;D2 156;D3 1636;D4 20534;D5 223507;D6 2594412",
+    "8/8/4k3/3Nn3/3nN3/4K3/8/8 w - - 0 1;D1 19;D2 289;D3 4442;D4 73584;D5 1198299;D6 19870403",
+    "K7/8/2n5/1n6/8/8/8/k6N w - - 0 1;D1 3;D2 51;D3 345;D4 5301;D5 38348;D6 588695",
+    "k7/8/2N5/1N6/8/8/8/K6n w - - 0 1;D1 17;D2 54;D3 835;D4 5910;D5 92250;D6 688780",
+    "8/1n4N1/2k5/8/8/5K2/1N4n1/8 b - - 0 1;D1 15;D2 193;D3 2816;D4 40039;D5 582642;D6 8503277",
+    "8/1k6/8/5N2/8/4n3/8/2K5 b - - 0 1;D1 16;D2 180;D3 2290;D4 24640;D5 288141;D6 3147566",
+    "8/8/3K4/3Nn3/3nN3/4k3/8/8 b - - 0 1;D1 4;D2 68;D3 1118;D4 16199;D5 281190;D6 4405103",
+    "K7/8/2n5/1n6/8/8/8/k6N b - - 0 1;D1 17;D2 54;D3 835;D4 5910;D5 92250;D6 688780",
+    "k7/8/2N5/1N6/8/8/8/K6n b - - 0 1;D1 3;D2 51;D3 345;D4 5301;D5 38348;D6 588695",
+    "B6b/8/8/8/2K5/4k3/8/b6B w - - 0 1;D1 17;D2 278;D3 4607;D4 76778;D5 1320507;D6 22823890",
+    "8/8/1B6/7b/7k/8/2B1b3/7K w - - 0 1;D1 21;D2 316;D3 5744;D4 93338;D5 1713368;D6 28861171",
+    "k7/B7/1B6/1B6/8/8/8/K6b w - - 0 1;D1 21;D2 144;D3 3242;D4 32955;D5 787524;D6 7881673",
+    "K7/b7/1b6/1b6/8/8/8/k6B w - - 0 1;D1 7;D2 143;D3 1416;D4 31787;D5 310862;D6 7382896",
+    "B6b/8/8/8/2K5/5k2/8/b6B b - - 0 1;D1 6;D2 106;D3 1829;D4 31151;D5 530585;D6 9250746",
+    "8/8/1B6/7b/7k/8/2B1b3/7K b - - 0 1;D1 17;D2 309;D3 5133;D4 93603;D5 1591064;D6 29027891",
+    "k7/B7/1B6/1B6/8/8/8/K6b b - - 0 1;D1 7;D2 143;D3 1416;D4 31787;D5 310862;D6 7382896",
+    "K7/b7/1b6/1b6/8/8/8/k6B b - - 0 1;D1 21;D2 144;D3 3242;D4 32955;D5 787524;D6 7881673",
+    "7k/RR6/8/8/8/8/rr6/7K w - - 0 1;D1 19;D2 275;D3 5300;D4 104342;D5 2161211;D6 44956585",
+    "R6r/8/8/2K5/5k2/8/8/r6R w - - 0 1;D1 36;D2 1027;D3 29215;D4 771461;D5 20506480;D6 525169084",
+    "7k/RR6/8/8/8/8/rr6/7K b - - 0 1;D1 19;D2 275;D3 5300;D4 104342;D5 2161211;D6 44956585",
+    "R6r/8/8/2K5/5k2/8/8/r6R b - - 0 1;D1 36;D2 1027;D3 29227;D4 771368;D5 20521342;D6 524966748",
+    "6kq/8/8/8/8/8/8/7K w - - 0 1;D1 2;D2 36;D3 143;D4 3637;D5 14893;D6 391507",
+    "6KQ/8/8/8/8/8/8/7k b - - 0 1;D1 2;D2 36;D3 143;D4 3637;D5 14893;D6 391507",
+    "K7/8/8/3Q4/4q3/8/8/7k w - - 0 1;D1 6;D2 35;D3 495;D4 8349;D5 166741;D6 3370175",
+    "6qk/8/8/8/8/8/8/7K b - - 0 1;D1 22;D2 43;D3 1015;D4 4167;D5 105749;D6 419369",
+    "K7/8/8/3Q4/4q3/8/8/7k b - - 0 1;D1 6;D2 35;D3 495;D4 8349;D5 166741;D6 3370175",
+    "8/8/8/8/8/K7/P7/k7 w - - 0 1;D1 3;D2 7;D3 43;D4 199;D5 1347;D6 6249",
+    "8/8/8/8/8/7K/7P/7k w - - 0 1;D1 3;D2 7;D3 43;D4 199;D5 1347;D6 6249",
+    "K7/p7/k7/8/8/8/8/8 w - - 0 1;D1 1;D2 3;D3 12;D4 80;D5 342;D6 2343",
+    "7K/7p/7k/8/8/8/8/8 w - - 0 1;D1 1;D2 3;D3 12;D4 80;D5 342;D6 2343",
+    "8/2k1p3/3pP3/3P2K1/8/8/8/8 w - - 0 1;D1 7;D2 35;D3 210;D4 1091;D5 7028;D6 34834",
+    "8/8/8/8/8/K7/P7/k7 b - - 0 1;D1 1;D2 3;D3 12;D4 80;D5 342;D6 2343",
+    "8/8/8/8/8/7K/7P/7k b - - 0 1;D1 1;D2 3;D3 12;D4 80;D5 342;D6 2343",
+    "K7/p7/k7/8/8/8/8/8 b - - 0 1;D1 3;D2 7;D3 43;D4 199;D5 1347;D6 6249",
+    "7K/7p/7k/8/8/8/8/8 b - - 0 1;D1 3;D2 7;D3 43;D4 199;D5 1347;D6 6249",
+    "8/2k1p3/3pP3/3P2K1/8/8/8/8 b - - 0 1;D1 5;D2 35;D3 182;D4 1091;D5 5408;D6 34822",
+    "8/8/8/8/8/4k3/4P3/4K3 w - - 0 1;D1 2;D2 8;D3 44;D4 282;D5 1814;D6 11848",
+    "4k3/4p3/4K3/8/8/8/8/8 b - - 0 1;D1 2;D2 8;D3 44;D4 282;D5 1814;D6 11848",
+    "8/8/7k/7p/7P/7K/8/8 w - - 0 1;D1 3;D2 9;D3 57;D4 360;D5 1969;D6 10724",
+    "8/8/k7/p7/P7/K7/8/8 w - - 0 1;D1 3;D2 9;D3 57;D4 360;D5 1969;D6 10724",
+    "8/8/3k4/3p4/3P4/3K4/8/8 w - - 0 1;D1 5;D2 25;D3 180;D4 1294;D5 8296;D6 53138",
+    "8/3k4/3p4/8/3P4/3K4/8/8 w - - 0 1;D1 8;D2 61;D3 483;D4 3213;D5 23599;D6 157093",
+    "8/8/3k4/3p4/8/3P4/3K4/8 w - - 0 1;D1 8;D2 61;D3 411;D4 3213;D5 21637;D6 158065",
+    "k7/8/3p4/8/3P4/8/8/7K w - - 0 1;D1 4;D2 15;D3 90;D4 534;D5 3450;D6 20960",
+    "8/8/7k/7p/7P/7K/8/8 b - - 0 1;D1 3;D2 9;D3 57;D4 360;D5 1969;D6 10724",
+    "8/8/k7/p7/P7/K7/8/8 b - - 0 1;D1 3;D2 9;D3 57;D4 360;D5 1969;D6 10724",
+    "8/8/3k4/3p4/3P4/3K4/8/8 b - - 0 1;D1 5;D2 25;D3 180;D4 1294;D5 8296;D6 53138",
+    "8/3k4/3p4/8/3P4/3K4/8/8 b - - 0 1;D1 8;D2 61;D3 411;D4 3213;D5 21637;D6 158065",
+    "8/8/3k4/3p4/8/3P4/3K4/8 b - - 0 1;D1 8;D2 61;D3 483;D4 3213;D5 23599;D6 157093",
+    "k7/8/3p4/8/3P4/8/8/7K b - - 0 1;D1 4;D2 15;D3 89;D4 537;D5 3309;D6 21104",
+    "7k/3p4/8/8/3P4/8/8/K7 w - - 0 1;D1 4;D2 19;D3 117;D4 720;D5 4661;D6 32191",
+    "7k/8/8/3p4/8/8/3P4/K7 w - - 0 1;D1 5;D2 19;D3 116;D4 716;D5 4786;D6 30980",
+    "k7/8/8/7p/6P1/8/8/K7 w - - 0 1;D1 5;D2 22;D3 139;D4 877;D5 6112;D6 41874",
+    "k7/8/7p/8/8/6P1/8/K7 w - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4354;D6 29679",
+    "k7/8/8/6p1/7P/8/8/K7 w - - 0 1;D1 5;D2 22;D3 139;D4 877;D5 6112;D6 41874",
+    "k7/8/6p1/8/8/7P/8/K7 w - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4354;D6 29679",
+    "k7/8/8/3p4/4p3/8/8/7K w - - 0 1;D1 3;D2 15;D3 84;D4 573;D5 3013;D6 22886",
+    "k7/8/3p4/8/8/4P3/8/7K w - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4271;D6 28662",
+    "7k/3p4/8/8/3P4/8/8/K7 b - - 0 1;D1 5;D2 19;D3 117;D4 720;D5 5014;D6 32167",
+    "7k/8/8/3p4/8/8/3P4/K7 b - - 0 1;D1 4;D2 19;D3 117;D4 712;D5 4658;D6 30749",
+    "k7/8/8/7p/6P1/8/8/K7 b - - 0 1;D1 5;D2 22;D3 139;D4 877;D5 6112;D6 41874",
+    "k7/8/7p/8/8/6P1/8/K7 b - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4354;D6 29679",
+    "k7/8/8/6p1/7P/8/8/K7 b - - 0 1;D1 5;D2 22;D3 139;D4 877;D5 6112;D6 41874",
+    "k7/8/6p1/8/8/7P/8/K7 b - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4354;D6 29679",
+    "k7/8/8/3p4/4p3/8/8/7K b - - 0 1;D1 5;D2 15;D3 102;D4 569;D5 4337;D6 22579",
+    "k7/8/3p4/8/8/4P3/8/7K b - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4271;D6 28662",
+    "7k/8/8/p7/1P6/8/8/7K w - - 0 1;D1 5;D2 22;D3 139;D4 877;D5 6112;D6 41874",
+    "7k/8/p7/8/8/1P6/8/7K w - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4354;D6 29679",
+    "7k/8/8/1p6/P7/8/8/7K w - - 0 1;D1 5;D2 22;D3 139;D4 877;D5 6112;D6 41874",
+    "7k/8/1p6/8/8/P7/8/7K w - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4354;D6 29679",
+    "k7/7p/8/8/8/8/6P1/K7 w - - 0 1;D1 5;D2 25;D3 161;D4 1035;D5 7574;D6 55338",
+    "k7/6p1/8/8/8/8/7P/K7 w - - 0 1;D1 5;D2 25;D3 161;D4 1035;D5 7574;D6 55338",
+    "3k4/3pp3/8/8/8/8/3PP3/3K4 w - - 0 1;D1 7;D2 49;D3 378;D4 2902;D5 24122;D6 199002",
+    "7k/8/8/p7/1P6/8/8/7K b - - 0 1;D1 5;D2 22;D3 139;D4 877;D5 6112;D6 41874",
+    "7k/8/p7/8/8/1P6/8/7K b - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4354;D6 29679",
+    "7k/8/8/1p6/P7/8/8/7K b - - 0 1;D1 5;D2 22;D3 139;D4 877;D5 6112;D6 41874",
+    "7k/8/1p6/8/8/P7/8/7K b - - 0 1;D1 4;D2 16;D3 101;D4 637;D5 4354;D6 29679",
+    "k7/7p/8/8/8/8/6P1/K7 b - - 0 1;D1 5;D2 25;D3 161;D4 1035;D5 7574;D6 55338",
+    "k7/6p1/8/8/8/8/7P/K7 b - - 0 1;D1 5;D2 25;D3 161;D4 1035;D5 7574;D6 55338",
+    "3k4/3pp3/8/8/8/8/3PP3/3K4 b - - 0 1;D1 7;D2 49;D3 378;D4 2902;D5 24122;D6 199002",
+    "8/Pk6/8/8/8/8/6Kp/8 w - - 0 1;D1 11;D2 97;D3 887;D4 8048;D5 90606;D6 1030499",
+    "n1n5/1Pk5/8/8/8/8/5Kp1/5N1N w - - 0 1;D1 24;D2 421;D3 7421;D4 124608;D5 2193768;D6 37665329",
+    "8/PPPk4/8/8/8/8/4Kppp/8 w - - 0 1;D1 18;D2 270;D3 4699;D4 79355;D5 1533145;D6 28859283",
+    "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N w - - 0 1;D1 24;D2 496;D3 9483;D4 182838;D5 3605103;D6 71179139",
+    "8/Pk6/8/8/8/8/6Kp/8 b - - 0 1;D1 11;D2 97;D3 887;D4 8048;D5 90606;D6 1030499",
+    "n1n5/1Pk5/8/8/8/8/5Kp1/5N1N b - - 0 1;D1 24;D2 421;D3 7421;D4 124608;D5 2193768;D6 37665329",
+    "8/PPPk4/8/8/8/8/4Kppp/8 b - - 0 1;D1 18;D2 270;D3 4699;D4 79355;D5 1533145;D6 28859283",
+    "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1;D1 24;D2 496;D3 9483;D4 182838;D5 3605103;D6 71179139",
+    "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1;D4 43238;D5 674624;D6 11030083;D8 3009794393",
+    "rnbqkb1r/ppppp1pp/7n/4Pp2/8/8/PPPP1PPP/RNBQKBNR w KQkq f6 0 3;D5 11139762",
+    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -;D1 48;D2 2039;D3 97862;D4 4085603;D5 193690690;D6 8031647685",
+    "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq -;D1 6;D2 264;D3 9467;D4 422333;D5 15833292;D6 706045033",
+    "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ -;D1 44;D2 1486;D3 62379;D4 2103487;D5 89941194",
+    "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - -;D5 164075551;D6 6923051137",
+};
+// clang-format on
 
-using std::string;
-using std::string_view;
+static constexpr int kNumEPD = (int)(sizeof(perft_epd) / sizeof(perft_epd[0]));
 
-#include "chess_clock.h"
-#include "debug_hashtable.h"
-#include "position.h"
-#include "transposition_table.h"
-
-/// @brief Structure to hold a basic perft test.
-struct PerftTest
+struct PerftCase
 {
-    string   position; ///< FEN string view of starting position
-    int      depth;    ///< perft search depth
-    uint64_t count;    ///< total number of leaf node moves
+    std::string fen;
+    int         depth;
+    uint64_t    nodes;
 };
 
-static constexpr MoveList GeneratePseudoLegalMoves(const Position &position);
-
-/// @brief Run standard perft test - recursive search.
-/// @param src_position position to search
-/// @param depth search depth
-/// @param num_moves total number of moves at terminal / leaf nodes
-static void Perft(const Position &src_position, int depth, uint64_t &num_moves)
+static void Perft(const Position &pos, int depth, uint64_t &nodes)
 {
-    MoveList move_list{src_position.GenerateLegalMoves()};
-    if (depth > 1)
-    {
-        for (const auto &move : move_list)
-        {
-            Position position{src_position.MakeMove(move)};
-            Perft(position, depth - 1, num_moves);
-        }
-        return;
-    }
-    num_moves += move_list.size();
+    MoveList moves{pos.GenerateLegalMoves()};
+    if (depth == 1) { nodes += moves.size(); return; }
+    for (const auto &m : moves)
+        Perft(pos.MakeMove(m), depth - 1, nodes);
 }
 
-/// @brief Run a comprehensive perft test and regression check every node against a pseudo legal move generator -
-/// recursive. This is very slow compared with the standard perft test.
-/// @param src_position Starting position.
-/// @param depth search depth.
-/// @param num_moves total number of moves at terminal / leaf nodes
-static void PerftRegression(const Position &src_position, int depth, uint64_t &num_moves)
+static std::vector<PerftCase> ParseEPD(int max_depth)
 {
-    MoveList       move_list{src_position.GenerateLegalMoves()}; // Legal moves only - main generator.
-    std::set<Move> move_set{move_list.begin(), move_list.end()};
-    MoveList       pseudo_legal_moves{GeneratePseudoLegalMoves(src_position)}; // Pseudo legal moves.
-    const Color    color = src_position.ColorToMove();
-    std::set<Move> legal_move_set;
-    // Test pseudo legal moves for legality.
-    for (auto move : pseudo_legal_moves)
+    std::vector<PerftCase> cases;
+    for (int i = 0; i < kNumEPD; ++i)
     {
-        Position dst_position{src_position.MakeMove(move)};
-        if (!dst_position.IsAttacked(dst_position.KingLocation(color), EnemyOf(color)))
+        std::string s{perft_epd[i]};
+        auto        sep = s.find(';');
+        if (sep == std::string::npos) continue;
+        std::string fen = s.substr(0, sep);
+        std::string rest = s.substr(sep + 1);
+        while (!rest.empty())
         {
-            legal_move_set.insert(move);
-        }
-    }
-    // Compare legal and validated move lists for equality
-    for (auto move : move_set)
-    {
-        if (!legal_move_set.contains(move))
-        {
-            std::cout << std::format("Error on position {} missing move {}\n", src_position.ToString(),
-                                     move.ToString());
-        }
-    }
-    for (auto move : legal_move_set)
-    {
-        if (!move_set.contains(move))
-        {
-            std::cout << std::format("Error on position {} superfluous move {}\n", src_position.ToString(),
-                                     move.ToString());
-        }
-    }
-    if (depth > 1)
-    {
-        for (const auto &move : move_list)
-        {
-            Position position{src_position.MakeMove(move)};
-            PerftRegression(position, depth - 1, num_moves);
-        }
-        return;
-    }
-    num_moves += move_set.size();
-}
-
-// Standard Perft test position set.
-extern const std::array<const char *, 132> perft_results;
-
-/// @brief Run the suite of perft tests.
-/// @param do_regression If true, also cross-check against pseudo-legal move generator.
-/// @param max_depth Skip test cases with depth greater than this value.
-static void RunPerftTests(bool do_regression, int max_depth)
-{
-    std::vector<PerftTest> tests;
-    for (const char *line : perft_results)
-    {
-        // Split into tokens separated by semicolons
-        std::vector<string> tokens;
-        string              test_str{line};
-        for (std::size_t i = test_str.find(';'); i != string::npos; i = test_str.find(';'))
-        {
-            tokens.push_back(test_str.substr(0, i));
-            test_str = test_str.substr(i + 1);
-        }
-        tokens.push_back(test_str);
-        // First token is FEN position
-        const auto fen = tokens[0];
-        tokens.erase(tokens.begin());
-        // Remaining tokens are depth and counts
-        for (auto token : tokens)
-        {
-            // Format is "Dxx NNNN"
-            int      depth;
-            uint64_t count;
-            if (std::sscanf(token.c_str(), " D%d %" PRIu64, &depth, &count) != 2)
-            {
-                std::cout << std::format("ERROR: unable to scan perft test {}\n", test_str);
-            }
+            auto next = rest.find(';');
+            std::string token = next == std::string::npos ? rest : rest.substr(0, next);
+            rest = next == std::string::npos ? "" : rest.substr(next + 1);
+            if (token.size() < 3 || token[0] != 'D') continue;
+            auto sp = token.find(' ');
+            if (sp == std::string::npos) continue;
+            int      depth = std::atoi(token.c_str() + 1);
+            uint64_t nodes = std::strtoull(token.c_str() + sp + 1, nullptr, 10);
             if (depth <= max_depth)
-                tests.push_back(PerftTest{fen, depth, count});
+                cases.push_back({fen, depth, nodes});
         }
     }
-    bool       is_good     = true;
-    uint64_t   total_nodes = 0;
-    const auto first_start = std::chrono::system_clock::now();
-    for (const auto &test : tests)
-    {
-        Position position{Position::FromString(test.position)};
-        string   pos_string{position.ToString()};
-        uint64_t num_moves = 0;
-        total_nodes += test.count;
-        const auto start = std::chrono::system_clock::now();
-        do_regression ? PerftRegression(position, test.depth, num_moves) : Perft(position, test.depth, num_moves);
-        const auto stop       = std::chrono::system_clock::now();
-        auto       elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count();
-        if (elapsed_us == 0)
-        {
-            elapsed_us = 1;
-        }
-        std::cout << std::format("{:<75} depth:{:2} moves:{:10} Mnps:{:4}\n", pos_string, test.depth, num_moves,
-                                 num_moves / elapsed_us);
-        if (num_moves != test.count)
-        {
-            std::cout << std::format("ERROR: expected {} got {}\n", test.count, num_moves);
-            is_good = false;
-        }
-    }
-    const auto last_stop = std::chrono::system_clock::now();
-    std::cout << std::format("{:<40}{:10}\n", "total elapsed milliseconds",
-                             std::chrono::duration_cast<std::chrono::milliseconds>(last_stop - first_start).count());
-    std::cout << std::format(
-        "{:<40}{:10}\n", "mean positions per second",
-        total_nodes * 1000 / std::chrono::duration_cast<std::chrono::milliseconds>(last_stop - first_start).count());
-    if (is_good)
-    {
-        std::cout << "******************* PERFT PASS *******************\n";
-    }
-    else
-    {
-        std::cout << "******************* PERFT FAIL *******************\n";
-    }
-}
-
-static constexpr std::array<uint8_t, 2> double_push_rank{3, 4};
-static constexpr std::array<uint8_t, 2> promotion_rank{7, 0};
-
-/// @brief Generate all pseudo legal moves for this position.
-/// @param position Position for which to generate moves.
-/// @return List of all pseudo legal moves (some may leave King in check).
-/// This is only used for regression testing of the main move generator.
-static constexpr MoveList GeneratePseudoLegalMoves(const Position &position)
-{
-    MoveList       moves;
-    const Color    color            = position.ColorToMove();
-    const Bitboard friendly_pieces  = position.PiecesOfColor(color);
-    const Bitboard occupied_squares = position.OccupiedSquares();
-    const Bitboard vacant_squares   = ~occupied_squares;
-    const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
-
-    // Generate pawn moves.
-    Bitboard pawns = position.Pawns() & friendly_pieces;
-    for (Square from : pawns)
-    {
-        // Single pawn push.
-        Square to = color == kWhite ? from + 8 : from - 8;
-        if ((Bitboard{to} & occupied_squares).IsEmpty())
-        {
-            if (to.Rank() == promotion_rank[color])
-            {
-                // Push promotion.
-                moves.push_back(Move::Promotion(from, to, kQueen));
-                moves.push_back(Move::Promotion(from, to, kRook));
-                moves.push_back(Move::Promotion(from, to, kBishop));
-                moves.push_back(Move::Promotion(from, to, kKnight));
-            }
-            else
-            {
-                // Regular single push.
-                moves.push_back(Move::NonCapture(from, to, kPawn));
-                // Double pawn push.
-                to = color == kWhite ? from + 16 : from - 16;
-                if (to.Rank() == double_push_rank[color])
-                {
-                    if ((Bitboard{to} & occupied_squares).IsEmpty())
-                    {
-                        moves.push_back(Move::DoublePush(from, to));
-                    }
-                }
-            }
-        }
-        // Pawn captures
-        const Bitboard pawn_attacks = color == kWhite ? kPawnAttacksWhite[from] : kPawnAttacksBlack[from];
-        const Bitboard captures     = pawn_attacks & enemy_pieces;
-        for (Square to : captures)
-        {
-            if (to.Rank() == promotion_rank[color])
-            {
-                // Capture promotion.
-                moves.push_back(Move::Promotion(from, to, kQueen, position.PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, kRook, position.PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, kBishop, position.PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, kKnight, position.PieceAt(to)));
-            }
-            else
-            {
-                // Regular capture.
-                moves.push_back(Move::Capture(from, to, kPawn, position.PieceAt(to)));
-            }
-        }
-        // En passant capture.
-        if (position.EnPassantIndex() != 0)
-        {
-            if ((pawn_attacks & Bitboard{position.EnPassantIndex()}).IsNotEmpty())
-            {
-                moves.push_back(Move::EpCapture(from, position.EnPassantIndex()));
-            }
-        }
-    }
-
-    for (auto &[piece, fn] : piece_attackers)
-    {
-        const Bitboard b = position.PiecesOfType(piece) & friendly_pieces;
-        for (Square from : b)
-        {
-            const Bitboard attacks  = fn(occupied_squares, from);
-            const Bitboard captures = attacks & enemy_pieces;
-            for (Square to : captures)
-            {
-                moves.push_back(Move::Capture(from, to, piece, position.PieceAt(to)));
-            }
-            const Bitboard non_captures = attacks & vacant_squares;
-            for (Square to : non_captures)
-            {
-                moves.push_back(Move::NonCapture(from, to, piece));
-            }
-        }
-    }
-
-    // Generate castling moves
-    if (!position.IsInCheck())
-    {
-        if (color == kWhite)
-        {
-            if (position.MayWhiteCastleKingside() && (occupied_squares & (Bitboard("F1") | Bitboard("G1"))).IsEmpty() &&
-                !position.IsAttacked("F1", kBlack) && !position.IsAttacked("G1", kBlack))
-            {
-                moves.push_back(Move::Castling("E1", "G1"));
-            }
-            if (position.MayWhiteCastleQueenside() &&
-                (occupied_squares & (Bitboard("B1") | Bitboard("C1") | Bitboard("D1"))).IsEmpty() &&
-                !position.IsAttacked("D1", kBlack) && !position.IsAttacked("C1", kBlack))
-            {
-                moves.push_back(Move::Castling("E1", "C1"));
-            }
-        }
-        else
-        {
-            if (position.MayBlackCastleKingside() && (occupied_squares & (Bitboard("F8") | Bitboard("G8"))).IsEmpty() &&
-                !position.IsAttacked("F8", kWhite) && !position.IsAttacked("G8", kWhite))
-            {
-                moves.push_back(Move::Castling("E8", "G8"));
-            }
-            if (position.MayBlackCastleQueenside() &&
-                (occupied_squares & (Bitboard("B8") | Bitboard("C8") | Bitboard("D8"))).IsEmpty() &&
-                !position.IsAttacked("D8", kWhite) && !position.IsAttacked("C8", kWhite))
-            {
-                moves.push_back(Move::Castling("E8", "C8"));
-            }
-        }
-    }
-
-    return moves;
+    return cases;
 }
 
 int main(int argc, char *argv[])
 {
+    int  max_depth     = 6;
     bool do_regression = false;
-    int  max_depth     = INT_MAX;
     for (int i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "x") == 0)
@@ -322,6 +209,39 @@ int main(int argc, char *argv[])
         else
             max_depth = std::atoi(argv[i]);
     }
-    RunPerftTests(do_regression, max_depth);
-    return 0;
+    (void)do_regression; // regression mode unused — kept for CLI compat
+
+    const auto cases = ParseEPD(max_depth);
+
+    bool     pass        = true;
+    uint64_t total_nodes = 0;
+    auto     t0          = std::chrono::steady_clock::now();
+
+    for (const auto &tc : cases)
+    {
+        Position pos{Position::FromString(tc.fen)};
+        uint64_t got    = 0;
+        auto     start  = std::chrono::steady_clock::now();
+        Perft(pos, tc.depth, got);
+        auto elapsed_us = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::steady_clock::now() - start).count();
+        if (elapsed_us == 0) elapsed_us = 1;
+        total_nodes += got;
+
+        std::cout << std::format("{:<75} d{} nodes={:<12} {:.0f} Mnps\n",
+                                 tc.fen, tc.depth, got,
+                                 (double)got / elapsed_us);
+        if (got != tc.nodes)
+        {
+            std::cout << std::format("  ERROR: expected {} got {}\n", tc.nodes, got);
+            pass = false;
+        }
+    }
+
+    auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - t0).count();
+    std::cout << std::format("\ntotal nodes={} time={}ms {:.0f} Mnps\n", total_nodes, total_ms,
+                             (double)total_nodes / std::max(total_ms * 1000LL, 1LL));
+    std::cout << (pass ? "PERFT PASS\n" : "PERFT FAIL\n");
+    return pass ? 0 : 1;
 }

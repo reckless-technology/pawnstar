@@ -130,11 +130,11 @@ struct PawnStructure
 {
     Bitboard passed_pawns;   ///< A passed pawn has no enemy pawns whicn can prevent it promoting.
     Bitboard isolated_pawns; ///< An isolated pawn has no friendly pawns on either adjacent file.
-    Bitboard backward_pawns; ///< A backward pawn has no pawns to support it.
+    Bitboard unsupported_pawns; ///< An unsupported pawn has no friendly pawns in its support window.
     Bitboard doubled_pawns;  ///< A doubled pawn has a friendly pawn in front of it.
     Bitboard defended_pawns; ///< A defended pawn has a friendly pawn defending it.
     PawnStructure()
-        : passed_pawns(kNoSquares), isolated_pawns(kNoSquares), backward_pawns(kNoSquares), doubled_pawns(kNoSquares),
+        : passed_pawns(kNoSquares), isolated_pawns(kNoSquares), unsupported_pawns(kNoSquares), doubled_pawns(kNoSquares),
           defended_pawns(kNoSquares)
     {
     }
@@ -180,24 +180,7 @@ template <Color color> PawnStructure DeterminePawnStructure(const Position &posi
         }
         if ((supported_pawn_mask[s] & friendly_pawns).IsEmpty())
         {
-            if constexpr (color == kWhite)
-            {
-                const Bitboard enemy_pawn_attacks = enemy_pawns.ShiftSouthwest() | enemy_pawns.ShiftSoutheast();
-                const Square   forward_locn       = (Square)(s + 8);
-                if ((enemy_pawn_attacks & Bitboard(forward_locn)).IsNotEmpty())
-                {
-                    ps.backward_pawns |= b;
-                }
-            }
-            else
-            {
-                const Bitboard enemy_pawn_attacks = enemy_pawns.ShiftNorthwest() | enemy_pawns.ShiftNortheast();
-                const Square   forward_locn       = (Square)(s - 8);
-                if ((enemy_pawn_attacks & Bitboard(forward_locn)).IsNotEmpty())
-                {
-                    ps.backward_pawns |= b;
-                }
-            }
+            ps.unsupported_pawns |= b;
         }
     }
     // Doubled pawns cannot be passed pawns.
@@ -310,7 +293,7 @@ template <Color color> int EvaluatePawnStructure(const PawnStructure &ps)
         score += kPassedPawnSquare[s ^ rank_flip];
     }
     score += ps.defended_pawns.PopCount() * 5;
-    score -= ps.backward_pawns.PopCount() * 10;
+    score -= ps.unsupported_pawns.PopCount() * 10;
     score -= ps.doubled_pawns.PopCount() * 10;
     score -= ps.isolated_pawns.PopCount() * 20;
     return score;

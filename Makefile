@@ -33,9 +33,11 @@ DEPS                = $(OBJECTS:.o=.d)
 TEST_PERFT_EXE      = $(BUILD_DIR)/test_perft
 TEST_SEE_EXE        = $(BUILD_DIR)/test_see
 TEST_BK_EXE         = $(BUILD_DIR)/test_bratko_kopec
-TEST_OBJECTS        = $(BUILD_DIR)/perft.o $(BUILD_DIR)/perft_results.o \
+TEST_PS_EXE         = $(BUILD_DIR)/test_pawn_structure
+TEST_OBJECTS        = $(BUILD_DIR)/perft.o \
                       $(BUILD_DIR)/see.o \
-                      $(BUILD_DIR)/bratko_kopec.o
+                      $(BUILD_DIR)/bratko_kopec.o \
+                      $(BUILD_DIR)/pawn_structure.o
 TEST_DEPS           = $(TEST_OBJECTS:.o=.d)
 
 ifeq ($(DEBUG), 1)
@@ -44,17 +46,23 @@ else
 	CXXFLAGS += -g -O3 -D NDEBUG
 endif
 
-.PHONY: all tests prep clean gen
+.PHONY: all tests check prep clean gen
 
 all: prep $(PROGRAM_EXE)
 
-tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE)
+tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE)
+
+check: tests
+	$(TEST_SEE_EXE)
+	$(TEST_PS_EXE)
+	$(TEST_PERFT_EXE)
+	$(TEST_BK_EXE)
 
 prep:
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) \
+	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE) \
 	      $(OBJECTS) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
 	      $(GENERATED_DATA) $(GENERATOR_EXE)
 
@@ -73,13 +81,16 @@ $(PROGRAM_EXE): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS)
 
 # Link test executables against all engine objects (no main.o).
-$(TEST_PERFT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/perft.o $(BUILD_DIR)/perft_results.o
+$(TEST_PERFT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/perft.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(TEST_SEE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/see.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(TEST_BK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/bratko_kopec.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+$(TEST_PS_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/pawn_structure.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 # Compile the generator executable.
