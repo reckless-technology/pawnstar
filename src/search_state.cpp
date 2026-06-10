@@ -9,9 +9,7 @@
 /// game history.
 SearchState::SearchState(Game &g) : game(g), batch_cutoff(nullptr)
 {
-    const StackList<Position, 256> &pos = g.Positions();
-    // Reserve enough for the full game history plus the maximum search depth.
-    hash_stack_.reserve(pos.size() + kMaxPly + 4);
+    const StackList<Position, kMaxGameLength> &pos = g.Positions();
     // Push all positions except the last (current) one into the hash history.
     for (std::size_t i = 0; i + 1 < pos.size(); ++i)
     {
@@ -27,7 +25,6 @@ SearchState::SearchState(Game &g) : game(g), batch_cutoff(nullptr)
 SearchState::SearchState(const SearchState &parent, std::atomic<bool> *cutoff) : game(parent.game), batch_cutoff(cutoff)
 {
     hash_stack_ = parent.hash_stack_;
-    hash_stack_.reserve(hash_stack_.size() + kMaxPly + 4);
     positions_.push_back(parent.CurrentPosition());
 }
 

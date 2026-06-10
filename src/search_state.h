@@ -9,7 +9,6 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
-#include <vector>
 
 class Game;
 
@@ -90,8 +89,9 @@ class SearchState
     }
 
   private:
-    StackList<Position, kMaxPly + 4> positions_;  ///< Per-thread copy-make position stack.
-    std::vector<HashEntry>           hash_stack_; ///< Hash history from game-start through parent of current node.
+    StackList<Position, kMaxPly + 4> positions_; ///< Per-thread copy-make position stack.
+    /// @brief Hash history from game-start through parent of current node (game history + search depth).
+    StackList<HashEntry, kMaxGameLength + kMaxPly + 4> hash_stack_;
 
     /// @brief Piece values for MVV/LVA move scoring (indexed by Piece enum).
     static constexpr std::array<int, 7> kPieceValues{0, 100, 300, 300, 500, 900, 10000};

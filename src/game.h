@@ -48,7 +48,7 @@ class Game
     }
     /// @brief Read-only view of the full game position stack, used to seed SearchState.
     /// @return The position history stack.
-    const StackList<Position, 256> &Positions() const
+    const StackList<Position, kMaxGameLength> &Positions() const
     {
         return positions_;
     }
@@ -82,5 +82,5 @@ class Game
   private:
     void                     SearchThreadEntry(); ///< Entry point of the search worker thread.
     std::thread              worker_thread_;      ///< Worker thread for searching moves.
-    StackList<Position, 256> positions_;          ///< Game position history stack.
+    StackList<Position, kMaxGameLength> positions_; ///< Game position history stack.
 };
