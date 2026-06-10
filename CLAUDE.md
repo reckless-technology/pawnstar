@@ -84,7 +84,7 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 **Alpha-beta** — `SearchAlphaBeta` ([search_alphabeta.cpp](src/search_alphabeta.cpp)) is a fail-soft negamax with:
 - Transposition table probe/store (exact PV, lower-bound CUT, upper-bound ALL).
 - Null-move pruning.
-- Late-move reduction (LMR) via `ComputeLmrDepth()` helper: reduces non-captures, non-pawn, non-check moves after the 4th move at depth > 2, with an extra reduction after the 7th.
+- Late-move reduction (LMR), computed inline in both the sequential and parallel phases: reduces non-captures, non-pawn, non-check moves after the 4th move at depth > 2, with an extra reduction after the 7th.
 - Killer move heuristic (2 killers per ply): a quiet move that causes a beta cutoff is stored via `SearchState::RecordKiller`.
 - History heuristic (`HistoryTable`, thread-safe atomics) for move ordering.
 

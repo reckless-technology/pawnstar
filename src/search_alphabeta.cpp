@@ -12,19 +12,6 @@
 #include <mutex>
 #include <utility>
 
-/// @brief Compute late-move reduction depth. Returns `depth` unchanged when no reduction applies.
-static inline int ComputeLmrDepth(int depth, int move_index, bool in_check, bool is_capture, bool is_pawn)
-{
-    if (move_index > 3 && !in_check && depth > 2 && !is_capture && !is_pawn)
-    {
-        int reduced = depth - 1;
-        if (depth > 3 && move_index > 6)
-            --reduced;
-        return reduced;
-    }
-    return depth;
-}
-
 /// @brief Search a single move and return its alpha-beta score and whether it gives check.
 /// @param state Per-thread search state.
 /// @param depth Depth to search to.
@@ -315,17 +302,17 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
         if (transposition && move == transposition->move)
             continue;
 
+        // Late move reduction: reduce quiet, non-check, late moves at null-window nodes.
         int lmr_depth = depth;
-        if (beta == alpha + 1)
+        if (beta == alpha + 1 && move_index > 3 && !in_check_seq && depth > 2 &&
+            move.captured() == Piece::kNone && move.piece() != kPawn)
         {
-            const int reduced = ComputeLmrDepth(depth, move_index, in_check_seq, move.captured() != Piece::kNone,
-                                                move.piece() == kPawn);
-            if (reduced < depth)
+            INCREMENT("late move reduction");
+            lmr_depth = depth - 1;
+            if (depth > 3 && move_index > 6)
             {
-                INCREMENT("late move reduction");
-                lmr_depth = reduced;
-                if (lmr_depth < depth - 1)
-                    INCREMENT("late move reduction extreme");
+                --lmr_depth;
+                INCREMENT("late move reduction extreme");
             }
         }
 
@@ -386,8 +373,14 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             const Move &mv = move_list[mi];
             if (transposition && mv == transposition->move)
                 continue;
-            const int lmr_d =
-                ComputeLmrDepth(depth, mi, in_check_seq, mv.captured() != Piece::kNone, mv.piece() == kPawn);
+            // Late move reduction (this batch is always a null-window node).
+            int lmr_d = depth;
+            if (mi > 3 && !in_check_seq && depth > 2 && mv.captured() == Piece::kNone && mv.piece() != kPawn)
+            {
+                lmr_d = depth - 1;
+                if (depth > 3 && mi > 6)
+                    --lmr_d;
+            }
             batch.push_back({nullptr, mv, mi, lmr_d, depth, ply, alpha, beta, nullptr, 0});
         }
 
