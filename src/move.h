@@ -6,9 +6,7 @@
 #include <string>
 #include <string_view>
 
-#include "color.h"
 #include "constants.h"
-#include "piece.h"
 #include "square.h"
 #include "stack_list.h"
 

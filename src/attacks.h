@@ -3,7 +3,7 @@
 /// or branches.
 
 #include "generated_data.h"
-#include "piece.h"
+#include "constants.h"
 
 #include <immintrin.h>
 

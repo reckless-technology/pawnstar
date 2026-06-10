@@ -11,6 +11,7 @@
 #include "history_table.h"
 #include "opening_book.h"
 #include "position.h"
+#include "search_state_pool.h"
 #include "thread_pool.h"
 #include "transposition_table.h"
 

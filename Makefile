@@ -20,6 +20,7 @@ ENGINE_SOURCES      = \
 	search_quiescent.cpp \
 	search_root_node.cpp \
 	search_state.cpp \
+	search_state_pool.cpp \
 	static_exchange_evaluation.cpp \
 	thread_pool.cpp \
 	transposition_table.cpp \

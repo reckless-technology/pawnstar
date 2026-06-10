@@ -1,5 +1,34 @@
 #pragma once
-/// @file Program configuration constants.
+/// @file Program configuration constants and core enums.
+
+#include <cstdint>
+
+/// @brief Chess pieces.
+enum Piece : uint8_t
+{
+    kNone,
+    kPawn,
+    kKnight,
+    kBishop,
+    kRook,
+    kQueen,
+    kKing,
+};
+
+/// @brief Piece colors.
+enum Color : uint8_t
+{
+    kWhite,
+    kBlack,
+};
+
+/// @brief Return the enemy of a color.
+/// @param color the color
+/// @return The opposite color
+constexpr Color EnemyOf(Color color)
+{
+    return color == Color::kWhite ? Color::kBlack : Color::kWhite;
+}
 
 constexpr int kHashtableMegabytes        = 64;        ///< default transposition table size in MB
 constexpr int kQHashtableMb              = 8;         ///< quiescent hash table default size
@@ -16,3 +45,5 @@ constexpr int kSearchCancelledScore      = -12345678; ///< illegal value returne
 constexpr int kScoreInstabilityThreshold = 50;        ///< window of score variability
 constexpr int kStartDepth                = 3;         ///< depth to do full width search
 constexpr int kMegabyte                  = 1 << 20;
+constexpr int kSearchStatePoolCapacity   = 64;        ///< max concurrent worker search states (slab slots)
+constexpr int kThreadPoolQueueCapacity   = 128;       ///< thread pool task ring buffer size (power of two > pool capacity)

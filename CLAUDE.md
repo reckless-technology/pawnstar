@@ -100,7 +100,7 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 - `positions_` (`StackList<Position>`) — position stack for the search tree.
 - `hash_stack_` (`vector<HashEntry>`) — Zobrist hash history for 50-move/repetition detection.
 
-`SearchStatePool` ([thread_pool.h](src/thread_pool.h)) is a 64-slot slab allocator with a mutex+condition variable for blocking `acquire()` calls. `ThreadPool` is a fixed-size pool of `hardware_concurrency() - 1` persistent worker threads.
+`SearchStatePool` ([search_state_pool.h](src/search_state_pool.h)) is a 64-slot slab allocator with a mutex+condition variable for blocking `acquire()` calls. `ThreadPool` ([thread_pool.h](src/thread_pool.h)) is a fixed-size pool of `hardware_concurrency() - 1` persistent worker threads. Both capacities are in [constants.h](src/constants.h) (`kSearchStatePoolCapacity`, `kThreadPoolQueueCapacity`).
 
 ### Transposition table
 
