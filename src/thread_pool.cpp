@@ -1,4 +1,4 @@
-/// @file Thread pool implementation.
+/// @file thread_pool.cpp Thread pool implementation.
 
 #include "thread_pool.h"
 
@@ -24,7 +24,7 @@ ThreadPool::ThreadPool(unsigned n_threads)
                     --idle_count_;
                     if (stop_ && head_ == tail_)
                         return;
-                    task = queue_[head_];
+                    task  = queue_[head_];
                     head_ = (head_ + 1) % kThreadPoolQueueCapacity;
                 }
                 task.fn(task.arg);

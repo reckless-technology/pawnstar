@@ -1,4 +1,4 @@
-/// @file SearchState slab allocator implementation.
+/// @file search_state_pool.cpp SearchState slab allocator implementation.
 
 #include "search_state_pool.h"
 

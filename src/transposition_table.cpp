@@ -1,12 +1,12 @@
-/// @file Functions to implement a transposition table.
+/// @file transposition_table.cpp Functions to implement a transposition table.
 /// The table is lockless: each cell holds key = hash ^ data and data (the packed move). A reader accepts
 /// a cell only when key ^ data == probe hash, so a torn pair written by concurrent stores is detected and
 /// read as a miss (Hyatt's XOR trick). Individual 64-bit words are std::atomic, accessed with relaxed
 /// ordering; the XOR check supplies the cross-word consistency that relaxed ordering does not.
 
+#include "transposition_table.h"
 #include "debug_hashtable.h"
 #include "position.h"
-#include "transposition_table.h"
 
 /// @brief Create the transposition table.
 /// @param megabytes Approx max size of the table in megabytes.

@@ -1,4 +1,4 @@
-/// @file Standard perft move generation tests.
+/// @file perft.cpp Standard perft move generation tests.
 /// Test data from https://github.com/AndyGrant/Ethereal/blob/master/src/perft/standard.epd
 /// Format matches the Go perft_test.go EPD set exactly.
 
@@ -19,6 +19,7 @@
 #include <vector>
 
 // clang-format off
+/// @brief Standard perft positions in EPD format ("FEN;D1 nodes;D2 nodes;...").
 static const char *perft_epd[] = {
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1;D1 20;D2 400;D3 8902;D4 197281;D5 4865609;D6 119060324;D7 3195901860",
     "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1;D1 48;D2 2039;D3 97862;D4 4085603;D5 193690690",
@@ -154,15 +155,18 @@ static const char *perft_epd[] = {
 };
 // clang-format on
 
-static constexpr int kNumEPD = (int)(sizeof(perft_epd) / sizeof(perft_epd[0]));
+static constexpr int kNumEPD = (int)(sizeof(perft_epd) / sizeof(perft_epd[0])); ///< Number of EPD records.
 
+/// @brief One perft expectation: a position and the node count at a given depth.
 struct PerftCase
 {
-    std::string fen;
-    int         depth;
-    uint64_t    nodes;
+    std::string fen;   ///< Position FEN.
+    int         depth; ///< Search depth.
+    uint64_t    nodes; ///< Expected node count at that depth.
 };
 
+/// @brief Recursively count leaf nodes of the move tree (perft).
+/// @param pos Position to expand. @param depth Remaining depth. @param nodes Accumulated node count.
 static void Perft(const Position &pos, int depth, uint64_t &nodes)
 {
     MoveList moves{pos.GenerateLegalMoves()};
@@ -175,6 +179,9 @@ static void Perft(const Position &pos, int depth, uint64_t &nodes)
         Perft(pos.MakeMove(m), depth - 1, nodes);
 }
 
+/// @brief Parse the EPD table into perft cases up to a maximum depth.
+/// @param max_depth Maximum depth of cases to include.
+/// @return The list of perft cases.
 static std::vector<PerftCase> ParseEPD(int max_depth)
 {
     std::vector<PerftCase> cases;
@@ -205,6 +212,9 @@ static std::vector<PerftCase> ParseEPD(int max_depth)
     return cases;
 }
 
+/// @brief Run the perft regression suite.
+/// @param argc Argument count. @param argv Arguments ("x" to run the deeper regression set).
+/// @return Non-zero if any position produced the wrong node count.
 int main(int argc, char *argv[])
 {
     int  max_depth     = 6;

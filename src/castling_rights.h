@@ -1,4 +1,5 @@
 #pragma once
+/// @file castling_rights.h Castling-rights flags and their effect on hashing and move making.
 #include <array>
 #include <cstdint>
 #include <string>
@@ -12,25 +13,36 @@
 class CastlingRights
 {
   public:
+    /// @brief Default constructor; no castling rights.
     constexpr CastlingRights() : value_{0}
     {
     }
+    /// @brief Construct from a raw 4-bit flag value.
+    /// @param rights Bitwise OR of the Flags enumerators.
     constexpr CastlingRights(uint8_t rights) : value_{rights}
     {
     }
 
+    /// @brief Whether white may still castle kingside.
+    /// @return true if the white kingside right is set.
     constexpr bool MayWhiteCastleKingside() const
     {
         return !!(value_ & kWhiteKingside);
     }
+    /// @brief Whether white may still castle queenside.
+    /// @return true if the white queenside right is set.
     constexpr bool MayWhiteCastleQueenside() const
     {
         return !!(value_ & kWhiteQueenside);
     }
+    /// @brief Whether black may still castle kingside.
+    /// @return true if the black kingside right is set.
     constexpr bool MayBlackCastleKingside() const
     {
         return !!(value_ & kBlackKingside);
     }
+    /// @brief Whether black may still castle queenside.
+    /// @return true if the black queenside right is set.
     constexpr bool MayBlackCastleQueenside() const
     {
         return !!(value_ & kBlackQueenside);
@@ -43,6 +55,8 @@ class CastlingRights
     }
 
     /// @brief Return the castling rights that result after making a move.
+    /// @param move Move being made (its from/to squares may revoke rights).
+    /// @return Reference to this updated castling-rights object.
     constexpr CastlingRights &AfterMove(const Move &move)
     {
         value_ &= kMoveMasks[move.from()] & kMoveMasks[move.to()];
@@ -50,6 +64,8 @@ class CastlingRights
     }
 
     /// @brief Parse the castling field from a FEN string (e.g. "KQkq" or "-").
+    /// @param fen FEN castling field.
+    /// @return The parsed castling rights.
     static constexpr CastlingRights FromFen(std::string_view fen)
     {
         uint8_t result = 0;
@@ -101,19 +117,20 @@ class CastlingRights
   private:
     uint8_t value_; ///< The actual flag value.
 
+    /// @brief Castling-rights bit flags, and the AND masks applied when a key square is vacated/entered.
     enum Flags : uint8_t
     {
-        kWhiteKingside  = 0x01,
-        kWhiteQueenside = 0x02,
-        kBlackKingside  = 0x04,
-        kBlackQueenside = 0x08,
-        kOK             = (uint8_t)(~0),
-        kA1             = (uint8_t)(~kWhiteQueenside),
-        kE1             = (uint8_t)(~(kWhiteKingside | kWhiteQueenside)),
-        kH1             = (uint8_t)(~kWhiteKingside),
-        kA8             = (uint8_t)(~kBlackQueenside),
-        kE8             = (uint8_t)(~(kBlackKingside | kBlackQueenside)),
-        kH8             = (uint8_t)(~kBlackKingside),
+        kWhiteKingside  = 0x01,                                           ///< White may castle kingside.
+        kWhiteQueenside = 0x02,                                           ///< White may castle queenside.
+        kBlackKingside  = 0x04,                                           ///< Black may castle kingside.
+        kBlackQueenside = 0x08,                                           ///< Black may castle queenside.
+        kOK             = (uint8_t)(~0),                                  ///< Mask that preserves all rights.
+        kA1             = (uint8_t)(~kWhiteQueenside),                    ///< Mask applied for the a1 square.
+        kE1             = (uint8_t)(~(kWhiteKingside | kWhiteQueenside)), ///< Mask applied for the e1 square.
+        kH1             = (uint8_t)(~kWhiteKingside),                     ///< Mask applied for the h1 square.
+        kA8             = (uint8_t)(~kBlackQueenside),                    ///< Mask applied for the a8 square.
+        kE8             = (uint8_t)(~(kBlackKingside | kBlackQueenside)), ///< Mask applied for the e8 square.
+        kH8             = (uint8_t)(~kBlackKingside),                     ///< Mask applied for the h8 square.
     };
 
     /// @brief Mask values ANDed with move from and to squares to determine new castling rights after a move.

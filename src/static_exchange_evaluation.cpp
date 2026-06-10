@@ -11,26 +11,34 @@ constexpr int piece_values[7] = {0, 100, 300, 300, 500, 900, 10000};
 /// @brief Bitboards of piece on the board used for static exchange evaluation.
 struct SeeBoard
 {
-    Bitboard pawns;
-    Bitboard knights;
-    Bitboard bishops;
-    Bitboard rooks;
-    Bitboard queens;
-    Bitboard kings;
-    Bitboard white_pieces;
-    Bitboard black_pieces;
+    Bitboard pawns;        ///< Squares with a pawn on them.
+    Bitboard knights;      ///< Squares with a knight on them.
+    Bitboard bishops;      ///< Squares with a bishop on them.
+    Bitboard rooks;        ///< Squares with a rook on them.
+    Bitboard queens;       ///< Squares with a queen on them.
+    Bitboard kings;        ///< Squares with a king on them.
+    Bitboard white_pieces; ///< Squares with a white piece on them.
+    Bitboard black_pieces; ///< Squares with a black piece on them.
 
+    /// @brief Construct the working board from a position.
+    /// @param p Position to copy piece bitboards from.
     constexpr SeeBoard(const Position &p)
         : pawns(p.Pawns()), knights(p.Knights()), bishops(p.Bishops()), rooks(p.Rooks()), queens(p.Queens()),
           kings(p.Kings()), white_pieces(p.WhitePieces()), black_pieces(p.BlackPieces())
     {
     }
 
+    /// @brief Mutable bitboard for a piece type.
+    /// @param piece Piece type.
+    /// @return Reference to that type's bitboard.
     constexpr Bitboard &PiecesOfType(Piece piece)
     {
         return (&pawns)[piece - kPawn];
     }
 
+    /// @brief Mutable bitboard for a colour.
+    /// @param color Colour.
+    /// @return Reference to that colour's bitboard.
     constexpr Bitboard &PiecesOfColor(Color color)
     {
         return (&white_pieces)[color];
@@ -42,8 +50,7 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
 /// @brief Evaluate the static exchange evaluation for a move.
 /// @param src_position Position to evaluate.
 /// @param move Move to evaluate.
-/// @param is_checking On exit, set to true if the move gave check.
-/// @return static exchange evaluation score for this move, and whether move gives check.
+/// @return Pair of {static exchange evaluation score for this move, whether the move gives check}.
 std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move move)
 {
     Position    dst_position{src_position.MakeMove(move)};

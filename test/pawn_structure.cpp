@@ -1,4 +1,4 @@
-/// @file Pawn structure tests matching Go pawn_structure_test.go.
+/// @file pawn_structure.cpp Pawn structure tests matching Go pawn_structure_test.go.
 
 #include "evaluation.h"
 #include "position.h"
@@ -9,25 +9,29 @@
 #include <string_view>
 #include <vector>
 
+/// @brief A single boolean assertion within a pawn-structure test.
 struct Check
 {
-    bool        expected;
-    std::string description;
+    bool        expected;    ///< Result of the assertion (true = passed).
+    std::string description; ///< Description shown when the assertion fails.
 };
 
-static int total_failures = 0;
-static int total_checks   = 0;
+static int total_failures = 0; ///< Running count of failed assertions across all tests.
+static int total_checks   = 0; ///< Running count of all assertions across all tests.
 
-// has returns true if sq is a member of bb.
+/// @brief Whether a square is a member of a bitboard.
+/// @param bb Bitboard to test. @param sq Square to look for. @return true if the bit is set.
 static bool has(Bitboard bb, Square sq)
 {
     return (bb & Bitboard(sq)).IsNotEmpty();
 }
 
+/// @brief Run a named test (a set of assertions) and print its pass/fail result.
+/// @param name Test name. @param fn Function producing the list of assertions.
 static void run_test(std::string_view name, std::function<std::vector<Check>()> fn)
 {
-    auto   checks   = fn();
-    bool   all_pass = true;
+    auto checks   = fn();
+    bool all_pass = true;
     for (const auto &c : checks)
     {
         ++total_checks;
@@ -41,6 +45,8 @@ static void run_test(std::string_view name, std::function<std::vector<Check>()> 
     std::cout << std::format("[{}] {}\n", all_pass ? "PASS" : "FAIL", name);
 }
 
+/// @brief Run all pawn-structure tests.
+/// @return Non-zero if any assertion failed.
 int main()
 {
     // ── Test 1: single white pawn — isolated, unsupported, passed ─────────
@@ -49,11 +55,11 @@ int main()
         PawnStructure ps  = DeterminePawnStructure<kWhite>(pos);
         Square        e4("e4");
         return std::vector<Check>{
-            { has(ps.passed_pawns, e4),      "e4 should be passed"},
-            { has(ps.isolated_pawns, e4),    "e4 should be isolated"},
-            { has(ps.unsupported_pawns, e4), "e4 should be unsupported"},
-            {!has(ps.doubled_pawns, e4),     "e4 should not be doubled"},
-            {!has(ps.defended_pawns, e4),    "e4 should not be defended"},
+            {has(ps.passed_pawns, e4), "e4 should be passed"},
+            {has(ps.isolated_pawns, e4), "e4 should be isolated"},
+            {has(ps.unsupported_pawns, e4), "e4 should be unsupported"},
+            {!has(ps.doubled_pawns, e4), "e4 should not be doubled"},
+            {!has(ps.defended_pawns, e4), "e4 should not be defended"},
         };
     });
 
@@ -63,11 +69,11 @@ int main()
         PawnStructure ps  = DeterminePawnStructure<kWhite>(pos);
         Square        e4("e4"), d3("d3");
         return std::vector<Check>{
-            { has(ps.defended_pawns, e4),    "e4 should be defended by d3"},
+            {has(ps.defended_pawns, e4), "e4 should be defended by d3"},
             {!has(ps.unsupported_pawns, e4), "e4 should be supported (d3 is in its support window)"},
-            {!has(ps.isolated_pawns, e4),    "e4 should not be isolated (d-file has a pawn)"},
-            {!has(ps.defended_pawns, d3),    "d3 should not be defended"},
-            { has(ps.unsupported_pawns, d3), "d3 should be unsupported (e4 is rank 4, above supportedMask[d3])"},
+            {!has(ps.isolated_pawns, e4), "e4 should not be isolated (d-file has a pawn)"},
+            {!has(ps.defended_pawns, d3), "d3 should not be defended"},
+            {has(ps.unsupported_pawns, d3), "d3 should be unsupported (e4 is rank 4, above supportedMask[d3])"},
         };
     });
 
@@ -78,8 +84,8 @@ int main()
         Square        e4("e4");
         return std::vector<Check>{
             {!has(ps.unsupported_pawns, e4), "e4 should be supported (d2 is in its support window)"},
-            {!has(ps.defended_pawns, e4),    "e4 should NOT be defended (d2 is two ranks behind)"},
-            {!has(ps.isolated_pawns, e4),    "e4 should not be isolated (d-file has a pawn)"},
+            {!has(ps.defended_pawns, e4), "e4 should NOT be defended (d2 is two ranks behind)"},
+            {!has(ps.isolated_pawns, e4), "e4 should not be isolated (d-file has a pawn)"},
         };
     });
 
@@ -89,10 +95,10 @@ int main()
         PawnStructure ps  = DeterminePawnStructure<kWhite>(pos);
         Square        e5("e5"), e6("e6");
         return std::vector<Check>{
-            { has(ps.doubled_pawns, e5),  "e5 should be doubled (e6 is ahead on same file)"},
-            {!has(ps.doubled_pawns, e6),  "e6 should not be doubled (nothing ahead)"},
-            {!has(ps.passed_pawns, e5),   "e5 should not be passed: doubled pawns are excluded from passed"},
-            { has(ps.passed_pawns, e6),   "e6 should be passed (front pawn, not doubled, no blockers)"},
+            {has(ps.doubled_pawns, e5), "e5 should be doubled (e6 is ahead on same file)"},
+            {!has(ps.doubled_pawns, e6), "e6 should not be doubled (nothing ahead)"},
+            {!has(ps.passed_pawns, e5), "e5 should not be passed: doubled pawns are excluded from passed"},
+            {has(ps.passed_pawns, e6), "e6 should be passed (front pawn, not doubled, no blockers)"},
         };
     });
 
@@ -102,9 +108,9 @@ int main()
         PawnStructure ps  = DeterminePawnStructure<kWhite>(pos);
         Square        e4("e4");
         return std::vector<Check>{
-            {!has(ps.passed_pawns, e4),      "e4 should not be passed (black pawn on f5 is in the passed-pawn mask)"},
-            { has(ps.unsupported_pawns, e4), "e4 should be unsupported"},
-            { has(ps.isolated_pawns, e4),    "e4 should be isolated"},
+            {!has(ps.passed_pawns, e4), "e4 should not be passed (black pawn on f5 is in the passed-pawn mask)"},
+            {has(ps.unsupported_pawns, e4), "e4 should be unsupported"},
+            {has(ps.isolated_pawns, e4), "e4 should be isolated"},
         };
     });
 
@@ -114,10 +120,10 @@ int main()
         PawnStructure ps  = DeterminePawnStructure<kBlack>(pos);
         Square        e5("e5"), d6("d6");
         return std::vector<Check>{
-            { has(ps.defended_pawns, e5),    "black e5 should be defended by d6"},
+            {has(ps.defended_pawns, e5), "black e5 should be defended by d6"},
             {!has(ps.unsupported_pawns, e5), "black e5 should be supported (d6 is in its support window)"},
-            {!has(ps.isolated_pawns, e5),    "black e5 should not be isolated"},
-            {!has(ps.defended_pawns, d6),    "black d6 should not be defended"},
+            {!has(ps.isolated_pawns, e5), "black e5 should not be isolated"},
+            {!has(ps.defended_pawns, d6), "black d6 should not be defended"},
         };
     });
 
@@ -128,7 +134,7 @@ int main()
         Square        e5("e5");
         return std::vector<Check>{
             {!has(ps.unsupported_pawns, e5), "black e5 should be supported (d7 is in its support window)"},
-            {!has(ps.defended_pawns, e5),    "black e5 should NOT be defended (d7 is two ranks behind)"},
+            {!has(ps.defended_pawns, e5), "black e5 should NOT be defended (d7 is two ranks behind)"},
         };
     });
 
@@ -138,18 +144,18 @@ int main()
         PawnStructure ps  = DeterminePawnStructure<kWhite>(pos);
         Square        c3("c3"), d4("d4"), e5("e5");
         return std::vector<Check>{
-            { has(ps.defended_pawns, d4),    "d4 should be defended by c3"},
-            { has(ps.defended_pawns, e5),    "e5 should be defended by d4"},
-            {!has(ps.defended_pawns, c3),    "c3 should not be defended"},
-            { has(ps.unsupported_pawns, c3), "c3 should be unsupported (d4 is ahead, not behind)"},
+            {has(ps.defended_pawns, d4), "d4 should be defended by c3"},
+            {has(ps.defended_pawns, e5), "e5 should be defended by d4"},
+            {!has(ps.defended_pawns, c3), "c3 should not be defended"},
+            {has(ps.unsupported_pawns, c3), "c3 should be unsupported (d4 is ahead, not behind)"},
             {!has(ps.unsupported_pawns, d4), "d4 should be supported by c3"},
             {!has(ps.unsupported_pawns, e5), "e5 should be supported by d4"},
-            {!has(ps.doubled_pawns, c3),     "c3 should not be doubled"},
-            {!has(ps.doubled_pawns, d4),     "d4 should not be doubled"},
-            {!has(ps.doubled_pawns, e5),     "e5 should not be doubled"},
-            { has(ps.passed_pawns, c3),      "c3 should be passed (no enemy pawns)"},
-            { has(ps.passed_pawns, d4),      "d4 should be passed (no enemy pawns)"},
-            { has(ps.passed_pawns, e5),      "e5 should be passed (no enemy pawns)"},
+            {!has(ps.doubled_pawns, c3), "c3 should not be doubled"},
+            {!has(ps.doubled_pawns, d4), "d4 should not be doubled"},
+            {!has(ps.doubled_pawns, e5), "e5 should not be doubled"},
+            {has(ps.passed_pawns, c3), "c3 should be passed (no enemy pawns)"},
+            {has(ps.passed_pawns, d4), "d4 should be passed (no enemy pawns)"},
+            {has(ps.passed_pawns, e5), "e5 should be passed (no enemy pawns)"},
         };
     });
 

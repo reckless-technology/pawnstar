@@ -1,5 +1,5 @@
 #pragma once
-/// @file Types and functions for using chess moves.
+/// @file move.h Types and functions for using chess moves.
 
 #include <algorithm>
 #include <cstdint>
@@ -41,7 +41,7 @@ class Move
     static constexpr int     kDepthShift    = 25;
     static constexpr int     kAgeShift      = 33;
     static constexpr int     kScoreShift    = 41;
-    static constexpr int64_t kAgeMask       = (int64_t)0xFF << kAgeShift;             // bits 33-40
+    static constexpr int64_t kAgeMask       = (int64_t)0xFF << kAgeShift;            // bits 33-40
     static constexpr int64_t kScoreMask     = ~(((int64_t)1 << kScoreShift) - 1);    // bits 41-63
     static constexpr int64_t kTTDataMask    = ~(((int64_t)1 << kNodeTypeShift) - 1); // bits 23-63
     int64_t                  val;
@@ -250,6 +250,7 @@ class Move
     /// @brief Create a non capture move.
     /// @param from From square.
     /// @param to To square.
+    /// @param piece Moving piece.
     /// @return The move.
     constexpr static Move NonCapture(Square from, Square to, Piece piece)
     {
@@ -259,6 +260,8 @@ class Move
     /// @brief Create a capture move.
     /// @param from From square.
     /// @param to To square.
+    /// @param piece Moving piece.
+    /// @param captured Captured piece.
     /// @return The move.
     constexpr static Move Capture(Square from, Square to, Piece piece, Piece captured)
     {
@@ -269,6 +272,7 @@ class Move
     /// @param from From square.
     /// @param to To square.
     /// @param promoted Piece to be promoted to.
+    /// @param captured Captured piece.
     /// @return The move.
     constexpr static Move Promotion(Square from, Square to, Piece promoted, Piece captured)
     {
@@ -333,20 +337,29 @@ class Move
     }
 
   private:
+    /// @brief Construct a non-capture move of a piece.
+    /// @param from From square. @param to To square. @param piece Moving piece.
     constexpr Move(Square from, Square to, Piece piece) : val(to | (from << 6) | (piece << 12))
     {
     }
 
+    /// @brief Construct a typed move (no captured piece).
+    /// @param from From square. @param to To square. @param piece Moving piece. @param type Move type.
     constexpr Move(Square from, Square to, Piece piece, Type type)
         : val(to | (from << 6) | (piece << 12) | (type << 18))
     {
     }
 
+    /// @brief Construct a typed capture move.
+    /// @param from From square. @param to To square. @param piece Moving piece. @param type Move type.
+    /// @param captured Captured piece.
     constexpr Move(Square from, Square to, Piece piece, Type type, Piece captured)
         : val(to | (from << 6) | (piece << 12) | (captured << 15) | (type << 18))
     {
     }
 
+    /// @brief Construct directly from a raw 64-bit representation.
+    /// @param v Raw packed move bits.
     constexpr Move(int64_t v) : val(v)
     {
     }

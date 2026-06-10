@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 
+#include "generated_data.h"
 #include "move.h"
 
 /// @brief A transposition table entry.
@@ -77,6 +78,6 @@ class TranspositionTable
     static_assert(sizeof(AtomicEntry) == 16);
 
     std::unique_ptr<AtomicEntry[]> table_;          ///< Indexed using Zobrist hash; value-initialised to 0.
-    std::size_t                    size_ = 0;        ///< Number of cells in table_.
-    uint8_t                        generation_ = 0;  ///< Current generation; bumped by Age().
+    std::size_t                    size_       = 0; ///< Number of cells in table_.
+    uint8_t                        generation_ = 0; ///< Current generation; bumped by Age().
 };

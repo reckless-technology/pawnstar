@@ -1,4 +1,4 @@
-/// @file Precomputes, at compile time, constants used by pawnstar.
+/// @file generate_constants.cpp Precomputes, at compile time, constants used by pawnstar.
 /// This program is compiled and then executed by the Makefile to create the "generated_data.cpp" file which is then
 /// used in the compilation of the main program.
 
@@ -20,33 +20,34 @@
 /// @brief Chess piece types.
 enum Piece
 {
-    kNone,
-    kPawn,
-    kKnight,
-    kBishop,
-    kRook,
-    kQueen,
-    kKing,
+    kNone,   ///< No piece / empty square.
+    kPawn,   ///< Pawn.
+    kKnight, ///< Knight.
+    kBishop, ///< Bishop.
+    kRook,   ///< Rook.
+    kQueen,  ///< Queen.
+    kKing,   ///< King.
 };
 
 /// @brief Compass rose directions from white's perspective, i.e. north is "forward" for white.
 enum Direction
 {
-    kNorth,
-    kNortheast,
-    kEast,
-    kSoutheast,
-    kSouth,
-    kSouthwest,
-    kWest,
-    kNorthwest,
+    kNorth,     ///< Up the board (toward rank 8).
+    kNortheast, ///< Up and to the right.
+    kEast,      ///< To the right (toward the h-file).
+    kSoutheast, ///< Down and to the right.
+    kSouth,     ///< Down the board (toward rank 1).
+    kSouthwest, ///< Down and to the left.
+    kWest,      ///< To the left (toward the a-file).
+    kNorthwest, ///< Up and to the left.
 };
 
-constexpr uint64_t                        kFileA = 0x0101010101010101; ///< Using LERF bitboard mapping.
-constexpr uint64_t                        kFileH = kFileA << 7;
-constexpr std::array<std::string_view, 7> kPieceNames{"none", "pawn", "knight", "bishop", "rook", "queen", "king"};
-constexpr std::array<std::string_view, 2> kColorNames{"white", "black"};
-std::mt19937_64                           prng{0xAA55AA55AA55AA55};
+constexpr uint64_t                        kFileA = 0x0101010101010101; ///< The a-file (LERF bitboard mapping).
+constexpr uint64_t                        kFileH = kFileA << 7;        ///< The h-file.
+constexpr std::array<std::string_view, 7> kPieceNames{"none", "pawn",  "knight", "bishop",
+                                                      "rook", "queen", "king"}; ///< Piece names by index.
+constexpr std::array<std::string_view, 2> kColorNames{"white", "black"};        ///< Color names by index.
+std::mt19937_64                           prng{0xAA55AA55AA55AA55};             ///< PRNG for generating Zobrist hashes.
 
 // clang-format off
 constexpr uint8_t       FileOf(uint8_t sq)          { return sq  & 7; }                         ///< Convert square index to file.
@@ -75,7 +76,7 @@ constexpr std::array<ShiftFn, 8> kShiftFunctions{ShiftNorth, ShiftNortheast, Shi
                                                  ShiftSouth, ShiftSouthwest, ShiftWest, ShiftNorthwest};
 
 /// @brief Generate a ray from a square in a single compass direction.
-/// @param Source Square index.
+/// @param sq Source square index.
 /// @param direction Compass direction.
 /// @return Ray from sq in direction specified, excluding source square.
 constexpr uint64_t RayFrom(uint8_t sq, Direction direction)
@@ -413,9 +414,10 @@ struct PiecePextGenerator
 };
 
 // clang-format off
-constexpr std::array<PiecePextGenerator, 2> kPieceGenerators = 
+/// @brief The pext generators for the two sliding piece types that use pext lookup.
+constexpr std::array<PiecePextGenerator, 2> kPieceGenerators =
 {{
-    { "kBishop", BishopAttacks, BishopOccupancyMask }, 
+    { "kBishop", BishopAttacks, BishopOccupancyMask },
     { "kRook",   RookAttacks,   RookOccupancyMask   },
 }};
 // clang-format on

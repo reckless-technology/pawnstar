@@ -1,4 +1,5 @@
 #pragma once
+/// @file pins.h Absolute-pin detection and the resulting legal move masks.
 
 #include "bitboard.h"
 #include "generated_data.h"

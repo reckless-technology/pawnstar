@@ -12,8 +12,7 @@
 int EvaluatePosition(const SearchState &state, int alpha, int beta)
 {
     INCREMENT("eval calls");
-    if (state.CurrentPosition().IsDrawByMaterial() || state.IsDrawByFiftyMoves() ||
-        state.IsDrawByRepetition())
+    if (state.CurrentPosition().IsDrawByMaterial() || state.IsDrawByFiftyMoves() || state.IsDrawByRepetition())
     {
         return kDrawScore;
     }

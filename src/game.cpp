@@ -23,6 +23,7 @@ void Game::NewGame(std::string_view fen_string)
     positions_.push_back(Position::FromString(fen_string));
 }
 
+/// @brief Start a new game from the standard initial position.
 void Game::NewGame()
 {
     NewGame("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");

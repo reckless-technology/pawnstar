@@ -16,6 +16,7 @@
 #include "position.h"
 #include "transposition_table.h"
 
+/// @brief Pointer to a command handler taking the game and the command's argument list.
 using HandlerFn = void (*)(Game &game, std::span<std::string> args);
 
 /// @brief Structure to hold a hander for an input command.
@@ -25,44 +26,57 @@ struct Handler
     std::string_view name;        ///< Command name
     std::string_view description; ///< Command description
 
+    /// @brief Construct a command handler entry.
+    /// @param fn Handler function. @param name Command name. @param desc Human-readable description.
     constexpr Handler(HandlerFn fn, std::string_view name, std::string_view desc)
         : function(fn), name(name), description(desc)
     {
     }
 };
 
+/// @brief Handle the "bookmoves" command: display book moves for the current position.
+/// @param game Game to act on.
 void handle_bookmoves(Game &game, std::span<std::string>)
 {
     game.book.DisplayAvailableMoves(game.CurrentPosition());
 }
 
+/// @brief Handle the "freebook" command: release the opening book from memory.
+/// @param game Game to act on.
 void handle_freebook(Game &game, std::span<std::string>)
 {
     game.book.Free();
 }
 
+/// @brief Handle the "eval" command: print the static evaluation of the current position.
+/// @param game Game to act on.
 void handle_eval(Game &game, std::span<std::string>)
 {
     SearchState tmp{game};
     std::cout << std::format("evaluation {}\n", EvaluatePosition(tmp, kAlpha, kBeta));
 }
 
+/// @brief Handle the "dbg" command: print diagnostic counters.
 void handle_dbg(Game &, std::span<std::string>)
 {
     DebugXWrite();
 }
 
+/// @brief Handle the "dbgclear" command: reset diagnostic counters.
 void handle_dbgclear(Game &, std::span<std::string>)
 {
     DebugXClear();
 }
 
+/// @brief Handle the "getboard" command: print the FEN of the current position.
+/// @param game Game to act on.
 void handle_getboard(Game &game, std::span<std::string>)
 {
     auto fen = game.CurrentPosition().ToString();
     std::cout << std::format("{}\n", fen);
 }
 
+/// @brief Handle the "uci" command: identify the engine and acknowledge UCI mode.
 void handle_uci(Game &, std::span<std::string>)
 {
     std::cout << "id name Pawnstar\n";
@@ -70,12 +84,17 @@ void handle_uci(Game &, std::span<std::string>)
     std::cout << "uciok\n";
 }
 
+/// @brief Handle the "ucinewgame" command: stop searching and reset to a new game.
+/// @param game Game to act on.
 void handle_ucinewgame(Game &game, std::span<std::string>)
 {
     game.StopThinking();
     game.NewGame();
 }
 
+/// @brief Handle the "go" command: parse time controls and start searching.
+/// @param game Game to act on.
+/// @param args Command arguments (time controls, depth, etc.).
 void handle_go(Game &game, std::span<std::string> args)
 {
     for (std::size_t i = 1; i < args.size(); ++i)
@@ -112,22 +131,30 @@ void handle_go(Game &game, std::span<std::string> args)
     game.StartThinking();
 }
 
+/// @brief Handle the "stop" command: stop searching and report the best move found.
+/// @param game Game to act on.
 void handle_stop(Game &game, std::span<std::string>)
 {
     game.StopThinking();
 }
 
+/// @brief Handle the "quit" command: stop searching and exit the program.
+/// @param game Game to act on.
 void handle_quit(Game &game, std::span<std::string>)
 {
     game.StopThinking();
     exit(0);
 }
 
+/// @brief Handle the "isready" command: respond with readyok.
 void handle_isready(Game &, std::span<std::string>)
 {
     std::cout << "readyok\n";
 }
 
+/// @brief Handle the "position" command: set up the position and apply the listed moves.
+/// @param game Game to act on.
+/// @param args Command arguments (startpos / fen and the move list).
 void handle_position(Game &game, std::span<std::string> args)
 {
     for (std::size_t i = 1; i < args.size(); ++i)
@@ -150,12 +177,15 @@ void handle_position(Game &game, std::span<std::string> args)
     }
 }
 
+/// @brief Handle the "help" command: list all available commands.
 void handle_help(Game &, std::span<std::string>);
 
+/// @brief Expand to a handler function pointer and its command name string.
 #define COMMAND(name) handle_##name, #name
 
 // clang-format off
-constexpr std::array handlers = 
+/// @brief Table of all supported input commands and their handlers.
+constexpr std::array handlers =
 {
     Handler { COMMAND(bookmoves),      "Display available book moves for current position"},
     Handler { COMMAND(dbg),            "Display diagnostic counts"},
@@ -174,6 +204,7 @@ constexpr std::array handlers =
 };
 // clang-format on
 
+/// @brief Handle the "help" command: list all available commands.
 void handle_help(Game &, std::span<std::string>)
 {
     std::cout << "Available commands:\n";
@@ -183,6 +214,9 @@ void handle_help(Game &, std::span<std::string>)
     }
 }
 
+/// @brief Tokenize a line of input and dispatch it to the matching command handler.
+/// @param game Game to act on.
+/// @param line Input line.
 void ProcessInput(Game &game, std::string_view line)
 {
     std::stringstream ss;

@@ -1,5 +1,5 @@
 #pragma once
-/// @file Chess clock.
+/// @file chess_clock.h Chess clock.
 #include <chrono>
 #include <cstdint>
 
@@ -16,6 +16,7 @@ class ChessClock
         kInfinite,   ///< Keep searching until told to stop.
     };
 
+    /// @brief Default constructor; standard clock with five minutes remaining, started now.
     ChessClock()
         : clock_type{kStandard}, hard_stop_ms{0}, ms_remaining{5 * 60 * 1000}, num_moves_remaining{0}, depth{10},
           start_time_{std::chrono::system_clock::now()}
@@ -28,16 +29,20 @@ class ChessClock
     int       num_moves_remaining; ///< Number of moves remaining in this clock period.
     int       depth;               ///< Search depth (when CLOCK_FIXED_DEPTH is used).
 
+    /// @brief Elapsed time since the clock was constructed.
+    /// @return Microseconds elapsed.
     int64_t ElapsedMicroseconds()
     {
         return duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start_time_).count();
     }
 
+    /// @brief Elapsed time since the clock was constructed.
+    /// @return Milliseconds elapsed.
     int64_t ElapsedMilliseconds()
     {
         return ElapsedMicroseconds() / 1000;
     }
 
   private:
-    std::chrono::system_clock::time_point start_time_;
+    std::chrono::system_clock::time_point start_time_; ///< When the clock was started.
 };

@@ -1,5 +1,5 @@
 #pragma once
-/// @file Square indices on the chess board.
+/// @file square.h Square indices on the chess board.
 
 #include <cstdint>
 #include <string>

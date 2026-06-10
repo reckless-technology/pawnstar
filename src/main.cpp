@@ -14,8 +14,11 @@
 #include <string_view>
 #include <unistd.h>
 
+/// @brief Process a single line of UCI input (defined in input_handling.cpp).
 void ProcessInput(Game &game, std::string_view line);
 
+/// @brief Program entry point. Prints the banner, loads the book, then runs the UCI input loop.
+/// @return Process exit code.
 int main()
 {
     setbuf(stdin, NULL);

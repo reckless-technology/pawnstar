@@ -1,5 +1,5 @@
 #pragma once
-/// @file Types, values and functions for using chess Bitboards.
+/// @file bitboard.h Types, values and functions for using chess Bitboards.
 
 #include <cstdint>
 #include <string>
@@ -256,33 +256,46 @@ class Bitboard
     class Iterator
     {
       private:
-        uint64_t i;
+        uint64_t i; ///< Remaining set bits still to be iterated over.
 
       public:
-        using value_type = Square;
+        using value_type = Square; ///< Value produced when dereferencing the iterator.
+
+        /// @brief Construct an iterator over the set bits of a bitboard.
+        /// @param bb Bitboard whose set bits will be iterated.
         constexpr Iterator(Bitboard bb) : i(bb.v)
         {
         }
+        /// @brief Compare against the end sentinel.
+        /// @return true when there are no more bits to iterate over.
         constexpr bool operator==(const Sentinel &) const
         {
-            return i == 0; ///< No more bits to iterate over.
+            return i == 0;
         }
+        /// @brief Dereference.
+        /// @return Square index of the least significant set bit.
         constexpr Square operator*() const
         {
-            return Square{(uint8_t)__builtin_ctzll(i)}; ///< Least significant bit.
+            return Square{(uint8_t)__builtin_ctzll(i)};
         }
+        /// @brief Advance to the next set bit by clearing the least significant set bit.
+        /// @return Reference to this iterator.
         constexpr Iterator &operator++()
         {
-            i &= i - 1; ///< Clear LSB.
+            i &= i - 1;
             return *this;
         }
     };
 
+    /// @brief Begin iteration over the set bits.
+    /// @return Iterator to the first set bit.
     constexpr Iterator begin() const
     {
         return Iterator{*this};
     }
 
+    /// @brief End of iteration.
+    /// @return Sentinel marking the end of the set bits.
     constexpr Sentinel end() const
     {
         return Sentinel{};
@@ -291,24 +304,24 @@ class Bitboard
 
 // Useful Bitboard constant values.
 // clang-format off
-static constexpr Bitboard kNoSquares        {0ull};
-static constexpr Bitboard kAllSquares       {~kNoSquares};
-static constexpr Bitboard kRank1            {0xFFull};
-static constexpr Bitboard kRank2            {kRank1.ShiftNorth()};
-static constexpr Bitboard kRank3            {kRank2.ShiftNorth()};
-static constexpr Bitboard kRank4            {kRank3.ShiftNorth()};
-static constexpr Bitboard kRank5            {kRank4.ShiftNorth()};
-static constexpr Bitboard kRank6            {kRank5.ShiftNorth()};
-static constexpr Bitboard kRank7            {kRank6.ShiftNorth()};
-static constexpr Bitboard kRank8            {kRank7.ShiftNorth()};
-static constexpr Bitboard kFileA            {0x0101010101010101ull};
-static constexpr Bitboard kFileB            {kFileA.ShiftEast()};
-static constexpr Bitboard kFileC            {kFileB.ShiftEast()};
-static constexpr Bitboard kFileD            {kFileC.ShiftEast()};
-static constexpr Bitboard kFileE            {kFileD.ShiftEast()};
-static constexpr Bitboard kFileF            {kFileE.ShiftEast()};
-static constexpr Bitboard kFileG            {kFileF.ShiftEast()};
-static constexpr Bitboard kFileH            {kFileG.ShiftEast()};
-static constexpr Bitboard kWhiteSquares     {0x55AA55AA55AA55AAull};
-static constexpr Bitboard kBlackSquares     {~kWhiteSquares};
+static constexpr Bitboard kNoSquares        {0ull};                 ///< Empty board (no squares set).
+static constexpr Bitboard kAllSquares       {~kNoSquares};          ///< Every square set.
+static constexpr Bitboard kRank1            {0xFFull};              ///< All squares on rank 1.
+static constexpr Bitboard kRank2            {kRank1.ShiftNorth()};  ///< All squares on rank 2.
+static constexpr Bitboard kRank3            {kRank2.ShiftNorth()};  ///< All squares on rank 3.
+static constexpr Bitboard kRank4            {kRank3.ShiftNorth()};  ///< All squares on rank 4.
+static constexpr Bitboard kRank5            {kRank4.ShiftNorth()};  ///< All squares on rank 5.
+static constexpr Bitboard kRank6            {kRank5.ShiftNorth()};  ///< All squares on rank 6.
+static constexpr Bitboard kRank7            {kRank6.ShiftNorth()};  ///< All squares on rank 7.
+static constexpr Bitboard kRank8            {kRank7.ShiftNorth()};  ///< All squares on rank 8.
+static constexpr Bitboard kFileA            {0x0101010101010101ull};///< All squares on the a file.
+static constexpr Bitboard kFileB            {kFileA.ShiftEast()};   ///< All squares on the b file.
+static constexpr Bitboard kFileC            {kFileB.ShiftEast()};   ///< All squares on the c file.
+static constexpr Bitboard kFileD            {kFileC.ShiftEast()};   ///< All squares on the d file.
+static constexpr Bitboard kFileE            {kFileD.ShiftEast()};   ///< All squares on the e file.
+static constexpr Bitboard kFileF            {kFileE.ShiftEast()};   ///< All squares on the f file.
+static constexpr Bitboard kFileG            {kFileF.ShiftEast()};   ///< All squares on the g file.
+static constexpr Bitboard kFileH            {kFileG.ShiftEast()};   ///< All squares on the h file.
+static constexpr Bitboard kWhiteSquares     {0x55AA55AA55AA55AAull};///< All light squares.
+static constexpr Bitboard kBlackSquares     {~kWhiteSquares};       ///< All dark squares.
 // clang-format on

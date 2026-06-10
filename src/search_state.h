@@ -1,5 +1,5 @@
 #pragma once
-/// @file Per-thread search state for the parallel alpha-beta search.
+/// @file search_state.h Per-thread search state for the parallel alpha-beta search.
 
 #include "constants.h"
 #include "move.h"
@@ -27,10 +27,10 @@ struct HashEntry
 class SearchState
 {
   public:
-    Game &                                   game;         ///< Shared state: TT, history, clock, cancellation flag.
+    Game                                    &game;         ///< Shared state: TT, history, clock, cancellation flag.
     std::array<std::array<Move, 2>, kMaxPly> killers{};    ///< Killer moves indexed by ply.
     int                                      node_count{}; ///< Nodes searched by this thread.
-    std::atomic<bool> *                      batch_cutoff; ///< Per-batch abort flag; nullptr on the main thread.
+    std::atomic<bool>                       *batch_cutoff; ///< Per-batch abort flag; nullptr on the main thread.
 
     /// @brief Construct the main-thread search state from the current game.
     /// Builds the full hash history from the game's position stack and seeds the per-thread
@@ -46,26 +46,40 @@ class SearchState
     SearchState(const SearchState &parent, std::atomic<bool> *cutoff);
 
     /// @brief Current position at the tip of the search tree.
+    /// @return Reference to the current position.
     Position &CurrentPosition()
     {
         return positions_.back();
     }
 
     /// @brief Current position at the tip of the search tree (const overload).
+    /// @return Const reference to the current position.
     const Position &CurrentPosition() const
     {
         return positions_.back();
     }
 
+    /// @brief Make a move, pushing the resulting position onto the stack and recording its hash.
+    /// @param move Move to play.
     void PlayMove(Move move);
+    /// @brief Undo the most recent move, popping the position and hash stacks.
     void UndoMove();
+    /// @brief Play a null (pass) move, pushing the resulting position.
     void MakeNullMove();
+    /// @brief Assign ordering scores to a move list and sort it best-first.
+    /// @param moves Move list to score and sort.
+    /// @param ply Current search ply (used for the history heuristic).
     void ScoreAndSortMoves(MoveList &moves, int ply) const;
+    /// @brief Whether the current position is a draw by threefold repetition.
+    /// @return true if drawn by repetition.
     bool IsDrawByRepetition() const;
+    /// @brief Whether the current position is a draw by the fifty-move rule.
+    /// @return true if drawn by the fifty-move rule.
     bool IsDrawByFiftyMoves() const;
 
     /// @brief Returns true if this thread should abort: the global time limit fired, or a
     /// sibling worker in the current batch found a beta cutoff.
+    /// @return true if the search should be abandoned.
     bool IsCancelled() const;
 
     /// @brief Signal that this worker's batch should be cut off (beta cutoff found).
@@ -77,7 +91,7 @@ class SearchState
 
   private:
     StackList<Position, kMaxPly + 4> positions_;  ///< Per-thread copy-make position stack.
-    std::vector<HashEntry>           hash_stack_;  ///< Hash history from game-start through parent of current node.
+    std::vector<HashEntry>           hash_stack_; ///< Hash history from game-start through parent of current node.
 
     /// @brief Piece values for MVV/LVA move scoring (indexed by Piece enum).
     static constexpr std::array<int, 7> kPieceValues{0, 100, 300, 300, 500, 900, 10000};

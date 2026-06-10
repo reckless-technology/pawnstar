@@ -74,10 +74,10 @@ constexpr void Position::MovePiece(Color color, Piece piece, Square from, Square
     squares_[to]   = piece;
 }
 
-static constexpr Square G1{"G1"};
-static constexpr Square C1{"C1"};
-static constexpr Square G8{"G8"};
-static constexpr Square C8{"C8"};
+static constexpr Square G1{"G1"}; ///< White kingside castling king destination.
+static constexpr Square C1{"C1"}; ///< White queenside castling king destination.
+static constexpr Square G8{"G8"}; ///< Black kingside castling king destination.
+static constexpr Square C8{"C8"}; ///< Black queenside castling king destination.
 
 /// @brief Make a move and return the new position.
 /// @param move The move to be made.
@@ -257,6 +257,8 @@ Position Position::FromString(std::string_view fen_string)
     return position;
 }
 
+/// @brief Serialize the position to a FEN string.
+/// @return The FEN representation of the position.
 std::string Position::ToString() const
 {
     ostringstream ss;
@@ -396,11 +398,15 @@ constexpr zobrist_t Position::ComputeHash() const
     return hash;
 }
 
+/// @brief Whether the side to move is stalemated (not in check, no legal moves).
+/// @return true if stalemate.
 bool Position::IsStalemate() const
 {
     return !IsInCheck() && GenerateLegalMoves().size() == 0;
 }
 
+/// @brief Whether the side to move is checkmated (in check, no legal moves).
+/// @return true if checkmate.
 bool Position::IsCheckmate() const
 {
     return IsInCheck() && GenerateLegalMoves().size() == 0;

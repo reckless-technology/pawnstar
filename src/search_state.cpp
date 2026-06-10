@@ -1,4 +1,4 @@
-/// @file Per-thread search state implementation.
+/// @file search_state.cpp Per-thread search state implementation.
 
 #include "search_state.h"
 #include "game.h"
@@ -24,8 +24,7 @@ SearchState::SearchState(Game &g) : game(g), batch_cutoff(nullptr)
 /// @brief Construct a worker search state forked from a parent state.
 /// The worker gets a full copy of the parent's hash history (for repetition detection)
 /// and starts its own position stack from the parent's current position.
-SearchState::SearchState(const SearchState &parent, std::atomic<bool> *cutoff)
-    : game(parent.game), batch_cutoff(cutoff)
+SearchState::SearchState(const SearchState &parent, std::atomic<bool> *cutoff) : game(parent.game), batch_cutoff(cutoff)
 {
     hash_stack_ = parent.hash_stack_;
     hash_stack_.reserve(hash_stack_.size() + kMaxPly + 4);

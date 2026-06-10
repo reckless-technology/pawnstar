@@ -1,5 +1,5 @@
 #pragma once
-/// @file Fixed-size thread pool for parallel search.
+/// @file thread_pool.h Fixed-size thread pool for parallel search.
 
 #include "constants.h"
 

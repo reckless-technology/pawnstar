@@ -1,9 +1,9 @@
 #pragma once
-/// @file Sliding piece bitboard attacks. Uses precomputed pext bitboards to lookup sliding piece attacks without loops
-/// or branches.
+/// @file attacks.h Sliding piece bitboard attacks. Uses precomputed pext bitboards to lookup sliding piece attacks
+/// without loops or branches.
 
-#include "generated_data.h"
 #include "constants.h"
+#include "generated_data.h"
 
 #include <immintrin.h>
 
@@ -47,16 +47,26 @@ constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square s)
 // Alternate sliding piece attacks using traditional approach instead of pext bitboards. This is slower, and only used
 // for regression testing purposes.
 
+/// @brief Least significant bit, with the MSB forced set so an empty board still yields a valid square.
+/// @param b Bitboard to scan.
+/// @return Square index of the least significant set bit.
 constexpr Square LsbX(Bitboard b)
 {
     return (b | 0x8000000000000000).Lsb();
 }
 
+/// @brief Most significant bit, with the LSB forced set so an empty board still yields a valid square.
+/// @param b Bitboard to scan.
+/// @return Square index of the most significant set bit.
 constexpr Square MsbX(Bitboard b)
 {
     return (b | 1).Msb();
 }
 
+/// @brief Bishop sliding attacks (traditional ray-scan implementation).
+/// @param occupied_squares Squares with a piece on them.
+/// @param location Bishop location.
+/// @return Set of squares attacked by a bishop on location.
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
 {
     Bitboard result = kBishopAttacks[location];
@@ -67,6 +77,10 @@ constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square location)
     return result;
 }
 
+/// @brief Rook sliding attacks (traditional ray-scan implementation).
+/// @param occupied_squares Squares with a piece on them.
+/// @param location Rook location.
+/// @return Set of squares attacked by a rook on location.
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 {
     Bitboard result = kRookAttacks[location];
@@ -81,16 +95,18 @@ constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square location)
 
 /// @brief Queen sliding attacks.
 /// @param occupied_squares Squares with a piece on them.
-/// @param location Queen location.
+/// @param s Queen location.
 /// @return Set of squares attacked by a queen on location.
 constexpr Bitboard QueenAttacks(Bitboard occupied_squares, Square s)
 {
     return BishopAttacks(occupied_squares, s) | RookAttacks(occupied_squares, s);
 }
 
+/// @brief Pointer to an attack-generation function taking occupancy and a square.
 using AttackFn = Bitboard (*)(Bitboard occupied_squares, Square locn);
 // clang-format off
-constexpr std::array<std::pair<Piece, AttackFn>, 5> piece_attackers 
+/// @brief Attack functions for every non-pawn piece type, including the king.
+constexpr std::array<std::pair<Piece, AttackFn>, 5> piece_attackers
 {{
     { kKnight,   [](Bitboard, Square s){ return kKnightAttacks[s]; } }, 
     { kBishop,   BishopAttacks                                       }, 
@@ -99,7 +115,8 @@ constexpr std::array<std::pair<Piece, AttackFn>, 5> piece_attackers
     { kKing,     [](Bitboard, Square s){ return kKingAttacks[s]; }   }
 }};
 
-constexpr std::array<std::pair<Piece, AttackFn>, 4> piece_attackers_except_king 
+/// @brief Attack functions for every non-pawn piece type, excluding the king.
+constexpr std::array<std::pair<Piece, AttackFn>, 4> piece_attackers_except_king
 {{
     { kKnight,   [](Bitboard, Square s){ return kKnightAttacks[s]; } },
     { kBishop,   BishopAttacks                                       }, 

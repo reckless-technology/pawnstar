@@ -3,6 +3,7 @@ CXX                 = clang++
 CPPFLAGS            = -I src -D DEBUGX=1
 CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2
 BUILD_DIR           = build
+DOC_DIR             = doc/html
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
 GENERATED_DATA      = src/generated_data.cpp
 GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
@@ -47,7 +48,7 @@ else
 	CXXFLAGS += -g -O3 -D NDEBUG
 endif
 
-.PHONY: all tests check prep clean gen
+.PHONY: all tests check prep clean gen doc
 
 all: prep $(PROGRAM_EXE)
 
@@ -66,8 +67,13 @@ clean:
 	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE) \
 	      $(OBJECTS) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
 	      $(GENERATED_DATA) $(GENERATOR_EXE)
+	rm -rf $(DOC_DIR)
 
 gen: $(GENERATOR_EXE)
+
+# Generate API documentation with doxygen (output configured by the Doxyfile).
+doc:
+	doxygen Doxyfile
 
 # Compile an engine source object.
 $(BUILD_DIR)/%.o: src/%.cpp

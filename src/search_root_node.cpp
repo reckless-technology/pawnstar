@@ -1,4 +1,4 @@
-/// @file Functions to search for best move.
+/// @file search_root_node.cpp Functions to search for best move.
 #include "chess_clock.h"
 #include "debug_hashtable.h"
 #include "game.h"
@@ -76,7 +76,7 @@ Move SearchRootNode(Game &game)
         break;
     }
 
-    const int64_t start_ms    = game.time_control.ElapsedMilliseconds();
+    const int64_t start_ms = game.time_control.ElapsedMilliseconds();
     game.is_cancel_pending.store(false, std::memory_order_relaxed);
     DebugXClear();
     game.history_table.Reset();
@@ -107,13 +107,13 @@ Move SearchRootNode(Game &game)
         }
         SortMoves<true>(move_list); // Sort based on scores from the previous iteration.
         Variation child_pv{};
-        int       alpha     = kAlpha;
-        state.node_count    = 0;
+        int       alpha  = kAlpha;
+        state.node_count = 0;
         best_moves.push_back(best_move);
         for (auto &move : move_list)
         {
             const int move_index = (int)(&move - move_list.begin());
-            const int score = SearchSingleMove(state, depth, 0, alpha, kBeta, move, child_pv, move_index).score;
+            const int score      = SearchSingleMove(state, depth, 0, alpha, kBeta, move, child_pv, move_index).score;
             move.AssignScore(score);
             if (game.is_cancel_pending.load(std::memory_order_relaxed))
             {

@@ -1,4 +1,4 @@
-/// @file Static exchange evaluation tests matching Go see_test.go.
+/// @file see.cpp Static exchange evaluation tests matching Go see_test.go.
 
 #include "position.h"
 #include "static_exchange_evaluation.h"
@@ -7,16 +7,18 @@
 #include <iostream>
 #include <string_view>
 
+/// @brief A single static-exchange-evaluation test case.
 struct SeeTest
 {
-    std::string_view name;
-    std::string_view fen;
-    Move             move;
-    int              want_score;
-    bool             want_checking;
+    std::string_view name;          ///< Human-readable case name.
+    std::string_view fen;           ///< Position FEN.
+    Move             move;          ///< Move to evaluate.
+    int              want_score;    ///< Expected SEE score.
+    bool             want_checking; ///< Expected give-check flag.
 };
 
 // clang-format off
+/// @brief The full set of SEE test cases.
 static const SeeTest tests[] = {
     // ── C reference cases ─────────────────────────────────────────────────
     {
@@ -148,14 +150,16 @@ static const SeeTest tests[] = {
 };
 // clang-format on
 
+/// @brief Run all SEE test cases.
+/// @return Non-zero if any case failed.
 int main()
 {
     int failures = 0;
     for (const auto &tc : tests)
     {
-        Position   pos{Position::FromString(tc.fen)};
+        Position pos{Position::FromString(tc.fen)};
         const auto [score, is_checking] = EvaluateStaticExchange(pos, tc.move);
-        bool ok = (score == tc.want_score) && (is_checking == tc.want_checking);
+        bool ok                         = (score == tc.want_score) && (is_checking == tc.want_checking);
         if (!ok)
         {
             ++failures;

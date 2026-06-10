@@ -82,6 +82,7 @@ SingleMoveResult SearchSingleMove(SearchState &state, int depth, int ply, int al
     return {score, is_checking};
 }
 
+/// @brief Result of a null-move pruning attempt: the null-move score and the static evaluation.
 struct NullMoveResult
 {
     int score;      ///< Score after null move (or alpha if null move not tried).
@@ -152,13 +153,13 @@ static void RunParallelJob(void *arg)
 {
     ParallelJob &job = *static_cast<ParallelJob *>(arg);
     Variation    pv;
-    int score = SearchSingleMove(*job.worker, job.lmr_depth, job.ply, job.alpha, job.beta, job.move, pv, job.move_index)
-                    .score;
+    int          score =
+        SearchSingleMove(*job.worker, job.lmr_depth, job.ply, job.alpha, job.beta, job.move, pv, job.move_index).score;
     // Re-search at full depth if LMR was applied and the move beat alpha.
     if (!job.worker->IsCancelled() && score > job.alpha && job.lmr_depth < job.depth)
     {
-        score = SearchSingleMove(*job.worker, job.depth, job.ply, job.alpha, job.beta, job.move, pv, job.move_index)
-                    .score;
+        score =
+            SearchSingleMove(*job.worker, job.depth, job.ply, job.alpha, job.beta, job.move, pv, job.move_index).score;
     }
     if (score >= job.beta)
     {

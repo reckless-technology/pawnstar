@@ -1,5 +1,5 @@
 #pragma once
-/// @file Data and functions to evaluate a chess position.
+/// @file evaluation.h Data and functions to evaluate a chess position.
 
 #include <array>
 #include <cstdint>
@@ -8,6 +8,7 @@
 
 class SearchState;
 
+/// @brief Evaluate the current position from the side-to-move's perspective (see definition for details).
 int EvaluatePosition(const SearchState &state, int alpha, int beta);
 
 // clang-format off
@@ -118,9 +119,11 @@ constexpr std::array<int, 64> kPassedPawnSquare
      0,   0,   0,   0,   0,   0,   0,   0,
 };
 
-/// @brief Scores for bishop and rook mobility based on number of squares attacked.
+/// @brief Bishop mobility scores indexed by number of squares attacked.
 constexpr std::array<int, 14>     kBishopAttackScores   {-20,-10, -5, -5,  0,  5, 10, 15, 20, 20, 20, 20, 20, 20    };
+/// @brief Rook mobility scores indexed by number of squares attacked.
 constexpr std::array<int, 15>     kRookAttackScores     {-10,-10, -5, -5,  0,  5, 10, 15, 20, 20, 20, 20, 20, 20, 20};
+/// @brief Bitboard of each file, indexed by file number (0 = a-file).
 constexpr std::array<Bitboard, 8> kFileBitboards        {kFileA, kFileB, kFileC, kFileD, kFileE, kFileF, kFileG, kFileH};
 
 // clang-format on
@@ -128,14 +131,15 @@ constexpr std::array<Bitboard, 8> kFileBitboards        {kFileA, kFileB, kFileC,
 /// @brief Pawn structure for one color.
 struct PawnStructure
 {
-    Bitboard passed_pawns;   ///< A passed pawn has no enemy pawns whicn can prevent it promoting.
-    Bitboard isolated_pawns; ///< An isolated pawn has no friendly pawns on either adjacent file.
+    Bitboard passed_pawns;      ///< A passed pawn has no enemy pawns whicn can prevent it promoting.
+    Bitboard isolated_pawns;    ///< An isolated pawn has no friendly pawns on either adjacent file.
     Bitboard unsupported_pawns; ///< An unsupported pawn has no friendly pawns in its support window.
-    Bitboard doubled_pawns;  ///< A doubled pawn has a friendly pawn in front of it.
-    Bitboard defended_pawns; ///< A defended pawn has a friendly pawn defending it.
+    Bitboard doubled_pawns;     ///< A doubled pawn has a friendly pawn in front of it.
+    Bitboard defended_pawns;    ///< A defended pawn has a friendly pawn defending it.
+    /// @brief Construct with all pawn-structure bitboards empty.
     PawnStructure()
-        : passed_pawns(kNoSquares), isolated_pawns(kNoSquares), unsupported_pawns(kNoSquares), doubled_pawns(kNoSquares),
-          defended_pawns(kNoSquares)
+        : passed_pawns(kNoSquares), isolated_pawns(kNoSquares), unsupported_pawns(kNoSquares),
+          doubled_pawns(kNoSquares), defended_pawns(kNoSquares)
     {
     }
 };
@@ -218,6 +222,7 @@ template <Color color> int EvaluateMaterial(const Position &position)
 /// @brief Evaluate bishop and rook mobility scores
 /// @tparam color color to evaluate
 /// @param position current position
+/// @param ps Pawn structure for both colors (used to exclude pawn-defended targets).
 /// @return mobility score
 template <Color color> int EvaluateMobility(const Position &position, const std::array<PawnStructure, 2> &ps)
 {

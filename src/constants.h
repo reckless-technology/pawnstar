@@ -1,25 +1,25 @@
 #pragma once
-/// @file Program configuration constants and core enums.
+/// @file constants.h Program configuration constants and core enums.
 
 #include <cstdint>
 
 /// @brief Chess pieces.
 enum Piece : uint8_t
 {
-    kNone,
-    kPawn,
-    kKnight,
-    kBishop,
-    kRook,
-    kQueen,
-    kKing,
+    kNone,   ///< No piece / empty square.
+    kPawn,   ///< Pawn.
+    kKnight, ///< Knight.
+    kBishop, ///< Bishop.
+    kRook,   ///< Rook.
+    kQueen,  ///< Queen.
+    kKing,   ///< King.
 };
 
 /// @brief Piece colors.
 enum Color : uint8_t
 {
-    kWhite,
-    kBlack,
+    kWhite, ///< White pieces / side.
+    kBlack, ///< Black pieces / side.
 };
 
 /// @brief Return the enemy of a color.
@@ -45,5 +45,5 @@ constexpr int kSearchCancelledScore      = -12345678; ///< illegal value returne
 constexpr int kScoreInstabilityThreshold = 50;        ///< window of score variability
 constexpr int kStartDepth                = 3;         ///< depth to do full width search
 constexpr int kMegabyte                  = 1 << 20;
-constexpr int kSearchStatePoolCapacity   = 64;        ///< max concurrent worker search states (slab slots)
-constexpr int kThreadPoolQueueCapacity   = 128;       ///< thread pool task ring buffer size (power of two > pool capacity)
+constexpr int kSearchStatePoolCapacity   = 64;  ///< max concurrent worker search states (slab slots)
+constexpr int kThreadPoolQueueCapacity   = 128; ///< thread pool task ring buffer size (power of two > pool capacity)

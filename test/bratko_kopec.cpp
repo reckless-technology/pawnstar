@@ -1,4 +1,4 @@
-/// @file Bratko-Kopec search quality test suite matching Go search_test.go.
+/// @file bratko_kopec.cpp Bratko-Kopec search quality test suite matching Go search_test.go.
 
 #include "chess_clock.h"
 #include "debug_hashtable.h"
@@ -13,13 +13,15 @@
 #include <iostream>
 #include <string_view>
 
+/// @brief A single Bratko-Kopec position and its set of accepted best moves.
 struct BkCase
 {
-    std::string_view                fen;
-    std::array<std::string_view, 3> accepted; // up to 3 accepted best moves; empty strings ignored
+    std::string_view                fen;      ///< Position FEN.
+    std::array<std::string_view, 3> accepted; ///< Up to 3 accepted best moves; empty strings ignored.
 };
 
 // clang-format off
+/// @brief The 24 Bratko-Kopec test positions with their accepted moves.
 static const std::array<BkCase, 24> bk_cases{{
     {"1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -",                    {"d6d1", "", ""}},
     {"3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - -",                   {"e4e5", "", ""}},
@@ -48,13 +50,16 @@ static const std::array<BkCase, 24> bk_cases{{
 }};
 // clang-format on
 
+/// @brief Run the Bratko-Kopec search-quality suite.
+/// @param argc Argument count. @param argv Arguments (optional search depth, default 8).
+/// @return Non-zero if any position returned a non-accepted move.
 int main(int argc, char *argv[])
 {
     int depth = 8;
     if (argc > 1)
         depth = std::atoi(argv[1]);
 
-    using Clock = std::chrono::steady_clock;
+    using Clock    = std::chrono::steady_clock;
     int  failures  = 0;
     auto t_overall = Clock::now();
 
@@ -67,10 +72,9 @@ int main(int argc, char *argv[])
         game.time_control.clock_type = ChessClock::kFixedDepth;
         game.time_control.depth      = depth;
         DebugXClear();
-        auto t_start = Clock::now();
-        Move m       = SearchRootNode(game);
-        auto elapsed_ms =
-            std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t_start).count();
+        auto t_start    = Clock::now();
+        Move m          = SearchRootNode(game);
+        auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t_start).count();
         DebugXWrite();
         std::string got = m.ToString();
 

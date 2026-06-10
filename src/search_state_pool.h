@@ -1,5 +1,5 @@
 #pragma once
-/// @file Slab allocator for per-worker SearchState objects used by the parallel search.
+/// @file search_state_pool.h Slab allocator for per-worker SearchState objects used by the parallel search.
 
 #include "constants.h"
 #include "search_state.h"

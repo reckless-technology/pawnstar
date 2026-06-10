@@ -346,7 +346,7 @@ bool OpeningBook::ParsePgn(std::istream &is)
 }
 
 /// @brief Parse a multiline stringstream containing open book lines of play and create the opening book from it.
-/// @param iss stringstream to be parsed, with one line of play per new line.
+/// @param ss stringstream to be parsed, with one line of play per new line.
 /// @return true on success
 bool OpeningBook::InitializeFromStream(std::istream &ss)
 {
