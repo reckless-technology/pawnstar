@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//tmp/**)",
+      "Bash(valgrind --tool=helgrind ./build/test_bratko_kopec 5 2>/tmp/hg.txt >/dev/null; grep \"ERROR SUMMARY\" /tmp/hg.txt; echo \"--- unique src race frames ---\"; grep -oE \"src/[a-z_]+\\\\.cpp:[0-9]+\" /tmp/hg.txt | sort | uniq -c | sort -rn | head -40)",
+      "Bash(git commit -m ' *)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}
