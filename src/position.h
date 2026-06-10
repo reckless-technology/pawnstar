@@ -98,46 +98,6 @@ class Position
     {
         return state_flags_ & kIsBlackToMove ? kBlack : kWhite;
     }
-    /// @brief Squares occupied by pawns. @return Pawn bitboard.
-    constexpr Bitboard Pawns() const
-    {
-        return pieces_[kPawn];
-    }
-    /// @brief Squares occupied by knights. @return Knight bitboard.
-    constexpr Bitboard Knights() const
-    {
-        return pieces_[kKnight];
-    }
-    /// @brief Squares occupied by bishops. @return Bishop bitboard.
-    constexpr Bitboard Bishops() const
-    {
-        return pieces_[kBishop];
-    }
-    /// @brief Squares occupied by rooks. @return Rook bitboard.
-    constexpr Bitboard Rooks() const
-    {
-        return pieces_[kRook];
-    }
-    /// @brief Squares occupied by queens. @return Queen bitboard.
-    constexpr Bitboard Queens() const
-    {
-        return pieces_[kQueen];
-    }
-    /// @brief Squares occupied by kings. @return King bitboard.
-    constexpr Bitboard Kings() const
-    {
-        return pieces_[kKing];
-    }
-    /// @brief Squares occupied by white pieces. @return White piece bitboard.
-    constexpr Bitboard WhitePieces() const
-    {
-        return colors_[kWhite];
-    }
-    /// @brief Squares occupied by black pieces. @return Black piece bitboard.
-    constexpr Bitboard BlackPieces() const
-    {
-        return colors_[kBlack];
-    }
     /// @brief All occupied squares. @return Occupancy bitboard.
     constexpr Bitboard OccupiedSquares() const
     {
@@ -184,6 +144,11 @@ class Position
         return en_passant_square_;
     }
 
+    /// @brief Per-piece-type bitboards indexed by Piece (index 0 / kNone unused).
+    std::array<Bitboard, 7> pieces_;
+    /// @brief Per-color bitboards indexed by Color.
+    std::array<Bitboard, 2> colors_;
+
   private:
     constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
     constexpr void      RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board.
@@ -192,17 +157,15 @@ class Position
     template <Color, bool> constexpr MoveList GenMoves() const; ///< Generate legal moves.
 
     // State variables.
-    std::array<Bitboard, 7> pieces_;            ///< Per-piece-type bitboards indexed by Piece (index 0 / kNone unused).
-    std::array<Bitboard, 2> colors_;            ///< Per-color bitboards indexed by Color.
-    std::array<Piece, 64>   squares_;           ///< Squares array for fast piece lookup.
-    Bitboard                checkers_;          ///< Set of squares which attack the king.
-    zobrist_t               hash_;              ///< Zobrist hash of this position, maintained incrementally.
-    std::array<Square, 2>   king_location_;     ///< Square index of white and black kings.
-    Square                  en_passant_square_; ///< En passant capture availability square.
-    uint8_t                 reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
-    uint8_t                 full_move_count_;       ///< Number of full moves (zero indexed).
-    CastlingRights          castling_rights_;       ///< Castling rights flags.
-    uint8_t                 state_flags_;           ///< Position state flags.
+    std::array<Piece, 64> squares_;               ///< Squares array for fast piece lookup.
+    Bitboard              checkers_;              ///< Set of squares which attack the king.
+    zobrist_t             hash_;                  ///< Zobrist hash of this position, maintained incrementally.
+    std::array<Square, 2> king_location_;         ///< Square index of white and black kings.
+    Square                en_passant_square_;     ///< En passant capture availability square.
+    uint8_t               reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
+    uint8_t               full_move_count_;       ///< Number of full moves (zero indexed).
+    CastlingRights        castling_rights_;       ///< Castling rights flags.
+    uint8_t               state_flags_;           ///< Position state flags.
 
     /// @brief Bit values for state flags.
     constexpr static uint8_t kIsBlackToMove = 0x01; ///< Set when it is black's turn to move.

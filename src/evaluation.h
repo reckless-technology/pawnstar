@@ -150,9 +150,8 @@ struct PawnStructure
 /// @return Pawn structure
 template <Color color> constexpr PawnStructure DeterminePawnStructure(const Position &position)
 {
-    const Bitboard friendly_pawns =
-        position.Pawns() & (color == kWhite ? position.WhitePieces() : position.BlackPieces());
-    const Bitboard enemy_pawns = position.Pawns() ^ friendly_pawns;
+    const Bitboard friendly_pawns = position.pieces_[kPawn] & position.colors_[color];
+    const Bitboard enemy_pawns    = position.pieces_[kPawn] ^ friendly_pawns;
     PawnStructure  ps;
     // clang-format off
     const std::array<Bitboard, 64> &passed_pawn_mask    = color == kWhite ? kPassedPawnMaskWhite    : kPassedPawnMaskBlack;
@@ -199,12 +198,12 @@ template <Color color> constexpr PawnStructure DeterminePawnStructure(const Posi
 /// @return material score
 template <Color color> constexpr int EvaluateMaterial(const Position &position)
 {
-    const Bitboard friendly_pieces = (color == kWhite ? position.WhitePieces() : position.BlackPieces());
-    const Bitboard pawns           = position.Pawns() & friendly_pieces;
-    const Bitboard knights         = position.Knights() & friendly_pieces;
-    const Bitboard bishops         = position.Bishops() & friendly_pieces;
-    const Bitboard rooks           = position.Rooks() & friendly_pieces;
-    const Bitboard queens          = position.Queens() & friendly_pieces;
+    const Bitboard friendly_pieces = position.colors_[color];
+    const Bitboard pawns           = position.pieces_[kPawn] & friendly_pieces;
+    const Bitboard knights         = position.pieces_[kKnight] & friendly_pieces;
+    const Bitboard bishops         = position.pieces_[kBishop] & friendly_pieces;
+    const Bitboard rooks           = position.pieces_[kRook] & friendly_pieces;
+    const Bitboard queens          = position.pieces_[kQueen] & friendly_pieces;
     // clang-format off
     int score = pawns.PopCount()   *  100 + 
                 knights.PopCount() *  400 + 
@@ -228,10 +227,10 @@ template <Color color> constexpr int EvaluateMaterial(const Position &position)
 template <Color color> constexpr int EvaluateMobility(const Position &position, const std::array<PawnStructure, 2> &ps)
 {
 
-    const Bitboard friendly_pieces  = (color == kWhite ? position.WhitePieces() : position.BlackPieces());
+    const Bitboard friendly_pieces  = position.colors_[color];
     const Bitboard occupied_squares = position.OccupiedSquares();
     int            score            = 0;
-    for (Square s : position.Bishops() & friendly_pieces)
+    for (Square s : position.pieces_[kBishop] & friendly_pieces)
     {
         Bitboard attacks = BishopAttacks(occupied_squares, s) & ~friendly_pieces;
         // Exclude pawns defended by a pawn from the bishop move targets, since they always result in the loss of the
@@ -246,7 +245,7 @@ template <Color color> constexpr int EvaluateMobility(const Position &position, 
         }
         score += kBishopAttackScores[attacks.PopCount()];
     }
-    for (Square s : position.Rooks() & friendly_pieces)
+    for (Square s : position.pieces_[kRook] & friendly_pieces)
     {
         const Bitboard attacks = RookAttacks(occupied_squares, s) & ~friendly_pieces;
         score += kRookAttackScores[attacks.PopCount()];
@@ -261,25 +260,25 @@ template <Color color> constexpr int EvaluateMobility(const Position &position, 
 template <Color color> constexpr int EvaluatePieceSquare(const Position &position)
 {
     constexpr uint8_t rank_flip       = (color == kWhite ? kRankFlip : 0);
-    const Bitboard    friendly_pieces = (color == kWhite ? position.WhitePieces() : position.BlackPieces());
+    const Bitboard    friendly_pieces = position.colors_[color];
     int               score           = 0;
-    for (Square s : position.Pawns() & friendly_pieces)
+    for (Square s : position.pieces_[kPawn] & friendly_pieces)
     {
         score += kPawnSquare[s ^ rank_flip];
     }
-    for (Square s : position.Knights() & friendly_pieces)
+    for (Square s : position.pieces_[kKnight] & friendly_pieces)
     {
         score += kKnightSquare[s ^ rank_flip];
     }
-    for (Square s : position.Bishops() & friendly_pieces)
+    for (Square s : position.pieces_[kBishop] & friendly_pieces)
     {
         score += kBishopSquare[s ^ rank_flip];
     }
-    for (Square s : position.Rooks() & friendly_pieces)
+    for (Square s : position.pieces_[kRook] & friendly_pieces)
     {
         score += kRookSquare[s ^ rank_flip];
     }
-    for (Square s : position.Queens() & friendly_pieces)
+    for (Square s : position.pieces_[kQueen] & friendly_pieces)
     {
         score += kQueenSquare[s ^ rank_flip];
     }
@@ -312,12 +311,12 @@ template <Color color> constexpr int EvaluatePawnStructure(const PawnStructure &
 template <Color color> constexpr int EvaluateKing(const Position &position)
 {
     constexpr uint8_t rank_flip       = (color == kWhite ? kRankFlip : 0);
-    const Bitboard    friendly_pieces = (color == kWhite ? position.WhitePieces() : position.BlackPieces());
-    const Bitboard    enemy_pieces    = (color == kWhite ? position.BlackPieces() : position.WhitePieces());
-    const Bitboard    friendly_pawns  = friendly_pieces & position.Pawns();
-    const Bitboard    enemy_pawns     = enemy_pieces & position.Pawns();
+    const Bitboard    friendly_pieces = position.colors_[color];
+    const Bitboard    enemy_pieces    = position.colors_[EnemyOf(color)];
+    const Bitboard    friendly_pawns  = friendly_pieces & position.pieces_[kPawn];
+    const Bitboard    enemy_pawns     = enemy_pieces & position.pieces_[kPawn];
     const bool        is_endgame =
-        position.Queens().IsEmpty() && (position.OccupiedSquares() ^ position.Pawns()).PopCount() < 8;
+        position.pieces_[kQueen].IsEmpty() && (position.OccupiedSquares() ^ position.pieces_[kPawn]).PopCount() < 8;
 
     const int piece_square_score = is_endgame ? kKingSquareEndgame[position.KingLocation(color) ^ rank_flip]
                                               : kKingSquareMidgame[position.KingLocation(color) ^ rank_flip];

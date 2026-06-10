@@ -18,12 +18,12 @@ class Pins
         pinned_pieces_                  = kNoSquares;
         const Color    color            = position.ColorToMove();
         const Bitboard occupied_squares = position.OccupiedSquares();
-        const Bitboard friendly_pieces  = color == kWhite ? position.WhitePieces() : position.BlackPieces();
+        const Bitboard friendly_pieces  = position.colors_[color];
         const Square   king_location    = position.KingLocation(color);
         const auto    &intervening      = kInterveningSquares[king_location];
         const Bitboard enemy_sliding_pieces =
-            ((kBishopAttacks[king_location] & (position.Bishops() | position.Queens())) |
-             (kRookAttacks[king_location] & (position.Rooks() | position.Queens()))) &
+            ((kBishopAttacks[king_location] & (position.pieces_[kBishop] | position.pieces_[kQueen])) |
+             (kRookAttacks[king_location] & (position.pieces_[kRook] | position.pieces_[kQueen]))) &
             ~friendly_pieces;
         for (Square s : enemy_sliding_pieces)
         {

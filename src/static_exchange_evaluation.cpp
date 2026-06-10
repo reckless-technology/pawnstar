@@ -16,9 +16,7 @@ struct SeeBoard
 
     /// @brief Construct the working board from a position.
     /// @param p Position to copy piece bitboards from.
-    constexpr SeeBoard(const Position &p)
-        : pieces_{kNoSquares, p.Pawns(), p.Knights(), p.Bishops(), p.Rooks(), p.Queens(), p.Kings()},
-          colors_{p.WhitePieces(), p.BlackPieces()}
+    constexpr SeeBoard(const Position &p) : pieces_(p.pieces_), colors_(p.colors_)
     {
     }
 };
