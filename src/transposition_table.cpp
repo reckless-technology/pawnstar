@@ -52,11 +52,13 @@ void TranspositionTable::RecordTransposition(const Transposition &transposition)
 {
     const std::size_t idx = transposition.hash % table_.size();
     TTLock            lock{locks_[idx]};
-    Transposition    &t = table_[idx];
-    if (t.hash == 0 || t.is_old || t.depth <= transposition.depth ||
+    Transposition    &t      = table_[idx];
+    const bool        is_old = t.age != generation_;
+    if (t.hash == 0 || is_old || t.depth <= transposition.depth ||
         transposition.node_type == Transposition::NodeType::kPv)
     {
-        t = transposition;
+        t     = transposition;
+        t.age = generation_;
     }
 }
 
@@ -67,9 +69,11 @@ std::pair<std::size_t, int> TranspositionTable::UsageStats() const
     return {count, (count * 100) / table_.size()};
 }
 
-/// @brief Mark all entries as old so they can be replaced by the upcoming search.
-/// Called single-threaded before search starts; no locking needed.
+/// @brief Advance the table generation so that all existing entries become stale (replaceable).
+/// O(1): entries are not touched; an entry is "old" when its age differs from the current
+/// generation. The uint8_t generation wraps every 256 searches, which is harmless. Called
+/// single-threaded before search starts; no locking needed.
 void TranspositionTable::Age()
 {
-    std::ranges::for_each(table_, [](Transposition &t) { t.is_old = true; });
+    ++generation_;
 }

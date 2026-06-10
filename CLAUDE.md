@@ -102,9 +102,9 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 
 ### Transposition table
 
-Two tables: 64 MB main (`kHashtableMegabytes`) and 8 MB quiescence (`kQHashtableMb`). Entries store hash, best move, score, depth, node type (CUT/ALL/PV), and `is_old` for age-based replacement. Access is protected by a parallel array of `std::atomic_flag` spinlocks (one per entry) via the `TTLock` RAII guard in [transposition_table.cpp](src/transposition_table.cpp).
+Two tables: 64 MB main (`kHashtableMegabytes`) and 8 MB quiescence (`kQHashtableMb`). Entries store hash, best move, score, depth, node type (CUT/ALL/PV), and an `age` stamp. Access is protected by a parallel array of `std::atomic_flag` spinlocks (one per entry) via the `TTLock` RAII guard in [transposition_table.cpp](src/transposition_table.cpp).
 
-Replacement policy: prefer replacing old entries, lower-depth entries, or any entry for PV nodes.
+Aging is O(1): the table holds a `generation_` counter that `Age()` increments before each search; an entry is stale when its `age != generation_`, and `RecordTransposition` stamps the current generation when it writes. Replacement policy: prefer replacing stale entries, lower-depth entries, or any entry for PV nodes.
 
 ### Evaluation
 
