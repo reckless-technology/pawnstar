@@ -41,6 +41,7 @@ constexpr void Position::AddPiece(Color color, Piece piece, Square to)
     const Bitboard to_bb = Bitboard{to};
     pieces_[piece] ^= to_bb;
     colors_[color] ^= to_bb;
+    pieces_[kNone] ^= to_bb; // pieces_[kNone] holds the occupied-squares bitboard
     hash_ ^= kPieceSquareHashes[color][piece - 1][to];
     squares_[to] = piece;
 }
@@ -54,6 +55,7 @@ constexpr void Position::RemovePiece(Color color, Piece piece, Square from)
     const Bitboard from_bb = Bitboard{from};
     pieces_[piece] ^= from_bb;
     colors_[color] ^= from_bb;
+    pieces_[kNone] ^= from_bb; // pieces_[kNone] holds the occupied-squares bitboard
     hash_ ^= kPieceSquareHashes[color][piece - 1][from];
     squares_[from] = Piece::kNone;
 }
@@ -69,6 +71,7 @@ constexpr void Position::MovePiece(Color color, Piece piece, Square from, Square
     const std::array<zobrist_t, 64> &hash       = kPieceSquareHashes[color][piece - 1];
     pieces_[piece] ^= from_to_bb;
     colors_[color] ^= from_to_bb;
+    pieces_[kNone] ^= from_to_bb; // pieces_[kNone] holds the occupied-squares bitboard
     hash_ ^= hash[to] ^ hash[from];
     squares_[from] = Piece::kNone;
     squares_[to]   = piece;
@@ -263,7 +266,7 @@ std::string Position::ToString() const
 {
     ostringstream ss;
     // Pieces on the board
-    const Bitboard occupied_squares = colors_[kWhite] | colors_[kBlack];
+    const Bitboard occupied_squares = OccupiedSquares();
     for (int y = 7; y >= 0; --y)
     {
         int num_empty_squares = 0;
@@ -320,7 +323,7 @@ std::string Position::ToString() const
 /// @return true if a material draw
 bool Position::IsDrawByMaterial() const
 {
-    const Bitboard occupied_squares = colors_[kWhite] | colors_[kBlack];
+    const Bitboard occupied_squares = OccupiedSquares();
     switch (occupied_squares.PopCount())
     {
     case 0:

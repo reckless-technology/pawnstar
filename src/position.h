@@ -101,12 +101,12 @@ class Position
     /// @brief All occupied squares. @return Occupancy bitboard.
     constexpr Bitboard OccupiedSquares() const
     {
-        return colors_[kWhite] | colors_[kBlack];
+        return pieces_[kNone];
     }
     /// @brief All empty squares. @return Vacant-square bitboard.
     constexpr Bitboard VacantSquares() const
     {
-        return ~(colors_[kWhite] | colors_[kBlack]);
+        return ~pieces_[kNone];
     }
     /// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
     constexpr Piece PieceAt(Square location) const
@@ -144,7 +144,7 @@ class Position
         return en_passant_square_;
     }
 
-    /// @brief Per-piece-type bitboards indexed by Piece (index 0 / kNone unused).
+    /// @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the occupied-squares bitboard.
     std::array<Bitboard, 7> pieces_;
     /// @brief Per-color bitboards indexed by Color.
     std::array<Bitboard, 2> colors_;
@@ -198,7 +198,7 @@ constexpr Bitboard Position::AttacksTo(Square location, Color color) const
 /// @return list of moves generated
 template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves() const
 {
-    const Bitboard occupied_squares = colors_[kWhite] | colors_[kBlack];
+    const Bitboard occupied_squares = OccupiedSquares();
     const Bitboard friendly_pieces  = colors_[color];
     const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
     const Bitboard enemy_pawns      = pieces_[kPawn] & enemy_pieces;

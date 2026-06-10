@@ -56,7 +56,7 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
     const Bitboard knight_attacks = kKnightAttacks[location];
     const Bitboard king_attacks   = kKingAttacks[location];
     const Bitboard square         = Bitboard(location);
-    Bitboard       occupied       = bb.colors_[kWhite] | bb.colors_[kBlack];
+    Bitboard       occupied       = bb.pieces_[kNone]; // pieces_[kNone] holds the occupied-squares bitboard
     int            scores[32];
     int            ply;
     // First pass: perform all the captures onto the square least valuable piece first.
