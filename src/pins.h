@@ -18,7 +18,7 @@ class Pins
         pinned_pieces_                  = kNoSquares;
         const Color    color            = position.ColorToMove();
         const Bitboard occupied_squares = position.OccupiedSquares();
-        const Bitboard friendly_pieces  = position.PiecesOfColor(color);
+        const Bitboard friendly_pieces  = color == kWhite ? position.WhitePieces() : position.BlackPieces();
         const Square   king_location    = position.KingLocation(color);
         const auto    &intervening      = kInterveningSquares[king_location];
         const Bitboard enemy_sliding_pieces =

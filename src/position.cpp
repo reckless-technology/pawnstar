@@ -39,8 +39,8 @@ Position Position::MakeNullMove() const
 constexpr void Position::AddPiece(Color color, Piece piece, Square to)
 {
     const Bitboard to_bb = Bitboard{to};
-    PiecesOfType(piece) ^= to_bb;
-    PiecesOfColor(color) ^= to_bb;
+    pieces_[piece] ^= to_bb;
+    colors_[color] ^= to_bb;
     hash_ ^= kPieceSquareHashes[color][piece - 1][to];
     squares_[to] = piece;
 }
@@ -52,8 +52,8 @@ constexpr void Position::AddPiece(Color color, Piece piece, Square to)
 constexpr void Position::RemovePiece(Color color, Piece piece, Square from)
 {
     const Bitboard from_bb = Bitboard{from};
-    PiecesOfType(piece) ^= from_bb;
-    PiecesOfColor(color) ^= from_bb;
+    pieces_[piece] ^= from_bb;
+    colors_[color] ^= from_bb;
     hash_ ^= kPieceSquareHashes[color][piece - 1][from];
     squares_[from] = Piece::kNone;
 }
@@ -67,8 +67,8 @@ constexpr void Position::MovePiece(Color color, Piece piece, Square from, Square
 {
     const Bitboard                   from_to_bb = Bitboard{from} | Bitboard{to};
     const std::array<zobrist_t, 64> &hash       = kPieceSquareHashes[color][piece - 1];
-    PiecesOfType(piece) ^= from_to_bb;
-    PiecesOfColor(color) ^= from_to_bb;
+    pieces_[piece] ^= from_to_bb;
+    colors_[color] ^= from_to_bb;
     hash_ ^= hash[to] ^ hash[from];
     squares_[from] = Piece::kNone;
     squares_[to]   = piece;
@@ -164,7 +164,7 @@ Position Position::MakeMove(const Move &move) const
     position.state_flags_ ^= kIsBlackToMove;
     position.hash_ ^= kBlackMoveHash;
     position.full_move_count_ += color; // Increments after black's move.
-    position.king_location_[color] = (position.kings_ & position.PiecesOfColor(color)).Lsb();
+    position.king_location_[color] = (position.pieces_[kKing] & position.colors_[color]).Lsb();
     position.checkers_             = position.AttacksTo(position.king_location_[EnemyOf(color)], color);
     return position;
 }
@@ -219,8 +219,8 @@ Position Position::FromString(std::string_view fen_string)
     {
         position.state_flags_ |= kIsBlackToMove;
     }
-    position.king_location_[kWhite] = (position.kings_ & position.white_pieces_).Lsb();
-    position.king_location_[kBlack] = (position.kings_ & position.black_pieces_).Lsb();
+    position.king_location_[kWhite] = (position.pieces_[kKing] & position.colors_[kWhite]).Lsb();
+    position.king_location_[kBlack] = (position.pieces_[kKing] & position.colors_[kBlack]).Lsb();
     // Castling rights
     string castling_rights;
     ss >> castling_rights;
@@ -263,7 +263,7 @@ std::string Position::ToString() const
 {
     ostringstream ss;
     // Pieces on the board
-    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
+    const Bitboard occupied_squares = colors_[kWhite] | colors_[kBlack];
     for (int y = 7; y >= 0; --y)
     {
         int num_empty_squares = 0;
@@ -280,7 +280,7 @@ std::string Position::ToString() const
                     ss << num_empty_squares;
                     num_empty_squares = 0;
                 }
-                const char piece = (white_pieces_ & Bitboard(x, y)).IsNotEmpty()
+                const char piece = (colors_[kWhite] & Bitboard(x, y)).IsNotEmpty()
                                        ? " PNBRQK"[PieceAt((Square)(x + 8 * y))]
                                        : " pnbrqk"[PieceAt((Square)(x + 8 * y))];
                 ss << piece;
@@ -320,7 +320,7 @@ std::string Position::ToString() const
 /// @return true if a material draw
 bool Position::IsDrawByMaterial() const
 {
-    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
+    const Bitboard occupied_squares = colors_[kWhite] | colors_[kBlack];
     switch (occupied_squares.PopCount())
     {
     case 0:
@@ -333,7 +333,7 @@ bool Position::IsDrawByMaterial() const
         return true;
     case 3:
         // king and bishop vs king or king and knight vs king
-        if ((bishops_ | knights_).IsNotEmpty())
+        if ((pieces_[kBishop] | pieces_[kKnight]).IsNotEmpty())
         {
             INCREMENT("draws by material (3)");
             return true;
@@ -342,8 +342,8 @@ bool Position::IsDrawByMaterial() const
     case 4:
         // king and bishop vs king and bishop with bishops on same color square
         {
-            const Bitboard white_bishops                   = bishops_ & white_pieces_;
-            const Bitboard black_bishops                   = bishops_ & black_pieces_;
+            const Bitboard white_bishops                   = pieces_[kBishop] & colors_[kWhite];
+            const Bitboard black_bishops                   = pieces_[kBishop] & colors_[kBlack];
             const bool     is_white_bishop_on_white_square = (white_bishops & kWhiteSquares).IsNotEmpty();
             const bool     is_black_bishop_on_white_square = (black_bishops & kWhiteSquares).IsNotEmpty();
             if (white_bishops.IsNotEmpty() && black_bishops.IsNotEmpty() &&
@@ -367,8 +367,8 @@ bool Position::IsDrawByMaterial() const
 bool Position::IsLegal() const
 {
     const Color    color      = ColorToMove();
-    const Bitboard white_king = kings_ & white_pieces_;
-    const Bitboard black_king = kings_ & black_pieces_;
+    const Bitboard white_king = pieces_[kKing] & colors_[kWhite];
+    const Bitboard black_king = pieces_[kKing] & colors_[kBlack];
     return white_king.PopCount() == 1 && black_king.PopCount() == 1 && white_king != black_king &&
            (kKingAttacks[white_king.Lsb()] & black_king).IsEmpty() &&
            !IsAttacked(king_location_[EnemyOf(color)], color);
@@ -384,12 +384,12 @@ constexpr zobrist_t Position::ComputeHash() const
     constexpr std::array pieces{kPawn, kKnight, kBishop, kRook, kQueen, kKing};
     for (auto piece : pieces)
     {
-        Bitboard b = PiecesOfType(piece) & white_pieces_;
+        Bitboard b = pieces_[piece] & colors_[kWhite];
         for (Square s : b)
         {
             hash ^= kPieceSquareHashes[kWhite][piece - 1][s];
         }
-        b = PiecesOfType(piece) & black_pieces_;
+        b = pieces_[piece] & colors_[kBlack];
         for (Square s : b)
         {
             hash ^= kPieceSquareHashes[kBlack][piece - 1][s];

@@ -11,37 +11,15 @@ constexpr int piece_values[7] = {0, 100, 300, 300, 500, 900, 10000};
 /// @brief Bitboards of piece on the board used for static exchange evaluation.
 struct SeeBoard
 {
-    Bitboard pawns;        ///< Squares with a pawn on them.
-    Bitboard knights;      ///< Squares with a knight on them.
-    Bitboard bishops;      ///< Squares with a bishop on them.
-    Bitboard rooks;        ///< Squares with a rook on them.
-    Bitboard queens;       ///< Squares with a queen on them.
-    Bitboard kings;        ///< Squares with a king on them.
-    Bitboard white_pieces; ///< Squares with a white piece on them.
-    Bitboard black_pieces; ///< Squares with a black piece on them.
+    std::array<Bitboard, 7> pieces_; ///< Per-piece-type bitboards indexed by Piece (index 0 / kNone unused).
+    std::array<Bitboard, 2> colors_; ///< Per-color bitboards indexed by Color.
 
     /// @brief Construct the working board from a position.
     /// @param p Position to copy piece bitboards from.
     constexpr SeeBoard(const Position &p)
-        : pawns(p.Pawns()), knights(p.Knights()), bishops(p.Bishops()), rooks(p.Rooks()), queens(p.Queens()),
-          kings(p.Kings()), white_pieces(p.WhitePieces()), black_pieces(p.BlackPieces())
+        : pieces_{kNoSquares, p.Pawns(), p.Knights(), p.Bishops(), p.Rooks(), p.Queens(), p.Kings()},
+          colors_{p.WhitePieces(), p.BlackPieces()}
     {
-    }
-
-    /// @brief Mutable bitboard for a piece type.
-    /// @param piece Piece type.
-    /// @return Reference to that type's bitboard.
-    constexpr Bitboard &PiecesOfType(Piece piece)
-    {
-        return (&pawns)[piece - kPawn];
-    }
-
-    /// @brief Mutable bitboard for a colour.
-    /// @param color Colour.
-    /// @return Reference to that colour's bitboard.
-    constexpr Bitboard &PiecesOfColor(Color color)
-    {
-        return (&white_pieces)[color];
     }
 };
 
@@ -80,7 +58,7 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
     const Bitboard knight_attacks = kKnightAttacks[location];
     const Bitboard king_attacks   = kKingAttacks[location];
     const Bitboard square         = Bitboard(location);
-    Bitboard       occupied       = bb.white_pieces | bb.black_pieces;
+    Bitboard       occupied       = bb.colors_[kWhite] | bb.colors_[kBlack];
     int            scores[32];
     int            ply;
     // First pass: perform all the captures onto the square least valuable piece first.
@@ -90,40 +68,40 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         Piece          capturing_piece;
         Bitboard       bishop_attacks;
         Bitboard       rook_attacks;
-        const Bitboard attacking_pieces = bb.PiecesOfColor(color);
-        Bitboard       attackers        = pawn_attacks & attacking_pieces & bb.pawns;
+        const Bitboard attacking_pieces = bb.colors_[color];
+        Bitboard       attackers        = pawn_attacks & attacking_pieces & bb.pieces_[kPawn];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kPawn;
             goto FoundAttacker;
         }
-        attackers = knight_attacks & attacking_pieces & bb.knights;
+        attackers = knight_attacks & attacking_pieces & bb.pieces_[kKnight];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kKnight;
             goto FoundAttacker;
         }
         bishop_attacks = BishopAttacks(occupied, location);
-        attackers      = bishop_attacks & attacking_pieces & bb.bishops;
+        attackers      = bishop_attacks & attacking_pieces & bb.pieces_[kBishop];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kBishop;
             goto FoundAttacker;
         }
         rook_attacks = RookAttacks(occupied, location);
-        attackers    = rook_attacks & attacking_pieces & bb.rooks;
+        attackers    = rook_attacks & attacking_pieces & bb.pieces_[kRook];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kRook;
             goto FoundAttacker;
         }
-        attackers = (bishop_attacks | rook_attacks) & attacking_pieces & bb.queens;
+        attackers = (bishop_attacks | rook_attacks) & attacking_pieces & bb.pieces_[kQueen];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kQueen;
             goto FoundAttacker;
         }
-        attackers = king_attacks & attacking_pieces & bb.kings;
+        attackers = king_attacks & attacking_pieces & bb.pieces_[kKing];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kKing;
@@ -136,10 +114,10 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
 
     FoundAttacker:
         attackers.IsolateLsb();
-        bb.PiecesOfType(piece_on_square) ^= square;
-        bb.PiecesOfColor(EnemyOf(color)) ^= square;
-        bb.PiecesOfType(capturing_piece) ^= attackers | square;
-        bb.PiecesOfColor(color) ^= attackers | square;
+        bb.pieces_[piece_on_square] ^= square;
+        bb.colors_[EnemyOf(color)] ^= square;
+        bb.pieces_[capturing_piece] ^= attackers | square;
+        bb.colors_[color] ^= attackers | square;
         occupied ^= attackers;
         scores[ply]     = piece_values[piece_on_square];
         piece_on_square = capturing_piece;
@@ -148,8 +126,8 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         if (piece_on_square == kPawn && (square & (kRank1 | kRank8)).IsNotEmpty())
         {
             piece_on_square = kQueen;
-            bb.pawns ^= square;
-            bb.queens ^= square;
+            bb.pieces_[kPawn] ^= square;
+            bb.pieces_[kQueen] ^= square;
         }
     }
     // Second pass: unwind the capture stack and propagate values back to the top for material winning sequences.

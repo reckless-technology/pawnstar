@@ -88,10 +88,11 @@ static inline NullMoveResult AttemptNullMove(SearchState &state, int depth, int 
     const Position &position = state.CurrentPosition();
     const Color     color    = position.ColorToMove();
     // Only try null move pruning if all conditions are met.
-    if (!position.IsNullMove() &&                     // previous move was not a null move
-        !position.IsInCheck() &&                      // we are not in check
-        beta == alpha + 1 &&                          // this is not a PV node
-        position.PiecesOfColor(color).PopCount() > 3) // we have at least 4 friendly pieces
+    const Bitboard friendly = color == kWhite ? position.WhitePieces() : position.BlackPieces();
+    if (!position.IsNullMove() && // previous move was not a null move
+        !position.IsInCheck() &&  // we are not in check
+        beta == alpha + 1 &&      // this is not a PV node
+        friendly.PopCount() > 3)  // we have at least 4 friendly pieces
     {
         const int eval_score = EvaluatePosition(state, alpha, beta);
         if (eval_score >= beta)

@@ -101,67 +101,57 @@ class Position
     /// @brief Squares occupied by pawns. @return Pawn bitboard.
     constexpr Bitboard Pawns() const
     {
-        return pawns_;
+        return pieces_[kPawn];
     }
     /// @brief Squares occupied by knights. @return Knight bitboard.
     constexpr Bitboard Knights() const
     {
-        return knights_;
+        return pieces_[kKnight];
     }
     /// @brief Squares occupied by bishops. @return Bishop bitboard.
     constexpr Bitboard Bishops() const
     {
-        return bishops_;
+        return pieces_[kBishop];
     }
     /// @brief Squares occupied by rooks. @return Rook bitboard.
     constexpr Bitboard Rooks() const
     {
-        return rooks_;
+        return pieces_[kRook];
     }
     /// @brief Squares occupied by queens. @return Queen bitboard.
     constexpr Bitboard Queens() const
     {
-        return queens_;
+        return pieces_[kQueen];
     }
     /// @brief Squares occupied by kings. @return King bitboard.
     constexpr Bitboard Kings() const
     {
-        return kings_;
+        return pieces_[kKing];
     }
     /// @brief Squares occupied by white pieces. @return White piece bitboard.
     constexpr Bitboard WhitePieces() const
     {
-        return white_pieces_;
+        return colors_[kWhite];
     }
     /// @brief Squares occupied by black pieces. @return Black piece bitboard.
     constexpr Bitboard BlackPieces() const
     {
-        return black_pieces_;
+        return colors_[kBlack];
     }
     /// @brief All occupied squares. @return Occupancy bitboard.
     constexpr Bitboard OccupiedSquares() const
     {
-        return white_pieces_ | black_pieces_;
+        return colors_[kWhite] | colors_[kBlack];
     }
     /// @brief All empty squares. @return Vacant-square bitboard.
     constexpr Bitboard VacantSquares() const
     {
-        return ~(white_pieces_ | black_pieces_);
+        return ~(colors_[kWhite] | colors_[kBlack]);
     }
     /// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
     constexpr Piece PieceAt(Square location) const
     {
         return squares_[location];
-    }
-    /// @brief Pieces of a colour. @param color Colour to query. @return The colour's piece bitboard.
-    constexpr Bitboard PiecesOfColor(Color color) const
-    {
-        return (&white_pieces_)[color];
-    }
-    /// @brief Pieces of a type. @param piece Piece type to query. @return The piece-type bitboard.
-    constexpr Bitboard PiecesOfType(Piece piece) const
-    {
-        return (&pawns_)[piece - kPawn];
     }
     /// @brief King location for a colour. @param color Colour to query. @return The king's square.
     constexpr Square KingLocation(Color color) const
@@ -193,17 +183,6 @@ class Position
     {
         return en_passant_square_;
     }
-    // Non const accessors.
-    /// @brief Mutable pieces-of-colour bitboard. @param color Colour to query. @return Reference to the bitboard.
-    constexpr Bitboard &PiecesOfColor(Color color)
-    {
-        return (&white_pieces_)[color];
-    }
-    /// @brief Mutable pieces-of-type bitboard. @param piece Piece type to query. @return Reference to the bitboard.
-    constexpr Bitboard &PiecesOfType(Piece piece)
-    {
-        return (&pawns_)[piece - kPawn];
-    }
 
   private:
     constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
@@ -213,30 +192,24 @@ class Position
     template <Color, bool> constexpr MoveList GenMoves() const; ///< Generate legal moves.
 
     // State variables.
-    Bitboard              pawns_;                 ///< Squares with a pawn on them.
-    Bitboard              knights_;               ///< Squares with a knight on them.
-    Bitboard              bishops_;               ///< Squares with a bishop on them.
-    Bitboard              rooks_;                 ///< Squares with a rook on them.
-    Bitboard              queens_;                ///< Squares with a queen on them.
-    Bitboard              kings_;                 ///< Squares with a king on them.
-    Bitboard              white_pieces_;          ///< Squares with a white piece on them.
-    Bitboard              black_pieces_;          ///< Squares with a black piece on them.
-    std::array<Piece, 64> squares_;               ///< Squares array for fast piece lookup.
-    Bitboard              checkers_;              ///< Set of squares which attack the king.
-    zobrist_t             hash_;                  ///< Zobrist hash of this position, maintained incrementally.
-    std::array<Square, 2> king_location_;         ///< Square index of white and black kings.
-    Square                en_passant_square_;     ///< En passant capture availability square.
-    uint8_t               reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
-    uint8_t               full_move_count_;       ///< Number of full moves (zero indexed).
-    CastlingRights        castling_rights_;       ///< Castling rights flags.
-    uint8_t               state_flags_;           ///< Position state flags.
+    std::array<Bitboard, 7> pieces_;            ///< Per-piece-type bitboards indexed by Piece (index 0 / kNone unused).
+    std::array<Bitboard, 2> colors_;            ///< Per-color bitboards indexed by Color.
+    std::array<Piece, 64>   squares_;           ///< Squares array for fast piece lookup.
+    Bitboard                checkers_;          ///< Set of squares which attack the king.
+    zobrist_t               hash_;              ///< Zobrist hash of this position, maintained incrementally.
+    std::array<Square, 2>   king_location_;     ///< Square index of white and black kings.
+    Square                  en_passant_square_; ///< En passant capture availability square.
+    uint8_t                 reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
+    uint8_t                 full_move_count_;       ///< Number of full moves (zero indexed).
+    CastlingRights          castling_rights_;       ///< Castling rights flags.
+    uint8_t                 state_flags_;           ///< Position state flags.
 
     /// @brief Bit values for state flags.
     constexpr static uint8_t kIsBlackToMove = 0x01; ///< Set when it is black's turn to move.
     constexpr static uint8_t kIsNullMove    = 0x02; ///< Set when the last move was a null move.
 };
 
-static_assert(sizeof(Position) == 152);
+static_assert(sizeof(Position) == 160);
 
 /// @brief Determine attacks to a square by a color.
 /// @param location Square index.
@@ -245,11 +218,12 @@ static_assert(sizeof(Position) == 152);
 constexpr Bitboard Position::AttacksTo(Square location, Color color) const
 {
     const Bitboard occupied_squares = OccupiedSquares();
-    Bitboard result = color == kWhite ? kPawnAttacksBlack[location] & pawns_ : kPawnAttacksWhite[location] & pawns_;
-    result |= (kKnightAttacks[location] & knights_) | (kKingAttacks[location] & kings_);
-    result |= RookAttacks(occupied_squares, location) & (rooks_ | queens_);
-    result |= BishopAttacks(occupied_squares, location) & (bishops_ | queens_);
-    result &= PiecesOfColor(color);
+    Bitboard       result =
+        color == kWhite ? kPawnAttacksBlack[location] & pieces_[kPawn] : kPawnAttacksWhite[location] & pieces_[kPawn];
+    result |= (kKnightAttacks[location] & pieces_[kKnight]) | (kKingAttacks[location] & pieces_[kKing]);
+    result |= RookAttacks(occupied_squares, location) & (pieces_[kRook] | pieces_[kQueen]);
+    result |= BishopAttacks(occupied_squares, location) & (pieces_[kBishop] | pieces_[kQueen]);
+    result &= colors_[color];
     return result;
 }
 
@@ -261,10 +235,10 @@ constexpr Bitboard Position::AttacksTo(Square location, Color color) const
 /// @return list of moves generated
 template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves() const
 {
-    const Bitboard occupied_squares = white_pieces_ | black_pieces_;
-    const Bitboard friendly_pieces  = PiecesOfColor(color);
+    const Bitboard occupied_squares = colors_[kWhite] | colors_[kBlack];
+    const Bitboard friendly_pieces  = colors_[color];
     const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
-    const Bitboard enemy_pawns      = pawns_ & enemy_pieces;
+    const Bitboard enemy_pawns      = pieces_[kPawn] & enemy_pieces;
     const Square   king_locn        = king_location_[color];
 
     MoveList moves;
@@ -279,7 +253,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     for (auto &[piece, attack_fn] : piece_attackers)
     {
-        const Bitboard b = PiecesOfType(piece) & enemy_pieces;
+        const Bitboard b = pieces_[piece] & enemy_pieces;
         for (Square s : b)
         {
             forbidden_king_squares |= attack_fn(occupied_except_king, s);
@@ -331,7 +305,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // Generate knight, bishop, rook and queen moves.
     for (auto &[piece, attack_fn] : piece_attackers_except_king)
     {
-        const Bitboard b = PiecesOfType(piece) & friendly_pieces;
+        const Bitboard b = pieces_[piece] & friendly_pieces;
         for (Square from : b)
         {
             const Bitboard attacks         = attack_fn(occupied_squares, from) & pins.AllowedSquares(from);
@@ -408,11 +382,11 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     if constexpr (color == kWhite)
     {
-        pawns              = pawns_ & white_pieces_;
+        pawns              = pieces_[kPawn] & colors_[kWhite];
         single_pushes      = pawns.ShiftNorth() & ~occupied_squares;
         double_pushes      = single_pushes.ShiftNorth() & ~occupied_squares & kRank4;
-        captures_west      = pawns.ShiftNorthwest() & black_pieces_;
-        captures_east      = pawns.ShiftNortheast() & black_pieces_;
+        captures_west      = pawns.ShiftNorthwest() & colors_[kBlack];
+        captures_east      = pawns.ShiftNortheast() & colors_[kBlack];
         en_passant_sources = en_passant_square_ ? kPawnAttacksBlack[en_passant_square_] & pawns : kNoSquares;
         promotions         = single_pushes & kRank8;
         promotions_west    = captures_west & kRank8;
@@ -423,11 +397,11 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     }
     else
     {
-        pawns              = pawns_ & black_pieces_;
+        pawns              = pieces_[kPawn] & colors_[kBlack];
         single_pushes      = pawns.ShiftSouth() & ~occupied_squares;
         double_pushes      = single_pushes.ShiftSouth() & ~occupied_squares & kRank5;
-        captures_west      = pawns.ShiftSouthwest() & white_pieces_;
-        captures_east      = pawns.ShiftSoutheast() & white_pieces_;
+        captures_west      = pawns.ShiftSouthwest() & colors_[kWhite];
+        captures_east      = pawns.ShiftSoutheast() & colors_[kWhite];
         en_passant_sources = en_passant_square_ ? kPawnAttacksWhite[en_passant_square_] & pawns : kNoSquares;
         promotions         = single_pushes & kRank1;
         promotions_west    = captures_west & kRank1;
@@ -535,7 +509,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
                     occupied_squares ^ Bitboard(captured_pawn_locn) ^ Bitboard(from);
                 const Bitboard horizontal_attacks =
                     RookAttacks(pseudo_occupied_squares, king_locn) & (kWest[king_locn] | kEast[king_locn]);
-                if ((horizontal_attacks & enemy_pieces & (rooks_ | queens_)).IsEmpty())
+                if ((horizontal_attacks & enemy_pieces & (pieces_[kRook] | pieces_[kQueen])).IsEmpty())
                 {
                     // We can make this move since it's not a discovered check.
                     moves.push_back(Move::EpCapture(from, to));
