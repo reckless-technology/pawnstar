@@ -102,7 +102,7 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 - `node_count` — nodes searched by this thread.
 - `batch_cutoff*` — pointer to the per-batch abort flag (`nullptr` on the main thread).
 - `positions_` (`StackList<Position>`) — position stack for the search tree.
-- `hash_stack_` (`vector<HashEntry>`) — Zobrist hash history for 50-move/repetition detection.
+- `hash_stack_` (`StackList<HashEntry, kMaxGameLength + kMaxPly + 4>`) — Zobrist hash history for 50-move/repetition detection; fixed-capacity (no heap allocation per search).
 
 `SearchStatePool` ([search_state_pool.h](src/search_state_pool.h)) is a 64-slot slab allocator with a mutex+condition variable for blocking `acquire()` calls. `ThreadPool` ([thread_pool.h](src/thread_pool.h)) is a fixed-size pool of `hardware_concurrency() - 1` persistent worker threads. Both capacities are in [constants.h](src/constants.h) (`kSearchStatePoolCapacity`, `kThreadPoolQueueCapacity`).
 
