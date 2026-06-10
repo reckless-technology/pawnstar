@@ -3,13 +3,23 @@
 
 #include "search_state.h"
 
+#include <array>
 #include <atomic>
 #include <condition_variable>
-#include <deque>
-#include <functional>
 #include <mutex>
 #include <thread>
 #include <vector>
+
+/// @brief A unit of work for the thread pool: a function pointer and a non-owning argument.
+/// The pool never takes ownership of @c arg; the caller must keep it alive until the task runs
+/// (the parallel search blocks on a latch until its whole batch completes, so the argument lives
+/// in the caller's stack frame for the batch's duration). Using a plain function pointer instead
+/// of std::function avoids both heap allocation and type-erasure overhead per dispatch.
+struct Task
+{
+    void (*fn)(void *); ///< Function to invoke.
+    void *arg;          ///< Argument passed to fn (not owned by the pool).
+};
 
 /// @brief Fixed-size thread pool. Tasks are queued and executed by persistent worker threads.
 class ThreadPool
@@ -21,8 +31,8 @@ class ThreadPool
     ~ThreadPool();
 
     /// @brief Enqueue a task for execution on a worker thread.
-    /// @param task Callable to run.
-    void submit(std::function<void()> task);
+    /// @param task Function pointer and argument to run.
+    void submit(Task task);
 
     /// @brief Number of threads currently idle (available for immediate dispatch).
     int idle_count() const
@@ -31,8 +41,15 @@ class ThreadPool
     }
 
   private:
+    /// @brief Capacity of the task ring buffer. A power of two larger than SearchStatePool::kCapacity:
+    /// acquire() back-pressure caps the number of outstanding tasks at kCapacity, so the queue never
+    /// fills and no heap allocation is ever needed.
+    static constexpr int kQueueCapacity = 128;
+
     std::vector<std::thread>          workers_;
-    std::deque<std::function<void()>> queue_;
+    std::array<Task, kQueueCapacity>  queue_;       ///< Fixed-capacity ring buffer of pending tasks.
+    int                               head_{0};     ///< Index of the next task to pop.
+    int                               tail_{0};     ///< Index of the next free slot to push.
     std::mutex                        mutex_;
     std::condition_variable           cv_;
     std::atomic<int>                  idle_count_{0};

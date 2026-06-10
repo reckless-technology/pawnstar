@@ -11,7 +11,6 @@
 #include <latch>
 #include <mutex>
 #include <utility>
-#include <vector>
 
 /// @brief Compute late-move reduction depth. Returns `depth` unchanged when no reduction applies.
 static inline int ComputeLmrDepth(int depth, int move_index, bool in_check, bool is_capture, bool is_pawn)
@@ -127,6 +126,50 @@ static inline NullMoveResult AttemptNullMove(SearchState &state, int depth, int 
         }
     }
     return {alpha, kAlpha};
+}
+
+/// @brief Work descriptor for one move searched in the parallel (YBW) phase.
+/// Instances live in the dispatching node's stack frame for the duration of the batch (the node
+/// blocks on a latch until every worker finishes), so the thread pool can reference them without
+/// owning them. The worker writes its result back into @c score.
+struct ParallelJob
+{
+    SearchState *worker;     ///< Worker search state running this move.
+    Move         move;       ///< Move to search.
+    int          move_index; ///< Move number for ordering heuristics.
+    int          lmr_depth;  ///< Reduced search depth (may equal full depth).
+    int          depth;      ///< Full search depth.
+    int          ply;        ///< Distance from root.
+    int          alpha;      ///< Alpha bound at dispatch time.
+    int          beta;       ///< Beta bound at dispatch time.
+    std::latch  *latch;      ///< Batch completion latch, counted down when done.
+    int          score;      ///< Output: alpha-beta score for this move.
+};
+
+/// @brief Thread-pool trampoline: search one move on its worker state and record the result.
+/// @param arg Pointer to a ParallelJob owned by the dispatching node.
+static void RunParallelJob(void *arg)
+{
+    ParallelJob &job = *static_cast<ParallelJob *>(arg);
+    Variation    pv;
+    int score = SearchSingleMove(*job.worker, job.lmr_depth, job.ply, job.alpha, job.beta, job.move, pv, job.move_index)
+                    .score;
+    // Re-search at full depth if LMR was applied and the move beat alpha.
+    if (!job.worker->IsCancelled() && score > job.alpha && job.lmr_depth < job.depth)
+    {
+        score = SearchSingleMove(*job.worker, job.depth, job.ply, job.alpha, job.beta, job.move, pv, job.move_index)
+                    .score;
+    }
+    if (score >= job.beta)
+    {
+        job.worker->SignalBatchCutoff();
+        job.worker->game.history_table.RecordGoodMove(job.ply, job.move);
+    }
+    job.score = score;
+    // Return the slot before counting down so it is available immediately.
+    Game &g = job.worker->game;
+    g.state_pool.release(job.worker);
+    job.latch->count_down();
 }
 
 /// @brief Alpha-beta main search algorithm.
@@ -327,13 +370,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
     // ── Parallel phase (YBW) ─────────────────────────────────────────────────
     if (parallel_start_mi >= 0 && !state.IsCancelled())
     {
-        struct ParallelMove
-        {
-            Move move;
-            int  move_index;
-            int  lmr_depth;
-        };
-        StackList<ParallelMove, kMaxMovesPerPosition> batch;
+        StackList<ParallelJob, kMaxMovesPerPosition> batch;
 
         // Collect remaining non-TT moves and compute their LMR depths.
         // (Parallel phase is only entered at null-window nodes, so beta == alpha+1 is always true here.)
@@ -344,7 +381,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
                 continue;
             const int lmr_d =
                 ComputeLmrDepth(depth, mi, in_check_seq, mv.captured() != Piece::kNone, mv.piece() == kPawn);
-            batch.push_back({mv, mi, lmr_d});
+            batch.push_back({nullptr, mv, mi, lmr_d, depth, ply, alpha, beta, nullptr, 0});
         }
 
         if (batch.size() != 0)
@@ -353,45 +390,23 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             std::atomic<bool> batch_cutoff{false};
             std::latch        latch{(std::ptrdiff_t)batch.size()};
 
-            struct WorkResult
-            {
-                Move move;
-                int  score;
-            };
-            StackList<WorkResult, kMaxMovesPerPosition> results;
-            results.resize(batch.size());
-
-            // Dispatch each move to a worker SearchState on the thread pool.
+            // Dispatch each move to a worker SearchState on the thread pool. Each job lives in `batch`
+            // (this stack frame) until latch.wait() returns, so the pool can reference it by pointer.
             for (int bi = 0; bi < (int)batch.size(); ++bi)
             {
-                const auto [mv, mi, lmr_d] = batch[bi];
-                SearchState *worker        = state.game.state_pool.acquire(state, &batch_cutoff);
-                state.game.thread_pool.submit([worker, mv, mi, lmr_d, depth, ply, alpha, beta, bi, &results, &latch]() {
-                    Variation pv;
-                    int       score = SearchSingleMove(*worker, lmr_d, ply, alpha, beta, mv, pv, mi).score;
-                    // Re-search at full depth if LMR was applied and the move beat alpha.
-                    if (!worker->IsCancelled() && score > alpha && lmr_d < depth)
-                    {
-                        score = SearchSingleMove(*worker, depth, ply, alpha, beta, mv, pv, mi).score;
-                    }
-                    if (score >= beta)
-                    {
-                        worker->SignalBatchCutoff();
-                        worker->game.history_table.RecordGoodMove(ply, mv);
-                    }
-                    results[bi] = {mv, score};
-                    // Return the slot before counting down so it is available immediately.
-                    Game &g = worker->game;
-                    g.state_pool.release(worker);
-                    latch.count_down();
-                });
+                ParallelJob &job = batch[bi];
+                job.worker       = state.game.state_pool.acquire(state, &batch_cutoff);
+                job.latch        = &latch;
+                state.game.thread_pool.submit({&RunParallelJob, &job});
             }
 
             latch.wait(); // Block until every worker has finished.
 
             // Fold parallel results into best_score / alpha.
-            for (const auto &[r_move, r_score] : results)
+            for (const auto &job : batch)
             {
+                const Move r_move  = job.move;
+                const int  r_score = job.score;
                 if (state.game.is_cancel_pending.load(std::memory_order_relaxed))
                     return kSearchCancelledScore;
                 if (r_score >= beta)

@@ -18,18 +18,18 @@ ThreadPool::ThreadPool(unsigned n_threads)
         workers_.emplace_back([this] {
             for (;;)
             {
-                std::function<void()> task;
+                Task task;
                 {
                     std::unique_lock<std::mutex> lock(mutex_);
                     ++idle_count_;
-                    cv_.wait(lock, [this] { return stop_ || !queue_.empty(); });
+                    cv_.wait(lock, [this] { return stop_ || head_ != tail_; });
                     --idle_count_;
-                    if (stop_ && queue_.empty())
+                    if (stop_ && head_ == tail_)
                         return;
-                    task = std::move(queue_.front());
-                    queue_.pop_front();
+                    task = queue_[head_];
+                    head_ = (head_ + 1) % kQueueCapacity;
                 }
-                task();
+                task.fn(task.arg);
             }
         });
     }
@@ -48,11 +48,12 @@ ThreadPool::~ThreadPool()
 }
 
 /// @brief Enqueue a task and wake one idle worker.
-void ThreadPool::submit(std::function<void()> task)
+void ThreadPool::submit(Task task)
 {
     {
         std::unique_lock<std::mutex> lock(mutex_);
-        queue_.push_back(std::move(task));
+        queue_[tail_] = task;
+        tail_         = (tail_ + 1) % kQueueCapacity;
     }
     cv_.notify_one();
 }
