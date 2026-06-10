@@ -1,8 +1,8 @@
 /// @file Functions to implement a transposition table.
-
-#include <algorithm>
-#include <memory>
-#include <vector>
+/// The table is lockless: each cell holds key = hash ^ data and data (the packed move). A reader accepts
+/// a cell only when key ^ data == probe hash, so a torn pair written by concurrent stores is detected and
+/// read as a miss (Hyatt's XOR trick). Individual 64-bit words are std::atomic, accessed with relaxed
+/// ordering; the XOR check supplies the cross-word consistency that relaxed ordering does not.
 
 #include "debug_hashtable.h"
 #include "position.h"
@@ -12,61 +12,54 @@
 /// @param megabytes Approx max size of the table in megabytes.
 TranspositionTable::TranspositionTable(std::size_t megabytes)
 {
-    std::size_t num_entries = (megabytes * kMegabyte) / sizeof(Transposition);
-    table_.assign(num_entries, Transposition{});
-    locks_ = std::make_unique<std::atomic_flag[]>(num_entries);
+    size_  = (megabytes * kMegabyte) / sizeof(AtomicEntry);
+    table_ = std::make_unique<AtomicEntry[]>(size_); // value-initialises every word to 0.
 }
 
-namespace
-{
-struct TTLock
-{
-    std::atomic_flag &flag;
-    explicit TTLock(std::atomic_flag &f) : flag(f)
-    {
-        while (flag.test_and_set(std::memory_order_acquire))
-        {
-        }
-    }
-    ~TTLock() { flag.clear(std::memory_order_release); }
-};
-} // namespace
-
 /// @brief Find an entry in the TT if one exists for this position.
-/// Acquires a per-entry spinlock, copies the entry while locked, then releases.
 /// @param hash Zobrist hash of position.
 /// @return The matching transposition if found.
 std::optional<Transposition> TranspositionTable::FindTransposition(zobrist_t hash) const
 {
-    const std::size_t    idx = hash % table_.size();
-    TTLock               lock{locks_[idx]};
-    const Transposition  t = table_[idx];
-    if (t.hash == hash)
-        return t;
+    const AtomicEntry &e    = table_[hash % size_];
+    const uint64_t     data = e.data.load(std::memory_order_relaxed);
+    const uint64_t     key  = e.key.load(std::memory_order_relaxed);
+    if ((key ^ data) == hash)
+        return Transposition{hash, Move::FromBits(data)};
     return std::nullopt;
 }
 
 /// @brief Insert a new entry into the table if it is more valuable than the existing one.
+/// Lockless read-decide-write: a concurrent writer to the same cell results in benign last-writer-wins,
+/// while the XOR-encoded key keeps each stored pair self-consistent.
 /// @param transposition Transposition to be inserted.
 void TranspositionTable::RecordTransposition(const Transposition &transposition)
 {
-    const std::size_t idx = transposition.hash % table_.size();
-    TTLock            lock{locks_[idx]};
-    Transposition    &t      = table_[idx];
-    const bool        is_old = t.age() != generation_;
-    if (t.hash == 0 || is_old || t.depth() <= transposition.depth() ||
+    AtomicEntry   &e        = table_[transposition.hash % size_];
+    const uint64_t cur_key  = e.key.load(std::memory_order_relaxed);
+    const uint64_t cur_data = e.data.load(std::memory_order_relaxed);
+    const Move     cur      = Move::FromBits(cur_data);
+    const bool     is_empty = (cur_key == 0 && cur_data == 0);
+    const bool     is_old   = cur.TTAge() != generation_;
+    if (is_empty || is_old || cur.TTDepth() <= transposition.depth() ||
         transposition.node_type() == Transposition::NodeType::kPv)
     {
-        t = transposition;
-        t.move.SetTTAge(generation_);
+        Move m = transposition.move;
+        m.SetTTAge(generation_);
+        const uint64_t data = m.Bits();
+        e.key.store(transposition.hash ^ data, std::memory_order_relaxed);
+        e.data.store(data, std::memory_order_relaxed);
     }
 }
 
 /// @brief Return the number of occupied entries and percentage full of the table.
 std::pair<std::size_t, int> TranspositionTable::UsageStats() const
 {
-    std::size_t count = std::ranges::count_if(table_, [](const Transposition &t) { return t.hash != 0; });
-    return {count, (count * 100) / table_.size()};
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < size_; ++i)
+        if (table_[i].data.load(std::memory_order_relaxed) != 0)
+            ++count;
+    return {count, (int)((count * 100) / size_)};
 }
 
 /// @brief Advance the table generation so that all existing entries become stale (replaceable).

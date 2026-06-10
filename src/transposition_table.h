@@ -2,7 +2,6 @@
 #include <atomic>
 #include <memory>
 #include <optional>
-#include <vector>
 
 #include "move.h"
 
@@ -18,6 +17,12 @@ struct Transposition
     Move      move; ///< Best move, with score/depth/node-type/age packed into its spare bits.
 
     constexpr Transposition() : hash(0), move(Move::None())
+    {
+    }
+
+    /// @brief Construct from a move that already has its TT metadata packed in (used when reconstructing
+    /// an entry read back from the table).
+    constexpr Transposition(zobrist_t hash, Move move) : hash(hash), move(move)
     {
     }
 
@@ -61,7 +66,17 @@ class TranspositionTable
     std::pair<std::size_t, int>  UsageStats() const;
 
   private:
-    std::vector<Transposition>                  table_;          ///< Indexed using Zobrist hash.
-    mutable std::unique_ptr<std::atomic_flag[]> locks_;          ///< Per-entry spinlocks, parallel to table_.
-    uint8_t                                     generation_ = 0; ///< Current generation; bumped by Age().
+    /// @brief One lockless table cell. Stores @c key = hash ^ data alongside @c data (the packed move
+    /// bits). A reader accepts the entry only if @c key ^ @c data equals the probe hash, so a torn pair
+    /// (two 64-bit words written by different stores) is detected and treated as a miss (Hyatt's XOR trick).
+    struct AtomicEntry
+    {
+        std::atomic<uint64_t> key{0};  ///< hash ^ data.
+        std::atomic<uint64_t> data{0}; ///< Packed move bits (move + score/depth/node-type/age).
+    };
+    static_assert(sizeof(AtomicEntry) == 16);
+
+    std::unique_ptr<AtomicEntry[]> table_;          ///< Indexed using Zobrist hash; value-initialised to 0.
+    std::size_t                    size_ = 0;        ///< Number of cells in table_.
+    uint8_t                        generation_ = 0;  ///< Current generation; bumped by Age().
 };

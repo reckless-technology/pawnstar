@@ -104,7 +104,9 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 
 ### Transposition table
 
-Two tables: 64 MB main (`kHashtableMegabytes`) and 8 MB quiescence (`kQHashtableMb`). Each entry is exactly 128 bits: a 64-bit Zobrist `hash` and a 64-bit `move` whose spare bits encode the score, depth, node type (CUT/ALL/PV) and age. `Transposition` exposes `score()`/`depth()`/`node_type()`/`age()` accessors that read those packed bits. Access is protected by a parallel array of `std::atomic_flag` spinlocks (one per entry) via the `TTLock` RAII guard in [transposition_table.cpp](src/transposition_table.cpp).
+Two tables: 64 MB main (`kHashtableMegabytes`) and 8 MB quiescence (`kQHashtableMb`). Each entry is exactly 128 bits: a 64-bit Zobrist `hash` and a 64-bit `move` whose spare bits encode the score, depth, node type (CUT/ALL/PV) and age. `Transposition` exposes `score()`/`depth()`/`node_type()`/`age()` accessors that read those packed bits.
+
+The table is **lockless** (Hyatt's XOR trick). Each cell (`AtomicEntry`) stores two `std::atomic<uint64_t>`: `key = hash ^ data` and `data` (the packed move). A reader accepts a cell only when `key ^ data == probe hash`, so a torn pair written by concurrent stores is detected and read as a miss. Words are accessed with `relaxed` ordering; the XOR check supplies the cross-word consistency that relaxed ordering does not. Writers race benignly (last-writer-wins) — no spinlocks.
 
 Aging is O(1): the table holds a `generation_` counter that `Age()` increments before each search; an entry is stale when its `age != generation_`, and `RecordTransposition` stamps the current generation when it writes. Replacement policy: prefer replacing stale entries, lower-depth entries, or any entry for PV nodes.
 

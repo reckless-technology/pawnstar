@@ -198,6 +198,18 @@ class Move
         return !!(val & kIsChecking);
     }
 
+    /// @brief Raw 64-bit representation of the move (all packed fields). Used by the lockless TT.
+    constexpr uint64_t Bits() const
+    {
+        return (uint64_t)val;
+    }
+
+    /// @brief Construct a move from its raw 64-bit representation. Used by the lockless TT.
+    constexpr static Move FromBits(uint64_t bits)
+    {
+        return Move{(int64_t)bits};
+    }
+
     /// @brief Assign the score to the move (bits 41-63, signed 23-bit). Leaves all other bits untouched.
     /// @param score Score to be assigned (must fit in a signed 23-bit value).
     constexpr void AssignScore(int score)
