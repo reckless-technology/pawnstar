@@ -29,19 +29,40 @@ struct string_hasher
 using DebugTable = std::unordered_map<std::string_view, int64_t, string_hasher>;
 extern DebugTable debug_dictionary; ///< Global dictionary of named diagnostic counters.
 
+/// @brief Find-or-create the counter slot for a name and return a stable pointer to it.
+/// std::unordered_map nodes are stable across insert/rehash and DebugXClear zeroes values rather than
+/// erasing nodes, so the returned pointer is valid for the program's lifetime. Each INCREMENT call site
+/// caches this pointer in a function-local static, so after the first hit a counter update is a single
+/// pointer increment — no string hashing and no map lookup on the hot path.
+int64_t *DebugSlot(std::string_view name);
+
 /// @brief Reset all diagnostic counters to zero.
 void DebugXClear();
 /// @brief Print all diagnostic counters in alphabetical order.
 void DebugXWrite();
 
-#define INCREMENT(x)   ++debug_dictionary[x]     ///< Increment the named counter.
-#define ASSIGN(x, val) debug_dictionary[x] = val ///< Set the named counter to a value.
-/// @brief Increment the named counter when the condition is true.
-#define INCREMENT_IF(b, x)     \
-    if (b)                     \
-    {                          \
-        ++debug_dictionary[x]; \
-    }
+/// @brief Increment the named counter (slot pointer cached per call site).
+#define INCREMENT(x)                                                                                                    \
+    do                                                                                                                  \
+    {                                                                                                                   \
+        static int64_t *_dbg_slot = DebugSlot(x);                                                                       \
+        ++*_dbg_slot;                                                                                                   \
+    } while (0)
+/// @brief Set the named counter to a value (slot pointer cached per call site).
+#define ASSIGN(x, val)                                                                                                  \
+    do                                                                                                                  \
+    {                                                                                                                   \
+        static int64_t *_dbg_slot = DebugSlot(x);                                                                       \
+        *_dbg_slot                = (val);                                                                              \
+    } while (0)
+/// @brief Increment the named counter when the condition is true (slot pointer cached per call site).
+#define INCREMENT_IF(b, x)                                                                                              \
+    do                                                                                                                  \
+    {                                                                                                                   \
+        static int64_t *_dbg_slot = DebugSlot(x);                                                                       \
+        if (b)                                                                                                          \
+            ++*_dbg_slot;                                                                                               \
+    } while (0)
 
 #else
 
