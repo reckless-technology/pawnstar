@@ -23,7 +23,9 @@ ThreadPool::ThreadPool(unsigned n_threads)
                     cv_.wait(lock, [this] { return stop_ || head_ != tail_; });
                     --idle_count_;
                     if (stop_ && head_ == tail_)
+                    {
                         return;
+                    }
                     task  = queue_[head_];
                     head_ = (head_ + 1) % kThreadPoolQueueCapacity;
                 }
@@ -42,7 +44,9 @@ ThreadPool::~ThreadPool()
     }
     cv_.notify_all();
     for (auto &w : workers_)
+    {
         w.join();
+    }
 }
 
 /// @brief Enqueue a task and wake one idle worker.

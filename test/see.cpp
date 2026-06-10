@@ -165,9 +165,13 @@ int main()
             ++failures;
             std::cout << std::format("[FAIL] {}\n", tc.name);
             if (score != tc.want_score)
+            {
                 std::cout << std::format("       score: got {} want {}\n", score, tc.want_score);
+            }
             if (is_checking != tc.want_checking)
+            {
                 std::cout << std::format("       givesCheck: got {} want {}\n", is_checking, tc.want_checking);
+            }
         }
         else
         {

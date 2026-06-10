@@ -131,7 +131,9 @@ static Move ParseSan(const Position &pos, std::string_view san_view)
     }
 
     if (san.empty())
+    {
         return Move::None();
+    }
 
     const MoveList moves = pos.GenerateLegalMoves();
 
@@ -207,12 +209,16 @@ static Move ParseSan(const Position &pos, std::string_view san_view)
 
     // The destination square is always the last two characters.
     if (san.size() < i + 2)
+    {
         return Move::None();
+    }
 
     const char dest_file_char = san[san.size() - 2];
     const char dest_rank_char = san[san.size() - 1];
     if (dest_file_char < 'a' || dest_file_char > 'h' || dest_rank_char < '1' || dest_rank_char > '8')
+    {
         return Move::None();
+    }
 
     const Square to_sq(dest_file_char - 'a', dest_rank_char - '1');
 
@@ -224,9 +230,13 @@ static Move ParseSan(const Position &pos, std::string_view san_view)
     {
         const char c = san[j];
         if (c >= 'a' && c <= 'h')
+        {
             disambig_file = c - 'a';
+        }
         else if (c >= '1' && c <= '8')
+        {
             disambig_rank = c - '1';
+        }
     }
 
     // Search legal moves for a match.
@@ -274,7 +284,9 @@ bool OpeningBook::ParsePgn(std::istream &is)
 
     const auto process_token = [&]() {
         if (token.empty())
+        {
             return;
+        }
 
         // Result tokens end the current game and reset the position.
         if (token == "1-0" || token == "0-1" || token == "1/2-1/2" || token == "*")
@@ -295,7 +307,9 @@ bool OpeningBook::ParsePgn(std::istream &is)
         std::string_view san{token};
         size_t           j = 0;
         while (j < san.size() && (isdigit(static_cast<unsigned char>(san[j])) || san[j] == '.'))
+        {
             ++j;
+        }
         san = san.substr(j);
 
         // Skip move numbers, ellipsis, NAG glyphs ($n), and other non-move tokens.
@@ -352,11 +366,15 @@ bool OpeningBook::InitializeFromStream(std::istream &ss)
 {
     // Skip leading whitespace to detect the file format.
     while (ss.peek() != EOF && isspace(static_cast<unsigned char>(ss.peek())))
+    {
         ss.get();
+    }
 
     // A '[' at the start of content indicates PGN format; otherwise use the line-of-play format.
     if (ss.peek() == '[')
+    {
         return ParsePgn(ss);
+    }
 
     while (ss)
     {

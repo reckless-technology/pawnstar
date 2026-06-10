@@ -42,26 +42,26 @@ void DebugXClear();
 void DebugXWrite();
 
 /// @brief Increment the named counter (slot pointer cached per call site).
-#define INCREMENT(x)                                                                                                    \
-    do                                                                                                                  \
-    {                                                                                                                   \
-        static int64_t *_dbg_slot = DebugSlot(x);                                                                       \
-        ++*_dbg_slot;                                                                                                   \
+#define INCREMENT(x)                              \
+    do                                            \
+    {                                             \
+        static int64_t *_dbg_slot = DebugSlot(x); \
+        ++*_dbg_slot;                             \
     } while (0)
 /// @brief Set the named counter to a value (slot pointer cached per call site).
-#define ASSIGN(x, val)                                                                                                  \
-    do                                                                                                                  \
-    {                                                                                                                   \
-        static int64_t *_dbg_slot = DebugSlot(x);                                                                       \
-        *_dbg_slot                = (val);                                                                              \
+#define ASSIGN(x, val)                            \
+    do                                            \
+    {                                             \
+        static int64_t *_dbg_slot = DebugSlot(x); \
+        *_dbg_slot                = (val);        \
     } while (0)
 /// @brief Increment the named counter when the condition is true (slot pointer cached per call site).
-#define INCREMENT_IF(b, x)                                                                                              \
-    do                                                                                                                  \
-    {                                                                                                                   \
-        static int64_t *_dbg_slot = DebugSlot(x);                                                                       \
-        if (b)                                                                                                          \
-            ++*_dbg_slot;                                                                                               \
+#define INCREMENT_IF(b, x)                        \
+    do                                            \
+    {                                             \
+        static int64_t *_dbg_slot = DebugSlot(x); \
+        if (b)                                    \
+            ++*_dbg_slot;                         \
     } while (0)
 
 #else

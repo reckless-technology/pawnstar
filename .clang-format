@@ -7,5 +7,6 @@ AlignEscapedNewlines: Left
 AlignOperands: 'true'
 AlignTrailingComments: 'true'
 ColumnLimit: '120'
+InsertBraces: 'true'
 
 ...

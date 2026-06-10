@@ -101,16 +101,26 @@ class CastlingRights
     constexpr std::string ToFenString() const
     {
         if (value_ == 0)
+        {
             return "-";
+        }
         std::string s;
         if (value_ & kWhiteKingside)
+        {
             s += 'K';
+        }
         if (value_ & kWhiteQueenside)
+        {
             s += 'Q';
+        }
         if (value_ & kBlackKingside)
+        {
             s += 'k';
+        }
         if (value_ & kBlackQueenside)
+        {
             s += 'q';
+        }
         return s;
     }
 

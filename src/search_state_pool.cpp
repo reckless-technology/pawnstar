@@ -7,7 +7,9 @@ SearchStatePool::SearchStatePool()
 {
     free_indices_.reserve(kSearchStatePoolCapacity);
     for (int i = kSearchStatePoolCapacity - 1; i >= 0; --i)
+    {
         free_indices_.push_back(i);
+    }
 }
 
 /// @brief Acquire a slot (blocking if all are in use) and construct a SearchState in it.

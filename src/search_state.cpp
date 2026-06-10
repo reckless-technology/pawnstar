@@ -78,11 +78,17 @@ void SearchState::ScoreAndSortMoves(MoveList &moves, int ply) const
             sort          = see >= 0 ? kWinningCaptureBase + see : see; // losing captures sort below quiet moves
         }
         else if (move == killer0) // first killer: just below winning captures
+        {
             sort = kKillerBase + 1;
+        }
         else if (move == killer1) // second killer
+        {
             sort = kKillerBase;
+        }
         else // quiet move: history count, clamped below the killers
+        {
             sort = (int)std::min<uint32_t>(game.history_table.GetCount(ply, move), (uint32_t)kMaxQuiet);
+        }
         move.AssignScore(sort);
     }
     SortMoves<false>(moves);

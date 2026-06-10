@@ -25,7 +25,9 @@ std::optional<Transposition> TranspositionTable::FindTransposition(zobrist_t has
     const uint64_t     data = e.data.load(std::memory_order_relaxed);
     const uint64_t     key  = e.key.load(std::memory_order_relaxed);
     if ((key ^ data) == hash)
+    {
         return Transposition{hash, Move::FromBits(data)};
+    }
     return std::nullopt;
 }
 
@@ -57,8 +59,12 @@ std::pair<std::size_t, int> TranspositionTable::UsageStats() const
 {
     std::size_t count = 0;
     for (std::size_t i = 0; i < size_; ++i)
+    {
         if (table_[i].data.load(std::memory_order_relaxed) != 0)
+        {
             ++count;
+        }
+    }
     return {count, (int)((count * 100) / size_)};
 }
 

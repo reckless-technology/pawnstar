@@ -85,7 +85,9 @@ class SearchState
     void SignalBatchCutoff()
     {
         if (batch_cutoff != nullptr)
+        {
             batch_cutoff->store(true, std::memory_order_relaxed);
+        }
     }
 
     /// @brief Record a quiet move that caused a beta cutoff as a killer move for this ply.

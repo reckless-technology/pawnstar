@@ -80,7 +80,7 @@ class Game
     bool IsDrawByFiftyMoves() const;
 
   private:
-    void                     SearchThreadEntry(); ///< Entry point of the search worker thread.
-    std::thread              worker_thread_;      ///< Worker thread for searching moves.
-    StackList<Position, kMaxGameLength> positions_; ///< Game position history stack.
+    void                                SearchThreadEntry(); ///< Entry point of the search worker thread.
+    std::thread                         worker_thread_;      ///< Worker thread for searching moves.
+    StackList<Position, kMaxGameLength> positions_;          ///< Game position history stack.
 };

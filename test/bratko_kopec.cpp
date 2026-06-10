@@ -57,7 +57,9 @@ int main(int argc, char *argv[])
 {
     int depth = 8;
     if (argc > 1)
+    {
         depth = std::atoi(argv[1]);
+    }
 
     using Clock    = std::chrono::steady_clock;
     int  failures  = 0;
@@ -89,7 +91,9 @@ int main(int argc, char *argv[])
         }
 
         if (!pass)
+        {
             ++failures;
+        }
 
         std::string valid;
         for (std::string_view a : tc.accepted)
@@ -97,7 +101,9 @@ int main(int argc, char *argv[])
             if (!a.empty())
             {
                 if (!valid.empty())
+                {
                     valid += ' ';
+                }
                 valid += a;
             }
         }

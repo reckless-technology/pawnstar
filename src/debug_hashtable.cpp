@@ -17,7 +17,7 @@ DebugTable debug_dictionary;
 /// Creation is serialised so concurrent first-time creations from worker threads don't race on the map.
 int64_t *DebugSlot(std::string_view name)
 {
-    static std::mutex slot_mutex;
+    static std::mutex           slot_mutex;
     std::lock_guard<std::mutex> lock(slot_mutex);
     return &debug_dictionary[name];
 }
@@ -27,7 +27,9 @@ int64_t *DebugSlot(std::string_view name)
 void DebugXClear()
 {
     for (auto &entry : debug_dictionary)
+    {
         entry.second = 0;
+    }
 }
 
 /// @brief Print the non-zero debug counters in alphabetic order.
@@ -38,7 +40,9 @@ void DebugXWrite()
     for (const auto &[title, count] : sorted_entries)
     {
         if (count != 0)
+        {
             std::cout << std::format("{:<40}{:10}\n", title, count);
+        }
     }
     std::cout << "**************************************************\n";
 }

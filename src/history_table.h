@@ -25,7 +25,9 @@ class HistoryTable
     void Reset()
     {
         for (int i = 0; i < kTableSize; ++i)
+        {
             counts_[i].store(0, std::memory_order_relaxed);
+        }
     }
 
     /// @brief Return the maximum count across all entries.
@@ -37,7 +39,9 @@ class HistoryTable
         {
             uint32_t v = counts_[i].load(std::memory_order_relaxed);
             if (v > max_val)
+            {
                 max_val = v;
+            }
         }
         return max_val;
     }

@@ -176,7 +176,9 @@ static void Perft(const Position &pos, int depth, uint64_t &nodes)
         return;
     }
     for (const auto &m : moves)
+    {
         Perft(pos.MakeMove(m), depth - 1, nodes);
+    }
 }
 
 /// @brief Parse the EPD table into perft cases up to a maximum depth.
@@ -190,7 +192,9 @@ static std::vector<PerftCase> ParseEPD(int max_depth)
         std::string s{perft_epd[i]};
         auto        sep = s.find(';');
         if (sep == std::string::npos)
+        {
             continue;
+        }
         std::string fen  = s.substr(0, sep);
         std::string rest = s.substr(sep + 1);
         while (!rest.empty())
@@ -199,14 +203,20 @@ static std::vector<PerftCase> ParseEPD(int max_depth)
             std::string token = next == std::string::npos ? rest : rest.substr(0, next);
             rest              = next == std::string::npos ? "" : rest.substr(next + 1);
             if (token.size() < 3 || token[0] != 'D')
+            {
                 continue;
+            }
             auto sp = token.find(' ');
             if (sp == std::string::npos)
+            {
                 continue;
+            }
             int      depth = std::atoi(token.c_str() + 1);
             uint64_t nodes = std::strtoull(token.c_str() + sp + 1, nullptr, 10);
             if (depth <= max_depth)
+            {
                 cases.push_back({fen, depth, nodes});
+            }
         }
     }
     return cases;
@@ -222,9 +232,13 @@ int main(int argc, char *argv[])
     for (int i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "x") == 0)
+        {
             do_regression = true;
+        }
         else
+        {
             max_depth = std::atoi(argv[i]);
+        }
     }
     (void)do_regression; // regression mode unused — kept for CLI compat
 
@@ -243,7 +257,9 @@ int main(int argc, char *argv[])
         auto elapsed_us =
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
         if (elapsed_us == 0)
+        {
             elapsed_us = 1;
+        }
         total_nodes += got;
 
         std::cout << std::format("{:<75} d{} nodes={:<12} {:3.0f} Mnps\n", tc.fen, tc.depth, got,

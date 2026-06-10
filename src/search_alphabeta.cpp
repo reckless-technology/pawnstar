@@ -153,7 +153,9 @@ static void RunParallelJob(void *arg)
         job.worker->SignalBatchCutoff();
         job.worker->game.history_table.RecordGoodMove(job.ply, job.move);
         if (job.move.IsQuiet())
+        {
             job.worker->RecordKiller(job.ply, job.move);
+        }
     }
     job.score = score;
     // Return the slot before counting down so it is available immediately.
@@ -263,7 +265,9 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
                 state.CurrentPosition().Hash(), transposition->move, score, depth, Transposition::NodeType::kCut});
             state.game.history_table.RecordGoodMove(ply, transposition->move);
             if (transposition->move.IsQuiet())
+            {
                 state.RecordKiller(ply, transposition->move);
+            }
             return score;
         }
         best_score = score;
@@ -300,12 +304,14 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
     {
         const int move_index = (int)(&move - move_list.begin());
         if (transposition && move == transposition->move)
+        {
             continue;
+        }
 
         // Late move reduction: reduce quiet, non-check, late moves at null-window nodes.
         int lmr_depth = depth;
-        if (beta == alpha + 1 && move_index > 3 && !in_check_seq && depth > 2 &&
-            move.captured() == Piece::kNone && move.piece() != kPawn)
+        if (beta == alpha + 1 && move_index > 3 && !in_check_seq && depth > 2 && move.captured() == Piece::kNone &&
+            move.piece() != kPawn)
         {
             INCREMENT("late move reduction");
             lmr_depth = depth - 1;
@@ -323,7 +329,9 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             score = SearchSingleMove(state, depth, ply, alpha, beta, move, pv, move_index).score;
         }
         if (state.IsCancelled())
+        {
             return kSearchCancelledScore;
+        }
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
@@ -331,7 +339,9 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
                 Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
             state.game.history_table.RecordGoodMove(ply, move);
             if (move.IsQuiet())
+            {
                 state.RecordKiller(ply, move);
+            }
             return score;
         }
         if (score > best_score)
@@ -372,14 +382,18 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
         {
             const Move &mv = move_list[mi];
             if (transposition && mv == transposition->move)
+            {
                 continue;
+            }
             // Late move reduction (this batch is always a null-window node).
             int lmr_d = depth;
             if (mi > 3 && !in_check_seq && depth > 2 && mv.captured() == Piece::kNone && mv.piece() != kPawn)
             {
                 lmr_d = depth - 1;
                 if (depth > 3 && mi > 6)
+                {
                     --lmr_d;
+                }
             }
             batch.push_back({nullptr, mv, mi, lmr_d, depth, ply, alpha, beta, nullptr, 0});
         }
@@ -408,7 +422,9 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
                 const Move r_move  = job.move;
                 const int  r_score = job.score;
                 if (state.game.is_cancel_pending.load(std::memory_order_relaxed))
+                {
                     return kSearchCancelledScore;
+                }
                 if (r_score >= beta)
                 {
                     INCREMENT("parallel beta cutoffs");
@@ -416,7 +432,9 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
                         state.CurrentPosition().Hash(), r_move, r_score, depth, Transposition::NodeType::kCut});
                     state.game.history_table.RecordGoodMove(ply, r_move);
                     if (r_move.IsQuiet())
+                    {
                         state.RecordKiller(ply, r_move);
+                    }
                     return r_score;
                 }
                 if (r_score > best_score)
