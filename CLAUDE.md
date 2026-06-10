@@ -8,7 +8,9 @@ Requires `clang++` and GNU `make`. The build has a pre-compilation step that gen
 
 ```bash
 make          # full build → build/pawnstar
-make clean    # remove build artifacts
+make check    # build and run all test suites
+make doc      # generate Doxygen HTML into doc/html
+make clean    # remove build artifacts and generated docs
 ```
 
 Compiler flags include `-mbmi2` (BMI2 intrinsics required), `-std=c++20`, and `-I src`. Debug builds (`DEBUG=1`) add `-fsanitize=undefined,address`.
@@ -61,7 +63,7 @@ Pawnstar is a UCI chess engine using bitboard board representation and parallel 
 - Bits 0–5: to square; 6–11: from square; 12–14: moving piece; 15–17: captured piece; 18–21: move type; 22: is-checking flag.
 - Bits 23–24: TT node type; 25–32: TT depth (int8_t); 33–40: TT age (uint8_t); 41–63: score (signed 23-bit).
 
-The score field (bits 41–63) is shared: during move ordering it holds the sort score, and in a stored TT entry it holds the search score. The two never coexist — a move being ordered in a move list is never simultaneously a TT entry. The TT metadata bits (23–56) let a transposition entry be just `{hash, move}` (128 bits); see the transposition table section.
+The score field (bits 41–63) is shared: during move ordering it holds the sort score, and in a stored TT entry it holds the search score. The two never coexist — a move being ordered in a move list is never simultaneously a TT entry. The TT metadata bits (23–63) let a transposition entry be just `{hash, move}` (128 bits); see the transposition table section. `Move::WithTTData`/`SetTTAge` pack the metadata and `Bits`/`FromBits` round-trip the raw 64-bit value for the lockless TT.
 
 Move types: `kNonCapture`, `kCapture`, `kPawnDoublePush`, `kEpCapture`, `kCastling`, and promotion variants `kPromotionKnight/Bishop/Rook/Queen`.
 
@@ -86,7 +88,9 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 - Killer move heuristic (2 killers per ply).
 - History heuristic (`HistoryTable`, thread-safe atomics) for move ordering.
 
-**Quiescence search** — `SearchQuiescent` ([search_quiescent.cpp](src/search_quiescent.cpp)) searches captures only, with SEE pruning: captures with negative SEE that don't give check are skipped.
+**Move ordering** — `SearchState::ScoreAndSortMoves` assigns each move a 16/23-bit ordering score stored in the `Move` itself: captures sit in a high band ordered by MVV/LVA (centipawn victim value minus attacker), quiet moves below it by history count (clamped). The TT move is searched first, before the list is generated and sorted.
+
+**Quiescence search** — `SearchQuiescent` ([search_quiescent.cpp](src/search_quiescent.cpp)) searches captures only. (An SEE-based pruning path — skip captures with negative SEE that don't give check — exists but is currently compiled out behind `#if 0`.)
 
 **Parallel search (YBW)** — After 2 sequential moves at a null-window node, remaining moves are dispatched to the thread pool in parallel batches (Young Brothers Wait). Each parallel worker gets its own `SearchState` from the `SearchStatePool` slab (64 slots). A per-batch `std::atomic<bool>` cutoff flag and a `std::latch` synchronize workers within a batch. Workers never sub-parallelize (only the main thread triggers YBW).
 
@@ -114,14 +118,14 @@ Aging is O(1): the table holds a `generation_` counter that `Age()` increments b
 
 `EvaluatePosition` ([evaluation.cpp](src/evaluation.cpp)) scores:
 - **Material**: piece values from `SearchState::kPieceValues`.
-- **Piece-square tables**: per-piece tables in [evaluation.h](src/evaluation.h) (`kPawnSquare`, `kKnightSquare`, `kBishopSquare`, `kRookSquare`, `kQueenSquare`, `kKingSquare`).
+- **Piece-square tables**: per-piece tables in [evaluation.h](src/evaluation.h) (`kPawnSquare`, `kKnightSquare`, `kBishopSquare`, `kRookSquare`, `kQueenSquare`, and separate `kKingSquareMidgame`/`kKingSquareEndgame`).
 - **Pawn structure** via `DeterminePawnStructure<Color>()`: passed, isolated, unsupported, doubled, and defended pawn bitboards. Penalties for doubled/isolated/unsupported; bonuses for passed and defended.
 - **King safety**: penalties based on attacker proximity.
 - **Mobility**: bonus for piece mobility (number of legal moves available).
 
 Scores are tapered between opening/middlegame and endgame phases based on remaining material.
 
-SEE ([static_exchange_evaluation.h](src/static_exchange_evaluation.h)) is used for capture move ordering and quiescence pruning. `EvaluateStaticExchange` returns `{score, is_checking}`.
+SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a square; `EvaluateStaticExchange` returns `{score, is_checking}`. It is exercised by `test_see` and wired into the quiescence pruning path, but that path is currently disabled (`#if 0`), so SEE does not affect the live search.
 
 ### UCI protocol
 
