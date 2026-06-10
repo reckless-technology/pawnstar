@@ -137,7 +137,7 @@ struct PawnStructure
     Bitboard doubled_pawns;     ///< A doubled pawn has a friendly pawn in front of it.
     Bitboard defended_pawns;    ///< A defended pawn has a friendly pawn defending it.
     /// @brief Construct with all pawn-structure bitboards empty.
-    PawnStructure()
+    constexpr PawnStructure()
         : passed_pawns(kNoSquares), isolated_pawns(kNoSquares), unsupported_pawns(kNoSquares),
           doubled_pawns(kNoSquares), defended_pawns(kNoSquares)
     {
@@ -148,7 +148,7 @@ struct PawnStructure
 /// @tparam color color to evaluate
 /// @param position position to evaluate
 /// @return Pawn structure
-template <Color color> PawnStructure DeterminePawnStructure(const Position &position)
+template <Color color> constexpr PawnStructure DeterminePawnStructure(const Position &position)
 {
     const Bitboard friendly_pawns = position.Pawns() & position.PiecesOfColor(color);
     const Bitboard enemy_pawns    = position.Pawns() ^ friendly_pawns;
@@ -196,7 +196,7 @@ template <Color color> PawnStructure DeterminePawnStructure(const Position &posi
 /// @tparam color color to evaluate
 /// @param position position to evaluate
 /// @return material score
-template <Color color> int EvaluateMaterial(const Position &position)
+template <Color color> constexpr int EvaluateMaterial(const Position &position)
 {
     const Bitboard friendly_pieces = position.PiecesOfColor(color);
     const Bitboard pawns           = position.Pawns() & friendly_pieces;
@@ -224,7 +224,7 @@ template <Color color> int EvaluateMaterial(const Position &position)
 /// @param position current position
 /// @param ps Pawn structure for both colors (used to exclude pawn-defended targets).
 /// @return mobility score
-template <Color color> int EvaluateMobility(const Position &position, const std::array<PawnStructure, 2> &ps)
+template <Color color> constexpr int EvaluateMobility(const Position &position, const std::array<PawnStructure, 2> &ps)
 {
 
     const Bitboard friendly_pieces  = position.PiecesOfColor(color);
@@ -257,7 +257,7 @@ template <Color color> int EvaluateMobility(const Position &position, const std:
 /// @tparam color Color to evaluate for
 /// @param position Position
 /// @return score
-template <Color color> int EvaluatePieceSquare(const Position &position)
+template <Color color> constexpr int EvaluatePieceSquare(const Position &position)
 {
     constexpr uint8_t rank_flip       = (color == kWhite ? kRankFlip : 0);
     const Bitboard    friendly_pieces = position.PiecesOfColor(color);
@@ -289,7 +289,7 @@ template <Color color> int EvaluatePieceSquare(const Position &position)
 /// @tparam color color to evaluate
 /// @param ps pawn structure
 /// @return score for pawn structure
-template <Color color> int EvaluatePawnStructure(const PawnStructure &ps)
+template <Color color> constexpr int EvaluatePawnStructure(const PawnStructure &ps)
 {
     constexpr uint8_t rank_flip = (color == kWhite ? kRankFlip : 0);
     int               score     = 0;
@@ -308,7 +308,7 @@ template <Color color> int EvaluatePawnStructure(const PawnStructure &ps)
 /// @tparam color Color to evaluate
 /// @param position Position
 /// @return score
-template <Color color> int EvaluateKing(const Position &position)
+template <Color color> constexpr int EvaluateKing(const Position &position)
 {
     constexpr uint8_t rank_flip       = (color == kWhite ? kRankFlip : 0);
     const Bitboard    friendly_pieces = position.PiecesOfColor(color);

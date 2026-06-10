@@ -98,7 +98,7 @@ class CastlingRights
 
     /// @brief Serialize castling rights to FEN format.
     /// @return string containing FEN of castling rights (e.g. "KQkq" or "-").
-    std::string ToFenString() const
+    constexpr std::string ToFenString() const
     {
         if (value_ == 0)
             return "-";
