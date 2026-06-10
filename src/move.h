@@ -196,6 +196,13 @@ class Move
         return !!(val & kIsChecking);
     }
 
+    /// @brief Whether this is a quiet move (neither a capture nor a promotion).
+    /// @return true if the move is neither a capture nor a promotion.
+    constexpr bool IsQuiet() const
+    {
+        return captured() == Piece::kNone && promoted() == Piece::kNone;
+    }
+
     /// @brief Raw 64-bit representation of the move (all packed fields). Used by the lockless TT.
     constexpr uint64_t Bits() const
     {

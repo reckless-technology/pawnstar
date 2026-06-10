@@ -121,8 +121,10 @@ is a fail-soft negamax with:
 - **Late-move reductions** — quiet, non-check moves are reduced after the 4th move at depth > 2, with
   an extra reduction after the 7th.
 - **Search extensions** for promotions and en passant captures.
-- **Move ordering** — the TT move first, then captures by MVV/LVA in a high score band, then quiet
-  moves by history-heuristic count. Killers (two per ply) are also maintained.
+- **Move ordering** — the TT move first, then winning/equal captures and promotions by static
+  exchange evaluation, then the two killer moves for the ply, then quiet moves by history-heuristic
+  count, and finally losing captures (negative SEE) below the quiet moves. A quiet move that causes a
+  beta cutoff is stored as a killer.
 
 **Quiescence search** ([src/search_quiescent.cpp](src/search_quiescent.cpp)) extends the leaves with
 captures only, using a separate transposition table. (An SEE-based pruning path exists but is
@@ -161,7 +163,8 @@ endgame based on remaining material, and sums:
 
 Static exchange evaluation (`EvaluateStaticExchange`,
 [src/static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a
-square and is covered by `test_see`, though it is not currently wired into the live search.
+square; it is used to order captures and promotions during search (see above) and is covered by
+`test_see`.
 
 ## Test suite
 

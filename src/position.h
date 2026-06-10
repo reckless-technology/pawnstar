@@ -49,72 +49,161 @@ class Position
     /// @brief Render the board as a human-readable string.
     /// @return Board string.
     std::string ToString() const;
-    // clang-format off
     // Const accessors.
     /// @brief Pieces of a colour attacking a square (see definition for details).
-    constexpr Bitboard  AttacksTo(Square location, Color color) const;
+    constexpr Bitboard AttacksTo(Square location, Color color) const;
     /// @brief Generate all legal moves. @return The legal move list.
-    constexpr MoveList  GenerateLegalMoves() const          {return ColorToMove() == kWhite ? GenMoves<kWhite, true>()  : GenMoves<kBlack, true>();}
+    constexpr MoveList GenerateLegalMoves() const
+    {
+        return ColorToMove() == kWhite ? GenMoves<kWhite, true>() : GenMoves<kBlack, true>();
+    }
     /// @brief Generate legal captures and promotions only. @return The legal capture list.
-    constexpr MoveList  GenerateLegalCaptures() const       {return ColorToMove() == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();}
-    /// @brief Whether a square is attacked by a colour. @param s Target square. @param c Attacking colour. @return true if attacked.
-    constexpr bool      IsAttacked(Square s, Color c) const {return AttacksTo(s, c).IsNotEmpty();}
+    constexpr MoveList GenerateLegalCaptures() const
+    {
+        return ColorToMove() == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();
+    }
+    /// @brief Whether a square is attacked by a colour. @param s Target square. @param c Attacking colour. @return true
+    /// if attacked.
+    constexpr bool IsAttacked(Square s, Color c) const
+    {
+        return AttacksTo(s, c).IsNotEmpty();
+    }
     /// @brief Whether white may castle kingside. @return true if allowed.
-    constexpr bool      MayWhiteCastleKingside() const      {return castling_rights_.MayWhiteCastleKingside();}
+    constexpr bool MayWhiteCastleKingside() const
+    {
+        return castling_rights_.MayWhiteCastleKingside();
+    }
     /// @brief Whether white may castle queenside. @return true if allowed.
-    constexpr bool      MayWhiteCastleQueenside() const     {return castling_rights_.MayWhiteCastleQueenside();}
+    constexpr bool MayWhiteCastleQueenside() const
+    {
+        return castling_rights_.MayWhiteCastleQueenside();
+    }
     /// @brief Whether black may castle kingside. @return true if allowed.
-    constexpr bool      MayBlackCastleKingside() const      {return castling_rights_.MayBlackCastleKingside();}
+    constexpr bool MayBlackCastleKingside() const
+    {
+        return castling_rights_.MayBlackCastleKingside();
+    }
     /// @brief Whether black may castle queenside. @return true if allowed.
-    constexpr bool      MayBlackCastleQueenside() const     {return castling_rights_.MayBlackCastleQueenside();}
+    constexpr bool MayBlackCastleQueenside() const
+    {
+        return castling_rights_.MayBlackCastleQueenside();
+    }
     /// @brief Whether the last move was a null move. @return true if a null move.
-    constexpr bool      IsNullMove() const                  {return !!(state_flags_ & kIsNullMove);}
+    constexpr bool IsNullMove() const
+    {
+        return !!(state_flags_ & kIsNullMove);
+    }
     /// @brief Colour to move. @return The side to move.
-    constexpr Color     ColorToMove() const                 {return state_flags_ & kIsBlackToMove ? kBlack : kWhite;}
+    constexpr Color ColorToMove() const
+    {
+        return state_flags_ & kIsBlackToMove ? kBlack : kWhite;
+    }
     /// @brief Squares occupied by pawns. @return Pawn bitboard.
-    constexpr Bitboard  Pawns() const                       {return pawns_;}
+    constexpr Bitboard Pawns() const
+    {
+        return pawns_;
+    }
     /// @brief Squares occupied by knights. @return Knight bitboard.
-    constexpr Bitboard  Knights() const                     {return knights_;}
+    constexpr Bitboard Knights() const
+    {
+        return knights_;
+    }
     /// @brief Squares occupied by bishops. @return Bishop bitboard.
-    constexpr Bitboard  Bishops() const                     {return bishops_;}
+    constexpr Bitboard Bishops() const
+    {
+        return bishops_;
+    }
     /// @brief Squares occupied by rooks. @return Rook bitboard.
-    constexpr Bitboard  Rooks() const                       {return rooks_;}
+    constexpr Bitboard Rooks() const
+    {
+        return rooks_;
+    }
     /// @brief Squares occupied by queens. @return Queen bitboard.
-    constexpr Bitboard  Queens() const                      {return queens_;}
+    constexpr Bitboard Queens() const
+    {
+        return queens_;
+    }
     /// @brief Squares occupied by kings. @return King bitboard.
-    constexpr Bitboard  Kings() const                       {return kings_;}
+    constexpr Bitboard Kings() const
+    {
+        return kings_;
+    }
     /// @brief Squares occupied by white pieces. @return White piece bitboard.
-    constexpr Bitboard  WhitePieces() const                 {return white_pieces_;}
+    constexpr Bitboard WhitePieces() const
+    {
+        return white_pieces_;
+    }
     /// @brief Squares occupied by black pieces. @return Black piece bitboard.
-    constexpr Bitboard  BlackPieces() const                 {return black_pieces_;}
+    constexpr Bitboard BlackPieces() const
+    {
+        return black_pieces_;
+    }
     /// @brief All occupied squares. @return Occupancy bitboard.
-    constexpr Bitboard  OccupiedSquares() const             {return white_pieces_ | black_pieces_;}
+    constexpr Bitboard OccupiedSquares() const
+    {
+        return white_pieces_ | black_pieces_;
+    }
     /// @brief All empty squares. @return Vacant-square bitboard.
-    constexpr Bitboard  VacantSquares() const               {return ~(white_pieces_ | black_pieces_);}
+    constexpr Bitboard VacantSquares() const
+    {
+        return ~(white_pieces_ | black_pieces_);
+    }
     /// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
-    constexpr Piece     PieceAt(Square location) const      {return squares_[location];}
+    constexpr Piece PieceAt(Square location) const
+    {
+        return squares_[location];
+    }
     /// @brief Pieces of a colour. @param color Colour to query. @return The colour's piece bitboard.
-    constexpr Bitboard  PiecesOfColor(Color color) const    {return (&white_pieces_)[color];}
+    constexpr Bitboard PiecesOfColor(Color color) const
+    {
+        return (&white_pieces_)[color];
+    }
     /// @brief Pieces of a type. @param piece Piece type to query. @return The piece-type bitboard.
-    constexpr Bitboard  PiecesOfType(Piece piece) const     {return (&pawns_)[piece - kPawn];}
+    constexpr Bitboard PiecesOfType(Piece piece) const
+    {
+        return (&pawns_)[piece - kPawn];
+    }
     /// @brief King location for a colour. @param color Colour to query. @return The king's square.
-    constexpr Square    KingLocation(Color color) const     {return king_location_[color];}
+    constexpr Square KingLocation(Color color) const
+    {
+        return king_location_[color];
+    }
     /// @brief Zobrist hash of the position. @return The hash.
-    constexpr zobrist_t Hash() const                        {return hash_;}
+    constexpr zobrist_t Hash() const
+    {
+        return hash_;
+    }
     /// @brief Whether the side to move is in check. @return true if in check.
-    constexpr bool      IsInCheck() const                   {return checkers_.IsNotEmpty();}
+    constexpr bool IsInCheck() const
+    {
+        return checkers_.IsNotEmpty();
+    }
     /// @brief Full move count. @return Number of full moves.
-    constexpr uint8_t   MoveCount() const                   {return full_move_count_;}
+    constexpr uint8_t MoveCount() const
+    {
+        return full_move_count_;
+    }
     /// @brief Half-move (50-move) clock. @return Consecutive reversible plies.
-    constexpr uint8_t   ReversibleMoveCount() const         {return reversible_move_count_;}
+    constexpr uint8_t ReversibleMoveCount() const
+    {
+        return reversible_move_count_;
+    }
     /// @brief En passant target square. @return The en passant square (0 if none).
-    constexpr Square    EnPassantIndex() const              {return en_passant_square_;}
+    constexpr Square EnPassantIndex() const
+    {
+        return en_passant_square_;
+    }
     // Non const accessors.
     /// @brief Mutable pieces-of-colour bitboard. @param color Colour to query. @return Reference to the bitboard.
-    constexpr Bitboard& PiecesOfColor(Color color)          {return (&white_pieces_)[color];}
+    constexpr Bitboard &PiecesOfColor(Color color)
+    {
+        return (&white_pieces_)[color];
+    }
     /// @brief Mutable pieces-of-type bitboard. @param piece Piece type to query. @return Reference to the bitboard.
-    constexpr Bitboard& PiecesOfType(Piece piece)           {return (&pawns_)[piece - kPawn];}
-    // clang-format on
+    constexpr Bitboard &PiecesOfType(Piece piece)
+    {
+        return (&pawns_)[piece - kPawn];
+    }
 
   private:
     constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.

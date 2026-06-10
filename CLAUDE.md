@@ -85,10 +85,10 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 - Transposition table probe/store (exact PV, lower-bound CUT, upper-bound ALL).
 - Null-move pruning.
 - Late-move reduction (LMR) via `ComputeLmrDepth()` helper: reduces non-captures, non-pawn, non-check moves after the 4th move at depth > 2, with an extra reduction after the 7th.
-- Killer move heuristic (2 killers per ply).
+- Killer move heuristic (2 killers per ply): a quiet move that causes a beta cutoff is stored via `SearchState::RecordKiller`.
 - History heuristic (`HistoryTable`, thread-safe atomics) for move ordering.
 
-**Move ordering** — `SearchState::ScoreAndSortMoves` assigns each move a 16/23-bit ordering score stored in the `Move` itself: captures sit in a high band ordered by MVV/LVA (centipawn victim value minus attacker), quiet moves below it by history count (clamped). The TT move is searched first, before the list is generated and sorted.
+**Move ordering** — `SearchState::ScoreAndSortMoves` assigns each move a 23-bit ordering score stored in the `Move` itself, in descending bands: winning/equal captures and promotions (`kWinningCaptureBase` + SEE score), the two killer moves for the ply (just below winning captures), quiet moves (history count, clamped below the killers), and finally losing captures (their negative SEE, sorting below quiet moves). The TT move is searched first, before the list is generated and sorted.
 
 **Quiescence search** — `SearchQuiescent` ([search_quiescent.cpp](src/search_quiescent.cpp)) searches captures only. (An SEE-based pruning path — skip captures with negative SEE that don't give check — exists but is currently compiled out behind `#if 0`.)
 
@@ -117,7 +117,7 @@ Aging is O(1): the table holds a `generation_` counter that `Age()` increments b
 ### Evaluation
 
 `EvaluatePosition` ([evaluation.cpp](src/evaluation.cpp)) scores:
-- **Material**: piece values from `SearchState::kPieceValues`.
+- **Material**: per-piece centipawn values (with a bishop-pair bonus) in `EvaluateMaterial`.
 - **Piece-square tables**: per-piece tables in [evaluation.h](src/evaluation.h) (`kPawnSquare`, `kKnightSquare`, `kBishopSquare`, `kRookSquare`, `kQueenSquare`, and separate `kKingSquareMidgame`/`kKingSquareEndgame`).
 - **Pawn structure** via `DeterminePawnStructure<Color>()`: passed, isolated, unsupported, doubled, and defended pawn bitboards. Penalties for doubled/isolated/unsupported; bonuses for passed and defended.
 - **King safety**: penalties based on attacker proximity.
@@ -125,7 +125,7 @@ Aging is O(1): the table holds a `generation_` counter that `Age()` increments b
 
 Scores are tapered between opening/middlegame and endgame phases based on remaining material.
 
-SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a square; `EvaluateStaticExchange` returns `{score, is_checking}`. It is exercised by `test_see` and wired into the quiescence pruning path, but that path is currently disabled (`#if 0`), so SEE does not affect the live search.
+SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a square; `EvaluateStaticExchange` returns `{score, is_checking}`. It is used to order captures and promotions in `ScoreAndSortMoves` (see Move ordering above) and is exercised by `test_see`. A separate SEE-based quiescence *pruning* path exists but is currently compiled out (`#if 0`).
 
 ### UCI protocol
 

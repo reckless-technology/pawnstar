@@ -165,6 +165,8 @@ static void RunParallelJob(void *arg)
     {
         job.worker->SignalBatchCutoff();
         job.worker->game.history_table.RecordGoodMove(job.ply, job.move);
+        if (job.move.IsQuiet())
+            job.worker->RecordKiller(job.ply, job.move);
     }
     job.score = score;
     // Return the slot before counting down so it is available immediately.
@@ -273,6 +275,8 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             state.game.transposition_table.RecordTransposition(Transposition{
                 state.CurrentPosition().Hash(), transposition->move, score, depth, Transposition::NodeType::kCut});
             state.game.history_table.RecordGoodMove(ply, transposition->move);
+            if (transposition->move.IsQuiet())
+                state.RecordKiller(ply, transposition->move);
             return score;
         }
         best_score = score;
@@ -339,6 +343,8 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             state.game.transposition_table.RecordTransposition(
                 Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
             state.game.history_table.RecordGoodMove(ply, move);
+            if (move.IsQuiet())
+                state.RecordKiller(ply, move);
             return score;
         }
         if (score > best_score)
@@ -416,6 +422,8 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
                     state.game.transposition_table.RecordTransposition(Transposition{
                         state.CurrentPosition().Hash(), r_move, r_score, depth, Transposition::NodeType::kCut});
                     state.game.history_table.RecordGoodMove(ply, r_move);
+                    if (r_move.IsQuiet())
+                        state.RecordKiller(ply, r_move);
                     return r_score;
                 }
                 if (r_score > best_score)

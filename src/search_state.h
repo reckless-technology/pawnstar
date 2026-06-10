@@ -88,11 +88,21 @@ class SearchState
             batch_cutoff->store(true, std::memory_order_relaxed);
     }
 
+    /// @brief Record a quiet move that caused a beta cutoff as a killer move for this ply.
+    /// Shifts the previous first killer into the second slot; ignores duplicates.
+    /// @param ply Current search ply.
+    /// @param move Quiet move that caused the cutoff.
+    void RecordKiller(int ply, Move move)
+    {
+        if (!(killers[ply][0] == move))
+        {
+            killers[ply][1] = killers[ply][0];
+            killers[ply][0] = move;
+        }
+    }
+
   private:
     StackList<Position, kMaxPly + 4> positions_; ///< Per-thread copy-make position stack.
     /// @brief Hash history from game-start through parent of current node (game history + search depth).
     StackList<HashEntry, kMaxGameLength + kMaxPly + 4> hash_stack_;
-
-    /// @brief Piece values for MVV/LVA move scoring (indexed by Piece enum).
-    static constexpr std::array<int, 7> kPieceValues{0, 100, 300, 300, 500, 900, 10000};
 };

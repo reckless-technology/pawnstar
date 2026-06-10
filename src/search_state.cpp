@@ -2,6 +2,9 @@
 
 #include "search_state.h"
 #include "game.h"
+#include "static_exchange_evaluation.h"
+
+#include <algorithm>
 
 /// @brief Construct the main-thread search state from the current game.
 /// hash_stack_ is populated with all ancestor positions (positions 0..N-1 where N is
@@ -52,22 +55,33 @@ void SearchState::MakeNullMove()
 }
 
 /// @brief Score moves for ordering, then sort descending.
-/// The score field is a signed 23-bit value shared with the stored TT score. Captures occupy a high band
-/// ordered by MVV/LVA using full centipawn victim values (with the attacker as a fine tiebreak); quiet
-/// moves are ordered by their history count, clamped just below the capture band so captures always rank
-/// first and nothing overflows the field.
+/// The score field is a signed 23-bit value shared with the stored TT score. Move ordering uses, from
+/// best to worst:
+///   - winning / equal captures and promotions: kWinningCaptureBase + SEE score,
+///   - the two killer moves for this ply: just below winning captures, above all quiet moves,
+///   - quiet moves: their history count, clamped below the killers,
+///   - losing captures (negative SEE): scored by their (negative) SEE, so they sort below quiet moves.
 void SearchState::ScoreAndSortMoves(MoveList &moves, int ply) const
 {
-    static constexpr int kCaptureBase = 1 << 21;          // 2,097,152: captures sort above all quiet moves
-    static constexpr int kMaxQuiet    = kCaptureBase - 1; // upper bound for clamped history scores
-    const Position      &position     = CurrentPosition();
+    static constexpr int kWinningCaptureBase = 1 << 20;         // 1,048,576: winning captures / promotions
+    static constexpr int kKillerBase         = 1 << 19;         // 524,288: killers sit just below winning captures
+    static constexpr int kMaxQuiet           = kKillerBase - 1; // history scores clamp just below the killers
+    const Position      &position            = CurrentPosition();
+    const Move           killer0             = killers[ply][0];
+    const Move           killer1             = killers[ply][1];
     for (Move &move : moves)
     {
-        const int victim = kPieceValues[position.PieceAt(move.to())];
-        int       sort;
-        if (victim != 0) // capture: MVV/LVA (victim centipawns dominate, attacker is a tiebreak)
-            sort = kCaptureBase + victim * 1000 - kPieceValues[position.PieceAt(move.from())];
-        else // quiet move: history count, clamped below the capture band
+        int sort;
+        if (!move.IsQuiet()) // capture or promotion: order by static exchange evaluation
+        {
+            const int see = EvaluateStaticExchange(position, move).first;
+            sort          = see >= 0 ? kWinningCaptureBase + see : see; // losing captures sort below quiet moves
+        }
+        else if (move == killer0) // first killer: just below winning captures
+            sort = kKillerBase + 1;
+        else if (move == killer1) // second killer
+            sort = kKillerBase;
+        else // quiet move: history count, clamped below the killers
             sort = (int)std::min<uint32_t>(game.history_table.GetCount(ply, move), (uint32_t)kMaxQuiet);
         move.AssignScore(sort);
     }
