@@ -8,36 +8,47 @@
 
 /// @brief A transposition table entry.
 /// A transposition is the result of a previous search containing pertinent information about what was found when this
-/// position was searched earlier.
+/// position was searched earlier. The score, depth, node type and age are packed into the move's spare bits so that an
+/// entry is exactly 128 bits (a 64-bit hash and a 64-bit move).
 struct Transposition
 {
-    /// @brief Alpha beta search tree node types.
-    enum NodeType : uint8_t
-    {
-        kCut, ///< Beta cutoff occurred.
-        kAll, ///< No move exceeded alpha.
-        kPv,  ///< Principal variation node.
-    };
+    using NodeType = ::NodeType; ///< Alpha-beta node type (kCut / kAll / kPv), defined in move.h.
 
-    zobrist_t hash;      ///< Zobrist hash of this position.
-    Move      move;      ///< Best move from this position.
-    int       score;     ///< The score computed from this position.
-    int16_t   depth;     ///< The depth to which this position was searched.
-    NodeType  node_type; ///< What type of result was this.
-    uint8_t   age;       ///< Table generation when stored; stale when != the table's current generation.
+    zobrist_t hash; ///< Zobrist hash of this position.
+    Move      move; ///< Best move, with score/depth/node-type/age packed into its spare bits.
 
-    constexpr Transposition()
-        : hash(0), move(Move::None()), score(0), depth(0), node_type(NodeType::kCut), age(0)
+    constexpr Transposition() : hash(0), move(Move::None())
     {
     }
 
     constexpr Transposition(zobrist_t hash, const Move &move, int score, int depth, NodeType type)
-        : hash(hash), move(move), score(score), depth((int16_t)depth), node_type(type), age(0)
+        : hash(hash), move(move.WithTTData(score, depth, type))
     {
+    }
+
+    /// @brief Score computed from this position (lower/upper bound or exact, per node_type()).
+    constexpr int score() const
+    {
+        return move.score();
+    }
+    /// @brief Depth to which this position was searched.
+    constexpr int depth() const
+    {
+        return move.TTDepth();
+    }
+    /// @brief Node type of the stored result.
+    constexpr NodeType node_type() const
+    {
+        return move.TTNodeType();
+    }
+    /// @brief Table generation when stored; stale when != the table's current generation.
+    constexpr uint8_t age() const
+    {
+        return move.TTAge();
     }
 };
 
-static_assert(sizeof(Transposition) == 24);
+static_assert(sizeof(Transposition) == 16);
 
 /// @brief Class to hold the transposition table.
 class TranspositionTable

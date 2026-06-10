@@ -30,10 +30,10 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
         return Search(state, depth, ply, alpha, beta, dummy);
     }
     auto transposition = state.game.quiescent_table.FindTransposition(state.CurrentPosition().Hash());
-    if (transposition && transposition->score >= beta)
+    if (transposition && transposition->score() >= beta)
     {
         INCREMENT("quiescent table beta cutoffs");
-        return transposition->score;
+        return transposition->score();
     }
     int score = EvaluatePosition(state, alpha, beta);
     if (score >= beta)

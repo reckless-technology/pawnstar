@@ -12,6 +12,15 @@
 #include "square.h"
 #include "stack_list.h"
 
+/// @brief Transposition-table node type, packed into a move's spare bits.
+/// kCut: beta cutoff (lower bound). kAll: no move exceeded alpha (upper bound). kPv: exact score.
+enum class NodeType : uint8_t
+{
+    kCut,
+    kAll,
+    kPv,
+};
+
 /// @brief Class for representing a chess move.
 /// A move is 64 bits in size.
 /// Bits are as follows:
@@ -21,12 +30,23 @@
 /// 15 - 17: captured piece (in the case of capture moves)
 /// 18 - 21: move type
 /// 22 - 22: is checking flag (move gives check)
-/// 32 - 63: score (when move has score assigned)
+/// 23 - 24: transposition node type (cut, all or pv)
+/// 25 - 32: transposition depth searched (int8_t)
+/// 33 - 40: transposition age / generation (uint8_t)
+/// 41 - 63: score for this move (signed, 23-bit); used for move ordering and as the stored TT score
 class Move
 {
   private:
     static const int64_t kIsChecking = 1 << 22;
-    int64_t              val;
+    // Transposition metadata bit layout (see class comment).
+    static constexpr int     kNodeTypeShift = 23;
+    static constexpr int     kDepthShift    = 25;
+    static constexpr int     kAgeShift      = 33;
+    static constexpr int     kScoreShift    = 41;
+    static constexpr int64_t kAgeMask       = (int64_t)0xFF << kAgeShift;             // bits 33-40
+    static constexpr int64_t kScoreMask     = ~(((int64_t)1 << kScoreShift) - 1);    // bits 41-63
+    static constexpr int64_t kTTDataMask    = ~(((int64_t)1 << kNodeTypeShift) - 1); // bits 23-63
+    int64_t                  val;
 
   public:
     /// @brief Move types.
@@ -139,11 +159,29 @@ class Move
         return Piece::kNone;
     }
 
-    /// @brief The move score.
-    /// @return Move score (usually in centipawns).
+    /// @brief The move score (bits 41-63, signed 23-bit). Used for move ordering and as the stored TT score.
+    /// @return Move score. The arithmetic right shift sign-extends from the top bit.
     constexpr int score() const
     {
-        return (int)(val >> 32);
+        return (int)(val >> kScoreShift);
+    }
+
+    /// @brief Transposition node type (bits 23-24).
+    constexpr NodeType TTNodeType() const
+    {
+        return NodeType((val >> kNodeTypeShift) & 0x3);
+    }
+
+    /// @brief Transposition depth searched (bits 25-32, int8_t).
+    constexpr int TTDepth() const
+    {
+        return (int8_t)((val >> kDepthShift) & 0xFF);
+    }
+
+    /// @brief Transposition age / generation (bits 33-40, uint8_t).
+    constexpr uint8_t TTAge() const
+    {
+        return (uint8_t)((val >> kAgeShift) & 0xFF);
     }
 
     /// @brief Create a from-to bits value for indexing into history tables.
@@ -160,11 +198,30 @@ class Move
         return !!(val & kIsChecking);
     }
 
-    /// @brief Assign the score to the move.
-    /// @param score Score to be assigned.
+    /// @brief Assign the score to the move (bits 41-63, signed 23-bit). Leaves all other bits untouched.
+    /// @param score Score to be assigned (must fit in a signed 23-bit value).
     constexpr void AssignScore(int score)
     {
-        val = (val & 0xFFFFFFFF) | (int64_t)(score) << 32;
+        val = (val & ~kScoreMask) | ((int64_t)score << kScoreShift);
+    }
+
+    /// @brief Return a copy of this move with transposition metadata packed in (clearing any prior
+    /// metadata / sort score in bits 23-63). Age is set to 0; the table stamps it on store.
+    /// @param score Score for the position. @param depth Depth searched. @param type Node type.
+    constexpr Move WithTTData(int score, int depth, NodeType type) const
+    {
+        int64_t v = val & ~kTTDataMask;
+        v |= (int64_t)((uint8_t)type) << kNodeTypeShift;
+        v |= (int64_t)(uint8_t)(int8_t)depth << kDepthShift;
+        v |= (int64_t)score << kScoreShift;
+        return Move{v};
+    }
+
+    /// @brief Stamp the transposition age / generation (bits 33-40), leaving all other bits untouched.
+    /// @param age Generation counter value.
+    constexpr void SetTTAge(uint8_t age)
+    {
+        val = (val & ~kAgeMask) | ((int64_t)age << kAgeShift);
     }
 
     /// @brief Set the flag that indicates this move gives check.

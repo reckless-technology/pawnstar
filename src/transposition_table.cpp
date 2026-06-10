@@ -53,12 +53,12 @@ void TranspositionTable::RecordTransposition(const Transposition &transposition)
     const std::size_t idx = transposition.hash % table_.size();
     TTLock            lock{locks_[idx]};
     Transposition    &t      = table_[idx];
-    const bool        is_old = t.age != generation_;
-    if (t.hash == 0 || is_old || t.depth <= transposition.depth ||
-        transposition.node_type == Transposition::NodeType::kPv)
+    const bool        is_old = t.age() != generation_;
+    if (t.hash == 0 || is_old || t.depth() <= transposition.depth() ||
+        transposition.node_type() == Transposition::NodeType::kPv)
     {
-        t     = transposition;
-        t.age = generation_;
+        t = transposition;
+        t.move.SetTTAge(generation_);
     }
 }
 

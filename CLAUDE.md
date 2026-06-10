@@ -59,7 +59,9 @@ Pawnstar is a UCI chess engine using bitboard board representation and parallel 
 
 `Move` ([move.h](src/move.h)) packs all move information into 64 bits:
 - Bits 0–5: to square; 6–11: from square; 12–14: moving piece; 15–17: captured piece; 18–21: move type; 22: is-checking flag.
-- Bits 32–63: sort score (used by move ordering; cleared before TT storage).
+- Bits 23–24: TT node type; 25–32: TT depth (int8_t); 33–40: TT age (uint8_t); 41–63: score (signed 23-bit).
+
+The score field (bits 41–63) is shared: during move ordering it holds the sort score, and in a stored TT entry it holds the search score. The two never coexist — a move being ordered in a move list is never simultaneously a TT entry. The TT metadata bits (23–56) let a transposition entry be just `{hash, move}` (128 bits); see the transposition table section.
 
 Move types: `kNonCapture`, `kCapture`, `kPawnDoublePush`, `kEpCapture`, `kCastling`, and promotion variants `kPromotionKnight/Bishop/Rook/Queen`.
 
@@ -102,7 +104,7 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 
 ### Transposition table
 
-Two tables: 64 MB main (`kHashtableMegabytes`) and 8 MB quiescence (`kQHashtableMb`). Entries store hash, best move, score, depth, node type (CUT/ALL/PV), and an `age` stamp. Access is protected by a parallel array of `std::atomic_flag` spinlocks (one per entry) via the `TTLock` RAII guard in [transposition_table.cpp](src/transposition_table.cpp).
+Two tables: 64 MB main (`kHashtableMegabytes`) and 8 MB quiescence (`kQHashtableMb`). Each entry is exactly 128 bits: a 64-bit Zobrist `hash` and a 64-bit `move` whose spare bits encode the score, depth, node type (CUT/ALL/PV) and age. `Transposition` exposes `score()`/`depth()`/`node_type()`/`age()` accessors that read those packed bits. Access is protected by a parallel array of `std::atomic_flag` spinlocks (one per entry) via the `TTLock` RAII guard in [transposition_table.cpp](src/transposition_table.cpp).
 
 Aging is O(1): the table holds a `generation_` counter that `Age()` increments before each search; an entry is stale when its `age != generation_`, and `RecordTransposition` stamps the current generation when it writes. Replacement policy: prefer replacing stale entries, lower-depth entries, or any entry for PV nodes.
 

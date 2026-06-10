@@ -55,15 +55,25 @@ void SearchState::MakeNullMove()
     positions_.push_back(cur.MakeNullMove());
 }
 
-/// @brief Score moves using MVV/LVA combined with history table counts, then sort descending.
+/// @brief Score moves for ordering, then sort descending.
+/// The score field is a signed 23-bit value shared with the stored TT score. Captures occupy a high band
+/// ordered by MVV/LVA using full centipawn victim values (with the attacker as a fine tiebreak); quiet
+/// moves are ordered by their history count, clamped just below the capture band so captures always rank
+/// first and nothing overflows the field.
 void SearchState::ScoreAndSortMoves(MoveList &moves, int ply) const
 {
-    const Position &position = CurrentPosition();
+    static constexpr int kCaptureBase = 1 << 21;          // 2,097,152: captures sort above all quiet moves
+    static constexpr int kMaxQuiet    = kCaptureBase - 1; // upper bound for clamped history scores
+    const Position      &position     = CurrentPosition();
     for (Move &move : moves)
     {
-        move.AssignScore(kPieceValues[position.PieceAt(move.to())] * 10000 -
-                         kPieceValues[position.PieceAt(move.from())] * 1000 +
-                         game.history_table.GetCount(ply, move));
+        const int victim = kPieceValues[position.PieceAt(move.to())];
+        int       sort;
+        if (victim != 0) // capture: MVV/LVA (victim centipawns dominate, attacker is a tiebreak)
+            sort = kCaptureBase + victim * 1000 - kPieceValues[position.PieceAt(move.from())];
+        else // quiet move: history count, clamped below the capture band
+            sort = (int)std::min<uint32_t>(game.history_table.GetCount(ply, move), (uint32_t)kMaxQuiet);
+        move.AssignScore(sort);
     }
     SortMoves<false>(moves);
 }

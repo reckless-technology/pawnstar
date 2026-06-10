@@ -208,25 +208,25 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
     }
     // Determine if there is an entry in the transposition table for this position.
     const auto transposition = state.game.transposition_table.FindTransposition(state.CurrentPosition().Hash());
-    if (transposition && transposition->depth >= depth)
+    if (transposition && transposition->depth() >= depth)
     {
-        switch (transposition->node_type)
+        switch (transposition->node_type())
         {
         case Transposition::NodeType::kCut:
             INCREMENT("table hit cut node");
-            if (transposition->score >= beta)
+            if (transposition->score() >= beta)
             {
                 INCREMENT("table hit cut node cutoffs");
-                return transposition->score;
+                return transposition->score();
             }
             break;
 
         case Transposition::NodeType::kAll:
             INCREMENT("table hit all node");
-            if (transposition->score < alpha)
+            if (transposition->score() < alpha)
             {
                 INCREMENT("table hit all node cutoffs");
-                return transposition->score;
+                return transposition->score();
             }
             break;
 
