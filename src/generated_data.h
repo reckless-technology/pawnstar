@@ -65,6 +65,7 @@ template <class T, size_t I, size_t... J> struct MultiDimArray
     using Nested = typename MultiDimArray<T, J...>::type; ///< Array type for the remaining dimensions.
     using type   = std::array<Nested, I>;                 ///< Array type for this and all nested dimensions.
 };
+
 /// @brief Specialization for a single dimension MultiDimArray.
 /// @tparam T Type of object to store in array.
 /// @tparam I Number of elements.

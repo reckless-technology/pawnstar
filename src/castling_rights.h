@@ -17,6 +17,7 @@ class CastlingRights
     constexpr CastlingRights() : value_{0}
     {
     }
+
     /// @brief Construct from a raw 4-bit flag value.
     /// @param rights Bitwise OR of the Flags enumerators.
     constexpr CastlingRights(uint8_t rights) : value_{rights}
@@ -29,18 +30,21 @@ class CastlingRights
     {
         return !!(value_ & kWhiteKingside);
     }
+
     /// @brief Whether white may still castle queenside.
     /// @return true if the white queenside right is set.
     constexpr bool MayWhiteCastleQueenside() const
     {
         return !!(value_ & kWhiteQueenside);
     }
+
     /// @brief Whether black may still castle kingside.
     /// @return true if the black kingside right is set.
     constexpr bool MayBlackCastleKingside() const
     {
         return !!(value_ & kBlackKingside);
     }
+
     /// @brief Whether black may still castle queenside.
     /// @return true if the black queenside right is set.
     constexpr bool MayBlackCastleQueenside() const

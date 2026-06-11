@@ -20,6 +20,7 @@ template <typename T, int N> class StackList
     {
         end_ = data_.begin();
     }
+
     /// @brief Copy constructor.
     /// @param that List to copy.
     constexpr StackList(const StackList &that)
@@ -27,6 +28,7 @@ template <typename T, int N> class StackList
         std::copy(that.begin(), that.end(), this->begin());
         end_ = data_.begin() + that.size();
     }
+
     /// @brief Copy assignment.
     /// @param that List to copy.
     /// @return Reference to this list.
@@ -36,35 +38,41 @@ template <typename T, int N> class StackList
         end_ = data_.begin() + that.size();
         return *this;
     }
+
     /// @brief Append an element to the end of the list.
     /// @param m Element to append.
     constexpr void push_back(const T &m)
     {
         *end_++ = m;
     }
+
     /// @brief Remove and return the last element.
     /// @return The removed element.
     constexpr T pop_back()
     {
         return *--end_;
     }
+
     /// @brief Access the last element.
     /// @return Reference to the last element.
     constexpr T &back()
     {
         return end_[-1];
     }
+
     /// @brief Access the last element (const overload).
     /// @return Const reference to the last element.
     constexpr const T &back() const
     {
         return end_[-1];
     }
+
     /// @brief Remove all elements.
     constexpr void clear()
     {
         end_ = data_.begin();
     }
+
     /// @brief Element access by index.
     /// @param i Index of the element.
     /// @return Reference to the element.
@@ -72,6 +80,7 @@ template <typename T, int N> class StackList
     {
         return data_[i];
     }
+
     /// @brief Element access by index (const overload).
     /// @param i Index of the element.
     /// @return Const reference to the element.
@@ -79,30 +88,35 @@ template <typename T, int N> class StackList
     {
         return data_[i];
     }
+
     /// @brief Number of elements currently stored.
     /// @return The element count.
     constexpr std::size_t size() const
     {
         return end_ - data_.begin();
     }
+
     /// @brief Iterator to the first element.
     /// @return Begin iterator.
     constexpr std::array<T, N>::iterator begin()
     {
         return data_.begin();
     }
+
     /// @brief Iterator one past the last element.
     /// @return End iterator.
     constexpr std::array<T, N>::iterator end()
     {
         return end_;
     }
+
     /// @brief Iterator to the first element (const overload).
     /// @return Const begin iterator.
     constexpr std::array<T, N>::const_iterator begin() const
     {
         return data_.begin();
     }
+
     /// @brief Iterator one past the last element (const overload).
     /// @return Const end iterator.
     constexpr std::array<T, N>::const_iterator end() const

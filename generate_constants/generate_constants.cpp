@@ -66,6 +66,7 @@ constexpr uint64_t      ShiftSouth(uint64_t b)      { return b >> 8; }          
 constexpr uint64_t      ShiftSouthwest(uint64_t b)  { return (b & ~kFileA) >> 9; }              ///< Shift a Bitboard one square to the southwest.
 constexpr uint64_t      ShiftWest(uint64_t b)       { return (b & ~kFileA) >> 1; }              ///< Shift a Bitboard one square to the west.
 constexpr uint64_t      ShiftNorthwest(uint64_t b)  { return (b & ~kFileA) << 7; }              ///< Shift a Bitboard one square to the northwest.
+
 // clang-format on
 
 /// @brief Function pointer for bitboard shift.
