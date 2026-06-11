@@ -52,11 +52,15 @@ std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move m
 /// @return int swap off (static exchange) score
 static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece piece_on_square)
 {
-    const Bitboard pawn_attacks   = color == kWhite ? kPawnAttacksBlack[location] : kPawnAttacksWhite[location];
-    const Bitboard knight_attacks = kKnightAttacks[location];
-    const Bitboard king_attacks   = kKingAttacks[location];
-    const Bitboard square         = Bitboard(location);
-    Bitboard       occupied       = bb.pieces_[kNone]; // pieces_[kNone] holds the occupied-squares bitboard
+    // Squares a pawn of each color must stand on to attack location. A white pawn attacks location from the squares a
+    // black pawn on location would attack, and vice versa. The relevant mask depends on whose turn it is, so it must be
+    // reselected each ply as color alternates (otherwise a recapturing pawn of the other color is missed).
+    const Bitboard white_pawn_attacks = kPawnAttacksBlack[location];
+    const Bitboard black_pawn_attacks = kPawnAttacksWhite[location];
+    const Bitboard knight_attacks     = kKnightAttacks[location];
+    const Bitboard king_attacks       = kKingAttacks[location];
+    const Bitboard square             = Bitboard(location);
+    Bitboard       occupied           = bb.pieces_[kNone]; // pieces_[kNone] holds the occupied-squares bitboard
     int            scores[32];
     int            ply;
     // First pass: perform all the captures onto the square least valuable piece first.
@@ -66,6 +70,7 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         Piece          capturing_piece;
         Bitboard       bishop_attacks;
         Bitboard       rook_attacks;
+        const Bitboard pawn_attacks     = color == kWhite ? white_pawn_attacks : black_pawn_attacks;
         const Bitboard attacking_pieces = bb.colors_[color];
         Bitboard       attackers        = pawn_attacks & attacking_pieces & bb.pieces_[kPawn];
         if (attackers.IsNotEmpty())

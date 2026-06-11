@@ -147,6 +147,54 @@ static const SeeTest tests[] = {
         Move::Capture("D4", "E5", kPawn, kRook),
         400, false,
     },
+
+    // ── En passant captures ───────────────────────────────────────────────
+    {
+        "en passant: wins an undefended pawn",
+        "7k/8/8/3Pp3/8/8/8/K7 w - e6 0 1",
+        Move::EpCapture("D5", "E6"),
+        100, false,
+    },
+    {
+        "en passant: equal, recaptured by an adjacent pawn",
+        "7k/5p2/8/3Pp3/8/8/8/K7 w - e6 0 1",
+        Move::EpCapture("D5", "E6"),
+        0, false,
+    },
+
+    // ── Battery / revealed attacker ───────────────────────────────────────
+    {
+        "battery: rook in front of queen wins the pawn after the trade",
+        "4r2k/8/8/4p3/8/8/4R3/K3Q3 w - - 0 1",
+        Move::Capture("E2", "E5", kRook, kPawn),
+        100, false,
+    },
+
+    // ── Losing capture that gives check ───────────────────────────────────
+    {
+        "queen grabs a king-defended pawn, loses the queen but gives check",
+        "k7/p7/8/8/8/8/8/Q6K w - - 0 1",
+        Move::Capture("A1", "A7", kQueen, kPawn),
+        -800, true,
+    },
+
+    // ── Battery vs a pawn-defended minor: rook behind bishop wins a pawn ───
+    {
+        "bishop+rook battery beats a pawn-defended knight",
+        "7k/8/4p3/3n4/8/8/6B1/K2R4 w - - 0 1",
+        Move::Capture("G2", "D5", kBishop, kKnight),
+        100, false,
+    },
+
+    // ── Cross-color pawn recapture: two attackers vs one defender ─────────
+    // White answers black's e6xd5 recapture with c4xd5 — the recapturing pawns
+    // are of different colors, which the swap-off must follow across plies.
+    {
+        "two pawn attackers vs one defender wins a pawn",
+        "7k/8/4p3/3p4/2P1P3/8/8/K7 w - - 0 1",
+        Move::Capture("E4", "D5", kPawn, kPawn),
+        100, false,
+    },
 };
 // clang-format on
 

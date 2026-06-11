@@ -159,6 +159,76 @@ int main()
         };
     });
 
+    // ── Test 9: wing pawns — both isolated and passed ─────────────────────
+    run_test("wing pawns a4 and h4: both isolated, unsupported and passed", [] {
+        Position      pos = Position::FromString("7k/8/8/8/P6P/8/8/K7 w - - 0 1");
+        PawnStructure ps  = DeterminePawnStructure<kWhite>(pos);
+        Square        a4("a4"), h4("h4");
+        return std::vector<Check>{
+            {has(ps.isolated_pawns, a4), "a4 should be isolated (no friendly pawn on the b-file)"},
+            {has(ps.isolated_pawns, h4), "h4 should be isolated (no friendly pawn on the g-file)"},
+            {has(ps.passed_pawns, a4), "a4 should be passed (no enemy pawns)"},
+            {has(ps.passed_pawns, h4), "h4 should be passed (no enemy pawns)"},
+            {has(ps.unsupported_pawns, a4), "a4 should be unsupported"},
+            {has(ps.unsupported_pawns, h4), "h4 should be unsupported"},
+            {!has(ps.defended_pawns, a4), "a4 should not be defended"},
+            {!has(ps.defended_pawns, h4), "h4 should not be defended"},
+            {!has(ps.doubled_pawns, a4), "a4 should not be doubled"},
+            {!has(ps.doubled_pawns, h4), "h4 should not be doubled"},
+        };
+    });
+
+    // ── Test 10: doubled and isolated on the c-file ───────────────────────
+    run_test("doubled and isolated: c2 and c4 with no neighbours", [] {
+        Position      pos = Position::FromString("7k/8/8/8/2P5/8/2P5/K7 w - - 0 1");
+        PawnStructure ps  = DeterminePawnStructure<kWhite>(pos);
+        Square        c2("c2"), c4("c4");
+        return std::vector<Check>{
+            {has(ps.doubled_pawns, c2), "c2 should be doubled (c4 is ahead on the same file)"},
+            {!has(ps.doubled_pawns, c4), "c4 should not be doubled (nothing ahead)"},
+            {has(ps.isolated_pawns, c2), "c2 should be isolated (no b/d-file pawns)"},
+            {has(ps.isolated_pawns, c4), "c4 should be isolated (no b/d-file pawns)"},
+            {!has(ps.passed_pawns, c2), "c2 should not be passed (doubled pawns are excluded)"},
+            {has(ps.passed_pawns, c4), "c4 should be passed (front pawn, no enemy pawns)"},
+            {!has(ps.defended_pawns, c2), "c2 should not be defended"},
+            {!has(ps.defended_pawns, c4), "c4 should not be defended"},
+        };
+    });
+
+    // ── Test 11: black doubled pawns mirror ───────────────────────────────
+    run_test("black doubled pawns: front pawn passed, rear pawn excluded", [] {
+        Position      pos = Position::FromString("7k/8/8/8/4p3/4p3/8/K7 w - - 0 1");
+        PawnStructure ps  = DeterminePawnStructure<kBlack>(pos);
+        Square        e4("e4"), e3("e3");
+        return std::vector<Check>{
+            {has(ps.doubled_pawns, e4), "black e4 should be doubled (e3 is ahead for black)"},
+            {!has(ps.doubled_pawns, e3), "black e3 should not be doubled (nothing ahead)"},
+            {has(ps.passed_pawns, e3), "black e3 should be passed (front pawn, no enemy pawns)"},
+            {!has(ps.passed_pawns, e4), "black e4 should not be passed (doubled pawns are excluded)"},
+            {has(ps.isolated_pawns, e3), "black e3 should be isolated"},
+            {has(ps.isolated_pawns, e4), "black e4 should be isolated"},
+        };
+    });
+
+    // ── Test 12: connected passed pawns (phalanx) ─────────────────────────
+    run_test("phalanx b5/c5: connected passed pawns, supported but not defended", [] {
+        Position      pos = Position::FromString("7k/8/8/1PP5/8/8/8/K7 w - - 0 1");
+        PawnStructure ps  = DeterminePawnStructure<kWhite>(pos);
+        Square        b5("b5"), c5("c5");
+        return std::vector<Check>{
+            {has(ps.passed_pawns, b5), "b5 should be passed (no enemy pawns)"},
+            {has(ps.passed_pawns, c5), "c5 should be passed (no enemy pawns)"},
+            {!has(ps.isolated_pawns, b5), "b5 should not be isolated (c-file neighbour)"},
+            {!has(ps.isolated_pawns, c5), "c5 should not be isolated (b-file neighbour)"},
+            {!has(ps.unsupported_pawns, b5), "b5 should be supported (c5 is in its support window)"},
+            {!has(ps.unsupported_pawns, c5), "c5 should be supported (b5 is in its support window)"},
+            {!has(ps.defended_pawns, b5), "b5 should not be defended (side-by-side, not behind)"},
+            {!has(ps.defended_pawns, c5), "c5 should not be defended (side-by-side, not behind)"},
+            {!has(ps.doubled_pawns, b5), "b5 should not be doubled"},
+            {!has(ps.doubled_pawns, c5), "c5 should not be doubled"},
+        };
+    });
+
     std::cout << std::format("\n{} individual checks; {} failed\n", total_checks, total_failures);
     return total_failures > 0 ? 1 : 0;
 }
