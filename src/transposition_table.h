@@ -37,16 +37,19 @@ struct Transposition
     {
         return move.score();
     }
+
     /// @brief Depth to which this position was searched.
     constexpr int depth() const
     {
         return move.TTDepth();
     }
+
     /// @brief Node type of the stored result.
     constexpr NodeType node_type() const
     {
         return move.TTNodeType();
     }
+
     /// @brief Table generation when stored; stale when != the table's current generation.
     constexpr uint8_t age() const
     {
@@ -75,6 +78,7 @@ class TranspositionTable
         std::atomic<uint64_t> key{0};  ///< hash ^ data.
         std::atomic<uint64_t> data{0}; ///< Packed move bits (move + score/depth/node-type/age).
     };
+
     static_assert(sizeof(AtomicEntry) == 16);
 
     std::unique_ptr<AtomicEntry[]> table_;          ///< Indexed using Zobrist hash; value-initialised to 0.

@@ -39,27 +39,32 @@ class Bitboard
     constexpr Bitboard()
     {
     }
+
     /// @brief Constructor.
     /// @param v Value to assign.
     constexpr Bitboard(uint64_t v) : v(v)
     {
     }
+
     /// @brief Constructor.
     /// @param location Square index to convert to Bitboard.
     constexpr Bitboard(Square location) : v(1ull << location)
     {
     }
+
     /// @brief Constructor.
     /// @param x File index (0,7)
     /// @param y Rank index (0,7)
     constexpr Bitboard(int x, int y) : v(1ull << (x + 8 * y))
     {
     }
+
     /// @brief Copy constructor.
     /// @param that Bitboard to be copied.
     constexpr Bitboard(const Bitboard &that) : v(that.v)
     {
     }
+
     /// @brief Assignment operator.
     /// @param that Source Bitboard.
     /// @return Assignee.
@@ -68,6 +73,7 @@ class Bitboard
         v = that.v;
         return *this;
     }
+
     /// @brief Convert Bitboard to 8 x 8 string for debug purposes.
     /// @return Chess board string containing 1s and 0s.
     constexpr std::string ToString() const
@@ -90,11 +96,13 @@ class Bitboard
         }
         return result;
     }
+
     /// @brief Clear all but the LSB, i.e. make unique square.
     constexpr void IsolateLsb()
     {
         v &= -v;
     }
+
     /// @brief Equality operator.
     /// @param that Comparee.
     /// @return true if Bitboards are equal.
@@ -102,6 +110,7 @@ class Bitboard
     {
         return v == that.v;
     }
+
     /// @brief Inequality operator.
     /// @param that Comparee.
     /// @return true if Bitboards are not equal.
@@ -109,6 +118,7 @@ class Bitboard
     {
         return v != that.v;
     }
+
     /// @brief Bitwise AND assignment.
     /// @param that Source
     /// @return Assignee.
@@ -117,6 +127,7 @@ class Bitboard
         v &= that.v;
         return *this;
     }
+
     /// @brief Bitwise OR assignment.
     /// @param that Source
     /// @return Assignee.
@@ -125,6 +136,7 @@ class Bitboard
         v |= that.v;
         return *this;
     }
+
     /// @brief Bitwise XOR assignment.
     /// @param that Source
     /// @return Assignee.
@@ -133,6 +145,7 @@ class Bitboard
         v ^= that.v;
         return *this;
     }
+
     /// @brief Bitwise AND operator
     /// @param that Source
     /// @return Result.
@@ -140,6 +153,7 @@ class Bitboard
     {
         return Bitboard{v & that.v};
     }
+
     /// @brief Bitwise OR operator
     /// @param that Source
     /// @return Result.
@@ -147,6 +161,7 @@ class Bitboard
     {
         return Bitboard{v | that.v};
     }
+
     /// @brief Bitwise XOR operator
     /// @param that Source
     /// @return Result.
@@ -154,89 +169,104 @@ class Bitboard
     {
         return Bitboard{v ^ that.v};
     }
+
     /// @brief Bitwise complement operator
     /// @return Result.
     constexpr Bitboard operator~() const
     {
         return Bitboard{~v};
     }
+
     /// @brief Least significant bit.
     /// @return Square index of LSB.
     constexpr Square Lsb() const
     {
         return Square{(uint8_t)__builtin_ctzll(v)};
     }
+
     /// @brief Most significant bit.
     /// @return Square index of MSB.
     constexpr Square Msb() const
     {
         return Square{(uint8_t)(63 - __builtin_clzll(v))};
     }
+
     /// @brief Population count.
     /// @return Number of bits set.
     constexpr int PopCount() const
     {
         return __builtin_popcountll(v);
     }
+
     /// @brief Check if bitboard is empty.
     /// @return true if no bits are set.
     constexpr bool IsEmpty() const
     {
         return v == 0;
     }
+
     /// @brief Check if bitboard is not empty.
     /// @return true if at least 1 bit is set.
     constexpr bool IsNotEmpty() const
     {
         return v != 0;
     }
+
     /// @brief Convert to native uint64_t
     constexpr explicit operator uint64_t() const
     {
         return v;
     }
+
     /// @brief Shift one square to the North.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftNorth() const
     {
         return Bitboard{v << 8};
     }
+
     /// @brief Shift one square to the Northeast.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftNortheast() const
     {
         return Bitboard{(v & kNotFileH) << 9};
     }
+
     /// @brief Shift one square to the East.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftEast() const
     {
         return Bitboard{(v & kNotFileH) << 1};
     }
+
     /// @brief Shift one square to the Southeast.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftSoutheast() const
     {
         return Bitboard{(v & kNotFileH) >> 7};
     }
+
     /// @brief Shift one square to the South.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftSouth() const
     {
         return Bitboard{v >> 8};
     }
+
     /// @brief Shift one square to the Southwest.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftSouthwest() const
     {
         return Bitboard{(v & kNotFileA) >> 9};
     }
+
     /// @brief Shift one square to the West.
     /// @return shifted Bitboard.
     constexpr Bitboard ShiftWest() const
     {
         return Bitboard{(v & kNotFileA) >> 1};
     }
+
     /// @brief Shift one square to the Northwest.
     /// @return shifted Bitboard.n
     constexpr Bitboard ShiftNorthwest() const
@@ -266,18 +296,21 @@ class Bitboard
         constexpr Iterator(Bitboard bb) : i(bb.v)
         {
         }
+
         /// @brief Compare against the end sentinel.
         /// @return true when there are no more bits to iterate over.
         constexpr bool operator==(const Sentinel &) const
         {
             return i == 0;
         }
+
         /// @brief Dereference.
         /// @return Square index of the least significant set bit.
         constexpr Square operator*() const
         {
             return Square{(uint8_t)__builtin_ctzll(i)};
         }
+
         /// @brief Advance to the next set bit by clearing the least significant set bit.
         /// @return Reference to this iterator.
         constexpr Iterator &operator++()

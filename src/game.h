@@ -40,12 +40,14 @@ class Game
     {
         return positions_.back();
     }
+
     /// @brief Current position (const overload).
     /// @return Const reference to the current position.
     const Position &CurrentPosition() const
     {
         return positions_.back();
     }
+
     /// @brief Read-only view of the full game position stack, used to seed SearchState.
     /// @return The position history stack.
     const StackList<Position, kMaxGameLength> &Positions() const

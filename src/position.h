@@ -52,92 +52,110 @@ class Position
     // Const accessors.
     /// @brief Pieces of a colour attacking a square (see definition for details).
     constexpr Bitboard AttacksTo(Square location, Color color) const;
+
     /// @brief Generate all legal moves. @return The legal move list.
     constexpr MoveList GenerateLegalMoves() const
     {
         return ColorToMove() == kWhite ? GenMoves<kWhite, true>() : GenMoves<kBlack, true>();
     }
+
     /// @brief Generate legal captures and promotions only. @return The legal capture list.
     constexpr MoveList GenerateLegalCaptures() const
     {
         return ColorToMove() == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();
     }
+
     /// @brief Whether a square is attacked by a colour. @param s Target square. @param c Attacking colour. @return true
     /// if attacked.
     constexpr bool IsAttacked(Square s, Color c) const
     {
         return AttacksTo(s, c).IsNotEmpty();
     }
+
     /// @brief Whether white may castle kingside. @return true if allowed.
     constexpr bool MayWhiteCastleKingside() const
     {
         return castling_rights_.MayWhiteCastleKingside();
     }
+
     /// @brief Whether white may castle queenside. @return true if allowed.
     constexpr bool MayWhiteCastleQueenside() const
     {
         return castling_rights_.MayWhiteCastleQueenside();
     }
+
     /// @brief Whether black may castle kingside. @return true if allowed.
     constexpr bool MayBlackCastleKingside() const
     {
         return castling_rights_.MayBlackCastleKingside();
     }
+
     /// @brief Whether black may castle queenside. @return true if allowed.
     constexpr bool MayBlackCastleQueenside() const
     {
         return castling_rights_.MayBlackCastleQueenside();
     }
+
     /// @brief Whether the last move was a null move. @return true if a null move.
     constexpr bool IsNullMove() const
     {
         return !!(state_flags_ & kIsNullMove);
     }
+
     /// @brief Colour to move. @return The side to move.
     constexpr Color ColorToMove() const
     {
         return state_flags_ & kIsBlackToMove ? kBlack : kWhite;
     }
+
     /// @brief All occupied squares. @return Occupancy bitboard.
     constexpr Bitboard OccupiedSquares() const
     {
         return pieces_[kNone];
     }
+
     /// @brief All empty squares. @return Vacant-square bitboard.
     constexpr Bitboard VacantSquares() const
     {
         return ~pieces_[kNone];
     }
+
     /// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
     constexpr Piece PieceAt(Square location) const
     {
         return squares_[location];
     }
+
     /// @brief King location for a colour. @param color Colour to query. @return The king's square.
     constexpr Square KingLocation(Color color) const
     {
         return king_location_[color];
     }
+
     /// @brief Zobrist hash of the position. @return The hash.
     constexpr zobrist_t Hash() const
     {
         return hash_;
     }
+
     /// @brief Whether the side to move is in check. @return true if in check.
     constexpr bool IsInCheck() const
     {
         return checkers_.IsNotEmpty();
     }
+
     /// @brief Full move count. @return Number of full moves.
     constexpr uint8_t MoveCount() const
     {
         return full_move_count_;
     }
+
     /// @brief Half-move (50-move) clock. @return Consecutive reversible plies.
     constexpr uint8_t ReversibleMoveCount() const
     {
         return reversible_move_count_;
     }
+
     /// @brief En passant target square. @return The en passant square (0 if none).
     constexpr Square EnPassantIndex() const
     {

@@ -136,6 +136,7 @@ struct PawnStructure
     Bitboard unsupported_pawns; ///< An unsupported pawn has no friendly pawns in its support window.
     Bitboard doubled_pawns;     ///< A doubled pawn has a friendly pawn in front of it.
     Bitboard defended_pawns;    ///< A defended pawn has a friendly pawn defending it.
+
     /// @brief Construct with all pawn-structure bitboards empty.
     constexpr PawnStructure()
         : passed_pawns(kNoSquares), isolated_pawns(kNoSquares), unsupported_pawns(kNoSquares),
