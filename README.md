@@ -110,33 +110,82 @@ each pinned piece may still move to, before move generation.
 
 ### Search
 
-Iterative deepening starts at depth 3 (`SearchRootNode`, [src/search_root_node.cpp](src/search_root_node.cpp))
-and runs on a dedicated worker thread so the UCI `stop` command (which sets an atomic cancellation
-flag) can interrupt it. The recursive search (`Search`, [src/search_alphabeta.cpp](src/search_alphabeta.cpp))
-is a fail-soft negamax with:
+The search is a fail-soft negamax with alpha-beta pruning, driven by iterative deepening and split
+across a thread pool with Young Brothers Wait.
 
-- **Transposition table** probe/store with CUT / ALL / PV node types.
-- **Principal variation search** — null-window re-search of non-PV moves.
-- **Null-move pruning**.
-- **Late-move reductions** — quiet, non-check moves are reduced after the 4th move at depth > 2, with
-  an extra reduction after the 7th.
+#### Iterative deepening and time management
+
+`SearchRootNode` ([src/search_root_node.cpp](src/search_root_node.cpp)) runs on a dedicated worker
+thread — started by `Game::StartThinking` — so the UCI `stop` command, which sets an atomic
+cancellation flag polled throughout the tree, can interrupt it at any time. It searches the root move
+list at increasing depths starting from `kStartDepth` (3) up to `kMaxPly` (64), emitting a
+`info depth … score cp … pv …` line each time the best move improves. After every iteration the root
+moves are re-sorted by their scores from the previous iteration, so the prior best move is tried first
+next time. The root searches a full `[kAlpha, kBeta]` window (no aspiration windows); alpha is raised
+in place as root moves beat it.
+
+Under a standard (time-budgeted) clock the engine can stop *before* the allotted time is spent, using
+the stability of the result across iterations:
+
+- if the best move has been **consistent** across iterations **and** the score has stayed within
+  `kScoreInstabilityThreshold` (50 cp), it stops once it has used a quarter of the time budget;
+- if **either** the move or the score is stable, it stops at half the budget;
+- otherwise it runs until the full budget is reached, or until a forced mate is found
+  (`|score| > kWinThreshold`).
+
+This avoids burning the whole clock on positions whose answer is already settled. Fixed-depth and
+fixed-time clocks bypass the heuristic.
+
+#### Recursive search
+
+`Search` ([src/search_alphabeta.cpp](src/search_alphabeta.cpp)) applies, at each node:
+
+- **Transposition table** probe/store with CUT / ALL / PV node types; a TT cutoff or TT move ordering
+  hint is taken before any moves are generated.
+- **Principal variation search (PVS)** — the first move is searched with the full window; later moves
+  get a null-window (`[alpha, alpha+1]`) scout search and are only re-searched with the full window if
+  the scout beats alpha.
+- **Null-move pruning** — when not in check and the previous move was not itself a null move, a null
+  move is searched at reduced depth (`depth − 3`, i.e. R = 2); a resulting score `≥ beta` prunes the
+  node.
+- **Late-move reductions (LMR)** — at null-window nodes, a quiet (non-capture), non-pawn, non-check
+  move past the 4th move at `depth > 2` is searched one ply shallower, with a second ply shaved off
+  past the 7th move at `depth > 3`. A reduced search that beats alpha is re-searched at full depth.
 - **Search extensions** for promotions and en passant captures.
-- **Move ordering** — the TT move first, then winning/equal captures and promotions by static
-  exchange evaluation, then the two killer moves for the ply, then quiet moves by history-heuristic
-  count, and finally losing captures (negative SEE) below the quiet moves. A quiet move that causes a
-  beta cutoff is stored as a killer.
+- **Move ordering** — the TT move first, then winning/equal captures and promotions by static exchange
+  evaluation, then the two killer moves for the ply, then quiet moves by history-heuristic count, and
+  finally losing captures (negative SEE) below the quiet moves. A quiet move that causes a beta cutoff
+  is recorded as a killer and rewarded in the history table.
 
 **Quiescence search** ([src/search_quiescent.cpp](src/search_quiescent.cpp)) extends the leaves with
-captures only, using a separate transposition table. (An SEE-based pruning path exists but is
-currently compiled out.)
+captures only, using a separate transposition table, so the static evaluation is never called on a
+position with a hanging capture available. (An SEE-based pruning path exists but is currently compiled
+out.)
 
-**Parallel search (Young Brothers Wait):** after two moves have been searched sequentially at a
-null-window node and idle threads are available, the remaining moves are dispatched to a thread pool.
-Each worker borrows its own `SearchState` (position stack, hash history, killers, node count) from a
-fixed slab allocator (`SearchStatePool`), searches one move, and writes its result back into a
-stack-allocated job. A `std::latch` plus a per-batch `std::atomic<bool>` cutoff flag coordinate the
-batch; the thread pool dispatches plain function-pointer tasks (no `std::function`, no per-task heap
-allocation). Workers never sub-parallelize — only the main thread splits work.
+#### Parallel search (Young Brothers Wait)
+
+After two moves have been searched sequentially at a null-window node and idle threads are available,
+the remaining moves are dispatched to a thread pool. Each worker borrows its own `SearchState`
+(position stack, hash history, killers, node count) from a fixed slab allocator (`SearchStatePool`),
+searches one move, and writes its result back into a stack-allocated job. A `std::latch` plus a
+per-batch `std::atomic<bool>` cutoff flag coordinate the batch; the thread pool dispatches plain
+function-pointer tasks (no `std::function`, no per-task heap allocation). Workers never sub-parallelize
+— only the main thread splits work, which keeps the YBW tree shallow and the shared state contention
+low. The pool holds `hardware_concurrency() − 1` persistent threads.
+
+#### Tuning constants
+
+The knobs above live in [src/constants.h](src/constants.h):
+
+| Constant | Value | Meaning |
+|---|---|---|
+| `kStartDepth` | 3 | First (full-width) iterative-deepening depth |
+| `kMaxPly` | 64 | Hard ceiling on search depth / ply |
+| `kHashtableMegabytes` | 64 | Main transposition table size |
+| `kQHashtableMb` | 8 | Quiescence transposition table size |
+| `kScoreInstabilityThreshold` | 50 | Centipawn window for the "score stable" time-management test |
+| `kSearchStatePoolCapacity` | 64 | Concurrent worker search states (slab slots) |
+| `kThreadPoolQueueCapacity` | 128 | Thread-pool task ring-buffer size |
 
 ### Transposition table
 
@@ -176,8 +225,8 @@ builds and runs four standalone test executables:
 
 | Executable | Description |
 |---|---|
-| `build/test_see` | 18 static exchange evaluation cases |
-| `build/test_pawn_structure` | 8 pawn structure tests, 38 individual checks |
+| `build/test_see` | 24 static exchange evaluation cases |
+| `build/test_pawn_structure` | 12 pawn structure tests, 72 individual checks |
 | `build/test_perft` | Move-generation regression on the standard PERFT positions |
 | `build/test_bratko_kopec` | 24 Bratko-Kopec search positions (default depth 8) |
 
@@ -200,3 +249,62 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 | `test/` | Standalone test programs |
 | `generate_constants/` | Build-time generator for the precomputed lookup tables |
 | `Doxyfile` | Doxygen configuration |
+
+## Design notes
+
+A few deliberate choices shape the codebase:
+
+- **Immutable, copy-make positions.** `Position` is never mutated in place; `MakeMove` returns a new
+  one by value and there is no `UnmakeMove`. This trades a per-ply copy for far simpler code: no
+  state to restore, no aliasing between plies, and positions that are trivially safe to hand to other
+  threads. The class is kept small (160 bytes) so the copy stays cheap.
+- **No heap allocation during search.** Move lists, the position stack, the hash history, and the
+  thread-pool task queue are all fixed-capacity stack containers sized from `constants.h`. The search
+  hot path performs no dynamic allocation, which keeps it allocator- and fragmentation-free.
+- **Everything precomputed that can be.** Attack tables, Zobrist keys and pawn-structure masks are
+  emitted at build time by `generate_constants`, so the engine binary starts instantly and the hot
+  paths are pure lookups.
+- **Lockless sharing.** The transposition tables, history table and cancellation flag are the only
+  cross-thread state, and all are accessed with atomics (the TT via Hyatt's XOR trick) rather than
+  locks, so worker threads never block one another mid-search.
+
+## Benchmarks
+
+Pawnstar has not been assigned a formal Elo rating yet. The objective figures currently tracked are:
+
+- **Move generation** — roughly 700 million legal moves per second on a modern laptop core.
+- **Bratko-Kopec** — 24/24 at the default depth 8 (`make check`).
+
+`make check` is the regression baseline; the perft suite verifies move-generation correctness against
+the published node counts for the standard positions.
+
+## Limitations and known issues
+
+- **BMI2 required.** The sliding-piece attacks depend on the `_pext_u64` instruction, so the engine
+  needs an Intel Haswell / AMD Zen 1 (or newer) CPU and will not run without `-mbmi2`. On early AMD
+  Zen parts `pext` is microcoded and comparatively slow.
+- **Thread count is fixed** at `hardware_concurrency() − 1`; it is not exposed as a UCI option.
+- **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
+- The SEE-based **quiescence pruning** path is implemented but currently compiled out (`#if 0`).
+- The evaluation is **hand-crafted**, not learned (no NNUE).
+
+## Contributing
+
+1. Build and run the full test suite before and after your change:
+   ```bash
+   make clean && make check
+   ```
+2. Format any touched sources with clang-format (Microsoft base style, 120-column limit; config in
+   `.clang-format`):
+   ```bash
+   clang-format -i src/<file>            # or your editor's format-on-save
+   ```
+   The generated `src/generated_data.cpp` is exempt — it is machine-emitted and gitignored.
+3. Only edit `generate_constants/generate_constants.cpp` when the precomputed-table logic actually
+   changes; never edit `src/generated_data.cpp` by hand.
+4. Keep new public declarations Doxygen-commented so `make doc` stays complete.
+
+## License
+
+No license has been specified yet. Until a `LICENSE` file is added to the repository, the work is
+**all rights reserved** by the author and may not be redistributed or used without permission.
