@@ -2,6 +2,7 @@
 /// @file search_state.h Per-thread search state for the parallel alpha-beta search.
 
 #include "constants.h"
+#include "debug_hashtable.h"
 #include "history_table.h"
 #include "move.h"
 #include "position.h"
@@ -89,6 +90,7 @@ class SearchState
     {
         if (!(killers[ply][0] == move))
         {
+            INCREMENT("killer moves");
             killers[ply][1] = killers[ply][0];
             killers[ply][0] = move;
         }
