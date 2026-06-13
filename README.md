@@ -149,9 +149,9 @@ fixed-time clocks bypass the heuristic.
 - **Null-move pruning** — when not in check and the previous move was not itself a null move, a null
   move is searched at reduced depth (`depth − 4`, i.e. R = 3); a resulting score `≥ beta` prunes the
   node.
-- **Late-move reductions (LMR)** — at null-window nodes, a quiet (non-capture), non-pawn, non-check
-  move past the 4th move at `depth > 2` is searched one ply shallower, with a second ply shaved off
-  past the 7th move at `depth > 3`. A reduced search that beats alpha is re-searched at full depth.
+- **Late-move reductions (LMR)** — at null-window nodes, any late move (past the 4th) outside a check
+  sequence at `depth > 2` is searched one ply shallower, with a second ply shaved off past the 7th
+  move at `depth > 3`. A reduced search that beats alpha is re-searched at full depth.
 - **Search extensions** for promotions and en passant captures.
 - **Move ordering** — the TT move first, then winning/equal captures and promotions by static exchange
   evaluation, then the two killer moves for the ply, then quiet moves by history-heuristic count, and

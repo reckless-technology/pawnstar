@@ -256,7 +256,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             continue;
         }
 
-        // Late move reduction: reduce quiet, non-check, late moves at null-window nodes.
+        // Late move reduction: reduce late moves outside a check sequence at null-window nodes.
         int lmr_depth = depth;
         if (beta == alpha + 1 && move_index > 3 && !in_check_seq && depth > 2)
         {
