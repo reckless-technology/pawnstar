@@ -128,9 +128,13 @@ Scores are tapered between opening/middlegame and endgame phases based on remain
 
 SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a square; `EvaluateStaticExchange` returns `{score, is_checking}`. It is used to order captures and promotions in `ScoreAndSortMoves` (see Move ordering above) and is exercised by `test_see`. A separate SEE-based quiescence *pruning* path exists but is currently compiled out (`#if 0`).
 
+### Opening book
+
+`OpeningBook` ([opening_book.h](src/opening_book.h)) is loaded from `pawnstar.book` in the working directory at startup (`main.cpp`); the shipped book ([doc/pawnstar.book](doc/pawnstar.book)) is the public-domain [TSCP](https://github.com/terredeciels/TSCP) `book.txt`. The format is plain text, one opening line per row, each move in **coordinate notation** (e.g. `e2e4 e7e5 g1f3`); `ParseLineOfPlay` replays each line from the start position, ignoring tokens that begin with a digit (move numbers) and treating `#` as a to-end-of-line comment. The book is a `std::map<zobrist_t, std::vector<Move>>` storing moves *with repeats*, so `GetMove`'s uniform-random pick is frequency-weighted. `SearchRootNode` returns a book move immediately on a hit, before searching; the `bookmoves` UCI command lists moves and frequencies for the current position. There is no SAN/PGN parser — coordinate notation only.
+
 ### UCI protocol
 
-[input_handling.cpp](src/input_handling.cpp) parses all UCI commands plus engine-specific diagnostics: `eval` (print position evaluation), `getboard` (print board), `dbg` (dump debug counters).
+[input_handling.cpp](src/input_handling.cpp) parses all UCI commands plus engine-specific diagnostics: `eval` (print position evaluation), `getboard` (print board), `bookmoves` (list opening-book moves for the current position), `dbg` (dump debug counters).
 
 ### Generated data
 

@@ -228,6 +228,25 @@ Static exchange evaluation (`EvaluateStaticExchange`,
 square; it is used to order captures and promotions during search (see above) and is covered by
 `test_see`.
 
+### Opening book
+
+`OpeningBook` ([src/opening_book.h](src/opening_book.h)) lets the engine play known opening lines
+instantly instead of searching. At startup the engine loads `pawnstar.book` from the working directory;
+the shipped book ([doc/pawnstar.book](doc/pawnstar.book)) is derived from the public-domain
+[TSCP](https://github.com/terredeciels/TSCP) `book.txt`.
+
+The file is plain text, one opening line per row, with each move in **coordinate notation**
+(from-square then to-square, e.g. `e2e4 e7e5 g1f3`). Tokens that begin with a digit are treated as
+move numbers and ignored, and a `#` begins a comment to end of line, so PGN-style numbered lines are
+also accepted. Each line is replayed from the standard start position and every move it visits is
+recorded.
+
+Internally the book is a `std::map` from position Zobrist hash to a vector of legal `Move`s, *with
+repeats*: a move that appears in many lines is stored many times, so picking uniformly at random
+(`GetMove`) naturally weights selection by how often the move occurs. `SearchRootNode` consults the
+book before searching and, on a hit, returns the chosen move immediately. The `bookmoves` UCI command
+prints the available book moves and their frequencies for the current position.
+
 ## Test suite
 
 ```bash
