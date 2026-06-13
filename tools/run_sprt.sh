@@ -17,6 +17,9 @@ PS="$REPO/build/pawnstar"
 
 # Single-threaded engines: faster per node, avoids Lazy SMP non-determinism, frees cores for concurrency.
 export PAWNSTAR_THREADS=1
+# The NNUE/HCE distinction must come ONLY from the per-engine UCI options below; make sure neither side
+# inherits a global NNUE setting from the environment.
+unset PAWNSTAR_NNUE PAWNSTAR_EVALFILE
 
 fastchess \
     -engine cmd="$PS" name=NNUE option.UseNNUE=true option.EvalFile="$NET" \

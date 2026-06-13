@@ -375,6 +375,7 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 | `nnue/` | NNUE training pipeline documentation |
 | `generate_constants/` | Build-time generator for the precomputed lookup tables |
 | `Doxyfile` | Doxygen configuration |
+| `LICENSE` | GNU General Public License v3 |
 
 ## Design notes
 
@@ -438,5 +439,11 @@ the published node counts for the standard positions.
 
 ## License
 
-No license has been specified yet. Until a `LICENSE` file is added to the repository, the work is
-**all rights reserved** by the author and may not be redistributed or used without permission.
+Pawnstar is free software, licensed under the **GNU General Public License, version 3** (GPLv3). You may
+redistribute and/or modify it under the terms of that license; it comes with **no warranty**. See the
+[LICENSE](LICENSE) file for the full text, or <https://www.gnu.org/licenses/gpl-3.0.html>.
+
+The bundled opening book ([doc/pawnstar.book](doc/pawnstar.book)) is derived from the public-domain
+[TSCP](https://github.com/terredeciels/TSCP) `book.txt`. The NNUE trainer sources under
+[tools/bullet/](tools/bullet) are written for the [bullet](https://github.com/jw1912/bullet) trainer
+(MIT-licensed), which is fetched separately by `tools/setup_bullet.sh` and is not redistributed here.
