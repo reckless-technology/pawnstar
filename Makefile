@@ -1,6 +1,6 @@
 PROGRAM             = pawnstar
 CXX                 = clang++
-CPPFLAGS            = -I src -D DEBUGX=1
+CPPFLAGS            = -I src
 CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2
 BUILD_DIR           = build
 DOC_DIR             = doc/html
@@ -39,6 +39,11 @@ TEST_OBJECTS        = $(BUILD_DIR)/perft.o \
                       $(BUILD_DIR)/bratko_kopec.o \
                       $(BUILD_DIR)/pawn_structure.o
 TEST_DEPS           = $(TEST_OBJECTS:.o=.d)
+
+# Diagnostic counters (DEBUGX) are compiled in by default; build with RELEASE=1 to omit them.
+ifneq ($(RELEASE), 1)
+	CPPFLAGS += -D DEBUGX=1
+endif
 
 ifeq ($(DEBUG), 1)
 	CXXFLAGS += -g -Og -D DEBUG -fsanitize=undefined -fsanitize=address

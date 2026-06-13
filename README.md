@@ -44,6 +44,15 @@ Debug build with AddressSanitizer + UndefinedBehaviorSanitizer:
 make DEBUG=1
 ```
 
+Release build for benchmarking, which omits the `DEBUGX` diagnostic counters:
+
+```bash
+make RELEASE=1
+```
+
+The `DEBUGX` diagnostic counters (the `dbg` command's data) are compiled in by default and cost roughly
+6% on the search hot path; `RELEASE=1` leaves them out. It composes with `DEBUG=1` independently.
+
 After switching branches or changing generated files, run `make clean && make` — stale `.d`
 dependency files can otherwise cause spurious build failures.
 
@@ -69,11 +78,16 @@ help        list all commands
 
 ### Board representation
 
-`Position` ([src/position.h](src/position.h)) is the central immutable state class. It stores six
-per-piece bitboards and two per-colour bitboards, a 64-entry square→piece array for O(1) lookup, the
-incrementally-maintained Zobrist hash, castling rights, the en passant square, the half-move clock,
-and a `checkers` bitboard. `MakeMove` and `MakeNullMove` return a brand new `Position` by value
-(copy-make); there is no unmake.
+`Position` ([src/position.h](src/position.h)) is the central immutable state class. It stores
+per-piece-type bitboards in `pieces_` and per-colour bitboards in `colors_`, a 64-entry square→piece
+array for O(1) lookup, the incrementally-maintained Zobrist hash, castling rights, the en passant
+square, the half-move clock, and a `checkers` bitboard. `MakeMove` and `MakeNullMove` return a brand
+new `Position` by value (copy-make); there is no unmake.
+
+`pieces_` is a `std::array<Bitboard, 7>` indexed by piece type, but **`pieces_[0]` (the `kNone` slot)
+holds the occupied-squares set** — the union of all pieces of both colours — rather than a piece
+bitboard; the six real piece types occupy indices 1–6. This lets occupancy queries and the `pext`-based
+attack lookups read it directly without recomputing a union.
 
 `Bitboard` ([src/bitboard.h](src/bitboard.h)) wraps a `uint64_t` with the usual set operations plus a
 range-based iterator that yields the `Square` of each set bit, enabling `for (Square s : bb)`.
@@ -160,8 +174,8 @@ fixed-time clocks bypass the heuristic.
 
 **Quiescence search** ([src/search_quiescent.cpp](src/search_quiescent.cpp)) extends the leaves with
 captures only, using a separate transposition table, so the static evaluation is never called on a
-position with a hanging capture available. (An SEE-based pruning path exists but is currently compiled
-out.)
+position with a hanging capture available. It applies **SEE pruning** — a capture that loses material
+by static exchange evaluation and does not give check is skipped rather than searched.
 
 #### Parallel search (Lazy SMP)
 
@@ -327,7 +341,6 @@ the published node counts for the standard positions.
 - **Thread count** defaults to `hardware_concurrency()` and is not exposed as a UCI option, though it
   can be overridden with the `PAWNSTAR_THREADS` environment variable.
 - **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
-- The SEE-based **quiescence pruning** path is implemented but currently compiled out (`#if 0`).
 - The evaluation is **hand-crafted**, not learned (no NNUE).
 
 ## Contributing

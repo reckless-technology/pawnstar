@@ -91,7 +91,7 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 
 **Move ordering** — `SearchState::ScoreAndSortMoves` assigns each move a 23-bit ordering score stored in the `Move` itself, in descending bands: winning/equal captures and promotions (`kWinningCaptureBase` + SEE score), the two killer moves for the ply (just below winning captures), quiet moves (history count, clamped below the killers), and finally losing captures (their negative SEE, sorting below quiet moves). The TT move is searched first, before the list is generated and sorted.
 
-**Quiescence search** — `SearchQuiescent` ([search_quiescent.cpp](src/search_quiescent.cpp)) searches captures only, using its own transposition table. (An SEE-based pruning path — skip captures with negative SEE that don't give check — exists but is currently compiled out behind `#if 0`.)
+**Quiescence search** — `SearchQuiescent` ([search_quiescent.cpp](src/search_quiescent.cpp)) searches captures only, using its own transposition table. It applies SEE pruning: a capture with negative SEE that does not give check is skipped rather than searched.
 
 **Parallel search (Lazy SMP)** — `SearchRootNode` spawns `hardware_concurrency()` threads (capped at `kMaxSearchThreads`, 256), each running a complete independent `IterativeDeepen` search of the root. There is no tree splitting and no work queue — threads cooperate only through the shared lockless transposition table, where one thread's entries prefill another's probes. Each thread has its own `SearchState` (including its own history table), so the only shared mutable state is the transposition tables and `is_cancel_pending`. The thread count can be overridden with the `PAWNSTAR_THREADS` environment variable (e.g. `PAWNSTAR_THREADS=1` for a deterministic single-threaded search — used to regenerate BK reference data). To stop helpers recomputing the same tree in lockstep, the main thread (thread 0) searches every depth while each helper follows a Stockfish-style iteration-skip schedule (`kSkipSize`/`kSkipPhase` tables in `search_root_node.cpp`) that skips selected depths. Only the main thread prints `info`, applies time management and returns the authoritative move; because helpers race ahead through the table, the result (move and exact score) is non-deterministic between runs.
 
@@ -126,7 +126,7 @@ Aging is O(1): the table holds a `generation_` counter that `Age()` increments b
 
 Scores are tapered between opening/middlegame and endgame phases based on remaining material.
 
-SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a square; `EvaluateStaticExchange` returns `{score, is_checking}`. It is used to order captures and promotions in `ScoreAndSortMoves` (see Move ordering above) and is exercised by `test_see`. A separate SEE-based quiescence *pruning* path exists but is currently compiled out (`#if 0`).
+SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a square; `EvaluateStaticExchange` returns `{score, is_checking}`. It is used to order captures and promotions in `ScoreAndSortMoves` (see Move ordering above), to prune losing captures in quiescence search, and is exercised by `test_see`.
 
 ### Opening book
 
