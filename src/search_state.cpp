@@ -10,7 +10,7 @@
 /// hash_stack_ is populated with all ancestor positions (positions 0..N-1 where N is
 /// the current position), so that IsDrawByRepetition can walk backwards through the full
 /// game history.
-SearchState::SearchState(Game &g) : game(g), batch_cutoff(nullptr)
+SearchState::SearchState(Game &g) : game(g)
 {
     const StackList<Position, kMaxGameLength> &pos = g.Positions();
     // Push all positions except the last (current) one into the hash history.
@@ -20,15 +20,6 @@ SearchState::SearchState(Game &g) : game(g), batch_cutoff(nullptr)
     }
     // Seed the per-thread position stack with only the current game position.
     positions_.push_back(g.CurrentPosition());
-}
-
-/// @brief Construct a worker search state forked from a parent state.
-/// The worker gets a full copy of the parent's hash history (for repetition detection)
-/// and starts its own position stack from the parent's current position.
-SearchState::SearchState(const SearchState &parent, std::atomic<bool> *cutoff) : game(parent.game), batch_cutoff(cutoff)
-{
-    hash_stack_ = parent.hash_stack_;
-    positions_.push_back(parent.CurrentPosition());
 }
 
 /// @brief Push the current position's hash then make the move on a copy of the position.
@@ -87,7 +78,7 @@ void SearchState::ScoreAndSortMoves(MoveList &moves, int ply) const
         }
         else // quiet move: history count, clamped below the killers
         {
-            sort = (int)std::min<uint32_t>(game.history_table.GetCount(ply, move), (uint32_t)kMaxQuiet);
+            sort = (int)std::min<uint32_t>(history.GetCount(ply, move), (uint32_t)kMaxQuiet);
         }
         move.AssignScore(sort);
     }
@@ -121,9 +112,8 @@ bool SearchState::IsDrawByRepetition() const
     return false;
 }
 
-/// @brief Check whether this thread should abort.
+/// @brief Check whether this thread should abort (the shared stop flag is set).
 bool SearchState::IsCancelled() const
 {
-    return game.is_cancel_pending.load(std::memory_order_relaxed) ||
-           (batch_cutoff != nullptr && batch_cutoff->load(std::memory_order_relaxed));
+    return game.is_cancel_pending.load(std::memory_order_relaxed);
 }

@@ -20,35 +20,46 @@ class Position
   public:
     /// @brief Default constructor; leaves the position uninitialized.
     Position() = default;
+
     /// @brief Copy constructor.
     /// @param that Position to copy.
     Position(const Position &that) = default;
+
     /// @brief Copy assignment.
     /// @param that Position to copy.
     /// @return Reference to this position.
     Position &operator=(const Position &that) = default;
+
     /// @brief Parse a position from a FEN string (see definition for details).
     static Position FromString(std::string_view fen_string);
+
     /// @brief Return a new position with the given move applied (see definition for details).
     Position MakeMove(const Move &move) const;
+
     /// @brief Return a new position with a null (pass) move applied.
     /// @return The resulting position.
     Position MakeNullMove() const;
+
     /// @brief Whether the side that just moved left its own king safe (position is legal).
     /// @return true if the position is legal.
     bool IsLegal() const;
+
     /// @brief Whether the side to move is checkmated.
     /// @return true if checkmate.
     bool IsCheckmate() const;
+
     /// @brief Whether the side to move is stalemated.
     /// @return true if stalemate.
     bool IsStalemate() const;
+
     /// @brief Whether the position is a draw by insufficient material.
     /// @return true if drawn by material.
     bool IsDrawByMaterial() const;
+
     /// @brief Render the board as a human-readable string.
     /// @return Board string.
     std::string ToString() const;
+
     // Const accessors.
     /// @brief Pieces of a colour attacking a square (see definition for details).
     constexpr Bitboard AttacksTo(Square location, Color color) const;
@@ -162,10 +173,9 @@ class Position
         return en_passant_square_;
     }
 
-    /// @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the occupied-squares bitboard.
-    std::array<Bitboard, 7> pieces_;
-    /// @brief Per-color bitboards indexed by Color.
-    std::array<Bitboard, 2> colors_;
+    std::array<Bitboard, 7> pieces_; ///< @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the
+                                     ///< occupied-squares bitboard
+    std::array<Bitboard, 2> colors_; ///< @brief Per-color bitboards indexed by Color.
 
   private:
     constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.

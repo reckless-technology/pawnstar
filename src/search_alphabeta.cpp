@@ -8,8 +8,6 @@
 #include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
-#include <latch>
-#include <mutex>
 #include <utility>
 
 /// @brief Search a single move and return its alpha-beta score and whether it gives check.
@@ -117,58 +115,9 @@ static inline NullMoveResult AttemptNullMove(SearchState &state, int depth, int 
     return {alpha, kAlpha};
 }
 
-/// @brief Work descriptor for one move searched in the parallel (YBW) phase.
-/// Instances live in the dispatching node's stack frame for the duration of the batch (the node
-/// blocks on a latch until every worker finishes), so the thread pool can reference them without
-/// owning them. The worker writes its result back into @c score.
-struct ParallelJob
-{
-    SearchState *worker;     ///< Worker search state running this move.
-    Move         move;       ///< Move to search.
-    int          move_index; ///< Move number for ordering heuristics.
-    int          lmr_depth;  ///< Reduced search depth (may equal full depth).
-    int          depth;      ///< Full search depth.
-    int          ply;        ///< Distance from root.
-    int          alpha;      ///< Alpha bound at dispatch time.
-    int          beta;       ///< Beta bound at dispatch time.
-    std::latch  *latch;      ///< Batch completion latch, counted down when done.
-    int          score;      ///< Output: alpha-beta score for this move.
-};
-
-/// @brief Thread-pool trampoline: search one move on its worker state and record the result.
-/// @param arg Pointer to a ParallelJob owned by the dispatching node.
-static void RunParallelJob(void *arg)
-{
-    ParallelJob &job = *static_cast<ParallelJob *>(arg);
-    Variation    pv;
-    int          score =
-        SearchSingleMove(*job.worker, job.lmr_depth, job.ply, job.alpha, job.beta, job.move, pv, job.move_index).score;
-    // Re-search at full depth if LMR was applied and the move beat alpha.
-    if (!job.worker->IsCancelled() && score > job.alpha && job.lmr_depth < job.depth)
-    {
-        score =
-            SearchSingleMove(*job.worker, job.depth, job.ply, job.alpha, job.beta, job.move, pv, job.move_index).score;
-    }
-    if (score >= job.beta)
-    {
-        job.worker->SignalBatchCutoff();
-        job.worker->game.history_table.RecordGoodMove(job.ply, job.move);
-        if (job.move.IsQuiet())
-        {
-            job.worker->RecordKiller(job.ply, job.move);
-        }
-    }
-    job.score = score;
-    // Return the slot before counting down so it is available immediately.
-    Game &g = job.worker->game;
-    g.state_pool.release(job.worker);
-    job.latch->count_down();
-}
-
 /// @brief Alpha-beta main search algorithm.
-/// This is the primary recursive search function used to find the best move.
-/// Implements Young Brothers Wait (YBW): after 2 sequential moves at a null-window node,
-/// remaining moves are dispatched to the thread pool in parallel.
+/// This is the primary recursive search function used to find the best move. It is purely sequential;
+/// parallelism is provided by Lazy SMP (multiple independent searches sharing the transposition table).
 /// @param state Per-thread search state.
 /// @param depth Depth to search.
 /// @param ply Distance from root node.
@@ -264,7 +213,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             INCREMENT("table move beta cutoffs");
             state.game.transposition_table.RecordTransposition(Transposition{
                 state.CurrentPosition().Hash(), transposition->move, score, depth, Transposition::NodeType::kCut});
-            state.game.history_table.RecordGoodMove(ply, transposition->move);
+            state.history.RecordGoodMove(ply, transposition->move);
             if (transposition->move.IsQuiet())
             {
                 state.RecordKiller(ply, transposition->move);
@@ -277,7 +226,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             INCREMENT("table move raised alpha");
             alpha            = score;
             has_raised_alpha = true;
-            state.game.history_table.RecordGoodMove(ply, transposition->move);
+            state.history.RecordGoodMove(ply, transposition->move);
         }
     }
 
@@ -294,12 +243,9 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
     }
     state.ScoreAndSortMoves(move_list, ply);
 
-    // ── Sequential phase ─────────────────────────────────────────────────────
-    // Search moves one at a time until we get a cutoff or have searched 2 moves
-    // at a null-window node, at which point we switch to the parallel phase.
-    int        sequential_count  = 0;
-    int        parallel_start_mi = -1; // move_list index where the parallel phase begins
-    const bool in_check_seq      = state.CurrentPosition().IsInCheck();
+    // Search the moves one at a time. Parallelism comes from Lazy SMP (independent whole-tree
+    // searches sharing the transposition table), not from splitting this node.
+    const bool in_check_seq = state.CurrentPosition().IsInCheck();
 
     for (const Move &move : move_list)
     {
@@ -338,7 +284,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
             INCREMENT("beta cutoffs");
             state.game.transposition_table.RecordTransposition(
                 Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
-            state.game.history_table.RecordGoodMove(ply, move);
+            state.history.RecordGoodMove(ply, move);
             if (move.IsQuiet())
             {
                 state.RecordKiller(ply, move);
@@ -355,102 +301,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
                 INCREMENT("pv changed");
                 alpha            = score;
                 has_raised_alpha = true;
-                state.game.history_table.RecordGoodMove(ply, move);
-            }
-        }
-
-        ++sequential_count;
-
-        // After 2 sequential searches at a null-window node, hand off remaining
-        // moves to the thread pool (Young Brothers Wait).  Only the main thread
-        // (batch_cutoff == nullptr) spawns workers; workers never sub-parallelize.
-        if (sequential_count >= 2 && state.batch_cutoff == nullptr && beta == alpha + 1 &&
-            state.game.thread_pool.idle_count() > 0)
-        {
-            parallel_start_mi = move_index + 1;
-            break;
-        }
-    }
-
-    // ── Parallel phase (YBW) ─────────────────────────────────────────────────
-    if (parallel_start_mi >= 0 && !state.IsCancelled())
-    {
-        StackList<ParallelJob, kMaxMovesPerPosition> batch;
-
-        // Collect remaining non-TT moves and compute their LMR depths.
-        // (Parallel phase is only entered at null-window nodes, so beta == alpha+1 is always true here.)
-        for (int mi = parallel_start_mi; mi < (int)move_list.size(); ++mi)
-        {
-            const Move &mv = move_list[mi];
-            if (transposition && mv == transposition->move)
-            {
-                continue;
-            }
-            // Late move reduction (this batch is always a null-window node).
-            int lmr_d = depth;
-            if (mi > 3 && !in_check_seq && depth > 2 && mv.captured() == Piece::kNone && mv.piece() != kPawn)
-            {
-                lmr_d = depth - 1;
-                if (depth > 3 && mi > 6)
-                {
-                    --lmr_d;
-                }
-            }
-            batch.push_back({nullptr, mv, mi, lmr_d, depth, ply, alpha, beta, nullptr, 0});
-        }
-
-        if (batch.size() != 0)
-        {
-            INCREMENT("parallel batches");
-            std::atomic<bool> batch_cutoff{false};
-            std::latch        latch{(std::ptrdiff_t)batch.size()};
-
-            // Dispatch each move to a worker SearchState on the thread pool. Each job lives in `batch`
-            // (this stack frame) until latch.wait() returns, so the pool can reference it by pointer.
-            for (int bi = 0; bi < (int)batch.size(); ++bi)
-            {
-                ParallelJob &job = batch[bi];
-                job.worker       = state.game.state_pool.acquire(state, &batch_cutoff);
-                job.latch        = &latch;
-                state.game.thread_pool.submit({&RunParallelJob, &job});
-            }
-
-            latch.wait(); // Block until every worker has finished.
-
-            // Fold parallel results into best_score / alpha.
-            for (const auto &job : batch)
-            {
-                const Move r_move  = job.move;
-                const int  r_score = job.score;
-                if (state.game.is_cancel_pending.load(std::memory_order_relaxed))
-                {
-                    return kSearchCancelledScore;
-                }
-                if (r_score >= beta)
-                {
-                    INCREMENT("parallel beta cutoffs");
-                    state.game.transposition_table.RecordTransposition(Transposition{
-                        state.CurrentPosition().Hash(), r_move, r_score, depth, Transposition::NodeType::kCut});
-                    state.game.history_table.RecordGoodMove(ply, r_move);
-                    if (r_move.IsQuiet())
-                    {
-                        state.RecordKiller(ply, r_move);
-                    }
-                    return r_score;
-                }
-                if (r_score > best_score)
-                {
-                    INCREMENT("best score changed");
-                    best_score = r_score;
-                    best_move  = r_move;
-                    if (r_score > alpha)
-                    {
-                        INCREMENT("pv changed");
-                        alpha            = r_score;
-                        has_raised_alpha = true;
-                        state.game.history_table.RecordGoodMove(ply, r_move);
-                    }
-                }
+                state.history.RecordGoodMove(ply, move);
             }
         }
     }
@@ -462,7 +313,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
         INCREMENT("pv nodes");
         state.game.transposition_table.RecordTransposition(
             Transposition{state.CurrentPosition().Hash(), best_move, alpha, depth, Transposition::NodeType::kPv});
-        state.game.history_table.RecordGoodMove(ply, best_move);
+        state.history.RecordGoodMove(ply, best_move);
         CopyVariation(parent_pv, pv, best_move);
     }
     else

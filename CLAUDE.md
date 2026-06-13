@@ -28,14 +28,14 @@ make check    # builds tests then runs all four suites; returns non-zero on any 
 Individual test executables:
 
 ```bash
-./build/test_see              # 18 static exchange evaluation cases
-./build/test_pawn_structure   # 8 pawn structure tests, 38 individual checks
+./build/test_see              # 24 static exchange evaluation cases
+./build/test_pawn_structure   # 12 pawn structure tests, 72 individual checks
 ./build/test_perft            # move generation regression (standard PERFT positions)
 ./build/test_bratko_kopec     # 24 Bratko-Kopec search positions (default depth 8)
-./build/test_bratko_kopec 9   # same positions at depth 9
+./build/test_bratko_kopec 12  # same positions at depth 12
 ```
 
-The BK test (`test/bratko_kopec.cpp`) accepts an optional depth argument. At depth 9 the YBW parallel search is non-deterministic; accepted move sets for each position include all moves observed across multiple runs.
+The BK test (`test/bratko_kopec.cpp`) accepts an optional depth argument in the range 8–12 (default 8). Because the Lazy SMP search is non-deterministic, the test checks the **score**, not the move played: each position stores baked single-threaded reference scores for depths 8–12, and a position passes when its parallel score lies within the span of those references for depths ≥ the requested one, widened by ±50 cp (`kScoreTolerance`). Mate scores match any mate of the same sign. It passes 24/24 at every depth 8–12. Regenerate the reference data after evaluation/search changes with a single-threaded run — `PAWNSTAR_THREADS=1 ./build/test_bratko_kopec 12` — and transcribe the per-depth `info depth D score cp S ... pv M` lines (last line per depth wins) into the `bk_cases` array.
 
 ## Code Formatting
 
@@ -79,32 +79,33 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 
 ### Search
 
-**Iterative deepening** — `SearchRootNode` ([search_root_node.cpp](src/search_root_node.cpp)) drives iterative deepening from `kStartDepth` (3) upwards, maintaining a principal variation. It runs on a dedicated worker thread started by `Game::StartThinking`; the UCI `stop` command sets `game.is_cancel_pending`.
+**Iterative deepening** — `SearchRootNode` ([search_root_node.cpp](src/search_root_node.cpp)) drives iterative deepening from `kStartDepth` (3) upwards, maintaining a principal variation. The per-iteration loop lives in the static `IterativeDeepen` helper, which every Lazy SMP thread runs. It runs on a dedicated worker thread started by `Game::StartThinking`; the UCI `stop` command sets `game.is_cancel_pending`.
 
 **Alpha-beta** — `SearchAlphaBeta` ([search_alphabeta.cpp](src/search_alphabeta.cpp)) is a fail-soft negamax with:
 - Transposition table probe/store (exact PV, lower-bound CUT, upper-bound ALL).
+- Principal variation search (PVS): full window on the first move, null-window scout on the rest, re-search on a fail-high.
 - Null-move pruning.
-- Late-move reduction (LMR), computed inline in both the sequential and parallel phases: reduces non-captures, non-pawn, non-check moves after the 4th move at depth > 2, with an extra reduction after the 7th.
+- Late-move reduction (LMR): reduces non-captures, non-pawn, non-check moves after the 4th move at depth > 2, with an extra reduction after the 7th. (Each thread searches its tree sequentially — there is no in-tree split.)
 - Killer move heuristic (2 killers per ply): a quiet move that causes a beta cutoff is stored via `SearchState::RecordKiller`.
-- History heuristic (`HistoryTable`, thread-safe atomics) for move ordering.
+- History heuristic (`HistoryTable`) for move ordering — **per-thread** (owned by `SearchState`), so there is no cross-thread contention on its counters.
 
 **Move ordering** — `SearchState::ScoreAndSortMoves` assigns each move a 23-bit ordering score stored in the `Move` itself, in descending bands: winning/equal captures and promotions (`kWinningCaptureBase` + SEE score), the two killer moves for the ply (just below winning captures), quiet moves (history count, clamped below the killers), and finally losing captures (their negative SEE, sorting below quiet moves). The TT move is searched first, before the list is generated and sorted.
 
-**Quiescence search** — `SearchQuiescent` ([search_quiescent.cpp](src/search_quiescent.cpp)) searches captures only. (An SEE-based pruning path — skip captures with negative SEE that don't give check — exists but is currently compiled out behind `#if 0`.)
+**Quiescence search** — `SearchQuiescent` ([search_quiescent.cpp](src/search_quiescent.cpp)) searches captures only, using its own transposition table that is guarded by the `PAWNSTAR_USE_QTT` compile-time toggle (defined to `1` at the top of the file). (An SEE-based pruning path — skip captures with negative SEE that don't give check — exists but is currently compiled out behind `#if 0`.)
 
-**Parallel search (YBW)** — After 2 sequential moves at a null-window node, remaining moves are dispatched to the thread pool in parallel batches (Young Brothers Wait). Each parallel worker gets its own `SearchState` from the `SearchStatePool` slab (64 slots). A per-batch `std::atomic<bool>` cutoff flag and a `std::latch` synchronize workers within a batch. Workers never sub-parallelize (only the main thread triggers YBW).
+**Parallel search (Lazy SMP)** — `SearchRootNode` spawns `hardware_concurrency()` threads (capped at `kMaxSearchThreads`, 256), each running a complete independent `IterativeDeepen` search of the root. There is no tree splitting and no work queue — threads cooperate only through the shared lockless transposition table, where one thread's entries prefill another's probes. Each thread has its own `SearchState` (including its own history table), so the only shared mutable state is the transposition tables and `is_cancel_pending`. The thread count can be overridden with the `PAWNSTAR_THREADS` environment variable (e.g. `PAWNSTAR_THREADS=1` for a deterministic single-threaded search — used to regenerate BK reference data). To stop helpers recomputing the same tree in lockstep, the main thread (thread 0) searches every depth while each helper follows a Stockfish-style iteration-skip schedule (`kSkipSize`/`kSkipPhase` tables in `search_root_node.cpp`) that skips selected depths. Only the main thread prints `info`, applies time management and returns the authoritative move; because helpers race ahead through the table, the result (move and exact score) is non-deterministic between runs.
 
 ### Per-thread state
 
 `SearchState` ([search_state.h](src/search_state.h)) owns:
-- A reference to the shared `Game` (TT, history, clock, cancellation).
+- A reference to the shared `Game` (TT, clock, cancellation).
+- `history` — the **per-thread** `HistoryTable` (no cross-thread sharing).
 - `killers[kMaxPly][2]` — killer moves.
 - `node_count` — nodes searched by this thread.
-- `batch_cutoff*` — pointer to the per-batch abort flag (`nullptr` on the main thread).
 - `positions_` (`StackList<Position>`) — position stack for the search tree.
 - `hash_stack_` (`StackList<HashEntry, kMaxGameLength + kMaxPly + 4>`) — Zobrist hash history for 50-move/repetition detection; fixed-capacity (no heap allocation per search).
 
-`SearchStatePool` ([search_state_pool.h](src/search_state_pool.h)) is a 64-slot slab allocator with a mutex+condition variable for blocking `acquire()` calls. `ThreadPool` ([thread_pool.h](src/thread_pool.h)) is a fixed-size pool of `hardware_concurrency() - 1` persistent worker threads. Both capacities are in [constants.h](src/constants.h) (`kSearchStatePoolCapacity`, `kThreadPoolQueueCapacity`).
+Lazy SMP retired the old YBW machinery: `SearchStatePool` and `ThreadPool` (and their `kSearchStatePoolCapacity`/`kThreadPoolQueueCapacity` constants) no longer exist. Threads are plain `std::thread`s spawned per search in `SearchRootNode`, each constructing its own `SearchState` on its stack.
 
 ### Transposition table
 

@@ -8,25 +8,19 @@
 
 #include "chess_clock.h"
 #include "constants.h"
-#include "history_table.h"
 #include "opening_book.h"
 #include "position.h"
-#include "search_state_pool.h"
-#include "thread_pool.h"
 #include "transposition_table.h"
 
 /// @brief Class to represent a game of chess.
 class Game
 {
   public:
-    TranspositionTable transposition_table; ///< The transposition table.
-    TranspositionTable quiescent_table;     ///< Special TT for quiescence search.
-    HistoryTable       history_table;       ///< The history table.
+    TranspositionTable transposition_table; ///< The transposition table (shared by all Lazy SMP threads).
+    TranspositionTable quiescent_table;     ///< Special TT for quiescence search (shared by all threads).
     ChessClock         time_control;        ///< Clock controls for the current game.
     OpeningBook        book;                ///< The opening book.
-    std::atomic<bool>  is_cancel_pending;   ///< Set to true when search time is expired.
-    ThreadPool         thread_pool;         ///< Worker thread pool for parallel search.
-    SearchStatePool    state_pool;          ///< Slab allocator for per-worker search states.
+    std::atomic<bool>  is_cancel_pending;   ///< Shared stop flag: set on timeout, UCI stop, or search completion.
 
     /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
     Game() : transposition_table{kHashtableMegabytes}, quiescent_table{kQHashtableMb}, is_cancel_pending{false}

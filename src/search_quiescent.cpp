@@ -7,6 +7,12 @@
 #include "static_exchange_evaluation.h"
 #include "transposition_table.h"
 
+#include <optional>
+
+// EXPERIMENT: set to 0 to disable the quiescence transposition table (probe + stores) and measure the
+// effect on Lazy SMP contention. Restore to 1 to re-enable.
+#define PAWNSTAR_USE_QTT 1
+
 /// @brief Alpha-beta quiescence search.
 /// @param state Per-thread search state.
 /// @param depth Search depth (<= 0).
@@ -29,7 +35,11 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
         Variation dummy{};
         return Search(state, depth, ply, alpha, beta, dummy);
     }
+#if PAWNSTAR_USE_QTT
     auto transposition = state.game.quiescent_table.FindTransposition(state.CurrentPosition().Hash());
+#else
+    std::optional<Transposition> transposition; // experiment: quiescence TT disabled
+#endif
     if (transposition && transposition->score() >= beta)
     {
         INCREMENT("quiescent table beta cutoffs");
@@ -39,8 +49,10 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
+#if PAWNSTAR_USE_QTT
         state.game.quiescent_table.RecordTransposition(
             Transposition{state.CurrentPosition().Hash(), Move::None(), score, depth, Transposition::NodeType::kCut});
+#endif
         return score;
     }
     if (score > alpha)
@@ -62,7 +74,7 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
         if (score >= beta)
         {
             INCREMENT("quiescent table move beta cutoffs");
-            state.game.history_table.RecordGoodMove(ply, transposition->move);
+            state.history.RecordGoodMove(ply, transposition->move);
             return score;
         }
         if (score > best_score)
@@ -72,7 +84,7 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent table move raise alpha");
-                state.game.history_table.RecordGoodMove(ply, transposition->move);
+                state.history.RecordGoodMove(ply, transposition->move);
             }
         }
     }
@@ -102,9 +114,11 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            state.game.history_table.RecordGoodMove(ply, move);
+            state.history.RecordGoodMove(ply, move);
+#if PAWNSTAR_USE_QTT
             state.game.quiescent_table.RecordTransposition(
                 Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
+#endif
             return score;
         }
         if (score > best_score)
@@ -114,9 +128,11 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent pv changed");
-                state.game.history_table.RecordGoodMove(ply, move);
+                state.history.RecordGoodMove(ply, move);
+#if PAWNSTAR_USE_QTT
                 state.game.quiescent_table.RecordTransposition(
                     Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
+#endif
             }
         }
     }

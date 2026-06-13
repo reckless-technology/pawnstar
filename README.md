@@ -1,7 +1,7 @@
 # Pawnstar
 
 Pawnstar is a [UCI](https://en.wikipedia.org/wiki/Universal_Chess_Interface) chess engine written in
-C++20. It uses a bitboard board representation, a parallel alpha-beta search (Young Brothers Wait),
+C++20. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
 a lockless transposition table, and a tapered hand-crafted evaluation.
 
 Legal move generation runs at roughly 700 million moves per second on a modern laptop.
@@ -11,9 +11,9 @@ Legal move generation runs at roughly 700 million moves per second on a modern l
 - Bitboard board representation with BMI2 `pext`-based sliding-piece attacks.
 - Fully legal move generator (pins, checks, en passant edge cases, and castling handled directly).
 - Parallel iterative-deepening alpha-beta search with principal variation search (PVS).
-- Young Brothers Wait (YBW) work splitting over a fixed thread pool.
+- Lazy SMP parallelism: independent per-thread searches sharing one lockless transposition table.
 - Lockless 128-bit transposition table using Hyatt's XOR trick.
-- Null-move pruning, late-move reductions, killer and history move ordering.
+- Null-move pruning, late-move reductions, killer and per-thread history move ordering.
 - Quiescence search over captures with its own transposition table.
 - Tapered evaluation: material, piece-square tables, pawn structure, king safety and mobility.
 - Optional opening book (`pawnstar.book`).
@@ -110,8 +110,9 @@ each pinned piece may still move to, before move generation.
 
 ### Search
 
-The search is a fail-soft negamax with alpha-beta pruning, driven by iterative deepening and split
-across a thread pool with Young Brothers Wait.
+The search is a fail-soft negamax with alpha-beta pruning, driven by iterative deepening and
+parallelised with Lazy SMP: several threads each run an independent whole-tree search, sharing a single
+lockless transposition table rather than splitting the tree between them.
 
 #### Iterative deepening and time management
 
@@ -155,23 +156,36 @@ fixed-time clocks bypass the heuristic.
 - **Move ordering** — the TT move first, then winning/equal captures and promotions by static exchange
   evaluation, then the two killer moves for the ply, then quiet moves by history-heuristic count, and
   finally losing captures (negative SEE) below the quiet moves. A quiet move that causes a beta cutoff
-  is recorded as a killer and rewarded in the history table.
+  is recorded as a killer and rewarded in the per-thread history table.
 
 **Quiescence search** ([src/search_quiescent.cpp](src/search_quiescent.cpp)) extends the leaves with
 captures only, using a separate transposition table, so the static evaluation is never called on a
 position with a hanging capture available. (An SEE-based pruning path exists but is currently compiled
 out.)
 
-#### Parallel search (Young Brothers Wait)
+#### Parallel search (Lazy SMP)
 
-After two moves have been searched sequentially at a null-window node and idle threads are available,
-the remaining moves are dispatched to a thread pool. Each worker borrows its own `SearchState`
-(position stack, hash history, killers, node count) from a fixed slab allocator (`SearchStatePool`),
-searches one move, and writes its result back into a stack-allocated job. A `std::latch` plus a
-per-batch `std::atomic<bool>` cutoff flag coordinate the batch; the thread pool dispatches plain
-function-pointer tasks (no `std::function`, no per-task heap allocation). Workers never sub-parallelize
-— only the main thread splits work, which keeps the YBW tree shallow and the shared state contention
-low. The pool holds `hardware_concurrency() − 1` persistent threads.
+Parallelism is provided by **Lazy SMP**: `SearchRootNode` launches `hardware_concurrency()` threads
+(capped at `kMaxSearchThreads`), each running its *own* complete iterative-deepening search of the root
+position via `IterativeDeepen`. There is no tree splitting and no work queue — the threads cooperate
+purely through the shared lockless transposition table, where one thread's deeper or earlier results
+prefill the entries another thread will probe. Each thread owns its own `SearchState` (position stack,
+hash history, killers, node count) **and its own history table**, so the only cross-thread sharing is
+the transposition tables and the cancellation flag; there is no per-(ply, move) counter contention.
+
+The thread count can be overridden for testing and benchmarking with the `PAWNSTAR_THREADS`
+environment variable (e.g. `PAWNSTAR_THREADS=1` forces a deterministic single-threaded search).
+
+To keep the helper threads from recomputing the same tree in lockstep, the main thread (thread 0)
+searches every depth while each helper follows a Stockfish-style **iteration-skip schedule**
+(`kSkipSize` / `kSkipPhase` tables in `search_root_node.cpp`) that makes it skip selected depths. The
+threads therefore desynchronise and seed the shared table with a diverse mix of depths. Only the main
+thread prints `info` lines, applies time management and produces the authoritative best move; helpers
+run silently and stop as soon as the shared cancellation flag is set.
+
+Because the helpers race ahead through the table, a search run to a nominal depth is *non-deterministic*
+and the returned best move (and its exact score) can vary slightly between runs — a known and accepted
+property of Lazy SMP. `PAWNSTAR_THREADS=1` recovers determinism when that matters.
 
 #### Tuning constants
 
@@ -184,8 +198,7 @@ The knobs above live in [src/constants.h](src/constants.h):
 | `kHashtableMegabytes` | 64 | Main transposition table size |
 | `kQHashtableMb` | 8 | Quiescence transposition table size |
 | `kScoreInstabilityThreshold` | 50 | Centipawn window for the "score stable" time-management test |
-| `kSearchStatePoolCapacity` | 64 | Concurrent worker search states (slab slots) |
-| `kThreadPoolQueueCapacity` | 128 | Thread-pool task ring-buffer size |
+| `kMaxSearchThreads` | 256 | Upper bound on Lazy SMP search threads |
 
 ### Transposition table
 
@@ -230,8 +243,14 @@ builds and runs four standalone test executables:
 | `build/test_perft` | Move-generation regression on the standard PERFT positions |
 | `build/test_bratko_kopec` | 24 Bratko-Kopec search positions (default depth 8) |
 
-The Bratko-Kopec test takes an optional depth argument, e.g. `./build/test_bratko_kopec 9`. Because
-the YBW search is non-deterministic, each position lists every best move observed across many runs.
+The Bratko-Kopec test takes an optional depth argument in the range 8–12, e.g.
+`./build/test_bratko_kopec 12`. Because the Lazy SMP search is non-deterministic, the test does not
+check the move played — it checks the **score**. Each position stores baked single-threaded reference
+scores for depths 8–12 (regenerate them with `PAWNSTAR_THREADS=1 ./build/test_bratko_kopec 12`), and a
+position passes when its parallel score falls within the span of those references for depths ≥ the
+requested one, widened by ±50 cp. This tolerates the legitimate move/score variation of Lazy SMP while
+still catching real search or evaluation regressions. The suite passes 24/24 at every depth from 8
+through 12.
 
 ## Documentation
 
@@ -258,22 +277,23 @@ A few deliberate choices shape the codebase:
   one by value and there is no `UnmakeMove`. This trades a per-ply copy for far simpler code: no
   state to restore, no aliasing between plies, and positions that are trivially safe to hand to other
   threads. The class is kept small (160 bytes) so the copy stays cheap.
-- **No heap allocation during search.** Move lists, the position stack, the hash history, and the
-  thread-pool task queue are all fixed-capacity stack containers sized from `constants.h`. The search
-  hot path performs no dynamic allocation, which keeps it allocator- and fragmentation-free.
+- **No heap allocation during search.** Move lists, the position stack and the hash history are all
+  fixed-capacity stack containers sized from `constants.h`. The search hot path performs no dynamic
+  allocation, which keeps it allocator- and fragmentation-free.
 - **Everything precomputed that can be.** Attack tables, Zobrist keys and pawn-structure masks are
   emitted at build time by `generate_constants`, so the engine binary starts instantly and the hot
   paths are pure lookups.
-- **Lockless sharing.** The transposition tables, history table and cancellation flag are the only
-  cross-thread state, and all are accessed with atomics (the TT via Hyatt's XOR trick) rather than
-  locks, so worker threads never block one another mid-search.
+- **Lockless sharing.** Under Lazy SMP the transposition tables and the cancellation flag are the only
+  cross-thread state — the history table and killers are per-thread — and the shared state is accessed
+  with atomics (the TT via Hyatt's XOR trick) rather than locks, so threads never block one another
+  mid-search.
 
 ## Benchmarks
 
 Pawnstar has not been assigned a formal Elo rating yet. The objective figures currently tracked are:
 
 - **Move generation** — roughly 700 million legal moves per second on a modern laptop core.
-- **Bratko-Kopec** — 24/24 at the default depth 8 (`make check`).
+- **Bratko-Kopec** — 24/24 at every depth from 8 through 12 (the default depth 8 runs in `make check`).
 
 `make check` is the regression baseline; the perft suite verifies move-generation correctness against
 the published node counts for the standard positions.
@@ -283,7 +303,8 @@ the published node counts for the standard positions.
 - **BMI2 required.** The sliding-piece attacks depend on the `_pext_u64` instruction, so the engine
   needs an Intel Haswell / AMD Zen 1 (or newer) CPU and will not run without `-mbmi2`. On early AMD
   Zen parts `pext` is microcoded and comparatively slow.
-- **Thread count is fixed** at `hardware_concurrency() − 1`; it is not exposed as a UCI option.
+- **Thread count** defaults to `hardware_concurrency()` and is not exposed as a UCI option, though it
+  can be overridden with the `PAWNSTAR_THREADS` environment variable.
 - **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
 - The SEE-based **quiescence pruning** path is implemented but currently compiled out (`#if 0`).
 - The evaluation is **hand-crafted**, not learned (no NNUE).

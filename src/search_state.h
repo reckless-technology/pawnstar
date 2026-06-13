@@ -2,6 +2,7 @@
 /// @file search_state.h Per-thread search state for the parallel alpha-beta search.
 
 #include "constants.h"
+#include "history_table.h"
 #include "move.h"
 #include "position.h"
 #include "stack_list.h"
@@ -20,29 +21,23 @@ struct HashEntry
 };
 
 /// @brief Per-thread search state for the parallel alpha-beta search.
-/// Each parallel worker owns an independent SearchState with its own position stack and hash
-/// history, while sharing the transposition table, history table, and time control through the
-/// Game reference.
+/// Each Lazy SMP thread owns an independent SearchState with its own position stack, hash history,
+/// killers and history heuristic table, while sharing the transposition table and time control through
+/// the Game reference. The history table is per-thread to avoid cross-thread cache-line contention on its
+/// hot counters.
 class SearchState
 {
   public:
-    Game                                    &game;         ///< Shared state: TT, history, clock, cancellation flag.
+    Game                                    &game;         ///< Shared state: TT, clock, cancellation flag.
+    HistoryTable                             history{};    ///< Per-thread history heuristic counts (no sharing).
     std::array<std::array<Move, 2>, kMaxPly> killers{};    ///< Killer moves indexed by ply.
     int                                      node_count{}; ///< Nodes searched by this thread.
-    std::atomic<bool>                       *batch_cutoff; ///< Per-batch abort flag; nullptr on the main thread.
 
-    /// @brief Construct the main-thread search state from the current game.
+    /// @brief Construct a search state from the current game.
     /// Builds the full hash history from the game's position stack and seeds the per-thread
     /// position stack with the current position only.
     /// @param game Game to search.
     explicit SearchState(Game &game);
-
-    /// @brief Construct a worker search state forked from a parent state.
-    /// Copies the parent's full hash history and seeds the position stack with the parent's
-    /// current position. Killers and node count start fresh.
-    /// @param parent Parent search state.
-    /// @param cutoff Per-batch abort flag shared with sibling workers.
-    SearchState(const SearchState &parent, std::atomic<bool> *cutoff);
 
     /// @brief Current position at the tip of the search tree.
     /// @return Reference to the current position.
@@ -76,19 +71,10 @@ class SearchState
     /// @return true if drawn by the fifty-move rule.
     bool IsDrawByFiftyMoves() const;
 
-    /// @brief Returns true if this thread should abort: the global time limit fired, or a
-    /// sibling worker in the current batch found a beta cutoff.
+    /// @brief Returns true if this thread should abort because the global stop flag is set
+    /// (time limit fired, UCI stop, or another Lazy SMP thread completed the search).
     /// @return true if the search should be abandoned.
     bool IsCancelled() const;
-
-    /// @brief Signal that this worker's batch should be cut off (beta cutoff found).
-    void SignalBatchCutoff()
-    {
-        if (batch_cutoff != nullptr)
-        {
-            batch_cutoff->store(true, std::memory_order_relaxed);
-        }
-    }
 
     /// @brief Record a quiet move that caused a beta cutoff as a killer move for this ply.
     /// Shifts the previous first killer into the second slot; ignores duplicates.

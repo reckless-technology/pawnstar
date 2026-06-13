@@ -14,6 +14,7 @@
 #include "game.h"
 #include "opening_book.h"
 #include "position.h"
+#include "search_state.h"
 #include "transposition_table.h"
 
 /// @brief Pointer to a command handler taking the game and the command's argument list.
