@@ -107,14 +107,11 @@ static Move IterativeDeepen(SearchState &state, MoveList move_list, Move best_mo
         if (is_main && game.time_control.clock_type == ChessClock::kStandard)
         {
             const int64_t elapsed_ms = game.time_control.ElapsedMilliseconds() - start_ms;
-            // clang-format off
-            const bool is_best_move_consistent =
+            const bool    is_best_move_consistent =
                 std::ranges::all_of(best_moves, [best_move](const Move &m) { return m == best_move; });
-            const bool is_score_stable =
-                std::ranges::all_of(best_moves, [best_move](const Move &m) {
-                    return std::abs(m.score() - best_move.score()) <= kScoreInstabilityThreshold;
-                });
-            // clang-format on
+            const bool is_score_stable = std::ranges::all_of(best_moves, [best_move](const Move &m) {
+                return std::abs(m.score() - best_move.score()) <= kScoreInstabilityThreshold;
+            });
             if ((is_best_move_consistent && is_score_stable) && (elapsed_ms * 4) > ms_allocated)
             {
                 std::cout << "info string Best move consistent AND score stable - search terminated.\n";
