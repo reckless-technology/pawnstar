@@ -258,8 +258,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
 
         // Late move reduction: reduce quiet, non-check, late moves at null-window nodes.
         int lmr_depth = depth;
-        if (beta == alpha + 1 && move_index > 3 && !in_check_seq && depth > 2 && move.captured() == Piece::kNone &&
-            move.piece() != kPawn)
+        if (beta == alpha + 1 && move_index > 3 && !in_check_seq && depth > 2)
         {
             INCREMENT("late move reduction");
             lmr_depth = depth - 1;
