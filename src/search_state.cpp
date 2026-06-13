@@ -1,6 +1,7 @@
 /// @file search_state.cpp Per-thread search state implementation.
 
 #include "search_state.h"
+#include "debug_hashtable.h"
 #include "game.h"
 #include "static_exchange_evaluation.h"
 
@@ -91,7 +92,7 @@ bool SearchState::IsDrawByFiftyMoves() const
     return CurrentPosition().ReversibleMoveCount() >= 100;
 }
 
-/// @brief Check for draw by three-fold repetition using the compact hash history.
+/// @brief Check for three-fold repetition using the compact hash history.
 /// Walks backwards through hash_stack_ two entries at a time (same side to move),
 /// starting four half-moves before the current position, matching the logic in Game::IsDrawByRepetition.
 bool SearchState::IsDrawByRepetition() const
@@ -102,6 +103,7 @@ bool SearchState::IsDrawByRepetition() const
     {
         if (hash_stack_[i].hash == hash && --repetitions == 0)
         {
+            INCREMENT("draws by repetition SS");
             return true;
         }
         if (hash_stack_[i].reversible_move_count == 0)

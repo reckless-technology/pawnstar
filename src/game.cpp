@@ -71,7 +71,7 @@ bool Game::IsDrawByRepetition() const
     {
         if (pos->Hash() == hash && --repetitions == 0)
         {
-            INCREMENT("draws by repetition");
+            INCREMENT("draws by repetition Game");
             return true;
         }
         if (pos->ReversibleMoveCount() == 0)

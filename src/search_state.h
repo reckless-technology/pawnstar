@@ -56,17 +56,22 @@ class SearchState
     /// @brief Make a move, pushing the resulting position onto the stack and recording its hash.
     /// @param move Move to play.
     void PlayMove(Move move);
+
     /// @brief Undo the most recent move, popping the position and hash stacks.
     void UndoMove();
+
     /// @brief Play a null (pass) move, pushing the resulting position.
     void MakeNullMove();
+
     /// @brief Assign ordering scores to a move list and sort it best-first.
     /// @param moves Move list to score and sort.
     /// @param ply Current search ply (used for the history heuristic).
     void ScoreAndSortMoves(MoveList &moves, int ply) const;
+
     /// @brief Whether the current position is a draw by threefold repetition.
     /// @return true if drawn by repetition.
     bool IsDrawByRepetition() const;
+
     /// @brief Whether the current position is a draw by the fifty-move rule.
     /// @return true if drawn by the fifty-move rule.
     bool IsDrawByFiftyMoves() const;
