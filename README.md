@@ -147,7 +147,7 @@ fixed-time clocks bypass the heuristic.
   get a null-window (`[alpha, alpha+1]`) scout search and are only re-searched with the full window if
   the scout beats alpha.
 - **Null-move pruning** — when not in check and the previous move was not itself a null move, a null
-  move is searched at reduced depth (`depth − 3`, i.e. R = 2); a resulting score `≥ beta` prunes the
+  move is searched at reduced depth (`depth − 4`, i.e. R = 3); a resulting score `≥ beta` prunes the
   node.
 - **Late-move reductions (LMR)** — at null-window nodes, a quiet (non-capture), non-pawn, non-check
   move past the 4th move at `depth > 2` is searched one ply shallower, with a second ply shaved off
