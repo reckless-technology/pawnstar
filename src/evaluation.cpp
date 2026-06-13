@@ -16,8 +16,8 @@ int EvaluatePosition(const SearchState &state, int alpha, int beta)
     {
         return kDrawScore;
     }
-    int             scores[2];
-    const Position &position = state.CurrentPosition();
+    std::array<int, 2> scores;
+    const Position    &position = state.CurrentPosition();
     // Phase 1: Evaluate material values alone.
     scores[kWhite] = EvaluateMaterial<kWhite>(position);
     scores[kBlack] = EvaluateMaterial<kBlack>(position);

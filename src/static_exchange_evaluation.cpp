@@ -6,7 +6,7 @@
 #include <algorithm>
 
 /// @brief Use nominal 1-3-3-5-9 material values for SEE
-constexpr int piece_values[7] = {0, 100, 300, 300, 500, 900, 10000};
+constexpr std::array<int, 7> piece_values{0, 100, 300, 300, 500, 900, 10000};
 
 /// @brief Bitboards of piece on the board used for static exchange evaluation.
 struct SeeBoard
@@ -55,14 +55,14 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
     // Squares a pawn of each color must stand on to attack location. A white pawn attacks location from the squares a
     // black pawn on location would attack, and vice versa. The relevant mask depends on whose turn it is, so it must be
     // reselected each ply as color alternates (otherwise a recapturing pawn of the other color is missed).
-    const Bitboard white_pawn_attacks = kPawnAttacksBlack[location];
-    const Bitboard black_pawn_attacks = kPawnAttacksWhite[location];
-    const Bitboard knight_attacks     = kKnightAttacks[location];
-    const Bitboard king_attacks       = kKingAttacks[location];
-    const Bitboard square             = Bitboard(location);
-    Bitboard       occupied           = bb.pieces_[kNone]; // pieces_[kNone] holds the occupied-squares bitboard
-    int            scores[32];
-    int            ply;
+    const Bitboard      white_pawn_attacks = kPawnAttacksBlack[location];
+    const Bitboard      black_pawn_attacks = kPawnAttacksWhite[location];
+    const Bitboard      knight_attacks     = kKnightAttacks[location];
+    const Bitboard      king_attacks       = kKingAttacks[location];
+    const Bitboard      square             = Bitboard(location);
+    Bitboard            occupied           = bb.pieces_[kNone]; // pieces_[kNone] holds the occupied-squares bitboard
+    std::array<int, 32> scores;
+    int                 ply;
     // First pass: perform all the captures onto the square least valuable piece first.
     for (ply = 0; ply != 32; ++ply)
     {

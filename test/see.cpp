@@ -3,6 +3,7 @@
 #include "position.h"
 #include "static_exchange_evaluation.h"
 
+#include <array>
 #include <format>
 #include <iostream>
 #include <string_view>
@@ -19,7 +20,7 @@ struct SeeTest
 
 // clang-format off
 /// @brief The full set of SEE test cases.
-static const SeeTest tests[] = {
+static const auto tests = std::to_array<SeeTest>({
     // ── C reference cases ─────────────────────────────────────────────────
     {
         "rook takes pawn, no defenders",
@@ -195,7 +196,7 @@ static const SeeTest tests[] = {
         Move::Capture("E4", "D5", kPawn, kPawn),
         100, false,
     },
-};
+});
 // clang-format on
 
 /// @brief Run all SEE test cases.
@@ -226,7 +227,7 @@ int main()
             std::cout << std::format("[PASS] {}\n", tc.name);
         }
     }
-    const int total = (int)(sizeof(tests) / sizeof(tests[0]));
+    const int total = (int)tests.size();
     std::cout << std::format("\n{}/{} passed\n", total - failures, total);
     return failures > 0 ? 1 : 0;
 }

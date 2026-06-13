@@ -9,6 +9,7 @@
 #include "transposition_table.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdlib>
 #include <format>
 #include <iostream>
@@ -39,9 +40,9 @@ static Move IterativeDeepen(SearchState &state, MoveList move_list, Move best_mo
     // Per-thread iteration-skip schedule (Stockfish-style): helper threads skip certain iteration depths so
     // their searches desynchronize from the main thread and from each other, prefilling the shared TT with
     // diverse entries instead of recomputing the same tree in lockstep. The main thread (thread_id 0) never skips.
-    static constexpr int kSkipSize[]  = {1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
-    static constexpr int kSkipPhase[] = {0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
-    constexpr int        kSkipEntries = (int)(sizeof(kSkipSize) / sizeof(kSkipSize[0]));
+    static constexpr std::array<int, 20> kSkipSize{1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4};
+    static constexpr std::array<int, 20> kSkipPhase{0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
+    constexpr int                        kSkipEntries = (int)kSkipSize.size();
 
     Game             &game = state.game;
     Variation         principal_variation{};
@@ -212,8 +213,8 @@ Move SearchRootNode(Game &game)
     // Lazy SMP: each thread runs an independent iterative-deepening search of the same root, sharing the
     // (lockless) transposition table and (atomic) history table. The main thread is authoritative; helper
     // threads deepen the shared TT to accelerate it. Each thread has its own SearchState and move-list copy.
-    unsigned  hw        = std::thread::hardware_concurrency();
-    int       n_threads = std::clamp<int>(hw == 0 ? 1 : (int)hw, 1, kMaxSearchThreads);
+    unsigned hw        = std::thread::hardware_concurrency();
+    int      n_threads = std::clamp<int>(hw == 0 ? 1 : (int)hw, 1, kMaxSearchThreads);
     if (const char *env = std::getenv("PAWNSTAR_THREADS"))
     {
         const int requested = std::atoi(env);
@@ -227,13 +228,11 @@ Move SearchRootNode(Game &game)
     for (int i = 1; i < n_threads; ++i)
     {
         // Each helper gets a distinct thread id, which selects its iteration-skip schedule (see IterativeDeepen).
-        helpers.emplace_back(
-            [&game, &move_list, best_move, i, start_ms, ms_allocated]
-            {
-                SearchState helper_state{game};
-                IterativeDeepen(helper_state, move_list, best_move, /*is_main=*/false, /*thread_id=*/i, start_ms,
-                                ms_allocated);
-            });
+        helpers.emplace_back([&game, &move_list, best_move, i, start_ms, ms_allocated] {
+            SearchState helper_state{game};
+            IterativeDeepen(helper_state, move_list, best_move, /*is_main=*/false, /*thread_id=*/i, start_ms,
+                            ms_allocated);
+        });
     }
 
     best_move = IterativeDeepen(state, move_list, best_move, /*is_main=*/true, /*thread_id=*/0, start_ms, ms_allocated);
