@@ -99,7 +99,7 @@ static inline NullMoveResult AttemptNullMove(SearchState &state, int depth, int 
             INCREMENT("null move");
             Variation dummy{};
             state.MakeNullMove();
-            int score = -Search(state, depth - 3, ply + 1, -beta, -alpha, dummy);
+            int score = -Search(state, depth - 4, ply + 1, -beta, -alpha, dummy);
             state.UndoMove();
             if (state.IsCancelled())
             {
