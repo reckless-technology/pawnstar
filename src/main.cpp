@@ -1,6 +1,7 @@
 #include "constants.h"
 #include "debug_hashtable.h"
 #include "game.h"
+#include "nnue.h"
 #include "opening_book.h"
 #include "position.h"
 #include "transposition_table.h"
@@ -44,6 +45,15 @@ int main()
     if (!game.book.Initialize("pawnstar.book"))
     {
         std::cout << "info string Unable to open book file.\n";
+    }
+    // Optional NNUE evaluation, configurable via environment variables (UCI setoption also works).
+    if (const char *eval_file = std::getenv("PAWNSTAR_EVALFILE"))
+    {
+        nnue::LoadNetwork(eval_file);
+    }
+    if (const char *use_nnue = std::getenv("PAWNSTAR_NNUE"))
+    {
+        nnue::g_use_nnue = (std::string_view(use_nnue) == "1" || std::string_view(use_nnue) == "true");
     }
     DebugXClear();
     std::cout << "ready\n";

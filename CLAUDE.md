@@ -9,6 +9,7 @@ Requires `clang++` and GNU `make`. The build has a pre-compilation step that gen
 ```bash
 make          # full build → build/pawnstar
 make check    # build and run all test suites
+make tools    # build NNUE data-generation tool → build/gen_data
 make doc      # generate Doxygen HTML into doc/html
 make clean    # remove build artifacts and generated docs
 ```
@@ -22,7 +23,7 @@ Always run `make clean && make` when switching branches or after changes to gene
 Tests are standalone executables in `test/`, linked against the engine objects but with their own `main()`. Build and run all tests with:
 
 ```bash
-make check    # builds tests then runs all four suites; returns non-zero on any failure
+make check    # builds tests then runs all five suites; returns non-zero on any failure
 ```
 
 Individual test executables:
@@ -33,7 +34,10 @@ Individual test executables:
 ./build/test_perft            # move generation regression (standard PERFT positions)
 ./build/test_bratko_kopec     # 24 Bratko-Kopec search positions (default depth 8)
 ./build/test_bratko_kopec 12  # same positions at depth 12
+./build/test_nnue             # NNUE inference cross-check (no-op without a net + reference file)
 ```
+
+`test_nnue` (`test/nnue_test.cpp`) takes `<net.bin> <reference.txt>` and checks the engine's NNUE eval against the trainer's reference evals (within ±2 cp). With no arguments it passes immediately, so `make check` stays green when no net is present. Because NNUE scores differ from the handcrafted scores, the BK test is **handcrafted-eval only** — regenerate BK references with `UseNNUE` off and do not retune them for NNUE.
 
 The BK test (`test/bratko_kopec.cpp`) accepts an optional depth argument in the range 8–12 (default 8). Because the Lazy SMP search is non-deterministic, the test checks the **score**, not the move played: each position stores baked single-threaded reference scores for depths 8–12, and a position passes when its parallel score lies within the span of those references across *all* depths 8–12, widened by ±50 cp (`kScoreTolerance`). (Lazy SMP desynchronizes effective depth in both directions — helpers race ahead, and aggressive pruning can make the main thread report a shallower valuation than a same-depth single-threaded search — so a nominal depth-D result can match any stored depth's score.) Mate scores match any mate of the same sign. At the shallowest depth (8) the parallel search is least stable, so depth 8 *additionally* accepts any best move recorded in that position's depth-8 move set (the full set of best moves observed across repeated parallel runs). It passes 24/24 at every depth 8–12. Regenerate the reference data after evaluation/search changes with a single-threaded run — `PAWNSTAR_THREADS=1 ./build/test_bratko_kopec 12` — and transcribe the per-depth `info depth D score cp S ... pv M` lines (last line per depth wins) into the `bk_cases` array; repopulate the depth-8 move sets from ~10 parallel `./build/test_bratko_kopec 8` runs, collecting each position's `got=` move.
 
@@ -128,13 +132,25 @@ Scores are tapered between opening/middlegame and endgame phases based on remain
 
 SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a square; `EvaluateStaticExchange` returns `{score, is_checking}`. It is used to order captures and promotions in `ScoreAndSortMoves` (see Move ordering above), to prune losing captures in quiescence search, and is exercised by `test_see`.
 
+### NNUE evaluation (optional, experimental)
+
+`nnue::Evaluate` ([nnue.cpp](src/nnue.cpp), [nnue.h](src/nnue.h)) is an optional learned evaluation that replaces the handcrafted one when enabled. After the draw short-circuit, `EvaluatePosition` branches to it when `nnue::IsActive()` (the `UseNNUE` option is on **and** a net is loaded), bypassing the handcrafted material lazy-cutoff and the round-to-nearest-5.
+
+- **Architecture**: a simple perspective net with the standard bullet `Chess768` feature set — `768 → 256` feature transformer (shared across both perspectives), SCReLU activation, `concat[stm | ntm] = 512 → 1` output (centipawns, side-to-move relative). Constants: `kHiddenSize=256`, `kQA=255`, `kQB=64`, `kScale=400`.
+- **Feature index** (per perspective): `colour*384 + (piece_type-1)*64 + square`, with the not-to-move perspective swapping the colour offset and flipping the square with `kRankFlip`. This matches bullet's `Chess768::map_features`.
+- **Accumulator**: full refresh on every evaluation (no incremental updates yet — slower per node than the handcrafted eval, but a clean baseline). Built from each piece in `Position`, seeded with `feature_bias`.
+- **Weights** are loaded directly from the [bullet](https://github.com/jw1912/bullet) trainer's native quantised `.bin` (headerless, tightly packed little-endian `int16`: `feature_weights[768*256]`, `feature_bias[256]`, `output_weights[512]`, scalar `output_bias`; bullet pads the trailing tensor to 64 bytes, which the loader tolerates). The forward pass and dequantisation mirror bullet's `simple` example exactly; correctness is verified by `test_nnue`.
+- **Enabling**: UCI `setoption name EvalFile value <path>` then `setoption name UseNNUE value true`, or env vars `PAWNSTAR_EVALFILE` / `PAWNSTAR_NNUE=1` read at startup in `main.cpp`. The net is process-global (shared by all Lazy SMP threads, read-only after load).
+
+**Training** (see [nnue/README.md](nnue/README.md) and [tools/](tools)): the net is trained on Pawnstar self-play, labelled with search score (`gen_data.cpp` → `build/gen_data`) and game result, via the bullet trainer (`tools/bullet/pawnstar.rs`, pinned commit installed by `tools/setup_bullet.sh`). Minimal flow: `tools/setup_bullet.sh` → `make tools` → `tools/run_gendata.sh <dir> <procs> <games> <depth>` → `tools/run_experiment.sh <dir> <net.bin>` (builds openings, trains via `tools/train_pipeline.sh`, then runs the SPRT via `tools/run_sprt.sh`). GPU training needs a CUDA toolkit and a driver supporting CUDA ≥ 12.3 (bullet uses `cuFuncLoad`); set `BULLET_FEATURES=""` to train on CPU. NNUE strength is measured by game play (SPRT vs the handcrafted eval), not by `test_bratko_kopec`.
+
 ### Opening book
 
 `OpeningBook` ([opening_book.h](src/opening_book.h)) is loaded from `pawnstar.book` in the working directory at startup (`main.cpp`); the shipped book ([doc/pawnstar.book](doc/pawnstar.book)) is the public-domain [TSCP](https://github.com/terredeciels/TSCP) `book.txt`. The format is plain text, one opening line per row, each move in **coordinate notation** (e.g. `e2e4 e7e5 g1f3`); `ParseLineOfPlay` replays each line from the start position, ignoring tokens that begin with a digit (move numbers) and treating `#` as a to-end-of-line comment. The book is a `std::map<zobrist_t, std::vector<Move>>` storing moves *with repeats*, so `GetMove`'s uniform-random pick is frequency-weighted. `SearchRootNode` returns a book move immediately on a hit, before searching; the `bookmoves` UCI command lists moves and frequencies for the current position. There is no SAN/PGN parser — coordinate notation only.
 
 ### UCI protocol
 
-[input_handling.cpp](src/input_handling.cpp) parses all UCI commands plus engine-specific diagnostics: `eval` (print position evaluation), `getboard` (print board), `bookmoves` (list opening-book moves for the current position), `dbg` (dump debug counters).
+[input_handling.cpp](src/input_handling.cpp) parses all UCI commands plus engine-specific diagnostics: `eval` (print position evaluation and which evaluator is active), `nnue` (print the raw NNUE eval), `getboard` (print board), `bookmoves` (list opening-book moves for the current position), `dbg` (dump debug counters). `setoption` handles `UseNNUE` (check) and `EvalFile` (string, path to a net), advertised in the `uci` response.
 
 ### Generated data
 

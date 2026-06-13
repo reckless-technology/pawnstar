@@ -9,12 +9,15 @@ GENERATED_DATA      = src/generated_data.cpp
 GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
 GENERATOR_EXE       = generate_constants/gen_constants
 TEST_DIR            = test
+TOOLS_DIR           = tools
+TOOL_GENDATA_EXE    = $(BUILD_DIR)/gen_data
 
 ENGINE_SOURCES      = \
 	debug_hashtable.cpp \
 	evaluation.cpp \
 	game.cpp \
 	input_handling.cpp \
+	nnue.cpp \
 	opening_book.cpp \
 	position.cpp \
 	search_alphabeta.cpp \
@@ -34,10 +37,12 @@ TEST_PERFT_EXE      = $(BUILD_DIR)/test_perft
 TEST_SEE_EXE        = $(BUILD_DIR)/test_see
 TEST_BK_EXE         = $(BUILD_DIR)/test_bratko_kopec
 TEST_PS_EXE         = $(BUILD_DIR)/test_pawn_structure
+TEST_NNUE_EXE       = $(BUILD_DIR)/test_nnue
 TEST_OBJECTS        = $(BUILD_DIR)/perft.o \
                       $(BUILD_DIR)/see.o \
                       $(BUILD_DIR)/bratko_kopec.o \
-                      $(BUILD_DIR)/pawn_structure.o
+                      $(BUILD_DIR)/pawn_structure.o \
+                      $(BUILD_DIR)/nnue_test.o
 TEST_DEPS           = $(TEST_OBJECTS:.o=.d)
 
 # Diagnostic counters (DEBUGX) are compiled in by default; build with RELEASE=1 to omit them.
@@ -51,23 +56,27 @@ else
 	CXXFLAGS += -g -O3 -D NDEBUG
 endif
 
-.PHONY: all tests check prep clean gen doc
+.PHONY: all tests check prep clean gen doc tools
 
 all: prep $(PROGRAM_EXE)
 
-tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE)
+tools: prep $(TOOL_GENDATA_EXE)
+
+tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE) $(TEST_NNUE_EXE)
 
 check: tests
 	$(TEST_SEE_EXE)
 	$(TEST_PS_EXE)
 	$(TEST_PERFT_EXE)
 	$(TEST_BK_EXE)
+	$(TEST_NNUE_EXE)
 
 prep:
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE) \
+	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE) $(TEST_NNUE_EXE) \
+	      $(TOOL_GENDATA_EXE) $(BUILD_DIR)/gen_data.o $(BUILD_DIR)/gen_data.d \
 	      $(OBJECTS) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
 	      $(GENERATED_DATA) $(GENERATOR_EXE)
 	rm -rf $(DOC_DIR)
@@ -86,6 +95,10 @@ $(BUILD_DIR)/%.o: src/%.cpp
 $(BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp
 	$(CXX) -c $(CXXFLAGS) -MMD -MP -o $@ $<
 
+# Compile a tools source object.
+$(BUILD_DIR)/%.o: $(TOOLS_DIR)/%.cpp
+	$(CXX) -c $(CXXFLAGS) -MMD -MP -o $@ $<
+
 # Link the main executable.
 $(PROGRAM_EXE): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS)
@@ -101,6 +114,13 @@ $(TEST_BK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/bratko_kopec.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(TEST_PS_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/pawn_structure.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+$(TEST_NNUE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_test.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+# Link the self-play data generator against all engine objects.
+$(TOOL_GENDATA_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/gen_data.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 # Compile the generator executable.

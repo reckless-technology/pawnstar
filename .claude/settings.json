@@ -3,7 +3,15 @@
     "allow": [
       "Read(//tmp/**)",
       "Bash(valgrind --tool=helgrind ./build/test_bratko_kopec 5 2>/tmp/hg.txt >/dev/null; grep \"ERROR SUMMARY\" /tmp/hg.txt; echo \"--- unique src race frames ---\"; grep -oE \"src/[a-z_]+\\\\.cpp:[0-9]+\" /tmp/hg.txt | sort | uniq -c | sort -rn | head -40)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(make)",
+      "Bash(tee /tmp/pawnstar_check.log)",
+      "Bash(python3 -)",
+      "Bash(/home/jonny/work/pawnstar/build/pawnstar)",
+      "Bash(make tools *)",
+      "Bash(time ./build/gen_data /tmp/gd_smoke.txt 3 1 6 8)",
+      "Bash(awk -F'|' '{print $3}' /tmp/gd_smoke.txt)",
+      "Bash(ASAN_OPTIONS=detect_leaks=0 ./build/gen_data /tmp/gd_smoke.txt 1 1 6 8)"
     ],
     "additionalDirectories": [
       "/tmp"

@@ -1,5 +1,6 @@
 #include "evaluation.h"
 #include "debug_hashtable.h"
+#include "nnue.h"
 #include "position.h"
 #include "search_state.h"
 #include "transposition_table.h"
@@ -16,8 +17,15 @@ int EvaluatePosition(const SearchState &state, int alpha, int beta)
     {
         return kDrawScore;
     }
+    const Position &position = state.CurrentPosition();
+    // NNUE evaluation (experimental): when selected and a net is loaded, use it instead of the handcrafted
+    // evaluation. The NNUE path bypasses the material lazy cutoff and the round-to-nearest-5 below, both of
+    // which are specific to the handcrafted scores.
+    if (nnue::IsActive())
+    {
+        return nnue::Evaluate(position);
+    }
     std::array<int, 2> scores;
-    const Position    &position = state.CurrentPosition();
     // Phase 1: Evaluate material values alone.
     scores[kWhite] = EvaluateMaterial<kWhite>(position);
     scores[kBlack] = EvaluateMaterial<kBlack>(position);

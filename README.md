@@ -16,6 +16,7 @@ Legal move generation runs at roughly 700 million moves per second on a modern l
 - Null-move pruning, late-move reductions, killer and per-thread history move ordering.
 - Quiescence search over captures with its own transposition table.
 - Tapered evaluation: material, piece-square tables, pawn structure, king safety and mobility.
+- Optional **NNUE** evaluation (efficiently-updatable neural network), switchable at runtime.
 - Optional opening book (`pawnstar.book`).
 
 ## Requirements
@@ -67,12 +68,32 @@ Run as a UCI engine (connect via Arena, Cute Chess, or any UCI-compatible GUI):
 In addition to the standard UCI commands, a few engine-specific commands are available at the prompt:
 
 ```
-eval        print the static evaluation of the current position
+eval        print the static evaluation of the current position (and which evaluator is active)
+nnue        print the raw NNUE evaluation of the current position
 getboard    print the FEN of the current position
 bookmoves   list opening-book moves for the current position
 dbg         dump internal diagnostic counters
 help        list all commands
 ```
+
+### Enabling NNUE evaluation
+
+NNUE is **off by default** (the hand-crafted evaluation is the engine's normal evaluator). Turn it on
+with the standard UCI `setoption` mechanism — point `EvalFile` at a trained net, then enable `UseNNUE`:
+
+```
+setoption name EvalFile value /path/to/net.bin
+setoption name UseNNUE value true
+```
+
+Equivalently, via environment variables at launch:
+
+```bash
+PAWNSTAR_EVALFILE=/path/to/net.bin PAWNSTAR_NNUE=1 ./build/pawnstar
+```
+
+`eval` reports which evaluator is in use. See [NNUE evaluation](#nnue-evaluation-experimental) below for
+how it works and how to train a net.
 
 ## Architecture
 
@@ -242,6 +263,48 @@ Static exchange evaluation (`EvaluateStaticExchange`,
 square; it is used to order captures and promotions during search (see above) and is covered by
 `test_see`.
 
+### NNUE evaluation (experimental)
+
+Pawnstar can optionally replace the hand-crafted evaluation with an **NNUE** (Efficiently Updatable
+Neural Network) — a small neural net trained to score positions. It is off by default and selected at
+runtime (see [Enabling NNUE evaluation](#enabling-nnue-evaluation) above); the hand-crafted evaluation
+remains the default.
+
+**How it works.** The network ([src/nnue.cpp](src/nnue.cpp), [src/nnue.h](src/nnue.h)) is a simple
+"perspective" net using the standard `Chess768` feature set:
+
+```
+768 inputs per perspective  ->  256 feature transformer (x2 perspectives)
+SCReLU,  concat[side-to-move | opponent] = 512  ->  1 output (centipawns, side-to-move relative)
+```
+
+The 768 inputs are (piece colour × piece type × square). Two accumulators are built — one from the
+side-to-move's perspective and one from the opponent's (with the board vertically mirrored) — passed
+through a squared-clipped-ReLU activation and a single output layer that produces a centipawn score.
+`EvaluatePosition` branches to the net when NNUE is enabled, bypassing the hand-crafted terms. The
+accumulator is currently recomputed from scratch on every evaluation (a full refresh); incremental
+updates are a planned optimisation. Weights are quantised `int16` (`QA=255`, `QB=64`, output scaled by
+`SCALE=400`) and loaded directly from the [bullet](https://github.com/jw1912/bullet) trainer's native
+`.bin`.
+
+**Training a net.** All tooling lives in [tools/](tools) and is documented in
+[nnue/README.md](nnue/README.md). The network is trained on positions from Pawnstar's own self-play,
+labelled with the search score and the game result, using the bullet trainer (GPU or CPU). The
+minimal-setup flow:
+
+```bash
+tools/setup_bullet.sh                                   # clone + register the bullet trainer (pinned commit)
+make tools                                              # build build/gen_data
+tools/run_gendata.sh ~/pawnstar_nnue/data 12 100000 8   # generate self-play data (12 procs, depth 8)
+tools/run_experiment.sh ~/pawnstar_nnue/data net.bin    # build openings, train, then SPRT vs the HCE
+```
+
+`run_experiment.sh` produces `net.bin`, which you can then load with `setoption name EvalFile`. The
+in-engine inference is verified against the trainer by `test_nnue` (see [Test suite](#test-suite)); GPU
+training needs a CUDA toolkit and a driver supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""`
+to train on CPU. Because NNUE scores differ from the hand-crafted scores, NNUE strength is measured by
+game play (an SPRT of NNUE vs the hand-crafted eval), not by `test_bratko_kopec`.
+
 ### Opening book
 
 `OpeningBook` ([src/opening_book.h](src/opening_book.h)) lets the engine play known opening lines
@@ -267,7 +330,7 @@ prints the available book moves and their frequencies for the current position.
 make check
 ```
 
-builds and runs four standalone test executables:
+builds and runs five standalone test executables:
 
 | Executable | Description |
 |---|---|
@@ -275,6 +338,13 @@ builds and runs four standalone test executables:
 | `build/test_pawn_structure` | 12 pawn structure tests, 72 individual checks |
 | `build/test_perft` | Move-generation regression on the standard PERFT positions |
 | `build/test_bratko_kopec` | 24 Bratko-Kopec search positions (default depth 8) |
+| `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
+
+`test_nnue` is a no-op (passes immediately) unless given a net file and a reference file —
+`make check` runs it with no arguments so it stays green when no net is built. To exercise it, generate
+reference evals with the bullet `pawnstar_eval` example and pass them in: see
+[nnue/README.md](nnue/README.md). NNUE does not change the Bratko-Kopec scores (that test always uses
+the hand-crafted evaluation), so leave `UseNNUE` off when regenerating its references.
 
 The Bratko-Kopec test takes an optional depth argument in the range 8–12, e.g.
 `./build/test_bratko_kopec 12`. Because the Lazy SMP search is non-deterministic, the test does not
@@ -301,6 +371,8 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 |---|---|
 | `src/` | Engine source and headers |
 | `test/` | Standalone test programs |
+| `tools/` | NNUE data generation, bullet trainer sources, and training/SPRT scripts |
+| `nnue/` | NNUE training pipeline documentation |
 | `generate_constants/` | Build-time generator for the precomputed lookup tables |
 | `Doxyfile` | Doxygen configuration |
 
@@ -341,7 +413,12 @@ the published node counts for the standard positions.
 - **Thread count** defaults to `hardware_concurrency()` and is not exposed as a UCI option, though it
   can be overridden with the `PAWNSTAR_THREADS` environment variable.
 - **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
-- The evaluation is **hand-crafted**, not learned (no NNUE).
+- **NNUE is experimental.** It is off by default; the hand-crafted evaluation is the normal evaluator.
+  The NNUE accumulator is recomputed from scratch each evaluation (no incremental updates yet), so it is
+  slower per node than the hand-crafted eval.
+- **Very long games can overflow the game history.** `Game` stores the full game in a fixed
+  `kMaxGameLength` (256) position stack, so games beyond ~255 plies can crash the engine; match testing
+  should use draw/resign adjudication to bound game length.
 
 ## Contributing
 

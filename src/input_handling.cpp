@@ -12,6 +12,7 @@
 #include "debug_hashtable.h"
 #include "evaluation.h"
 #include "game.h"
+#include "nnue.h"
 #include "opening_book.h"
 #include "position.h"
 #include "search_state.h"
@@ -54,7 +55,20 @@ void handle_freebook(Game &game, std::span<std::string>)
 void handle_eval(Game &game, std::span<std::string>)
 {
     SearchState tmp{game};
-    std::cout << std::format("evaluation {}\n", EvaluatePosition(tmp, kAlpha, kBeta));
+    const char *evaluator = nnue::IsActive() ? "nnue" : "handcrafted";
+    std::cout << std::format("evaluation {} ({})\n", EvaluatePosition(tmp, kAlpha, kBeta), evaluator);
+}
+
+/// @brief Handle the "nnue" command: print the raw NNUE evaluation of the current position (diagnostic).
+/// @param game Game to act on.
+void handle_nnue(Game &game, std::span<std::string>)
+{
+    if (!nnue::g_network_loaded)
+    {
+        std::cout << "info string NNUE: no net loaded (use setoption name EvalFile value <path>)\n";
+        return;
+    }
+    std::cout << std::format("nnue {}\n", nnue::Evaluate(game.CurrentPosition()));
 }
 
 /// @brief Handle the "dbg" command: print diagnostic counters.
@@ -82,7 +96,50 @@ void handle_uci(Game &, std::span<std::string>)
 {
     std::cout << "id name Pawnstar\n";
     std::cout << "id author Jonny Reckless\n";
+    std::cout << "option name UseNNUE type check default false\n";
+    std::cout << "option name EvalFile type string default <empty>\n";
     std::cout << "uciok\n";
+}
+
+/// @brief Handle the "setoption" command: "setoption name <Name> value <Value>".
+/// Recognises UseNNUE (toggle the NNUE evaluator) and EvalFile (load a net file).
+/// @param args Command arguments.
+void handle_setoption(Game &, std::span<std::string> args)
+{
+    // Parse the UCI "name <words...> value <words...>" grammar.
+    std::string name, value;
+    std::string *target = nullptr;
+    for (std::size_t i = 1; i < args.size(); ++i)
+    {
+        if (args[i] == "name")
+        {
+            target = &name;
+        }
+        else if (args[i] == "value")
+        {
+            target = &value;
+        }
+        else if (target)
+        {
+            if (!target->empty())
+            {
+                *target += ' ';
+            }
+            *target += args[i];
+        }
+    }
+    if (name == "UseNNUE")
+    {
+        nnue::g_use_nnue = (value == "true" || value == "1");
+        if (nnue::g_use_nnue && !nnue::g_network_loaded)
+        {
+            std::cout << "info string NNUE enabled but no net is loaded; set EvalFile first\n";
+        }
+    }
+    else if (name == "EvalFile")
+    {
+        nnue::LoadNetwork(value);
+    }
 }
 
 /// @brief Handle the "ucinewgame" command: stop searching and reset to a new game.
@@ -197,8 +254,10 @@ constexpr std::array handlers =
     Handler { COMMAND(go),             "Search the current position"},
     Handler { COMMAND(help),           "Display a summary of commands"},
     Handler { COMMAND(isready),        "Respond with readyok"},
+    Handler { COMMAND(nnue),           "Display the raw NNUE evaluation of the current position"},
     Handler { COMMAND(position),       "Set the position and series of moves"},
     Handler { COMMAND(quit),           "Exit the program"},
+    Handler { COMMAND(setoption),      "Set a UCI option (UseNNUE, EvalFile)"},
     Handler { COMMAND(stop),           "Stop searching and return best move found"},
     Handler { COMMAND(uci),            "Enter UCI protocol"},
     Handler { COMMAND(ucinewgame),     "UCI mode start new game"}
