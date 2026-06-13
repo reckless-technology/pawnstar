@@ -56,6 +56,7 @@ SingleMoveResult SearchSingleMove(SearchState &state, int depth, int ply, int al
         if (score > alpha)
         {
             INCREMENT("pvs fails");
+            INCREMENT_IF(ply == 0, "pvs fails root ply");
             score = -Search(state, child_depth, ply + 1, -beta, -alpha, pv);
         }
     }
