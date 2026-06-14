@@ -224,7 +224,18 @@ void handle_position(Game &game, std::span<std::string> args)
         }
         if (args[i] == "fen")
         {
-            game.NewGame(args[++i]);
+            // A FEN is six space-separated fields; reassemble them (stopping at "moves" or end of input)
+            // rather than consuming only the piece-placement field.
+            std::string fen;
+            for (int field = 0; field < 6 && i + 1 < args.size() && args[i + 1] != "moves"; ++field)
+            {
+                if (!fen.empty())
+                {
+                    fen += ' ';
+                }
+                fen += args[++i];
+            }
+            game.NewGame(fen);
             continue;
         }
         if (args[i] == "moves")
