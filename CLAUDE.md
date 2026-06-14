@@ -106,8 +106,9 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 - `history` — the **per-thread** `HistoryTable` (no cross-thread sharing).
 - `killers[kMaxPly][2]` — killer moves.
 - `node_count` — nodes searched by this thread.
-- `positions_` (`StackList<Position>`) — position stack for the search tree.
-- `hash_stack_` (`StackList<HashEntry, kMaxGameLength + kMaxPly + 4>`) — Zobrist hash history for 50-move/repetition detection; fixed-capacity (no heap allocation per search).
+- `positions_` (`StackList<Position, kMaxPly + 4>`) — fixed-capacity position stack for the search tree.
+- `accumulator_` (`nnue::Accumulator`) — the NNUE accumulator for the tip position, maintained incrementally across make/undo (only while `game.NnueActive()`).
+- `hash_stack_` (`std::vector<HashEntry>`, reserved in the constructor to game length + `kMaxPly` + 4) — Zobrist hash history for 50-move/repetition detection. One reservation per search, so the per-node hot path still allocates nothing.
 
 Lazy SMP retired the old YBW machinery: `SearchStatePool` and `ThreadPool` (and their `kSearchStatePoolCapacity`/`kThreadPoolQueueCapacity` constants) no longer exist. Threads are plain `std::thread`s spawned per search in `SearchRootNode`, each constructing its own `SearchState` on its stack.
 
@@ -134,15 +135,17 @@ SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_excha
 
 ### NNUE evaluation (optional, experimental)
 
-`nnue::Evaluate` ([nnue.cpp](src/nnue.cpp), [nnue.h](src/nnue.h)) is an optional learned evaluation that replaces the handcrafted one when enabled. After the draw short-circuit, `EvaluatePosition` branches to it when `nnue::IsActive()` (the `UseNNUE` option is on **and** a net is loaded), bypassing the handcrafted material lazy-cutoff and the round-to-nearest-5.
+`nnue::Network` ([nnue.cpp](src/nnue.cpp), [nnue.h](src/nnue.h)) is an optional learned evaluation that replaces the handcrafted one when enabled. The `Game` owns one `nnue::Network` instance plus the `UseNNUE` flag (accessors `NnueNetwork()`/`SetUseNnue()`/`NnueActive()`); there are no nnue globals. After the draw short-circuit, `EvaluatePosition` branches to the net when `state.game.NnueActive()` (the `UseNNUE` option is on **and** a net is loaded), bypassing the handcrafted material lazy-cutoff and the round-to-nearest-5.
 
 - **Architecture**: a simple perspective net with the standard bullet `Chess768` feature set — `768 → 256` feature transformer (shared across both perspectives), SCReLU activation, `concat[stm | ntm] = 512 → 1` output (centipawns, side-to-move relative). Constants: `kHiddenSize=256`, `kQA=255`, `kQB=64`, `kScale=400`.
 - **Feature index** (per perspective): `colour*384 + (piece_type-1)*64 + square`, with the not-to-move perspective swapping the colour offset and flipping the square with `kRankFlip`. This matches bullet's `Chess768::map_features`.
-- **Accumulator**: full refresh on every evaluation (no incremental updates yet — slower per node than the handcrafted eval, but a clean baseline). Built from each piece in `Position`, seeded with `feature_bias`.
+- **Accumulator** (`nnue::Accumulator`, two perspectives): maintained **incrementally** on `SearchState` across make/undo. `Network::Update` applies only the feature deltas for pieces whose placement changed (a parent/child bitboard diff; reversible on undo; a no-op for null moves); `Network::Refresh` rebuilds it from scratch at the root (seeded with `feature_bias`). `test_nnue_incremental` checks the incremental accumulator stays bit-identical to a full refresh.
 - **Weights** are loaded directly from the [bullet](https://github.com/jw1912/bullet) trainer's native quantised `.bin` (headerless, tightly packed little-endian `int16`: `feature_weights[768*256]`, `feature_bias[256]`, `output_weights[512]`, scalar `output_bias`; bullet pads the trailing tensor to 64 bytes, which the loader tolerates). The forward pass and dequantisation mirror bullet's `simple` example exactly; correctness is verified by `test_nnue`.
-- **Enabling**: UCI `setoption name EvalFile value <path>` then `setoption name UseNNUE value true`, or env vars `PAWNSTAR_EVALFILE` / `PAWNSTAR_NNUE=1` read at startup in `main.cpp`. The net is process-global (shared by all Lazy SMP threads, read-only after load).
+- **Enabling**: UCI `setoption name EvalFile value <path>` then `setoption name UseNNUE value true`, or env vars `PAWNSTAR_EVALFILE` / `PAWNSTAR_NNUE=1` read at startup in `main.cpp` (both route to `game.NnueNetwork().Load(...)` / `game.SetUseNnue(...)`). The network is a single `nnue::Network` owned by the `Game`, read-only after `Load` and shared by all Lazy SMP threads, which call only its `const` methods.
 
 **Training** (see [nnue/README.md](nnue/README.md) and [tools/](tools)): the net is trained on Pawnstar self-play, labelled with search score (`gen_data.cpp` → `build/gen_data`) and game result, via the bullet trainer (`tools/bullet/pawnstar.rs`, pinned commit installed by `tools/setup_bullet.sh`). Minimal flow: `tools/setup_bullet.sh` → `make tools` → `tools/run_gendata.sh <dir> <procs> <games> <depth>` → `tools/run_experiment.sh <dir> <net.bin>` (builds openings, trains via `tools/train_pipeline.sh`, then runs the SPRT via `tools/run_sprt.sh`). GPU training needs a CUDA toolkit and a driver supporting CUDA ≥ 12.3 (bullet uses `cuFuncLoad`); set `BULLET_FEATURES=""` to train on CPU. NNUE strength is measured by game play (SPRT vs the handcrafted eval), not by `test_bratko_kopec`.
+
+The repo ships two nets ([nnue/README.md](nnue/README.md) §7): `nnue/pawnstar-v1.bin` (Pawnstar self-play labels, slightly *weaker* than the HCE) and `nnue/pawnstar-v2.bin` (trained on public PlentyChess data, which *beats* the HCE by a wide margin at fixed depth). Both are off by default. The incremental accumulator makes NNUE competitive on equal time, not just equal depth.
 
 ### Opening book
 

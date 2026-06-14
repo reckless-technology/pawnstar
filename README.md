@@ -282,10 +282,12 @@ The 768 inputs are (piece colour × piece type × square). Two accumulators are 
 side-to-move's perspective and one from the opponent's (with the board vertically mirrored) — passed
 through a squared-clipped-ReLU activation and a single output layer that produces a centipawn score.
 `EvaluatePosition` branches to the net when NNUE is enabled, bypassing the hand-crafted terms. The
-accumulator is currently recomputed from scratch on every evaluation (a full refresh); incremental
-updates are a planned optimisation. Weights are quantised `int16` (`QA=255`, `QB=64`, output scaled by
-`SCALE=400`) and loaded directly from the [bullet](https://github.com/jw1912/bullet) trainer's native
-`.bin`.
+network is an `nnue::Network` instance owned by the `Game` (no globals), read-only after load and shared
+by all search threads. Its accumulator is **maintained incrementally** across make/undo on each thread's
+`SearchState` — only the feature columns for the pieces that moved are updated, rather than rebuilding it
+from scratch every node — which makes NNUE competitive on equal time, not just equal depth. Weights are
+quantised `int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) and loaded directly from the
+[bullet](https://github.com/jw1912/bullet) trainer's native `.bin`.
 
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
 [nnue/README.md](nnue/README.md). The network is trained on positions from Pawnstar's own self-play,
@@ -300,10 +302,17 @@ tools/run_experiment.sh ~/pawnstar_nnue/data net.bin    # build openings, train,
 ```
 
 `run_experiment.sh` produces `net.bin`, which you can then load with `setoption name EvalFile`. The
-in-engine inference is verified against the trainer by `test_nnue` (see [Test suite](#test-suite)); GPU
-training needs a CUDA toolkit and a driver supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""`
-to train on CPU. Because NNUE scores differ from the hand-crafted scores, NNUE strength is measured by
-game play (an SPRT of NNUE vs the hand-crafted eval), not by `test_bratko_kopec`.
+in-engine inference is verified against the trainer by `test_nnue`, and the incremental accumulator
+against a full refresh by `test_nnue_incremental` (see [Test suite](#test-suite)); GPU training needs a
+CUDA toolkit and a driver supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""` to train on CPU.
+Because NNUE scores differ from the hand-crafted scores, NNUE strength is measured by game play (an SPRT
+of NNUE vs the hand-crafted eval), not by `test_bratko_kopec`.
+
+**Shipped nets.** Two trained nets live in [nnue/](nnue): `nnue/pawnstar-v1.bin` (Pawnstar self-play
+labels) *loses* to the HCE by ~67 Elo, whereas `nnue/pawnstar-v2.bin` (trained on **public PlentyChess
+self-play** — strong-engine labels) *beats* the HCE by a wide margin at fixed depth. The lesson was label
+quality, not quantity. See [nnue/README.md](nnue/README.md) §7 for the numbers and exact step-by-step
+recreation of `pawnstar-v2.bin`.
 
 ### Opening book
 
@@ -385,9 +394,10 @@ A few deliberate choices shape the codebase:
   one by value and there is no `UnmakeMove`. This trades a per-ply copy for far simpler code: no
   state to restore, no aliasing between plies, and positions that are trivially safe to hand to other
   threads. The class is kept small (160 bytes) so the copy stays cheap.
-- **No heap allocation during search.** Move lists, the position stack and the hash history are all
-  fixed-capacity stack containers sized from `constants.h`. The search hot path performs no dynamic
-  allocation, which keeps it allocator- and fragmentation-free.
+- **No heap allocation on the search hot path.** Move lists and the per-thread search position stack are
+  fixed-capacity stack containers. The per-search hash history is a `std::vector` reserved once when the
+  `SearchState` is constructed, and the game history is a `std::vector` that grows only as real moves are
+  played — so the node-by-node search loop itself performs no dynamic allocation.
 - **Everything precomputed that can be.** Attack tables, Zobrist keys and pawn-structure masks are
   emitted at build time by `generate_constants`, so the engine binary starts instantly and the hot
   paths are pure lookups.
@@ -398,10 +408,14 @@ A few deliberate choices shape the codebase:
 
 ## Benchmarks
 
-Pawnstar has not been assigned a formal Elo rating yet. The objective figures currently tracked are:
+Pawnstar has no official CCRL rating. The figures currently tracked are:
 
 - **Move generation** — roughly 700 million legal moves per second on a modern laptop core.
 - **Bratko-Kopec** — 24/24 at every depth from 8 through 12 (the default depth 8 runs in `make check`).
+- **Strength (rough).** The hand-crafted evaluation measures ~2350 Elo (CCRL-ballpark, anchored against
+  reference engines at a fast time control). `nnue/pawnstar-v2.bin` beats the HCE by a large margin at
+  fixed depth, and the incremental accumulator is worth a further ~+80 Elo over the full-refresh version
+  at equal time (SPRT).
 
 `make check` is the regression baseline; the perft suite verifies move-generation correctness against
 the published node counts for the standard positions.
@@ -415,11 +429,8 @@ the published node counts for the standard positions.
   can be overridden with the `PAWNSTAR_THREADS` environment variable.
 - **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
 - **NNUE is experimental.** It is off by default; the hand-crafted evaluation is the normal evaluator.
-  The NNUE accumulator is recomputed from scratch each evaluation (no incremental updates yet), so it is
-  slower per node than the hand-crafted eval.
-- **Very long games can overflow the game history.** `Game` stores the full game in a fixed
-  `kMaxGameLength` (512) position stack, so games beyond ~511 plies can crash the engine; match testing
-  should use draw/resign adjudication to bound game length.
+  The accumulator is maintained incrementally across make/undo, but the forward pass is still scalar (no
+  SIMD yet), so each node's NNUE eval remains somewhat heavier than the hand-crafted eval.
 
 ## Contributing
 

@@ -45,8 +45,13 @@ out *= SCALE
 out /= QA * QB            # -> centipawns, side-to-move relative
 ```
 
-The accumulator is recomputed from scratch on every evaluation (a **full refresh**; no incremental
-updates yet), so NNUE is slower per node than the HCE — a clean baseline to optimise later.
+The net is an `nnue::Network` class (the quantised weights plus `Load`/`Refresh`/`Update`/`Evaluate`
+methods), **owned by the `Game`** — there are no nnue globals. Its accumulator is **maintained
+incrementally** across make/undo on each thread's `SearchState`: `Network::Update` applies only the
+feature-column deltas for pieces whose placement changed (a parent/child bitboard diff — reversible on
+undo, a no-op for null moves), while `Network::Refresh` rebuilds it from scratch at the root.
+`Network::Evaluate(position)` (a full refresh) is the reference the incremental path is checked against
+(§6). A SIMD forward pass is the remaining per-node speed lever.
 
 ## 2. File format
 
@@ -80,8 +85,10 @@ PAWNSTAR_EVALFILE=/path/to/net.bin PAWNSTAR_NNUE=1 ./build/pawnstar
 ```
 
 `UseNNUE`/`EvalFile` are advertised in the `uci` response. The `eval` command reports which evaluator
-is active; `nnue` prints the raw network eval of the current position. The net is process-global and
-read-only after load (shared by all Lazy SMP threads).
+is active; `nnue` prints the raw network eval of the current position. The net is a single
+`nnue::Network` instance owned by the `Game` (UCI `setoption` routes to `game.NnueNetwork().Load(...)`
+and `game.SetUseNnue(...)`), read-only after load and shared by all Lazy SMP threads through their
+`Game&` — they call only its `const` methods.
 
 ## 4. Tooling
 
@@ -135,8 +142,8 @@ result). Details:
 - `random_plies` random opening moves per game add diversity (not recorded).
 - Only **quiet, not-in-check** positions with `|eval| < 3000` cp are recorded (clean targets).
 - Games end on checkmate/stalemate/50-move/repetition/insufficient-material, on resign adjudication
-  (`|score| > 1500` for 4 consecutive plies), or at a 200-ply cap (kept below the engine's
-  `kMaxGameLength` so the game history never overflows).
+  (`|score| > 1500` for 4 consecutive plies), or at a 200-ply cap (a data-quality bound — the engine's
+  game history is a dynamic `std::vector` now, so game length is no longer a correctness limit).
 
 `run_gendata.sh <out_dir> <num_processes> <games_per_process> <depth> [random_plies]` launches the
 shards (`data_<i>.txt` + `log_<i>.txt`). Throughput at depth 8 is ~8–9 positions/sec/core
@@ -190,6 +197,12 @@ awk -F' \\| ' 'NR%500==0 {print $1}' ~/pawnstar_nnue/data/data_*.txt | head -200
 match confirms our feature indexing, perspective/orientation, SCReLU and dequantisation are all
 correct. `test_nnue` with no arguments is a no-op, so `make check` stays green when no net is present.
 
+A second test, `test_nnue_incremental <net.bin>`, plays random move sequences through a `SearchState`
+and asserts the incrementally-maintained accumulator evaluates **bit-identically** to a full refresh at
+every node (and again after every undo, to catch reverse-update bugs). With no argument it is a no-op,
+so `make check` stays green; run it with a net (e.g. `./build/test_nnue_incremental nnue/pawnstar-v2.bin`)
+after any change to the accumulator, feature indexing, or make/undo.
+
 ### Strength testing (the verdict)
 
 NNUE scores differ from the HCE reference scores, so `test_bratko_kopec` stays an **HCE-only** test
@@ -198,12 +211,12 @@ play. `run_sprt.sh <net.bin> <openings.epd> [rounds=500] [depth=8]` runs:
 
 - the **same** `build/pawnstar` binary as both engines, differing only by UCI options
   (`UseNNUE`/`EvalFile`), with `PAWNSTAR_THREADS=1`;
-- **fixed depth** (default 8) — pawnstar has no `go nodes`, and fixed depth isolates eval quality from
-  the unoptimised full-refresh NNUE speed;
+- **fixed depth** (default 8) — pawnstar has no `go nodes`, and fixed depth isolates eval *quality* from
+  NNUE's per-node speed. To measure the equal-*time* effect (e.g. incremental vs full-refresh, or NNUE
+  vs HCE on the clock) run a `tc=`-based match instead (`fastchess … -each tc=8+0.08`);
 - **win/draw adjudication** (`-resign movecount=3 score=600`, `-draw movenumber=40 movecount=8
-  score=20`). This is essential: it bounds game length so games never exceed the engine's
-  `kMaxGameLength` (512-ply) game-history stack, which would otherwise crash the engine in long
-  endgames;
+  score=20`) to keep games short and decisive (recommended, not required — the old fixed game-history
+  cap that crashed long games is gone; the history is a dynamic `std::vector` now);
 - `-sprt elo0=0 elo1=10 alpha=0.05 beta=0.05` and concurrency `nproc`.
 
 fastchess prints "Illegal PV move" warnings occasionally — these are cosmetic (a junk move in the
@@ -235,10 +248,59 @@ PlentyChess data: <https://huggingface.co/datasets/Yoshie2000/plentychess_data_b
 already bulletformat — `bullet-utils validate` a shard, `cat` a few together, `shuffle`, then train per
 §6, skipping the text-`convert` step).
 
-Caveats: these SPRTs are at **fixed depth**, which neutralises NNUE's slower per-node cost; on equal
-*time* the full-refresh net gives some of that margin back until the Phase-4 incremental-accumulator and
-SIMD work lands. For absolute context the HCE measures ~2350 Elo (CCRL-ballpark), so `pawnstar-v2` is a
-large step up. NNUE remains **off by default**; set `UseNNUE`/`EvalFile` (or the §3 env vars) to use it.
+Caveats: these SPRTs are at **fixed depth**, which neutralises per-node speed differences. The
+**incremental accumulator has since landed** — worth ~+80 Elo over the old full-refresh at equal time
+(SPRT) — so NNUE is now competitive on the clock too; a SIMD forward pass is the remaining speed lever.
+For absolute context the HCE measures ~2350 Elo (CCRL-ballpark), so `pawnstar-v2` is a large step up.
+NNUE remains **off by default**; set `UseNNUE`/`EvalFile` (or the §3 env vars) to use it.
+
+### Recreating `pawnstar-v2.bin`
+
+`pawnstar-v2.bin` was trained on ~60M positions of **public PlentyChess self-play**, already in
+bulletformat (32-byte `bullet::ChessBoard` records), so the text→`convert` step is skipped. GPU training
+is GPU-nondeterministic, so this reproduces a *functionally equivalent* net, not a byte-identical one.
+
+```bash
+# 0. One-time: set up the bullet trainer and build bullet-utils (see §8).
+tools/setup_bullet.sh
+BULLET=~/pawnstar_nnue/bullet
+( cd "$BULLET/crates/utils" && cargo build --release )
+UTILS="$BULLET/target/release/bullet-utils"
+mkdir -p ~/pawnstar_nnue/v2 && cd ~/pawnstar_nnue/v2
+
+# 1. Download two PlentyChess bulletformat shards (public, tokenless; ~1.9 GB + ~61 MB ≈ 60M positions).
+BASE=https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat/resolve/main
+curl -L -o 11848.data "$BASE/11848.data"     # ~58M positions
+curl -L -o 12892.data "$BASE/12892.data"     # ~1.9M positions
+
+# 2. Sanity-check the format (size % 32 == 0; all records valid).
+"$UTILS" validate --input 11848.data
+
+# 3. Concatenate (bulletformat is flat 32-byte records) and shuffle (self-play data is correlated).
+cat 11848.data 12892.data > all.data
+"$UTILS" shuffle --input all.data --output shuffled.data --mem-used-mb 4096
+
+# 4. Train 40 superbatches (1 superbatch ≈ 1 epoch, so PAWNSTAR_BPS = positions / 16384).
+export CUDA_PATH=~/cuda-12.2 PATH="$CUDA_PATH/bin:$PATH" LD_LIBRARY_PATH="$CUDA_PATH/lib64"
+COUNT=$(( $(stat -c%s shuffled.data) / 32 ))
+( cd "$BULLET/crates/bullet_lib" && \
+  PAWNSTAR_DATA=~/pawnstar_nnue/v2/shuffled.data PAWNSTAR_BPS=$(( COUNT / 16384 )) \
+  PAWNSTAR_SBS=40 PAWNSTAR_OUT=~/pawnstar_nnue/v2/checkpoints \
+  cargo run --release --features cuda --example pawnstar )   # drop --features cuda to train on CPU
+
+# 5. Export the quantised net into the repo.
+cp ~/pawnstar_nnue/v2/checkpoints/pawnstar-40/quantised.bin nnue/pawnstar-v2.bin
+
+# 6. Verify, then strength-test vs the HCE (reuse any openings.epd — e.g. one built by make_openings.sh
+#    from self-play data, or any EPD opening book; make_openings.sh cannot read bulletformat).
+./build/test_nnue_incremental nnue/pawnstar-v2.bin
+tools/run_sprt.sh nnue/pawnstar-v2.bin /path/to/openings.epd
+```
+
+The PlentyChess repo has many more (~10–12 GB) shards; add more `.data` files at step 1/3 for a larger
+set (raise the LR-schedule end with `PAWNSTAR_SBS` accordingly). The trainer architecture and
+quantisation in [pawnstar.rs](../tools/bullet/pawnstar.rs) (768→256, SCReLU, QA/QB/SCALE) must stay
+unchanged so the engine can load the result (§2).
 
 ## 8. Reproducibility
 
@@ -255,7 +317,8 @@ location with `BULLET=…`.
   `BULLET_FEATURES=""`.
 - **`NNUE: net '…' is N bytes, expected at least 394754`** — the file isn't a 256-hidden bullet net in
   the expected format (wrong `HIDDEN_SIZE`, wrong architecture, or truncated).
-- **Engine "disconnects" in long games during a match** — the `kMaxGameLength` overflow described
-  above; always run matches with adjudication (`run_sprt.sh` does).
+- **Engine "disconnects" mid-match** — the old long-game history overflow is fixed (the game history is
+  a dynamic `std::vector` now), so this should be rare; if it recurs it is an actual crash worth a debug
+  build. Adjudication (`run_sprt.sh`) is still recommended to keep matches short and decisive.
 - **bullet build links `-lcuda` against the system driver** (`/usr/lib/x86_64-linux-gnu/libcuda.so`),
   not the toolkit, so the *driver* version is what gates `cuFuncLoad`; a newer toolkit alone won't help.
