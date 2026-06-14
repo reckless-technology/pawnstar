@@ -72,14 +72,18 @@ tools: prep $(TOOL_GENDATA_EXE)
 
 tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_BK_NNUE_EXE) $(TEST_PS_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE)
 
+# Run every suite in one shell, chained with && so the first failure aborts (and the summary below is
+# skipped). On full success report the wall-clock time spent running the tests (not the build).
 check: tests
-	$(TEST_SEE_EXE)
-	$(TEST_PS_EXE)
-	$(TEST_PERFT_EXE)
-	$(TEST_BK_EXE)
-	$(TEST_NNUE_EXE) $(NNUE_NET) $(NNUE_REF)
-	$(TEST_NNUE_INC_EXE) $(NNUE_NET)
-	$(TEST_BK_NNUE_EXE) $(NNUE_NET)
+	@start=$$(date +%s%3N); \
+	$(TEST_PERFT_EXE) && \
+	$(TEST_BK_EXE) && \
+	$(TEST_BK_NNUE_EXE) $(NNUE_NET) && \
+	$(TEST_NNUE_EXE) $(NNUE_NET) $(NNUE_REF) && \
+	$(TEST_NNUE_INC_EXE) $(NNUE_NET) && \
+	$(TEST_SEE_EXE) && \
+	$(TEST_PS_EXE) && \
+	echo "all tests passed in $$(( $$(date +%s%3N) - start )) ms"
 
 prep:
 	mkdir -p $(BUILD_DIR)
