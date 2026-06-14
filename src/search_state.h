@@ -57,7 +57,7 @@ class SearchState
     }
 
     /// @brief The NNUE accumulator for the current position, maintained incrementally across make/undo.
-    /// Only valid (kept in sync) while nnue::IsActive(); ignored otherwise.
+    /// Only valid (kept in sync) while game.NnueActive(); ignored otherwise.
     /// @return Const reference to the current accumulator.
     const nnue::Accumulator &CurrentAccumulator() const
     {

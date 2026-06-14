@@ -49,11 +49,11 @@ int main()
     // Optional NNUE evaluation, configurable via environment variables (UCI setoption also works).
     if (const char *eval_file = std::getenv("PAWNSTAR_EVALFILE"))
     {
-        nnue::LoadNetwork(eval_file);
+        game.NnueNetwork().Load(eval_file);
     }
     if (const char *use_nnue = std::getenv("PAWNSTAR_NNUE"))
     {
-        nnue::g_use_nnue = (std::string_view(use_nnue) == "1" || std::string_view(use_nnue) == "true");
+        game.SetUseNnue(std::string_view(use_nnue) == "1" || std::string_view(use_nnue) == "true");
     }
     DebugXClear();
     std::cout << "ready\n";

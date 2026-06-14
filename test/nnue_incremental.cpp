@@ -25,9 +25,10 @@ long g_fails  = 0;
 /// refresh at entry and again after undoing all children (to catch UndoMove reverse bugs).
 void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
 {
-    const Position &p   = state.CurrentPosition();
-    const int       inc = nnue::EvaluateAccumulator(state.CurrentAccumulator(), p.ColorToMove());
-    const int       ref = nnue::Evaluate(p); // full refresh
+    const Position      &p   = state.CurrentPosition();
+    const nnue::Network &net = state.game.NnueNetwork();
+    const int            inc = net.Evaluate(state.CurrentAccumulator(), p.ColorToMove());
+    const int            ref = net.Evaluate(p); // full refresh
     ++g_checks;
     if (inc != ref)
     {
@@ -51,7 +52,7 @@ void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
         state.UndoMove();
     }
     // After undoing every child the accumulator must again match this position's full refresh.
-    const int inc_after = nnue::EvaluateAccumulator(state.CurrentAccumulator(), p.ColorToMove());
+    const int inc_after = net.Evaluate(state.CurrentAccumulator(), p.ColorToMove());
     ++g_checks;
     if (inc_after != ref)
     {
@@ -69,24 +70,25 @@ int main(int argc, char **argv)
         std::cout << "test_nnue_incremental: no net provided, skipping (pass).\n";
         return 0;
     }
-    if (!nnue::LoadNetwork(argv[1]))
+    // Load the net into a Game and select NNUE, so SearchState maintains the accumulator via game.NnueActive().
+    Game game;
+    if (!game.NnueNetwork().Load(argv[1]))
     {
         std::cout << "test_nnue_incremental: failed to load net '" << argv[1] << "'\n";
         return 1;
     }
-    nnue::g_use_nnue = true; // make nnue::IsActive() true so SearchState maintains the accumulator
-    if (!nnue::IsActive())
+    game.SetUseNnue(true);
+    if (!game.NnueActive())
     {
         std::cout << "test_nnue_incremental: NNUE not active after load\n";
         return 1;
     }
 
-    // Several independent random search trees from the start position.
+    // Several independent random search trees from the start position (the net persists across NewGame()).
     for (uint64_t seed = 1; seed <= 12; ++seed)
     {
-        Game game;
         game.NewGame();
-        SearchState   state{game};
+        SearchState     state{game};
         std::mt19937_64 rng(seed);
         Walk(state, rng, /*depth=*/10, /*branch=*/2);
     }

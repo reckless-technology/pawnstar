@@ -1,5 +1,6 @@
 #include "evaluation.h"
 #include "debug_hashtable.h"
+#include "game.h"
 #include "nnue.h"
 #include "position.h"
 #include "search_state.h"
@@ -21,11 +22,11 @@ int EvaluatePosition(const SearchState &state, int alpha, int beta)
     // NNUE evaluation (experimental): when selected and a net is loaded, use it instead of the handcrafted
     // evaluation. The NNUE path bypasses the material lazy cutoff and the round-to-nearest-5 below, both of
     // which are specific to the handcrafted scores.
-    if (nnue::IsActive())
+    if (state.game.NnueActive())
     {
         // Use the incrementally-maintained accumulator (kept in sync by SearchState make/undo) rather than
         // rebuilding it from scratch here.
-        return nnue::EvaluateAccumulator(state.CurrentAccumulator(), position.ColorToMove());
+        return state.game.NnueNetwork().Evaluate(state.CurrentAccumulator(), position.ColorToMove());
     }
     std::array<int, 2> scores;
     // Phase 1: Evaluate material values alone.

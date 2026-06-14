@@ -55,7 +55,7 @@ void handle_freebook(Game &game, std::span<std::string>)
 void handle_eval(Game &game, std::span<std::string>)
 {
     SearchState tmp{game};
-    const char *evaluator = nnue::IsActive() ? "nnue" : "handcrafted";
+    const char *evaluator = game.NnueActive() ? "nnue" : "handcrafted";
     std::cout << std::format("evaluation {} ({})\n", EvaluatePosition(tmp, kAlpha, kBeta), evaluator);
 }
 
@@ -63,12 +63,12 @@ void handle_eval(Game &game, std::span<std::string>)
 /// @param game Game to act on.
 void handle_nnue(Game &game, std::span<std::string>)
 {
-    if (!nnue::g_network_loaded)
+    if (!game.NnueNetwork().IsLoaded())
     {
         std::cout << "info string NNUE: no net loaded (use setoption name EvalFile value <path>)\n";
         return;
     }
-    std::cout << std::format("nnue {}\n", nnue::Evaluate(game.CurrentPosition()));
+    std::cout << std::format("nnue {}\n", game.NnueNetwork().Evaluate(game.CurrentPosition()));
 }
 
 /// @brief Handle the "dbg" command: print diagnostic counters.
@@ -104,7 +104,7 @@ void handle_uci(Game &, std::span<std::string>)
 /// @brief Handle the "setoption" command: "setoption name <Name> value <Value>".
 /// Recognises UseNNUE (toggle the NNUE evaluator) and EvalFile (load a net file).
 /// @param args Command arguments.
-void handle_setoption(Game &, std::span<std::string> args)
+void handle_setoption(Game &game, std::span<std::string> args)
 {
     // Parse the UCI "name <words...> value <words...>" grammar.
     std::string name, value;
@@ -130,15 +130,15 @@ void handle_setoption(Game &, std::span<std::string> args)
     }
     if (name == "UseNNUE")
     {
-        nnue::g_use_nnue = (value == "true" || value == "1");
-        if (nnue::g_use_nnue && !nnue::g_network_loaded)
+        game.SetUseNnue(value == "true" || value == "1");
+        if (game.UseNnue() && !game.NnueNetwork().IsLoaded())
         {
             std::cout << "info string NNUE enabled but no net is loaded; set EvalFile first\n";
         }
     }
     else if (name == "EvalFile")
     {
-        nnue::LoadNetwork(value);
+        game.NnueNetwork().Load(value);
     }
 }
 

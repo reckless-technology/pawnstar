@@ -25,9 +25,9 @@ SearchState::SearchState(Game &g) : game(g)
     // Seed the per-thread position stack with only the current game position.
     positions_.push_back(g.CurrentPosition());
     // Seed the NNUE accumulator from the root position (only needed when NNUE is the active evaluator).
-    if (nnue::IsActive())
+    if (game.NnueActive())
     {
-        nnue::Refresh(accumulator_, positions_.back());
+        game.NnueNetwork().Refresh(accumulator_, positions_.back());
     }
 }
 
@@ -38,9 +38,9 @@ void SearchState::PlayMove(Move move)
     const Position &cur = CurrentPosition();
     hash_stack_.push_back({cur.Hash(), cur.ReversibleMoveCount()});
     Position next = cur.MakeMove(move);
-    if (nnue::IsActive())
+    if (game.NnueActive())
     {
-        nnue::Update(accumulator_, cur, next);
+        game.NnueNetwork().Update(accumulator_, cur, next);
     }
     positions_.push_back(next);
 }
@@ -49,10 +49,10 @@ void SearchState::PlayMove(Move move)
 /// When NNUE is active, reverse the accumulator from the child back to the parent (Update is reversible).
 void SearchState::UndoMove()
 {
-    if (nnue::IsActive())
+    if (game.NnueActive())
     {
         const std::size_t n = positions_.size();
-        nnue::Update(accumulator_, positions_[n - 1], positions_[n - 2]);
+        game.NnueNetwork().Update(accumulator_, positions_[n - 1], positions_[n - 2]);
     }
     positions_.pop_back();
     hash_stack_.pop_back();

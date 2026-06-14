@@ -35,7 +35,8 @@ int main(int argc, char **argv)
         std::cout << "test_nnue skipped (no net/reference supplied)\n";
         return 0;
     }
-    if (!nnue::LoadNetwork(argv[1]))
+    nnue::Network net;
+    if (!net.Load(argv[1]))
     {
         std::cerr << "test_nnue: failed to load net '" << argv[1] << "'\n";
         return 1;
@@ -59,7 +60,7 @@ int main(int argc, char **argv)
         const int         expected = std::atoi(line.substr(bar + 1).c_str());
 
         const Position position = Position::FromString(fen);
-        const int      got      = nnue::Evaluate(position);
+        const int      got      = net.Evaluate(position);
         const int      diff     = std::abs(got - expected);
         max_abs_diff            = std::max(max_abs_diff, diff);
         ++checked;

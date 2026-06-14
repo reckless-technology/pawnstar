@@ -8,6 +8,7 @@
 
 #include "chess_clock.h"
 #include "constants.h"
+#include "nnue.h"
 #include "opening_book.h"
 #include "position.h"
 #include "transposition_table.h"
@@ -49,6 +50,38 @@ class Game
         return positions_;
     }
 
+    /// @brief The NNUE network owned by this game (shared read-only by all search threads after loading).
+    /// @return Reference to the network.
+    nnue::Network &NnueNetwork()
+    {
+        return nnue_network_;
+    }
+    /// @brief The NNUE network (const overload).
+    /// @return Const reference to the network.
+    const nnue::Network &NnueNetwork() const
+    {
+        return nnue_network_;
+    }
+
+    /// @brief Select whether NNUE evaluation is used (the UCI UseNNUE option). @param on true to enable.
+    void SetUseNnue(bool on)
+    {
+        use_nnue_ = on;
+    }
+    /// @brief Whether the UseNNUE option is currently selected (independent of whether a net is loaded).
+    /// @return true if NNUE is selected.
+    bool UseNnue() const
+    {
+        return use_nnue_;
+    }
+
+    /// @brief Whether NNUE evaluation is usable right now: selected via UseNNUE and a net is loaded.
+    /// @return true if the search should evaluate with the network.
+    bool NnueActive() const
+    {
+        return use_nnue_ && nnue_network_.IsLoaded();
+    }
+
     /// @brief Start a new game from the given position (see definition for details).
     void NewGame(std::string_view fen_string);
     /// @brief Start a new game from the standard initial position.
@@ -79,4 +112,6 @@ class Game
     void                  SearchThreadEntry(); ///< Entry point of the search worker thread.
     std::thread           worker_thread_;      ///< Worker thread for searching moves.
     std::vector<Position> positions_;          ///< Game position history (grows with the game; no fixed cap).
+    nnue::Network         nnue_network_;       ///< NNUE network instance (loaded via EvalFile; read-only in search).
+    bool                  use_nnue_ = false;   ///< Whether the UseNNUE option selects NNUE evaluation.
 };
