@@ -12,6 +12,7 @@
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <vector>
 
 class Game;
 
@@ -109,5 +110,6 @@ class SearchState
     StackList<Position, kMaxPly + 4> positions_;    ///< Per-thread copy-make position stack.
     nnue::Accumulator                accumulator_{}; ///< NNUE accumulator for the tip position (incremental).
     /// @brief Hash history from game-start through parent of current node (game history + search depth).
-    StackList<HashEntry, kMaxGameLength + kMaxPly + 4> hash_stack_;
+    /// A std::vector (reserved up-front in the constructor) so an arbitrarily long game cannot overflow it.
+    std::vector<HashEntry> hash_stack_;
 };

@@ -44,7 +44,7 @@ class Game
 
     /// @brief Read-only view of the full game position stack, used to seed SearchState.
     /// @return The position history stack.
-    const StackList<Position, kMaxGameLength> &Positions() const
+    const std::vector<Position> &Positions() const
     {
         return positions_;
     }
@@ -76,7 +76,7 @@ class Game
     bool IsDrawByFiftyMoves() const;
 
   private:
-    void                                SearchThreadEntry(); ///< Entry point of the search worker thread.
-    std::thread                         worker_thread_;      ///< Worker thread for searching moves.
-    StackList<Position, kMaxGameLength> positions_;          ///< Game position history stack.
+    void                  SearchThreadEntry(); ///< Entry point of the search worker thread.
+    std::thread           worker_thread_;      ///< Worker thread for searching moves.
+    std::vector<Position> positions_;          ///< Game position history (grows with the game; no fixed cap).
 };

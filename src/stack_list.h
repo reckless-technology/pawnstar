@@ -2,6 +2,7 @@
 /// @file stack_list.h Fixed-capacity stack-allocated list container.
 
 #include <array>
+#include <cassert>
 
 /// @brief Fixed size, very simple stack storage container for lists of moves.
 /// Considerably faster than std::vector due to not allocating data on the heap. More convenient than a raw std::array
@@ -43,6 +44,7 @@ template <typename T, int N> class StackList
     /// @param m Element to append.
     constexpr void push_back(const T &m)
     {
+        assert(end_ != data_.end() && "StackList capacity exceeded");
         *end_++ = m;
     }
 

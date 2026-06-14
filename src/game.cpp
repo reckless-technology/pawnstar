@@ -20,6 +20,7 @@ void Game::NewGame(std::string_view fen_string)
     time_control = ChessClock{};
     is_cancel_pending.store(false, std::memory_order_relaxed);
     positions_.clear();
+    positions_.reserve(1024); // typical games stay well under this; avoids reallocations during normal play
     positions_.push_back(Position::FromString(fen_string));
 }
 
@@ -66,15 +67,17 @@ bool Game::IsDrawByRepetition() const
 {
     int             repetitions = 2;
     const zobrist_t hash        = CurrentPosition().Hash();
-    // Start looking 4 half moves back, i.e. 2 moves ago, for repeated positions.
-    for (auto pos = positions_.end() - 5; pos >= positions_.begin(); pos -= 2)
+    // Start looking 4 half moves back, i.e. 2 moves ago, for repeated positions. Index-based so an early
+    // game (fewer than 5 positions) simply skips the loop rather than forming an out-of-range iterator.
+    for (int i = (int)positions_.size() - 5; i >= 0; i -= 2)
     {
-        if (pos->Hash() == hash && --repetitions == 0)
+        const Position &pos = positions_[i];
+        if (pos.Hash() == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition Game");
             return true;
         }
-        if (pos->ReversibleMoveCount() == 0)
+        if (pos.ReversibleMoveCount() == 0)
         {
             return false;
         }

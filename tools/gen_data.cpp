@@ -45,8 +45,8 @@ constexpr int kEvalCap = 3000;
 constexpr int kResignThreshold = 1500;
 /// @brief Consecutive decisive plies required to adjudicate.
 constexpr int kResignPlies = 4;
-/// @brief Hard cap on game length (plies) before adjudicating a draw. Kept well below the Game position-stack
-/// capacity (kMaxGameLength) so the full game history never overflows, including the random opening plies.
+/// @brief Hard cap on game length (plies) before adjudicating a draw, so self-play games terminate promptly
+/// (the Game position history grows dynamically now, so this is a data-quality bound, not an overflow guard).
 constexpr int kMaxPlies = 200;
 
 /// @brief One recorded training sample (game result is filled in once the game ends).

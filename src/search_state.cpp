@@ -13,7 +13,10 @@
 /// game history.
 SearchState::SearchState(Game &g) : game(g)
 {
-    const StackList<Position, kMaxGameLength> &pos = g.Positions();
+    const std::vector<Position> &pos = g.Positions();
+    // Reserve the whole game history plus the deepest the search can descend, so no push_back during the
+    // search reallocates (and an arbitrarily long game cannot overflow a fixed buffer).
+    hash_stack_.reserve(pos.size() + kMaxPly + 4);
     // Push all positions except the last (current) one into the hash history.
     for (std::size_t i = 0; i + 1 < pos.size(); ++i)
     {
