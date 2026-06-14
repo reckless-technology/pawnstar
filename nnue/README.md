@@ -202,7 +202,7 @@ play. `run_sprt.sh <net.bin> <openings.epd> [rounds=500] [depth=8]` runs:
   the unoptimised full-refresh NNUE speed;
 - **win/draw adjudication** (`-resign movecount=3 score=600`, `-draw movenumber=40 movecount=8
   score=20`). This is essential: it bounds game length so games never exceed the engine's
-  `kMaxGameLength` (256-ply) game-history stack, which would otherwise crash the engine in long
+  `kMaxGameLength` (512-ply) game-history stack, which would otherwise crash the engine in long
   endgames;
 - `-sprt elo0=0 elo1=10 alpha=0.05 beta=0.05` and concurrency `nproc`.
 

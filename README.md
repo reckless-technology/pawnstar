@@ -418,7 +418,7 @@ the published node counts for the standard positions.
   The NNUE accumulator is recomputed from scratch each evaluation (no incremental updates yet), so it is
   slower per node than the hand-crafted eval.
 - **Very long games can overflow the game history.** `Game` stores the full game in a fixed
-  `kMaxGameLength` (256) position stack, so games beyond ~255 plies can crash the engine; match testing
+  `kMaxGameLength` (512) position stack, so games beyond ~511 plies can crash the engine; match testing
   should use draw/resign adjudication to bound game length.
 
 ## Contributing
