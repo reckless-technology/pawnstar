@@ -209,7 +209,32 @@ play. `run_sprt.sh <net.bin> <openings.epd> [rounds=500] [depth=8]` runs:
 fastchess prints "Illegal PV move" warnings occasionally — these are cosmetic (a junk move in the
 printed PV tail; the actual best move played is legal).
 
-## 7. Reproducibility
+## 7. Shipped net (`pawnstar-v1.bin`)
+
+The repo ships one reference net, [pawnstar-v1.bin](pawnstar-v1.bin) (256-hidden bullet net, 394816
+bytes, `md5 d967b96fe3008a58a4d8c6fc61f2a7d5`). It is **experimental** and is not loaded by default —
+the HCE is still the engine's normal evaluator. Load it to try NNUE:
+
+```
+setoption name EvalFile value nnue/pawnstar-v1.bin
+setoption name UseNNUE  value true
+```
+
+**Training data.** ~3.6M quiet self-play positions from the **current HCE** engine: 3.37M generated at
+search depth 6 plus a 235k depth-8 seed set, labelled with search score + game result (§6). Trained
+with bullet on GPU, 40 superbatches.
+
+**Performance.** It **loses to the HCE**, but only narrowly: SPRT at fixed depth 8 (`run_sprt.sh`)
+measures **−67 ± 30 Elo** vs HCE (40.4% over 402 games). The earlier net trained on ~1.0M positions
+lost by **−151 Elo**, so ~3.6× the data roughly halved the deficit — data volume is the dominant
+lever, and NNUE has not yet overtaken the HCE. For absolute context, the HCE itself measures around
+~2350 Elo (CCRL-ballpark, anchored against reference engines at a fast time control).
+
+Next levers to try beating the HCE: more data (10M+), stronger labels (deeper search, or a full
+bootstrap pass on NNUE self-play), and the Phase-4 incremental-accumulator/SIMD speedups so NNUE is
+competitive on equal *time* rather than only equal depth.
+
+## 8. Reproducibility
 
 `setup_bullet.sh` pins bullet to commit `8893e489…` (bullet's API drifts; `tools/bullet/*.rs` target
 that commit). It is idempotent: re-running clones if needed, checks out the pinned commit, reinstalls
@@ -217,7 +242,7 @@ the example sources, and registers them in `crates/bullet_lib/Cargo.toml` only i
 working area is `~/pawnstar_nnue/` (bullet checkout, datasets, checkpoints); override the bullet
 location with `BULLET=…`.
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 - **`undefined symbol: cuFuncLoad` when building bullet with `--features cuda`** — the NVIDIA driver is
   too old (it lacks the CUDA ≥ 12.3 driver API). Upgrade the driver to ≥ 545, or train on CPU with
