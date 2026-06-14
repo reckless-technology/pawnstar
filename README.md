@@ -309,7 +309,7 @@ game play (an SPRT of NNUE vs the hand-crafted eval), not by `test_bratko_kopec`
 
 `OpeningBook` ([src/opening_book.h](src/opening_book.h)) lets the engine play known opening lines
 instantly instead of searching. At startup the engine loads `pawnstar.book` from the working directory;
-the shipped book ([doc/pawnstar.book](doc/pawnstar.book)) is derived from the public-domain
+the shipped book ([pawnstar.book](pawnstar.book)) is derived from the public-domain
 [TSCP](https://github.com/terredeciels/TSCP) `book.txt`.
 
 The file is plain text, one opening line per row, with each move in **coordinate notation**
@@ -443,7 +443,7 @@ Pawnstar is free software, licensed under the **GNU General Public License, vers
 redistribute and/or modify it under the terms of that license; it comes with **no warranty**. See the
 [LICENSE](LICENSE) file for the full text, or <https://www.gnu.org/licenses/gpl-3.0.html>.
 
-The bundled opening book ([doc/pawnstar.book](doc/pawnstar.book)) is derived from the public-domain
+The bundled opening book ([pawnstar.book](pawnstar.book)) is derived from the public-domain
 [TSCP](https://github.com/terredeciels/TSCP) `book.txt`. The NNUE trainer sources under
 [tools/bullet/](tools/bullet) are written for the [bullet](https://github.com/jw1912/bullet) trainer
 (MIT-licensed), which is fetched separately by `tools/setup_bullet.sh` and is not redistributed here.
