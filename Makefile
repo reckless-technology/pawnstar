@@ -79,7 +79,6 @@ clean:
 	      $(TOOL_GENDATA_EXE) $(BUILD_DIR)/gen_data.o $(BUILD_DIR)/gen_data.d \
 	      $(OBJECTS) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
 	      $(GENERATED_DATA) $(GENERATOR_EXE)
-	rm -rf $(DOC_DIR)
 
 gen: $(GENERATOR_EXE)
 
