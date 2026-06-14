@@ -14,7 +14,7 @@ make doc      # generate Doxygen HTML into doc/html
 make clean    # remove build artifacts and generated docs
 ```
 
-Compiler flags include `-mbmi2` (BMI2 intrinsics required), `-std=c++20`, and `-I src`. Debug builds (`DEBUG=1`) add `-fsanitize=undefined,address`.
+Compiler flags include `-mbmi2` and `-mavx2` (BMI2 `pext` for slider attacks and AVX2 for the NNUE kernels; both present on Intel Haswell / AMD Zen 1+), `-std=c++20`, and `-I src`. Debug builds (`DEBUG=1`) add `-fsanitize=undefined,address`.
 
 Always run `make clean && make` when switching branches or after changes to generated files — stale `.d` dependency files can cause spurious build failures.
 

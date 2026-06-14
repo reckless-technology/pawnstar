@@ -51,7 +51,9 @@ incrementally** across make/undo on each thread's `SearchState`: `Network::Updat
 feature-column deltas for pieces whose placement changed (a parent/child bitboard diff — reversible on
 undo, a no-op for null moves), while `Network::Refresh` rebuilds it from scratch at the root.
 `Network::Evaluate(position)` (a full refresh) is the reference the incremental path is checked against
-(§6). A SIMD forward pass is the remaining per-node speed lever.
+(§6). Both kernels (accumulator update and forward pass) are **AVX2-vectorised** when built with
+`-mavx2`, with scalar fallbacks behind `#if defined(__AVX2__)`; the vectorised path is bit-identical to
+the scalar one (verified by `test_nnue`).
 
 ## 2. File format
 
@@ -256,7 +258,8 @@ already bulletformat — `bullet-utils validate` a shard, `cat` a few together, 
 
 Caveats: these SPRTs are at **fixed depth**, which neutralises per-node speed differences. The
 **incremental accumulator has since landed** — worth ~+80 Elo over the old full-refresh at equal time
-(SPRT) — so NNUE is now competitive on the clock too; a SIMD forward pass is the remaining speed lever.
+(SPRT), and the AVX2 SIMD kernels a further ~+180 Elo over the scalar versions at equal time (SPRT) — so
+NNUE is now fully competitive on the clock.
 For absolute context the HCE measures ~2350 Elo (CCRL-ballpark), so `pawnstar-v2` is a large step up.
 NNUE remains **off by default**; set `UseNNUE`/`EvalFile` (or the §3 env vars) to use it.
 

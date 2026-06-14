@@ -22,7 +22,7 @@ Legal move generation runs at roughly 700 million moves per second on a modern l
 ## Requirements
 
 - `clang++` with C++20 support.
-- A CPU with the BMI2 instruction set (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2`.
+- A CPU with the BMI2 and AVX2 instruction sets (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`.
 - GNU `make`.
 - `doxygen` (and optionally Graphviz `dot`) only if you want to build the API docs.
 
@@ -424,23 +424,25 @@ Pawnstar has no official CCRL rating. The figures currently tracked are:
 - **Bratko-Kopec** — 24/24 at every depth from 8 through 12 (the default depth 8 runs in `make check`).
 - **Strength (rough).** The hand-crafted evaluation measures ~2350 Elo (CCRL-ballpark, anchored against
   reference engines at a fast time control). `nnue/pawnstar-v2.bin` beats the HCE by a large margin at
-  fixed depth, and the incremental accumulator is worth a further ~+80 Elo over the full-refresh version
-  at equal time (SPRT).
+  fixed depth. At equal *time*, the incremental accumulator is worth ~+80 Elo over a full refresh and the
+  AVX2 SIMD kernels a further ~+180 Elo over the scalar versions (both by SPRT).
 
 `make check` is the regression baseline; the perft suite verifies move-generation correctness against
 the published node counts for the standard positions.
 
 ## Limitations and known issues
 
-- **BMI2 required.** The sliding-piece attacks depend on the `_pext_u64` instruction, so the engine
-  needs an Intel Haswell / AMD Zen 1 (or newer) CPU and will not run without `-mbmi2`. On early AMD
-  Zen parts `pext` is microcoded and comparatively slow.
+- **BMI2 + AVX2 required.** The sliding-piece attacks use `_pext_u64` (BMI2) and the NNUE kernels use
+  AVX2, so the engine needs an Intel Haswell / AMD Zen 1 (or newer) CPU and is built with `-mbmi2 -mavx2`.
+  On early AMD Zen parts `pext` is microcoded and comparatively slow. (The NNUE kernels keep scalar
+  fallbacks behind `#if defined(__AVX2__)`, but the default build enables AVX2.)
 - **Thread count** defaults to `hardware_concurrency()` and is not exposed as a UCI option, though it
   can be overridden with the `PAWNSTAR_THREADS` environment variable.
 - **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
 - **NNUE is experimental.** It is off by default; the hand-crafted evaluation is the normal evaluator.
-  The accumulator is maintained incrementally across make/undo, but the forward pass is still scalar (no
-  SIMD yet), so each node's NNUE eval remains somewhat heavier than the hand-crafted eval.
+  The accumulator is maintained incrementally across make/undo and the kernels are AVX2-vectorised, so it
+  is fast enough to be competitive on equal time (it already beats the HCE — see Benchmarks), but it is
+  still a small 256-wide `Chess768` net without king buckets.
 
 ## Contributing
 
