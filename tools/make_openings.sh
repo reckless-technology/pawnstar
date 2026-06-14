@@ -11,6 +11,6 @@ N="${3:-1000}"
 
 awk -F' \\| ' '{n=split($1,a," "); if (a[6]+0 <= 5) print $1}' \
     "$DATA_DIR"/data_*.txt "$DATA_DIR"/seed*.txt 2>/dev/null \
-    | sort -u | shuf | head -"$N" > "$OUT"
+    | sort -u | shuf -n "$N" > "$OUT"
 
 echo "wrote $(wc -l < "$OUT") openings -> $OUT"
