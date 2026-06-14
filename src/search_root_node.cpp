@@ -54,7 +54,7 @@ static Move IterativeDeepen(SearchState &state, MoveList move_list, Move best_mo
         {
             break;
         }
-        if (thread_id > 0)
+        if (!is_main)
         {
             const int i = (thread_id - 1) % kSkipEntries;
             if (((depth + kSkipPhase[i]) / kSkipSize[i]) % 2 != 0)
