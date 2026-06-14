@@ -151,39 +151,67 @@ void handle_ucinewgame(Game &game, std::span<std::string>)
 }
 
 /// @brief Handle the "go" command: parse time controls and start searching.
+/// Parsed as a small state machine alternating between a keyword and its integer argument, rather than
+/// scanning with `args[++i]` look-ahead (which also read out of bounds when a value keyword ended the
+/// input). Recognised keywords: the flag `infinite`, and the value-taking `wtime`/`btime`/`movetime`/
+/// `depth`/`movestogo`; any other token (e.g. `winc`, `searchmoves` and its moves) is ignored.
 /// @param game Game to act on.
 /// @param args Command arguments (time controls, depth, etc.).
 void handle_go(Game &game, std::span<std::string> args)
 {
+    /// @brief Parser state: whether the next token is a keyword or the pending keyword's integer value.
+    enum class State
+    {
+        kAwaitKeyword, ///< Expecting a keyword (`infinite`, `wtime`, `depth`, …).
+        kAwaitValue,   ///< Expecting the integer argument for @c pending.
+    };
+
+    State            state = State::kAwaitKeyword;
+    std::string_view pending; // the value-taking keyword whose argument is expected next
+
     for (std::size_t i = 1; i < args.size(); ++i)
     {
-        if ((args[i] == "wtime" && game.CurrentPosition().ColorToMove() == kWhite) ||
-            (args[i] == "btime" && game.CurrentPosition().ColorToMove() == kBlack))
+        const std::string &token = args[i];
+        if (state == State::kAwaitKeyword)
         {
-            game.time_control.clock_type   = ChessClock::kStandard;
-            game.time_control.ms_remaining = stoi(args[++i]);
-            continue;
+            if (token == "infinite") // a flag, no argument
+            {
+                game.time_control.clock_type   = ChessClock::kInfinite;
+                game.time_control.ms_remaining = 0;
+            }
+            else if (token == "wtime" || token == "btime" || token == "movetime" || token == "depth" ||
+                     token == "movestogo")
+            {
+                pending = token; // a value-taking keyword: its argument is the next token
+                state   = State::kAwaitValue;
+            }
+            // else: ignore unrecognised tokens (winc/binc/nodes, searchmoves and its move list, …)
         }
-        if (args[i] == "depth")
+        else // kAwaitValue: token is the integer argument for `pending`
         {
-            game.time_control.clock_type = ChessClock::kFixedDepth;
-            game.time_control.depth      = stoi(args[++i]);
-            continue;
-        }
-        if (args[i] == "movetime")
-        {
-            game.time_control.clock_type   = ChessClock::kFixedTime;
-            game.time_control.ms_remaining = stoi(args[++i]);
-            continue;
-        }
-        if (args[i] == "infinite")
-        {
-            game.time_control.clock_type   = ChessClock::kInfinite;
-            game.time_control.ms_remaining = 0;
-        }
-        if (args[i] == "movestogo")
-        {
-            game.time_control.num_moves_remaining = stoi(args[++i]);
+            const int value = stoi(token);
+            if ((pending == "wtime" && game.CurrentPosition().ColorToMove() == kWhite) ||
+                (pending == "btime" && game.CurrentPosition().ColorToMove() == kBlack))
+            {
+                game.time_control.clock_type   = ChessClock::kStandard;
+                game.time_control.ms_remaining = value;
+            }
+            else if (pending == "movetime")
+            {
+                game.time_control.clock_type   = ChessClock::kFixedTime;
+                game.time_control.ms_remaining = value;
+            }
+            else if (pending == "depth")
+            {
+                game.time_control.clock_type = ChessClock::kFixedDepth;
+                game.time_control.depth      = value;
+            }
+            else if (pending == "movestogo")
+            {
+                game.time_control.num_moves_remaining = value;
+            }
+            // (wtime/btime for the side *not* to move falls through here and is intentionally ignored.)
+            state = State::kAwaitKeyword;
         }
     }
     game.StartThinking();
