@@ -209,30 +209,36 @@ play. `run_sprt.sh <net.bin> <openings.epd> [rounds=500] [depth=8]` runs:
 fastchess prints "Illegal PV move" warnings occasionally — these are cosmetic (a junk move in the
 printed PV tail; the actual best move played is legal).
 
-## 7. Shipped net (`pawnstar-v1.bin`)
+## 7. Shipped nets
 
-The repo ships one reference net, [pawnstar-v1.bin](pawnstar-v1.bin) (256-hidden bullet net, 394816
-bytes, `md5 d967b96fe3008a58a4d8c6fc61f2a7d5`). It is **experimental** and is not loaded by default —
-the HCE is still the engine's normal evaluator. Load it to try NNUE:
+The repo ships two reference nets in this directory. Both are 256-hidden bullet nets (394816 bytes,
+trained 40 superbatches on GPU) and load the same way — **off by default**, since the HCE remains the
+engine's normal evaluator unless you switch:
 
 ```
-setoption name EvalFile value nnue/pawnstar-v1.bin
+setoption name EvalFile value nnue/pawnstar-v2.bin
 setoption name UseNNUE  value true
 ```
 
-**Training data.** ~3.6M quiet self-play positions from the **current HCE** engine: 3.37M generated at
-search depth 6 plus a 235k depth-8 seed set, labelled with search score + game result (§6). Trained
-with bullet on GPU, 40 superbatches.
+| net | training data | vs HCE (fixed depth 8) |
+|---|---|---|
+| **[pawnstar-v2.bin](pawnstar-v2.bin)** *(recommended; md5 `ca2239fb…`)* | ~60M positions of **public PlentyChess** self-play (bulletformat, strong-engine labels) | **≈ +330 Elo** (≈87%) |
+| [pawnstar-v1.bin](pawnstar-v1.bin) *(md5 `d967b96f…`)* | ~3.6M Pawnstar **HCE** self-play (3.37M depth-6 + 235k depth-8 seed) | **−67 Elo** (40%) |
 
-**Performance.** It **loses to the HCE**, but only narrowly: SPRT at fixed depth 8 (`run_sprt.sh`)
-measures **−67 ± 30 Elo** vs HCE (40.4% over 402 games). The earlier net trained on ~1.0M positions
-lost by **−151 Elo**, so ~3.6× the data roughly halved the deficit — data volume is the dominant
-lever, and NNUE has not yet overtaken the HCE. For absolute context, the HCE itself measures around
-~2350 Elo (CCRL-ballpark, anchored against reference engines at a fast time control).
+**The decisive lesson is label quality, not quantity.** `pawnstar-v1`, trained only on Pawnstar's own
+handcrafted-eval self-play, *loses* to the HCE — and a smaller ~1.0M-position predecessor lost by
+−151 Elo, so more data only halved the gap, never closing it. `pawnstar-v2`, trained on a public
+dataset of **strong-engine** (PlentyChess) self-play, *beats* the HCE by a wide margin — roughly a
+400 Elo swing from the data source alone (SPRT at fixed depth 8, `run_sprt.sh`).
 
-Next levers to try beating the HCE: more data (10M+), stronger labels (deeper search, or a full
-bootstrap pass on NNUE self-play), and the Phase-4 incremental-accumulator/SIMD speedups so NNUE is
-competitive on equal *time* rather than only equal depth.
+PlentyChess data: <https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat> (public,
+already bulletformat — `bullet-utils validate` a shard, `cat` a few together, `shuffle`, then train per
+§6, skipping the text-`convert` step).
+
+Caveats: these SPRTs are at **fixed depth**, which neutralises NNUE's slower per-node cost; on equal
+*time* the full-refresh net gives some of that margin back until the Phase-4 incremental-accumulator and
+SIMD work lands. For absolute context the HCE measures ~2350 Elo (CCRL-ballpark), so `pawnstar-v2` is a
+large step up. NNUE remains **off by default**; set `UseNNUE`/`EvalFile` (or the §3 env vars) to use it.
 
 ## 8. Reproducibility
 
