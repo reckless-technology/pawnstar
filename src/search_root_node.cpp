@@ -22,21 +22,21 @@ using std::string;
 using std::stringstream;
 
 /// @brief Run iterative deepening on a single search state — one Lazy SMP thread.
-/// The main thread (@p is_main) prints info, applies time management and produces the authoritative best
-/// move. Helper threads search silently to deepen the shared transposition table and stop as soon as the
-/// global cancellation flag is set. Each thread owns its own @p state and @p move_list copy but shares the
-/// TT and history through the game.
+/// The main thread (@p thread_id 0) prints info, applies time management and produces the authoritative
+/// best move. Helper threads search silently to deepen the shared transposition table and stop as soon as
+/// the global cancellation flag is set. Each thread owns its own @p state and @p move_list copy but shares
+/// the TT and history through the game.
 /// @param state Per-thread search state.
 /// @param move_list This thread's copy of the root move list (re-sorted per iteration).
 /// @param best_move Best move from the shallow ordering pass (seed).
-/// @param is_main Whether this is the authoritative main thread.
-/// @param thread_id Thread index (0 = main); drives the per-thread iteration-skip schedule.
+/// @param thread_id Thread index (0 = the authoritative main thread); drives the per-thread iteration-skip schedule.
 /// @param start_ms Search start time (elapsed ms) for info/time accounting.
 /// @param ms_allocated Soft time budget (standard clock only).
 /// @return The best move found by this thread.
-static Move IterativeDeepen(SearchState &state, MoveList move_list, Move best_move, bool is_main, int thread_id,
-                            int64_t start_ms, int ms_allocated)
+static Move IterativeDeepen(SearchState &state, MoveList move_list, Move best_move, int thread_id, int64_t start_ms,
+                            int ms_allocated)
 {
+    const bool is_main = thread_id == 0; // thread 0 is the authoritative main thread
     // Per-thread iteration-skip schedule (Stockfish-style): helper threads skip certain iteration depths so
     // their searches desynchronize from the main thread and from each other, prefilling the shared TT with
     // diverse entries instead of recomputing the same tree in lockstep. The main thread (thread_id 0) never skips.
@@ -227,12 +227,11 @@ Move SearchRootNode(Game &game)
         // Each helper gets a distinct thread id, which selects its iteration-skip schedule (see IterativeDeepen).
         helpers.emplace_back([&game, &move_list, best_move, i, start_ms, ms_allocated] {
             SearchState helper_state{game};
-            IterativeDeepen(helper_state, move_list, best_move, /*is_main=*/false, /*thread_id=*/i, start_ms,
-                            ms_allocated);
+            IterativeDeepen(helper_state, move_list, best_move, /*thread_id=*/i, start_ms, ms_allocated);
         });
     }
 
-    best_move = IterativeDeepen(state, move_list, best_move, /*is_main=*/true, /*thread_id=*/0, start_ms, ms_allocated);
+    best_move = IterativeDeepen(state, move_list, best_move, /*thread_id=*/0, start_ms, ms_allocated);
 
     game.is_cancel_pending.store(true, std::memory_order_relaxed); // signal helpers to stop
     for (auto &helper : helpers)
