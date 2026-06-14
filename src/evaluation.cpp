@@ -23,7 +23,9 @@ int EvaluatePosition(const SearchState &state, int alpha, int beta)
     // which are specific to the handcrafted scores.
     if (nnue::IsActive())
     {
-        return nnue::Evaluate(position);
+        // Use the incrementally-maintained accumulator (kept in sync by SearchState make/undo) rather than
+        // rebuilding it from scratch here.
+        return nnue::EvaluateAccumulator(state.CurrentAccumulator(), position.ColorToMove());
     }
     std::array<int, 2> scores;
     // Phase 1: Evaluate material values alone.

@@ -38,11 +38,13 @@ TEST_SEE_EXE        = $(BUILD_DIR)/test_see
 TEST_BK_EXE         = $(BUILD_DIR)/test_bratko_kopec
 TEST_PS_EXE         = $(BUILD_DIR)/test_pawn_structure
 TEST_NNUE_EXE       = $(BUILD_DIR)/test_nnue
+TEST_NNUE_INC_EXE   = $(BUILD_DIR)/test_nnue_incremental
 TEST_OBJECTS        = $(BUILD_DIR)/perft.o \
                       $(BUILD_DIR)/see.o \
                       $(BUILD_DIR)/bratko_kopec.o \
                       $(BUILD_DIR)/pawn_structure.o \
-                      $(BUILD_DIR)/nnue_test.o
+                      $(BUILD_DIR)/nnue_test.o \
+                      $(BUILD_DIR)/nnue_incremental.o
 TEST_DEPS           = $(TEST_OBJECTS:.o=.d)
 
 # Diagnostic counters (DEBUGX) are compiled in by default; build with RELEASE=1 to omit them.
@@ -62,7 +64,7 @@ all: prep $(PROGRAM_EXE)
 
 tools: prep $(TOOL_GENDATA_EXE)
 
-tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE) $(TEST_NNUE_EXE)
+tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE)
 
 check: tests
 	$(TEST_SEE_EXE)
@@ -70,12 +72,13 @@ check: tests
 	$(TEST_PERFT_EXE)
 	$(TEST_BK_EXE)
 	$(TEST_NNUE_EXE)
+	$(TEST_NNUE_INC_EXE)
 
 prep:
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE) $(TEST_NNUE_EXE) \
+	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_PS_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) \
 	      $(TOOL_GENDATA_EXE) $(BUILD_DIR)/gen_data.o $(BUILD_DIR)/gen_data.d \
 	      $(OBJECTS) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
 	      $(GENERATED_DATA) $(GENERATOR_EXE)
@@ -116,6 +119,9 @@ $(TEST_PS_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/pawn_structure.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(TEST_NNUE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_test.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+$(TEST_NNUE_INC_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_incremental.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 # Link the self-play data generator against all engine objects.

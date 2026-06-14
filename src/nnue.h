@@ -20,6 +20,8 @@
 /// The activation and dequantisation below mirror bullet's `simple` example exactly so that an
 /// engine evaluation reproduces the trainer's eval (verified by test_nnue).
 
+#include "constants.h"
+
 #include <array>
 #include <cstdint>
 #include <string>
@@ -52,6 +54,27 @@ struct Network
 /// @brief Total size of a valid net file: every weight is a little-endian int16, tightly packed, no header.
 constexpr std::size_t kNetFileBytes =
     (static_cast<std::size_t>(kInputSize) * kHiddenSize + kHiddenSize + 2 * kHiddenSize + 1) * sizeof(int16_t);
+
+/// @brief The two perspective accumulators (each the feature-transformer output, width kHiddenSize).
+/// Maintained incrementally across make/undo so a node's evaluation does not rebuild it from scratch.
+struct Accumulator
+{
+    alignas(64) std::array<int16_t, kHiddenSize> white; ///< White-perspective accumulator.
+    alignas(64) std::array<int16_t, kHiddenSize> black; ///< Black-perspective accumulator.
+};
+
+/// @brief Rebuild both perspectives of @p acc from scratch for @p position (seed bias + every piece).
+void Refresh(Accumulator &acc, const Position &position);
+
+/// @brief Incrementally move @p acc from matching @p from to matching @p to by applying only the
+/// feature deltas for pieces whose placement differs. Reversible (swap @p from / @p to to undo), and a
+/// no-op when the placements are identical (e.g. a null move). Robust to captures/castling/EP/promotion.
+void Update(Accumulator &acc, const Position &from, const Position &to);
+
+/// @brief Evaluate from a maintained accumulator. @param acc Accumulator matching the position.
+/// @param side_to_move Side to move (selects which perspective feeds the first half of the output layer).
+/// @return Score in centipawns from the side-to-move's perspective.
+int EvaluateAccumulator(const Accumulator &acc, Color side_to_move);
 
 /// @brief Whether NNUE evaluation is currently selected (set via the UseNNUE UCI option / env).
 extern bool g_use_nnue;

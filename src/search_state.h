@@ -5,6 +5,7 @@
 #include "debug_hashtable.h"
 #include "history_table.h"
 #include "move.h"
+#include "nnue.h"
 #include "position.h"
 #include "stack_list.h"
 
@@ -54,6 +55,14 @@ class SearchState
         return positions_.back();
     }
 
+    /// @brief The NNUE accumulator for the current position, maintained incrementally across make/undo.
+    /// Only valid (kept in sync) while nnue::IsActive(); ignored otherwise.
+    /// @return Const reference to the current accumulator.
+    const nnue::Accumulator &CurrentAccumulator() const
+    {
+        return accumulator_;
+    }
+
     /// @brief Make a move, pushing the resulting position onto the stack and recording its hash.
     /// @param move Move to play.
     void PlayMove(Move move);
@@ -97,7 +106,8 @@ class SearchState
     }
 
   private:
-    StackList<Position, kMaxPly + 4> positions_; ///< Per-thread copy-make position stack.
+    StackList<Position, kMaxPly + 4> positions_;    ///< Per-thread copy-make position stack.
+    nnue::Accumulator                accumulator_{}; ///< NNUE accumulator for the tip position (incremental).
     /// @brief Hash history from game-start through parent of current node (game history + search depth).
     StackList<HashEntry, kMaxGameLength + kMaxPly + 4> hash_stack_;
 };

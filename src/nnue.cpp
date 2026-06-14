@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
+#include <utility>
 
 namespace nnue
 {
@@ -27,7 +28,7 @@ inline int32_t SCReLU(int16_t x)
     return y * y;
 }
 
-/// @brief Add a feature column to an accumulator.
+/// @brief Add a feature column to a single-perspective accumulator.
 /// @param acc Accumulator to update (width kHiddenSize).
 /// @param feature Feature index in [0, kInputSize).
 inline void AddFeature(std::array<int16_t, kHiddenSize> &acc, int feature)
@@ -38,7 +39,105 @@ inline void AddFeature(std::array<int16_t, kHiddenSize> &acc, int feature)
         acc[i] = static_cast<int16_t>(acc[i] + column[i]);
     }
 }
+
+/// @brief Subtract a feature column from a single-perspective accumulator (the inverse of AddFeature).
+inline void SubFeature(std::array<int16_t, kHiddenSize> &acc, int feature)
+{
+    const int16_t *column = &g_network.feature_weights[static_cast<std::size_t>(feature) * kHiddenSize];
+    for (int i = 0; i < kHiddenSize; ++i)
+    {
+        acc[i] = static_cast<int16_t>(acc[i] - column[i]);
+    }
+}
+
+/// @brief The bullet Chess768 feature indices for a piece, one per perspective.
+///   white-perspective index = color * 384 + (piece_type - 1) * 64 + square
+///   black-perspective index = (1 - color) * 384 + (piece_type - 1) * 64 + (square ^ kRankFlip)
+inline std::pair<int, int> FeatureIndices(int color, int piece, int sq)
+{
+    const int type_offset = (piece - kPawn) * 64;
+    return {color * 384 + type_offset + sq, (1 - color) * 384 + type_offset + (sq ^ kRankFlip)};
+}
+
+/// @brief Add one piece to both perspectives of an accumulator.
+inline void AddPiece(Accumulator &acc, int color, int piece, int sq)
+{
+    const auto [wi, bi] = FeatureIndices(color, piece, sq);
+    AddFeature(acc.white, wi);
+    AddFeature(acc.black, bi);
+}
+
+/// @brief Remove one piece from both perspectives of an accumulator.
+inline void RemovePiece(Accumulator &acc, int color, int piece, int sq)
+{
+    const auto [wi, bi] = FeatureIndices(color, piece, sq);
+    SubFeature(acc.white, wi);
+    SubFeature(acc.black, bi);
+}
 } // namespace
+
+void Refresh(Accumulator &acc, const Position &position)
+{
+    // Seed both perspectives with the feature-transformer bias, then add every piece.
+    acc.white = g_network.feature_bias;
+    acc.black = g_network.feature_bias;
+    for (int color = kWhite; color <= kBlack; ++color)
+    {
+        const Bitboard friendly = position.colors_[color];
+        for (int piece = kPawn; piece <= kKing; ++piece)
+        {
+            for (Square s : position.pieces_[piece] & friendly)
+            {
+                AddPiece(acc, color, piece, s);
+            }
+        }
+    }
+}
+
+void Update(Accumulator &acc, const Position &from, const Position &to)
+{
+    // Diff piece placement per (color, type): remove pieces that left a square, add pieces that arrived.
+    // A handful of squares change per move; identical placements (e.g. a null move) yield no work.
+    for (int color = kWhite; color <= kBlack; ++color)
+    {
+        for (int piece = kPawn; piece <= kKing; ++piece)
+        {
+            const Bitboard from_bb = from.pieces_[piece] & from.colors_[color];
+            const Bitboard to_bb   = to.pieces_[piece] & to.colors_[color];
+            for (Square s : from_bb & ~to_bb)
+            {
+                RemovePiece(acc, color, piece, s);
+            }
+            for (Square s : to_bb & ~from_bb)
+            {
+                AddPiece(acc, color, piece, s);
+            }
+        }
+    }
+}
+
+int EvaluateAccumulator(const Accumulator &acc, Color side_to_move)
+{
+    // The side-to-move accumulator feeds the first half of the output layer.
+    const bool                              white_to_move = side_to_move == kWhite;
+    const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white : acc.black;
+    const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? acc.black : acc.white;
+
+    // Forward pass mirroring bullet's `simple` example exactly (SCReLU activation).
+    int64_t output = 0;
+    for (int i = 0; i < kHiddenSize; ++i)
+    {
+        output += SCReLU(stm_acc[i]) * g_network.output_weights[i];
+        output += SCReLU(ntm_acc[i]) * g_network.output_weights[kHiddenSize + i];
+    }
+    // SCReLU leaves the dot product in QA*QA*QB units; reduce one QA, add the bias (QA*QB units), apply the
+    // eval scale, then remove the remaining QA*QB quantisation.
+    output /= kQA;
+    output += g_network.output_bias;
+    output *= kScale;
+    output /= (kQA * kQB);
+    return static_cast<int>(output);
+}
 
 bool LoadNetwork(const std::string &path)
 {
@@ -80,49 +179,11 @@ bool LoadNetwork(const std::string &path)
 
 int Evaluate(const Position &position)
 {
-    // Two perspective accumulators, seeded with the feature-transformer bias.
-    std::array<int16_t, kHiddenSize> white_acc = g_network.feature_bias;
-    std::array<int16_t, kHiddenSize> black_acc = g_network.feature_bias;
-
-    // Accumulate every piece into both perspectives using the bullet Chess768 feature layout:
-    //   white-perspective index = color * 384 + (piece_type - 1) * 64 + square
-    //   black-perspective index = (1 - color) * 384 + (piece_type - 1) * 64 + (square ^ kRankFlip)
-    for (int color = kWhite; color <= kBlack; ++color)
-    {
-        const Bitboard friendly = position.colors_[color];
-        for (int piece = kPawn; piece <= kKing; ++piece)
-        {
-            const int type_offset = (piece - kPawn) * 64;
-            for (Square s : position.pieces_[piece] & friendly)
-            {
-                const int sq          = s;
-                const int white_index = color * 384 + type_offset + sq;
-                const int black_index = (1 - color) * 384 + type_offset + (sq ^ kRankFlip);
-                AddFeature(white_acc, white_index);
-                AddFeature(black_acc, black_index);
-            }
-        }
-    }
-
-    // The side-to-move accumulator feeds the first half of the output layer.
-    const bool                              white_to_move = position.ColorToMove() == kWhite;
-    const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? white_acc : black_acc;
-    const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? black_acc : white_acc;
-
-    // Forward pass mirroring bullet's `simple` example exactly (SCReLU activation).
-    int64_t output = 0;
-    for (int i = 0; i < kHiddenSize; ++i)
-    {
-        output += SCReLU(stm_acc[i]) * g_network.output_weights[i];
-        output += SCReLU(ntm_acc[i]) * g_network.output_weights[kHiddenSize + i];
-    }
-    // SCReLU leaves the dot product in QA*QA*QB units; reduce one QA, add the bias (QA*QB units), apply the
-    // eval scale, then remove the remaining QA*QB quantisation.
-    output /= kQA;
-    output += g_network.output_bias;
-    output *= kScale;
-    output /= (kQA * kQB);
-    return static_cast<int>(output);
+    // Full-refresh evaluation (used by diagnostics/tests and as the incremental path's reference): build
+    // a fresh accumulator then run the shared forward pass, so both paths are guaranteed identical.
+    Accumulator acc;
+    Refresh(acc, position);
+    return EvaluateAccumulator(acc, position.ColorToMove());
 }
 
 } // namespace nnue

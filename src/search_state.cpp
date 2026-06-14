@@ -21,24 +21,42 @@ SearchState::SearchState(Game &g) : game(g)
     }
     // Seed the per-thread position stack with only the current game position.
     positions_.push_back(g.CurrentPosition());
+    // Seed the NNUE accumulator from the root position (only needed when NNUE is the active evaluator).
+    if (nnue::IsActive())
+    {
+        nnue::Refresh(accumulator_, positions_.back());
+    }
 }
 
 /// @brief Push the current position's hash then make the move on a copy of the position.
+/// When NNUE is active, advance the accumulator from the parent to the child by feature deltas.
 void SearchState::PlayMove(Move move)
 {
     const Position &cur = CurrentPosition();
     hash_stack_.push_back({cur.Hash(), cur.ReversibleMoveCount()});
-    positions_.push_back(cur.MakeMove(move));
+    Position next = cur.MakeMove(move);
+    if (nnue::IsActive())
+    {
+        nnue::Update(accumulator_, cur, next);
+    }
+    positions_.push_back(next);
 }
 
 /// @brief Pop the position and hash stacks to undo the last move.
+/// When NNUE is active, reverse the accumulator from the child back to the parent (Update is reversible).
 void SearchState::UndoMove()
 {
+    if (nnue::IsActive())
+    {
+        const std::size_t n = positions_.size();
+        nnue::Update(accumulator_, positions_[n - 1], positions_[n - 2]);
+    }
     positions_.pop_back();
     hash_stack_.pop_back();
 }
 
 /// @brief Push a null move (skip this side's turn) used for null-move pruning.
+/// Piece placement is unchanged by a null move, so the accumulator needs no update.
 void SearchState::MakeNullMove()
 {
     const Position &cur = CurrentPosition();
