@@ -211,38 +211,78 @@ void handle_isready(Game &, std::span<std::string>)
 }
 
 /// @brief Handle the "position" command: set up the position and apply the listed moves.
+/// Parses the UCI grammar `position [startpos | fen <6 fields>] [moves <m1> <m2> ...]` as a small state
+/// machine over the tokens, rather than scanning with look-ahead and index mutation.
 /// @param game Game to act on.
 /// @param args Command arguments (startpos / fen and the move list).
 void handle_position(Game &game, std::span<std::string> args)
 {
+    /// @brief Parser state: what the next token is expected to be.
+    enum class State
+    {
+        kAwaitSource, ///< Expecting `startpos` or `fen` (the position source).
+        kCollectFen,  ///< Accumulating the six space-separated FEN fields.
+        kPlayMoves,   ///< Source is set; the `moves` keyword and the moves themselves follow.
+    };
+
+    State       state = State::kAwaitSource;
+    std::string fen;
+    int         fen_fields = 0;
+
     for (std::size_t i = 1; i < args.size(); ++i)
     {
-        if (args[i] == "startpos")
+        const std::string &token = args[i];
+        switch (state)
         {
-            game.NewGame();
-            continue;
-        }
-        if (args[i] == "fen")
-        {
-            // A FEN is six space-separated fields; reassemble them (stopping at "moves" or end of input)
-            // rather than consuming only the piece-placement field.
-            std::string fen;
-            for (int field = 0; field < 6 && i + 1 < args.size() && args[i + 1] != "moves"; ++field)
+        case State::kAwaitSource:
+            if (token == "startpos")
+            {
+                game.NewGame();
+                state = State::kPlayMoves;
+            }
+            else if (token == "fen")
+            {
+                state = State::kCollectFen;
+            }
+            else if (token == "moves")
+            {
+                state = State::kPlayMoves; // tolerate a missing source: apply moves to the current position
+            }
+            break;
+
+        case State::kCollectFen:
+            if (token == "moves")
+            {
+                game.NewGame(fen); // FEN ended early (fewer than six fields is tolerated)
+                state = State::kPlayMoves;
+            }
+            else
             {
                 if (!fen.empty())
                 {
                     fen += ' ';
                 }
-                fen += args[++i];
+                fen += token;
+                if (++fen_fields == 6) // a complete FEN; anything after must be the move list
+                {
+                    game.NewGame(fen);
+                    state = State::kPlayMoves;
+                }
             }
-            game.NewGame(fen);
-            continue;
+            break;
+
+        case State::kPlayMoves:
+            if (token != "moves") // skip the `moves` keyword itself; everything else is a move
+            {
+                game.PlayMove(token);
+            }
+            break;
         }
-        if (args[i] == "moves")
-        {
-            continue;
-        }
-        game.PlayMove(args[i]);
+    }
+    // A FEN that ran to the end of input without a `moves` keyword or a sixth field is still applied.
+    if (state == State::kCollectFen && !fen.empty())
+    {
+        game.NewGame(fen);
     }
 }
 
