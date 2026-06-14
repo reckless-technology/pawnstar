@@ -39,6 +39,10 @@ TEST_BK_EXE         = $(BUILD_DIR)/test_bratko_kopec
 TEST_PS_EXE         = $(BUILD_DIR)/test_pawn_structure
 TEST_NNUE_EXE       = $(BUILD_DIR)/test_nnue
 TEST_NNUE_INC_EXE   = $(BUILD_DIR)/test_nnue_incremental
+# Shipped net + checked-in trainer reference, used by `make check` to exercise NNUE inference and the
+# incremental accumulator. Resolved with wildcard so the checks degrade to a no-op (still green) if absent.
+NNUE_NET            = $(wildcard nnue/pawnstar-v2.bin)
+NNUE_REF            = $(wildcard test/nnue_reference.txt)
 TEST_OBJECTS        = $(BUILD_DIR)/perft.o \
                       $(BUILD_DIR)/see.o \
                       $(BUILD_DIR)/bratko_kopec.o \
@@ -71,8 +75,8 @@ check: tests
 	$(TEST_PS_EXE)
 	$(TEST_PERFT_EXE)
 	$(TEST_BK_EXE)
-	$(TEST_NNUE_EXE)
-	$(TEST_NNUE_INC_EXE)
+	$(TEST_NNUE_EXE) $(NNUE_NET) $(NNUE_REF)
+	$(TEST_NNUE_INC_EXE) $(NNUE_NET)
 
 prep:
 	mkdir -p $(BUILD_DIR)

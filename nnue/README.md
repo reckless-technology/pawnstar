@@ -194,8 +194,14 @@ awk -F' \\| ' 'NR%500==0 {print $1}' ~/pawnstar_nnue/data/data_*.txt | head -200
 ```
 
 `pawnstar_eval` uses bullet's own `Chess768` feature extraction and `simple`-example inference, so a
-match confirms our feature indexing, perspective/orientation, SCReLU and dequantisation are all
-correct. `test_nnue` with no arguments is a no-op, so `make check` stays green when no net is present.
+match confirms our feature indexing, perspective/orientation, SCReLU and dequantisation are all correct.
+
+The repo checks in `test/nnue_reference.txt` — 250 reference evals for the shipped `pawnstar-v2.bin` —
+and `make check` runs `test_nnue nnue/pawnstar-v2.bin test/nnue_reference.txt` automatically (current
+engine: max |diff| 0 cp). The reference's first field is the FEN, so regenerate it after shipping a *new*
+net with: `cut -d'|' -f1 test/nnue_reference.txt > fens.txt && "$EVAL" nnue/pawnstar-v2.bin fens.txt >
+test/nnue_reference.txt`. With no arguments `test_nnue` is a no-op, so `make check` stays green if the
+net/reference are absent.
 
 A second test, `test_nnue_incremental <net.bin>`, plays random move sequences through a `SearchState`
 and asserts the incrementally-maintained accumulator evaluates **bit-identically** to a full refresh at

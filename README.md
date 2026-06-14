@@ -339,7 +339,7 @@ prints the available book moves and their frequencies for the current position.
 make check
 ```
 
-builds and runs five standalone test executables:
+builds and runs six standalone test executables:
 
 | Executable | Description |
 |---|---|
@@ -348,11 +348,14 @@ builds and runs five standalone test executables:
 | `build/test_perft` | Move-generation regression on the standard PERFT positions |
 | `build/test_bratko_kopec` | 24 Bratko-Kopec search positions (default depth 8) |
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
+| `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
 
-`test_nnue` is a no-op (passes immediately) unless given a net file and a reference file —
-`make check` runs it with no arguments so it stays green when no net is built. To exercise it, generate
-reference evals with the bullet `pawnstar_eval` example and pass them in: see
-[nnue/README.md](nnue/README.md). NNUE does not change the Bratko-Kopec scores (that test always uses
+`make check` runs both NNUE tests against the shipped `nnue/pawnstar-v2.bin`: `test_nnue` against the
+checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), and `test_nnue_incremental`
+which asserts the incremental accumulator matches a full refresh at every node. The Makefile passes the
+net/reference via `$(wildcard …)`, so the checks degrade to a green no-op only if those files are absent;
+regenerate `test/nnue_reference.txt` with the bullet `pawnstar_eval` example if you ship a new net (see
+[nnue/README.md](nnue/README.md)). NNUE does not change the Bratko-Kopec scores (that test always uses
 the hand-crafted evaluation), so leave `UseNNUE` off when regenerating its references.
 
 The Bratko-Kopec test takes an optional depth argument in the range 8–12, e.g.
