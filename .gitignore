@@ -1,3 +1,6 @@
 build/
 src/generated_data.cpp
 generate_constants/gen_constants
+
+# fastchess resumable tournament config (written into the cwd during SPRT runs)
+config.json
