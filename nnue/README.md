@@ -270,53 +270,75 @@ depth despite the wider net. For absolute context the HCE measures ~2350 Elo (CC
 with `UseNNUE false` / `PAWNSTAR_NNUE=0`). Next levers: more data for the *512* net (v4 used only 60M),
 or a wider net still (1024) / king-buckets.
 
-### Recreating `pawnstar-v4.bin`
+### Recreating `pawnstar-v4.bin` (step by step)
 
-`pawnstar-v4.bin` was trained on ~60M positions of **public PlentyChess self-play**, already in
-bulletformat (32-byte `bullet::ChessBoard` records), so the text→`convert` step is skipped. GPU training
-is GPU-nondeterministic, so this reproduces a *functionally equivalent* net, not a byte-identical one.
+`pawnstar-v4.bin` is a **512-wide** net trained on ~60M positions of **public PlentyChess self-play**
+(the *same* data as the 256-wide v2 — only the width differs). The data is already in bulletformat
+(32-byte `bullet::ChessBoard` records), so the text→`convert` step is skipped. GPU training is
+nondeterministic, so this reproduces a *functionally equivalent* net, not a byte-identical one.
+
+The key requirement: the **width must be 512 everywhere** — `kHiddenSize=512` in [src/nnue.h](../src/nnue.h)
+(this is the shipped engine) and `HIDDEN_SIZE`/`HIDDEN = 512` in [tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)
+and [tools/bullet/pawnstar_eval.rs](../tools/bullet/pawnstar_eval.rs). `setup_bullet.sh` copies those `.rs`
+files into bullet, so as long as the repo is on the 512 arch the trainer produces a 512 net automatically.
 
 ```bash
-# 0. One-time: set up the bullet trainer and build bullet-utils (see §8).
+cd /path/to/pawnstar                 # repo root (so ./build and nnue/ paths resolve)
+make                                 # build the 512-wide engine (kHiddenSize=512)
+make tests                           # build test_nnue / test_nnue_incremental
+
+# 0. One-time: install the bullet trainer (pinned commit) + the 512 examples, build utils + trainer + eval.
 tools/setup_bullet.sh
 BULLET=~/pawnstar_nnue/bullet
-( cd "$BULLET/crates/utils" && cargo build --release )
+export CUDA_PATH=~/cuda-12.2 PATH="$CUDA_PATH/bin:$PATH" LD_LIBRARY_PATH="$CUDA_PATH/lib64"
+( cd "$BULLET/crates/utils"      && cargo build --release )
+( cd "$BULLET/crates/bullet_lib" && cargo build --release --features cuda --example pawnstar --example pawnstar_eval )
 UTILS="$BULLET/target/release/bullet-utils"
-mkdir -p ~/pawnstar_nnue/v2 && cd ~/pawnstar_nnue/v2
+EVAL="$BULLET/target/release/examples/pawnstar_eval"
+mkdir -p ~/pawnstar_nnue/v4 && cd ~/pawnstar_nnue/v4
 
-# 1. Download two PlentyChess bulletformat shards (public, tokenless; ~1.9 GB + ~61 MB ≈ 60M positions).
+# 1. Download the two PlentyChess shards v4 used (public, tokenless; ~1.9 GB + ~61 MB ≈ 60M positions).
 BASE=https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat/resolve/main
 curl -L -o 11848.data "$BASE/11848.data"     # ~58M positions
 curl -L -o 12892.data "$BASE/12892.data"     # ~1.9M positions
 
-# 2. Sanity-check the format (size % 32 == 0; all records valid).
+# 2. Validate the format (size % 32 == 0; no invalid records). Some shards in the repo are corrupt
+#    (e.g. 11496.data fails this), so always validate before training.
 "$UTILS" validate --input 11848.data
+"$UTILS" validate --input 12892.data
 
-# 3. Concatenate (bulletformat is flat 32-byte records) and shuffle (self-play data is correlated).
+# 3. Concatenate (flat 32-byte records) and shuffle (self-play data is highly correlated).
 cat 11848.data 12892.data > all.data
 "$UTILS" shuffle --input all.data --output shuffled.data --mem-used-mb 4096
 
-# 4. Train 40 superbatches (1 superbatch ≈ 1 epoch, so PAWNSTAR_BPS = positions / 16384).
-export CUDA_PATH=~/cuda-12.2 PATH="$CUDA_PATH/bin:$PATH" LD_LIBRARY_PATH="$CUDA_PATH/lib64"
+# 4. Train 40 superbatches (1 superbatch ≈ 1 epoch, so PAWNSTAR_BPS = positions / 16384 ⇒ ~40 epochs,
+#    the same recipe as v2). The 512 net trains ~2.3x slower than 256 (~1h on a GTX 1050 Ti).
 COUNT=$(( $(stat -c%s shuffled.data) / 32 ))
 ( cd "$BULLET/crates/bullet_lib" && \
-  PAWNSTAR_DATA=~/pawnstar_nnue/v2/shuffled.data PAWNSTAR_BPS=$(( COUNT / 16384 )) \
-  PAWNSTAR_SBS=40 PAWNSTAR_OUT=~/pawnstar_nnue/v2/checkpoints \
+  PAWNSTAR_DATA=~/pawnstar_nnue/v4/shuffled.data PAWNSTAR_BPS=$(( COUNT / 16384 )) \
+  PAWNSTAR_SBS=40 PAWNSTAR_OUT=~/pawnstar_nnue/v4/checkpoints \
   cargo run --release --features cuda --example pawnstar )   # drop --features cuda to train on CPU
 
-# 5. Export the quantised net into the repo.
-cp ~/pawnstar_nnue/v2/checkpoints/pawnstar-40/quantised.bin nnue/pawnstar-v4.bin
+# 5. Export the quantised net into the repo (a 512 net is 789568 bytes).
+cp ~/pawnstar_nnue/v4/checkpoints/pawnstar-40/quantised.bin /path/to/pawnstar/nnue/pawnstar-v4.bin
 
-# 6. Verify, then strength-test vs the HCE (reuse any openings.epd — e.g. one built by make_openings.sh
-#    from self-play data, or any EPD opening book; make_openings.sh cannot read bulletformat).
-./build/test_nnue_incremental nnue/pawnstar-v4.bin
+# 6. Regenerate the engine-vs-trainer cross-check reference for the new net (§6), then verify.
+cd /path/to/pawnstar
+cut -d'|' -f1 test/nnue_reference.txt > /tmp/fens.txt      # reuse the existing FENs (first field)
+"$EVAL" nnue/pawnstar-v4.bin /tmp/fens.txt > test/nnue_reference.txt
+./build/test_nnue nnue/pawnstar-v4.bin test/nnue_reference.txt   # expect max |diff| <= 2 cp (engine == trainer)
+./build/test_nnue_incremental nnue/pawnstar-v4.bin              # incremental accumulator == full refresh
+make check                                                      # all suites, including the NNUE ones
+
+# 7. (optional) Strength-test vs the HCE at fixed depth; reuse any EPD opening book.
 tools/run_sprt.sh nnue/pawnstar-v4.bin /path/to/openings.epd
 ```
 
-The PlentyChess repo has many more (~10–12 GB) shards; add more `.data` files at step 1/3 for a larger
-set (raise the LR-schedule end with `PAWNSTAR_SBS` accordingly). The trainer architecture and
-quantisation in [pawnstar.rs](../tools/bullet/pawnstar.rs) (768→512, SCReLU, QA/QB/SCALE) must stay
-unchanged so the engine can load the result (§2).
+To train a **stronger** net, add more clean PlentyChess shards at steps 1–3 (the repo has dozens of
+~10–12 GB shards ≈ 370M positions each; `validate` each first). For a **wider** net, change the width to
+the same value in all three files above (`nnue.h`, `pawnstar.rs`, `pawnstar_eval.rs`), rebuild the engine
+and the bullet examples, and retrain — a different width yields a different file size, so an engine built
+for one width cannot load a net of another (§2).
 
 ## 8. Reproducibility
 
