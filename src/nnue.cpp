@@ -96,6 +96,12 @@ inline int FeatureRow(int bucket, int color, int piece, int sq, bool black)
     return bucket * kInputSize + base;
 }
 
+/// @brief Byte offset into feature_weights_ of a piece's column in one perspective's bucket bank.
+inline std::size_t Row(int bucket, int color, int piece, int sq, bool black)
+{
+    return static_cast<std::size_t>(FeatureRow(bucket, color, piece, sq, black)) * kHiddenSize;
+}
+
 /// @brief A perspective's king bucket: index the map with that perspective's king square, oriented to it.
 inline int WhiteBucket(const Position &p)
 {
@@ -118,8 +124,7 @@ void Network::RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position
         {
             for (Square s : position.pieces_[piece] & friendly)
             {
-                AddColumn(side, &feature_weights_[static_cast<std::size_t>(FeatureRow(bucket, color, piece, s, black)) *
-                                                  kHiddenSize]);
+                AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
             }
         }
     }
@@ -136,13 +141,11 @@ void Network::DiffSide(std::array<int16_t, kHiddenSize> &side, const Position &f
             const Bitboard to_bb   = to.pieces_[piece] & to.colors_[color];
             for (Square s : from_bb & ~to_bb)
             {
-                SubColumn(side, &feature_weights_[static_cast<std::size_t>(FeatureRow(bucket, color, piece, s, black)) *
-                                                  kHiddenSize]);
+                SubColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
             }
             for (Square s : to_bb & ~from_bb)
             {
-                AddColumn(side, &feature_weights_[static_cast<std::size_t>(FeatureRow(bucket, color, piece, s, black)) *
-                                                  kHiddenSize]);
+                AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
             }
         }
     }
@@ -195,9 +198,37 @@ void Network::Update(Accumulator &acc, const Position &from, const Position &to)
 {
     // A king move that crosses a bucket boundary changes that whole perspective's bank, so refresh it from
     // scratch; otherwise apply only the piece-placement delta within the (unchanged) bank. At most one king
-    // moves per ply, so at most one perspective refreshes. A null move (identical placements) yields no work.
+    // moves per ply, so at most one perspective refreshes.
     const int wf = WhiteBucket(from), wt = WhiteBucket(to);
     const int bf = BlackBucket(from), bt = BlackBucket(to);
+
+    // Common case (~98%): neither king changed bucket. Do a single combined pass — one bitboard diff per
+    // piece type, updating both perspectives together — rather than two independent DiffSide passes. A null
+    // move (identical placements) falls through here doing no column work.
+    if (wf == wt && bf == bt)
+    {
+        for (int color = kWhite; color <= kBlack; ++color)
+        {
+            for (int piece = kPawn; piece <= kKing; ++piece)
+            {
+                const Bitboard from_bb = from.pieces_[piece] & from.colors_[color];
+                const Bitboard to_bb   = to.pieces_[piece] & to.colors_[color];
+                for (Square s : from_bb & ~to_bb)
+                {
+                    SubColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
+                    SubColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
+                }
+                for (Square s : to_bb & ~from_bb)
+                {
+                    AddColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
+                    AddColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
+                }
+            }
+        }
+        return;
+    }
+
+    // Rare: one king crossed a bucket boundary. Refresh that perspective; diff the other.
     if (wf != wt)
     {
         RefreshSide(acc.white, to, wt, /*black=*/false);
