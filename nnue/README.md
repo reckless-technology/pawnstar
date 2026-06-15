@@ -9,32 +9,43 @@ works, how to enable/disable it, and how to generate data, train, validate and s
 In-engine code: [src/nnue.h](../src/nnue.h), [src/nnue.cpp](../src/nnue.cpp). The branch into NNUE is in
 [src/evaluation.cpp](../src/evaluation.cpp) (`EvaluatePosition`). Tooling: [tools/](../tools).
 
+> **Branch note (`kingbuckets-4`):** this branch is the **king-buckets experiment** — engine and trainer
+> use bullet's king-bucketed `ChessBuckets` feature set (4 buckets), so it cannot load the shipped
+> Chess768 net. §1, §2 and §6 below describe this branch's architecture. `main` ships the Chess768
+> 512-wide `nnue/pawnstar-v4.bin` (§7). A king-bucket net ships only if its SPRT vs v4 wins; otherwise
+> the branch is abandoned (like the rejected 1024-wide `bignet-1024`).
+
 ---
 
 ## 1. Architecture
 
-A simple "perspective" network using bullet's standard `Chess768` feature set:
+A "perspective" network using bullet's king-bucketed `ChessBuckets` feature set:
 
 ```
-768 inputs per perspective  ->  512 feature transformer (weights shared across both perspectives)
+768 inputs per (perspective, king bucket)  ->  512 feature transformer (weights shared across perspectives)
 SCReLU,  concat[side-to-move | opponent] = 1024  ->  1 output  (centipawns, side-to-move relative)
 ```
 
-Constants (must match the trainer): `kInputSize=768`, `kHiddenSize=512`, `kQA=255`, `kQB=64`,
-`kScale=400`.
+Constants (must match the trainer): `kInputSize=768` (features per bucket), `kNumKingBuckets=4`,
+`kFeatureRows=768*4=3072`, `kHiddenSize=512`, `kQA=255`, `kQB=64`, `kScale=400`.
 
-**Features.** The 768 inputs per perspective are `colour (2) × piece type (6) × square (64)`. For a
-piece of `colour` (0=white, 1=black), type `pt` (pawn=1 … king=6) on `square`:
+**Features.** The 768 base inputs per perspective are `colour (2) × piece type (6) × square (64)`. Each
+perspective then selects one of **4 weight banks** by *its own* king's square (in that perspective's
+orientation) through the 64-entry `kKingBucketMap` (a file/rank quadrant: files a–d vs e–h, own half
+ranks 1–4 vs far half 5–8). For a piece of `colour` (0=white, 1=black), type `pt` (pawn=1 … king=6) on
+`square`, with `wb`/`bb` the white/black king buckets:
 
 ```
-white-perspective index = colour     * 384 + (pt-1)*64 + square
-black-perspective index = (1-colour) * 384 + (pt-1)*64 + (square ^ 0x38)   # 0x38 flips the rank
+white-perspective row = wb*768 + colour     * 384 + (pt-1)*64 + square
+black-perspective row = bb*768 + (1-colour) * 384 + (pt-1)*64 + (square ^ 0x38)   # 0x38 flips the rank
 ```
 
 Two accumulators are built (white-perspective and black-perspective), each seeded with `feature_bias`
-and then summing the feature column of every piece. At evaluation the **side-to-move** accumulator is
-fed to the first 512 output weights and the opponent's to the second 512. This is mathematically
-identical to bullet's `Chess768::map_features` (verified by the cross-check in §6).
+and then summing the feature column of every piece in its king bucket's bank. At evaluation the
+**side-to-move** accumulator is fed to the first 512 output weights and the opponent's to the second
+512. This is mathematically identical to bullet's `ChessBuckets::map_features` with the same bucket map
+(verified by the cross-check in §6). The bucket map MUST stay byte-identical across `src/nnue.cpp`,
+`tools/bullet/pawnstar.rs` and `tools/bullet/pawnstar_eval.rs`.
 
 **Forward pass** (mirrors bullet's `simple` example exactly; `screlu(x) = clamp(x,0,QA)²`):
 
@@ -49,8 +60,11 @@ out /= QA * QB            # -> centipawns, side-to-move relative
 The net is an `nnue::Network` class (the quantised weights plus `Load`/`Refresh`/`Update`/`Evaluate`
 methods), **owned by the `Game`** — there are no nnue globals. Its accumulator is **maintained
 incrementally** across make/undo on each thread's `SearchState`: `Network::Update` applies only the
-feature-column deltas for pieces whose placement changed (a parent/child bitboard diff — reversible on
-undo, a no-op for null moves), while `Network::Refresh` rebuilds it from scratch at the root.
+feature-column deltas for pieces whose placement changed within a king bucket (a parent/child bitboard
+diff — reversible on undo, a no-op for null moves). When a king move **crosses a bucket boundary** that
+whole perspective's bank changes, so `Update` rebuilds just that one perspective from scratch (at most
+one king moves per ply, so at most one perspective refreshes per update); `Network::Refresh` rebuilds
+both at the root.
 `Network::Evaluate(position)` (a full refresh) is the reference the incremental path is checked against
 (§6). Both kernels (accumulator update and forward pass) are **AVX2-vectorised** when built with
 `-mavx2`, with scalar fallbacks behind `#if defined(__AVX2__)`; the vectorised path is bit-identical to
@@ -63,16 +77,18 @@ little-endian `int16`, in this order:
 
 | section | count (int16) | scale |
 |---|---|---|
-| `feature_weights` | `768 * 512 = 393216` (column-major: `feature*512 + i`) | QA |
+| `feature_weights` | `768*4 * 512 = 1572864` (column-major: `row*512 + i`, rows bucket-major) | QA |
 | `feature_bias` | `512` | QA |
 | `output_weights` | `2 * 512 = 1024` (first 512 = stm, next 512 = ntm) | QB |
 | `output_bias` | `1` (scalar) | QA·QB |
 
-Packed size is `(393216 + 512 + 1024 + 1) * 2 = 789506` bytes. bullet pads the trailing 1-element
-`output_bias` tensor up to a 64-byte boundary, so its files are **789568 bytes**; the loader requires
-`size >= 789506` and ignores any trailing padding. A size below that is rejected (wrong hidden size /
-format). The forward-pass math and quantisation are kept in lock-step with the trainer
-([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies they agree to within rounding.
+Packed size is `(1572864 + 512 + 1024 + 1) * 2 = 3148802` bytes. bullet pads the trailing 1-element
+`output_bias` tensor up to a 64-byte boundary, so its files are **3148864 bytes**; the loader requires
+`size >= 3148802` and ignores any trailing padding. The size-gate only rejects nets that are *too
+small*, so a build of one architecture can silently misread a *larger* net — build the engine/tests at
+the net's width before verifying. (On `main`, Chess768/512, the packed size is `(768*512 + 512 + 1024 +
+1)*2 = 789506`, files 789568.) The forward-pass math and quantisation are kept in lock-step with the
+trainer ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies they agree to within rounding.
 
 ## 3. Using a net in the engine
 
@@ -206,8 +222,10 @@ awk -F' \\| ' 'NR%500==0 {print $1}' ~/pawnstar_nnue/data/data_*.txt | head -200
 ./build/test_nnue net.bin ref.txt        # expects: max |diff| <= 2 cp (quantisation rounding)
 ```
 
-`pawnstar_eval` uses bullet's own `Chess768` feature extraction and `simple`-example inference, so a
-match confirms our feature indexing, perspective/orientation, SCReLU and dequantisation are all correct.
+`pawnstar_eval` uses bullet's own feature extraction (`ChessBuckets` on this branch, `Chess768` on
+`main`) and the same SCReLU inference, so a match confirms our feature indexing, king bucketing,
+perspective/orientation, SCReLU and dequantisation are all correct. It must be built at the same width
+and feature set as the engine, or the cross-check fails by design.
 
 The repo checks in `test/nnue_reference.txt` — 250 reference evals for the shipped `pawnstar-v4.bin` —
 and `make check` runs `test_nnue nnue/pawnstar-v4.bin test/nnue_reference.txt` automatically (current
@@ -275,7 +293,9 @@ strong-engine labels) with a 512-wide transformer. It beats the handcrafted eval
 | v1 (256) | Pawnstar's own **HCE self-play** (~3.6M) | **loses** to HCE (−67 Elo; a 1.0M predecessor was −151) |
 | v2 (256) | **public PlentyChess** data (~60M) | **beats** HCE ≈ +330 Elo — *label quality*, not quantity, was the lever |
 | v3 (256) | ~12× more PlentyChess data (~750M) | **no gain** over v2 (+9.5 ± 13.6, inconclusive) — 256 net is *capacity-limited* |
-| **v4 (512)** | **double the width**, same 60M as v2 | **+55 ± 20 Elo fixed-depth, +71 ± 25 at time control** over v2 — once data saturates, *net size* is the lever |
+| **v4 (512)** | **double the width**, same 60M as v2 | **+55 ± 20 Elo fixed-depth, +71 ± 25 at time control** over v2 — once data saturates, *net size* is the lever **(shipped on `main`)** |
+| v5 (1024) | **double width again**, same 60M | **rejected**: +2 ± 16 fixed-depth (dead even), **−74 ± 25 on the clock** — 60M *saturates* the 512 net; width only pays off with more data. Branch `bignet-1024`, not shipped |
+| kb (512 + 4 king buckets) | **king-bucketed feature set**, same 60M | *in progress* — branch `kingbuckets-4`, SPRT vs v4 pending |
 
 PlentyChess data: <https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat> (public,
 already bulletformat — `bullet-utils validate` a shard first (some are corrupt, e.g. `11496.data`),
@@ -285,8 +305,10 @@ The eval is also fast on the clock: the **incremental accumulator** (~+80 Elo eq
 refresh) and **AVX2 SIMD kernels** (~+180 Elo equal-time vs scalar) mean v4 wins on time as well as
 depth despite the wider net. For absolute context the HCE measures ~2350 Elo (CCRL-ballpark), so
 `pawnstar-v4` is a large step up — which is why it is now the engine's **default** evaluator (disable
-with `UseNNUE false` / `PAWNSTAR_NNUE=0`). Next levers: more data for the *512* net (v4 used only 60M),
-or a wider net still (1024) / king-buckets.
+with `UseNNUE false` / `PAWNSTAR_NNUE=0`). Next levers (1024-wide already tried and rejected — 60M
+saturates the 512 net): **more data** for the 512 net (v4 used only 60M), and **king buckets** (the
+`kingbuckets-4` experiment in progress), both of which add capacity/structure without the dead-weight
+speed cost that sank 1024.
 
 ### Recreating `pawnstar-v4.bin` (step by step)
 

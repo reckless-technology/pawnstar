@@ -269,54 +269,62 @@ square; it is used to order captures and promotions during search (see above) an
 ### NNUE evaluation (experimental)
 
 Pawnstar can optionally replace the hand-crafted evaluation with an **NNUE** (Efficiently Updatable
-Neural Network) — a small neural net trained to score positions. It is on by default (the shipped net is loaded at startup) and selected at
-runtime (see [Enabling NNUE evaluation](#enabling-nnue-evaluation) above); the hand-crafted evaluation
-remains the default.
+Neural Network) — a small neural net trained to score positions. It is **on by default** (the shipped net
+is loaded at startup) and switchable at runtime (see
+[Enabling NNUE evaluation](#enabling-nnue-evaluation) above); the hand-crafted eval is the fallback.
 
-**How it works.** The network ([src/nnue.cpp](src/nnue.cpp), [src/nnue.h](src/nnue.h)) is a simple
-"perspective" net using the standard `Chess768` feature set:
+> **Branch note (`kingbuckets-4`):** this branch is the king-buckets experiment — it uses bullet's
+> king-bucketed `ChessBuckets` feature set (4 buckets) and so cannot load the shipped Chess768 net. The
+> description below reflects this branch. `main` ships the Chess768 512-wide `nnue/pawnstar-v4.bin`
+> described under "Shipped net" below; a king-bucket net ships only if its SPRT vs v4 wins.
+
+**How it works.** The network ([src/nnue.cpp](src/nnue.cpp), [src/nnue.h](src/nnue.h)) is a
+"perspective" net using bullet's king-bucketed `ChessBuckets` feature set:
 
 ```
-768 inputs per perspective  ->  512 feature transformer (x2 perspectives)
+768 inputs per (perspective, king bucket)  ->  512 feature transformer (x2 perspectives)
 SCReLU,  concat[side-to-move | opponent] = 1024  ->  1 output (centipawns, side-to-move relative)
 ```
 
-The 768 inputs are (piece colour × piece type × square). Two accumulators are built — one from the
-side-to-move's perspective and one from the opponent's (with the board vertically mirrored) — passed
-through a squared-clipped-ReLU activation and a single output layer that produces a centipawn score.
-`EvaluatePosition` branches to the net when NNUE is enabled, bypassing the hand-crafted terms. The
-network is an `nnue::Network` instance owned by the `Game` (no globals), read-only after load and shared
-by all search threads. Its accumulator is **maintained incrementally** across make/undo on each thread's
-`SearchState` — only the feature columns for the pieces that moved are updated, rather than rebuilding it
-from scratch every node — which makes NNUE competitive on equal time, not just equal depth. Weights are
-quantised `int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) and loaded directly from the
+The 768 base inputs are (piece colour × piece type × square). Each perspective selects one of **4 weight
+banks** by its own king's square (a file/rank quadrant map), so the feature row is `bucket*768 + base`.
+Two accumulators are built — one from the side-to-move's perspective and one from the opponent's (board
+vertically mirrored) — passed through a squared-clipped-ReLU activation and a single output layer that
+produces a centipawn score. `EvaluatePosition` branches to the net when NNUE is enabled, bypassing the
+hand-crafted terms. The network is an `nnue::Network` instance owned by the `Game` (no globals),
+read-only after load and shared by all search threads. Its accumulator is **maintained incrementally**
+across make/undo on each thread's `SearchState` — only the feature columns for the pieces that moved are
+updated — except when a king crosses a bucket boundary, which rebuilds that one perspective's
+accumulator. This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
+`int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) and loaded directly from the
 [bullet](https://github.com/jw1912/bullet) trainer's native `.bin`.
 
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
-[nnue/README.md](nnue/README.md). The network is trained on positions from Pawnstar's own self-play,
-labelled with the search score and the game result, using the bullet trainer (GPU or CPU). The
-minimal-setup flow:
+[nnue/README.md](nnue/README.md). The shipped nets are trained on **public PlentyChess** bulletformat
+data (strong-engine labels), using the bullet trainer (GPU or CPU); Pawnstar self-play
+(`tools/run_gendata.sh`) is the original bootstrap source. The minimal flow:
 
 ```bash
-tools/setup_bullet.sh                                   # clone + register the bullet trainer (pinned commit)
-make tools                                              # build build/gen_data
-tools/run_gendata.sh ~/pawnstar_nnue/data 12 100000 8   # generate self-play data (12 procs, depth 8)
-tools/run_experiment.sh ~/pawnstar_nnue/data net.bin    # build openings, train, then SPRT vs the HCE
+tools/setup_bullet.sh                                       # clone + register the bullet trainer (pinned commit)
+tools/run_experiment.sh ~/pawnstar_nnue/shuffled.data net.bin   # train, verify, then SPRT (set OPENINGS=...)
 ```
 
-`run_experiment.sh` produces `net.bin`, which you can then load with `setoption name EvalFile`. The
-in-engine inference is verified against the trainer by `test_nnue`, and the incremental accumulator
-against a full refresh by `test_nnue_incremental` (see [Test suite](#test-suite)); GPU training needs a
-CUDA toolkit and a driver supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""` to train on CPU.
-Because NNUE scores differ from the hand-crafted scores, NNUE strength is measured by game play (an SPRT
-of NNUE vs the hand-crafted eval), not by `test_bratko_kopec`.
+`run_experiment.sh` accepts either a self-play shard directory or an already-converted bulletformat
+`.data` file; it produces `net.bin`, **verifies** it (`tools/verify_net.sh`: engine inference vs the
+trainer, plus the incremental accumulator vs a full refresh), then runs the SPRT. Load the net with
+`setoption name EvalFile`. The same two checks are wired into `make check` via `test_nnue` and
+`test_nnue_incremental` (see [Test suite](#test-suite)); GPU training needs a CUDA toolkit and a driver
+supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""` to train on CPU. Because NNUE scores differ
+from the hand-crafted scores, NNUE strength is measured by game play (SPRT), not by `test_bratko_kopec`.
 
-**Shipped net.** [nnue/pawnstar-v4.bin](nnue/pawnstar-v4.bin) is a 512-wide net trained on ~60M positions
-of **public PlentyChess self-play** (strong-engine labels) that beats the HCE by a wide margin. The
-experiments that produced it: training on Pawnstar's own self-play *lost* to the HCE (label quality, not
-quantity, is what mattered); scaling that data ~12× gave nothing more (the net was capacity-limited);
-**doubling the width to 512 then added +55 Elo (fixed depth) / +71 Elo (time control)**. See
-[nnue/README.md §7](nnue/README.md) for the full lineage and exact recreation steps.
+**Shipped net.** [nnue/pawnstar-v4.bin](nnue/pawnstar-v4.bin) (on `main`) is a 512-wide **Chess768** net
+trained on ~60M positions of **public PlentyChess** data that beats the HCE by a wide margin. Lineage,
+all SPRT-measured: Pawnstar self-play *lost* to the HCE (label quality, not quantity, was the lever);
+scaling that data ~12× gave nothing (capacity-limited); **doubling the width 256→512 added +55 Elo (fixed
+depth) / +71 (time control)** — that is v4; doubling again to **1024 gave ~0 at fixed depth and −74 on the
+clock** (rejected — 60M saturates the 512 net). The current experiment (this branch) adds **king buckets**
+to the 512 arch, pending its SPRT vs v4. See [nnue/README.md §7](nnue/README.md) for the full lineage and
+exact recreation steps.
 
 ### Opening book
 
