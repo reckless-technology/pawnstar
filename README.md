@@ -16,7 +16,7 @@ Legal move generation runs at roughly 700 million moves per second on a modern l
 - Null-move pruning, late-move reductions, killer and per-thread history move ordering.
 - Quiescence search over captures with its own transposition table.
 - Tapered evaluation: material, piece-square tables, pawn structure, king safety and mobility.
-- Optional **NNUE** evaluation (efficiently-updatable neural network), switchable at runtime.
+- **NNUE** evaluation (efficiently-updatable neural network) **on by default**, switchable at runtime (the hand-crafted eval remains as a fallback).
 - Optional opening book (`pawnstar.book`).
 
 ## Requirements
@@ -78,18 +78,21 @@ help        list all commands
 
 ### Enabling NNUE evaluation
 
-NNUE is **off by default** (the hand-crafted evaluation is the engine's normal evaluator). Turn it on
-with the standard UCI `setoption` mechanism — point `EvalFile` at a trained net, then enable `UseNNUE`:
+NNUE is **on by default**: at startup the engine loads the shipped net `nnue/pawnstar-v4.bin` (resolved
+relative to the working directory, like `pawnstar.book`) and evaluates with it. If the net isn't found it
+logs a notice and falls back to the hand-crafted evaluation. **Run the engine from the repository root**
+(or set `EvalFile`) so the default net is found. To use a different net or toggle NNUE at runtime:
 
 ```
 setoption name EvalFile value /path/to/net.bin
-setoption name UseNNUE value true
+setoption name UseNNUE value false   # force the hand-crafted eval (default is true)
 ```
 
-Equivalently, via environment variables at launch:
+or via environment variables at launch (these override the defaults):
 
 ```bash
-PAWNSTAR_EVALFILE=/path/to/net.bin PAWNSTAR_NNUE=1 ./build/pawnstar
+PAWNSTAR_EVALFILE=/path/to/net.bin ./build/pawnstar   # use a different net
+PAWNSTAR_NNUE=0 ./build/pawnstar                       # disable NNUE (hand-crafted eval)
 ```
 
 `eval` reports which evaluator is in use. See [NNUE evaluation](#nnue-evaluation-experimental) below for
@@ -266,7 +269,7 @@ square; it is used to order captures and promotions during search (see above) an
 ### NNUE evaluation (experimental)
 
 Pawnstar can optionally replace the hand-crafted evaluation with an **NNUE** (Efficiently Updatable
-Neural Network) — a small neural net trained to score positions. It is off by default and selected at
+Neural Network) — a small neural net trained to score positions. It is on by default (the shipped net is loaded at startup) and selected at
 runtime (see [Enabling NNUE evaluation](#enabling-nnue-evaluation) above); the hand-crafted evaluation
 remains the default.
 
@@ -440,10 +443,10 @@ the published node counts for the standard positions.
 - **Thread count** defaults to `hardware_concurrency()` and is not exposed as a UCI option, though it
   can be overridden with the `PAWNSTAR_THREADS` environment variable.
 - **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
-- **NNUE is experimental.** It is off by default; the hand-crafted evaluation is the normal evaluator.
-  The accumulator is maintained incrementally across make/undo and the kernels are AVX2-vectorised, so it
-  is fast enough to be competitive on equal time (it already beats the HCE — see Benchmarks), but it is
-  still a 512-wide `Chess768` net without king buckets.
+- **NNUE is experimental but on by default.** The engine loads the shipped net at startup (HCE fallback
+  if absent, or with `UseNNUE`/`PAWNSTAR_NNUE=0`). The accumulator is maintained incrementally across
+  make/undo and the kernels are AVX2-vectorised, so it is fast on the clock and beats the HCE (see
+  Benchmarks); it is still a 512-wide `Chess768` net without king buckets.
 
 ## Contributing
 

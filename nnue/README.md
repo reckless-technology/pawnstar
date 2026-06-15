@@ -1,9 +1,10 @@
 # NNUE evaluation (experimental)
 
-Pawnstar has an optional **NNUE** (Efficiently Updatable Neural Network) evaluation alongside the
-hand-crafted evaluation (HCE). It is **off by default** — the HCE remains the engine's normal
-evaluator. This document is the complete reference for how the net works, how to enable it, and how to
-generate data, train, validate and strength-test a net.
+Pawnstar has an **NNUE** (Efficiently Updatable Neural Network) evaluation alongside the hand-crafted
+evaluation (HCE). It is **on by default** — at startup the engine loads the shipped net
+`nnue/pawnstar-v4.bin` (relative to the working directory) and evaluates with it, falling back to the
+HCE if the net is absent or NNUE is disabled. This document is the complete reference for how the net
+works, how to enable/disable it, and how to generate data, train, validate and strength-test a net.
 
 In-engine code: [src/nnue.h](../src/nnue.h), [src/nnue.cpp](../src/nnue.cpp). The branch into NNUE is in
 [src/evaluation.cpp](../src/evaluation.cpp) (`EvaluatePosition`). Tooling: [tools/](../tools).
@@ -86,8 +87,11 @@ or via environment variables at launch:
 PAWNSTAR_EVALFILE=/path/to/net.bin PAWNSTAR_NNUE=1 ./build/pawnstar
 ```
 
-`UseNNUE`/`EvalFile` are advertised in the `uci` response. The `eval` command reports which evaluator
-is active; `nnue` prints the raw network eval of the current position. The net is a single
+NNUE is **on by default** — `main.cpp` loads `nnue/pawnstar-v4.bin` (cwd-relative) and enables it at
+startup, so the commands above are only needed to use a *different* net or to disable NNUE
+(`setoption name UseNNUE value false`, or `PAWNSTAR_NNUE=0`). `UseNNUE`/`EvalFile` are advertised in the
+`uci` response (UseNNUE default true). The `eval` command reports which evaluator is active; `nnue`
+prints the raw network eval of the current position. The net is a single
 `nnue::Network` instance owned by the `Game` (UCI `setoption` routes to `game.NnueNetwork().Load(...)`
 and `game.SetUseNnue(...)`), read-only after load and shared by all Lazy SMP threads through their
 `Game&` — they call only its `const` methods.
@@ -233,8 +237,8 @@ printed PV tail; the actual best move played is legal).
 ## 7. Shipped nets
 
 The repo ships one reference net, **[pawnstar-v4.bin](pawnstar-v4.bin)** (512-hidden bullet net, 789568
-bytes, `md5 a9c7308e…`) — **off by default**, since the HCE remains the engine's normal evaluator
-unless you switch:
+bytes, `md5 a9c7308e…`) — loaded and used **by default** at startup (the engine resolves it relative to
+the working directory). To use a different net, or to switch evaluators at runtime:
 
 ```
 setoption name EvalFile value nnue/pawnstar-v4.bin
@@ -262,9 +266,9 @@ already bulletformat — `bullet-utils validate` a shard first (some are corrupt
 The eval is also fast on the clock: the **incremental accumulator** (~+80 Elo equal-time vs full
 refresh) and **AVX2 SIMD kernels** (~+180 Elo equal-time vs scalar) mean v4 wins on time as well as
 depth despite the wider net. For absolute context the HCE measures ~2350 Elo (CCRL-ballpark), so
-`pawnstar-v4` is a large step up. NNUE remains **off by default**; set `UseNNUE`/`EvalFile` (or the §3
-env vars) to use it. Next levers: more data for the *512* net (v4 used only 60M), or a wider net still
-(1024) / king-buckets.
+`pawnstar-v4` is a large step up — which is why it is now the engine's **default** evaluator (disable
+with `UseNNUE false` / `PAWNSTAR_NNUE=0`). Next levers: more data for the *512* net (v4 used only 60M),
+or a wider net still (1024) / king-buckets.
 
 ### Recreating `pawnstar-v4.bin`
 

@@ -96,7 +96,7 @@ void handle_uci(Game &, std::span<std::string>)
 {
     std::cout << "id name Pawnstar\n";
     std::cout << "id author Jonny Reckless\n";
-    std::cout << "option name UseNNUE type check default false\n";
+    std::cout << "option name UseNNUE type check default true\n";
     std::cout << "option name EvalFile type string default <empty>\n";
     std::cout << "uciok\n";
 }
