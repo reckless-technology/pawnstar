@@ -71,28 +71,81 @@ inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *colu
 }
 #endif
 
-/// @brief The bullet Chess768 feature indices for a piece, one per perspective.
-///   white-perspective index = color * 384 + (piece_type - 1) * 64 + square
-///   black-perspective index = (1 - color) * 384 + (piece_type - 1) * 64 + (square ^ kRankFlip)
-inline std::pair<int, int> FeatureIndices(int color, int piece, int sq)
+/// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
+/// own* orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map
+/// serves both perspectives. Layout: file/rank quadrant — files a-d vs e-h, own half (ranks 1-4) vs far
+/// half (ranks 5-8). MUST be byte-identical to the array passed to ChessBuckets::new in tools/bullet/*.rs.
+constexpr std::array<int, 64> kKingBucketMap = {
+    0, 0, 0, 0, 1, 1, 1, 1, // rank 1 (own back rank)
+    0, 0, 0, 0, 1, 1, 1, 1, // rank 2
+    0, 0, 0, 0, 1, 1, 1, 1, // rank 3
+    0, 0, 0, 0, 1, 1, 1, 1, // rank 4
+    2, 2, 2, 2, 3, 3, 3, 3, // rank 5
+    2, 2, 2, 2, 3, 3, 3, 3, // rank 6
+    2, 2, 2, 2, 3, 3, 3, 3, // rank 7
+    2, 2, 2, 2, 3, 3, 3, 3, // rank 8
+};
+
+/// @brief Feature row for a piece in one perspective's bucket bank.
+///   white perspective: bucket*768 + color*384 + (type-1)*64 + square
+///   black perspective: bucket*768 + (1-color)*384 + (type-1)*64 + (square ^ kRankFlip)
+inline int FeatureRow(int bucket, int color, int piece, int sq, bool black)
 {
     const int type_offset = (piece - kPawn) * 64;
-    return {color * 384 + type_offset + sq, (1 - color) * 384 + type_offset + (sq ^ kRankFlip)};
+    const int base = black ? ((1 - color) * 384 + type_offset + (sq ^ kRankFlip)) : (color * 384 + type_offset + sq);
+    return bucket * kInputSize + base;
+}
+
+/// @brief A perspective's king bucket: index the map with that perspective's king square, oriented to it.
+inline int WhiteBucket(const Position &p)
+{
+    return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kWhite]).Lsb()];
+}
+inline int BlackBucket(const Position &p)
+{
+    return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kBlack]).Lsb() ^ kRankFlip];
 }
 } // namespace
 
-void Network::AddPiece(Accumulator &acc, int color, int piece, int sq) const
+void Network::RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position &position, int bucket,
+                          bool black) const
 {
-    const auto [wi, bi] = FeatureIndices(color, piece, sq);
-    AddColumn(acc.white, &feature_weights_[static_cast<std::size_t>(wi) * kHiddenSize]);
-    AddColumn(acc.black, &feature_weights_[static_cast<std::size_t>(bi) * kHiddenSize]);
+    side = feature_bias_;
+    for (int color = kWhite; color <= kBlack; ++color)
+    {
+        const Bitboard friendly = position.colors_[color];
+        for (int piece = kPawn; piece <= kKing; ++piece)
+        {
+            for (Square s : position.pieces_[piece] & friendly)
+            {
+                AddColumn(side, &feature_weights_[static_cast<std::size_t>(FeatureRow(bucket, color, piece, s, black)) *
+                                                  kHiddenSize]);
+            }
+        }
+    }
 }
 
-void Network::RemovePiece(Accumulator &acc, int color, int piece, int sq) const
+void Network::DiffSide(std::array<int16_t, kHiddenSize> &side, const Position &from, const Position &to, int bucket,
+                       bool black) const
 {
-    const auto [wi, bi] = FeatureIndices(color, piece, sq);
-    SubColumn(acc.white, &feature_weights_[static_cast<std::size_t>(wi) * kHiddenSize]);
-    SubColumn(acc.black, &feature_weights_[static_cast<std::size_t>(bi) * kHiddenSize]);
+    for (int color = kWhite; color <= kBlack; ++color)
+    {
+        for (int piece = kPawn; piece <= kKing; ++piece)
+        {
+            const Bitboard from_bb = from.pieces_[piece] & from.colors_[color];
+            const Bitboard to_bb   = to.pieces_[piece] & to.colors_[color];
+            for (Square s : from_bb & ~to_bb)
+            {
+                SubColumn(side, &feature_weights_[static_cast<std::size_t>(FeatureRow(bucket, color, piece, s, black)) *
+                                                  kHiddenSize]);
+            }
+            for (Square s : to_bb & ~from_bb)
+            {
+                AddColumn(side, &feature_weights_[static_cast<std::size_t>(FeatureRow(bucket, color, piece, s, black)) *
+                                                  kHiddenSize]);
+            }
+        }
+    }
 }
 
 bool Network::Load(const std::string &path)
@@ -133,41 +186,33 @@ bool Network::Load(const std::string &path)
 
 void Network::Refresh(Accumulator &acc, const Position &position) const
 {
-    // Seed both perspectives with the feature-transformer bias, then add every piece.
-    acc.white = feature_bias_;
-    acc.black = feature_bias_;
-    for (int color = kWhite; color <= kBlack; ++color)
-    {
-        const Bitboard friendly = position.colors_[color];
-        for (int piece = kPawn; piece <= kKing; ++piece)
-        {
-            for (Square s : position.pieces_[piece] & friendly)
-            {
-                AddPiece(acc, color, piece, s);
-            }
-        }
-    }
+    // Each perspective uses its own king's bucket bank; seed bias and add every piece.
+    RefreshSide(acc.white, position, WhiteBucket(position), /*black=*/false);
+    RefreshSide(acc.black, position, BlackBucket(position), /*black=*/true);
 }
 
 void Network::Update(Accumulator &acc, const Position &from, const Position &to) const
 {
-    // Diff piece placement per (color, type): remove pieces that left a square, add pieces that arrived.
-    // A handful of squares change per move; identical placements (e.g. a null move) yield no work.
-    for (int color = kWhite; color <= kBlack; ++color)
+    // A king move that crosses a bucket boundary changes that whole perspective's bank, so refresh it from
+    // scratch; otherwise apply only the piece-placement delta within the (unchanged) bank. At most one king
+    // moves per ply, so at most one perspective refreshes. A null move (identical placements) yields no work.
+    const int wf = WhiteBucket(from), wt = WhiteBucket(to);
+    const int bf = BlackBucket(from), bt = BlackBucket(to);
+    if (wf != wt)
     {
-        for (int piece = kPawn; piece <= kKing; ++piece)
-        {
-            const Bitboard from_bb = from.pieces_[piece] & from.colors_[color];
-            const Bitboard to_bb   = to.pieces_[piece] & to.colors_[color];
-            for (Square s : from_bb & ~to_bb)
-            {
-                RemovePiece(acc, color, piece, s);
-            }
-            for (Square s : to_bb & ~from_bb)
-            {
-                AddPiece(acc, color, piece, s);
-            }
-        }
+        RefreshSide(acc.white, to, wt, /*black=*/false);
+    }
+    else
+    {
+        DiffSide(acc.white, from, to, wt, /*black=*/false);
+    }
+    if (bf != bt)
+    {
+        RefreshSide(acc.black, to, bt, /*black=*/true);
+    }
+    else
+    {
+        DiffSide(acc.black, from, to, bt, /*black=*/true);
     }
 }
 

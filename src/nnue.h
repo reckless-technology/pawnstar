@@ -2,24 +2,31 @@
 /// @file nnue.h Optional NNUE (efficiently-updatable neural network) evaluation.
 ///
 /// This is an experimental alternative to the handcrafted evaluation in evaluation.cpp.
-/// The network is a simple "perspective" net with the standard bullet `Chess768` feature set:
+/// The network is a "perspective" net with bullet's king-bucketed `ChessBuckets` feature set:
 ///
-///   768 inputs per perspective  ->  kHiddenSize feature transformer  (x2 perspectives)
+///   768 inputs per (perspective, king bucket)  ->  kHiddenSize feature transformer  (x2 perspectives)
 ///   SCReLU activation, concat[own | opponent] = 2*kHiddenSize  ->  1 output (centipawns, stm relative)
+///
+/// Each perspective selects one of kNumKingBuckets weight banks by *its own* king's square (in that
+/// perspective's orientation): the feature row is `bucket * 768 + chess768_index`. This matches bullet's
+/// `ChessBuckets::new(kKingBucketMap)` exactly (the same 64-entry map; see nnue.cpp). A king move that
+/// crosses a bucket boundary changes that whole perspective's bank, so its accumulator is refreshed
+/// rather than diffed (at most one king moves per ply, so at most one perspective refreshes per Update).
 ///
 /// A net is owned by the Game (one instance, read-only after Network::Load) and shared by all Lazy SMP
 /// threads, which call only its const methods. The accumulator is maintained incrementally across
 /// make/undo (see SearchState); Network::Refresh rebuilds it from scratch. The weights are produced by
 /// the `bullet` trainer and loaded from bullet's *native* quantised .bin (see nnue/README.md), a
-/// headerless, tightly packed little-endian struct in this exact order (bullet `simple` save_format):
+/// headerless, tightly packed little-endian struct in this exact order (bullet save_format):
 ///
-///   feature_weights : int16[kInputSize * kHiddenSize]  (column-major: feature * kHiddenSize + i), scale QA
-///   feature_bias    : int16[kHiddenSize]                                                          , scale QA
-///   output_weights  : int16[2 * kHiddenSize]  (first kHiddenSize = stm, next = ntm)               , scale QB
-///   output_bias     : int16 (scalar)                                                              , scale QA*QB
+///   feature_weights : int16[kFeatureRows * kHiddenSize]  (column-major: feature * kHiddenSize + i), scale QA
+///   feature_bias    : int16[kHiddenSize]                                                           , scale QA
+///   output_weights  : int16[2 * kHiddenSize]  (first kHiddenSize = stm, next = ntm)                , scale QB
+///   output_bias     : int16 (scalar)                                                               , scale QA*QB
 ///
-/// The activation and dequantisation mirror bullet's `simple` example exactly so that an engine
-/// evaluation reproduces the trainer's eval (verified by test_nnue).
+/// where kFeatureRows = 768 * kNumKingBuckets (the bucket banks are laid out bucket-major). The
+/// activation and dequantisation mirror bullet's example exactly so that an engine evaluation reproduces
+/// the trainer's eval (verified by test_nnue).
 
 #include "constants.h"
 
@@ -32,8 +39,10 @@ class Position;
 namespace nnue
 {
 
-constexpr int kInputSize  = 768; ///< Features per perspective: 2 colors * 6 piece types * 64 squares.
-constexpr int kHiddenSize = 512; ///< Feature-transformer / accumulator width per perspective.
+constexpr int kInputSize     = 768; ///< Features per perspective per bucket: 2 colors * 6 types * 64 squares.
+constexpr int kNumKingBuckets = 4;  ///< King-square buckets; each perspective selects one weight bank.
+constexpr int kFeatureRows   = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
+constexpr int kHiddenSize    = 512; ///< Feature-transformer / accumulator width per perspective.
 
 // Quantisation constants. These MUST match the bullet trainer configuration that produced the net.
 constexpr int kQA    = 255; ///< Feature-transformer weight/activation scale (SCReLU clamp).
@@ -42,7 +51,7 @@ constexpr int kScale = 400; ///< Maps the raw network output to centipawns.
 
 /// @brief Total size of a valid net file: every weight is a little-endian int16, tightly packed, no header.
 constexpr std::size_t kNetFileBytes =
-    (static_cast<std::size_t>(kInputSize) * kHiddenSize + kHiddenSize + 2 * kHiddenSize + 1) * sizeof(int16_t);
+    (static_cast<std::size_t>(kFeatureRows) * kHiddenSize + kHiddenSize + 2 * kHiddenSize + 1) * sizeof(int16_t);
 
 /// @brief The two perspective accumulators (each the feature-transformer output, width kHiddenSize).
 /// Maintained incrementally across make/undo so a node's evaluation does not rebuild it from scratch.
@@ -88,13 +97,21 @@ class Network
     int Evaluate(const Position &position) const;
 
   private:
-    /// @brief Add one piece to both perspectives of an accumulator.
-    void AddPiece(Accumulator &acc, int color, int piece, int sq) const;
-    /// @brief Remove one piece from both perspectives of an accumulator.
-    void RemovePiece(Accumulator &acc, int color, int piece, int sq) const;
+    /// @brief Rebuild a single perspective from scratch (bias + every piece) using its king bucket.
+    /// @param side The perspective accumulator to rebuild (acc.white or acc.black).
+    /// @param position Position to read pieces from. @param bucket That perspective's king bucket.
+    /// @param black true for the black perspective (mirrors the square and swaps the colour offset).
+    void RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position &position, int bucket, bool black) const;
+
+    /// @brief Apply the piece-placement delta from @p from to @p to to a single perspective, within one
+    /// (unchanged) king bucket. @param side Perspective accumulator. @param bucket That perspective's bucket.
+    /// @param black true for the black perspective.
+    void DiffSide(std::array<int16_t, kHiddenSize> &side, const Position &from, const Position &to, int bucket,
+                  bool black) const;
 
     /// @brief Feature-transformer weights, column-major by feature then hidden: index = feature * kHiddenSize + i.
-    alignas(64) std::array<int16_t, kInputSize * kHiddenSize> feature_weights_;
+    /// Feature rows are laid out bucket-major: row = bucket * 768 + chess768_index.
+    alignas(64) std::array<int16_t, kFeatureRows * kHiddenSize> feature_weights_;
     alignas(64) std::array<int16_t, kHiddenSize> feature_bias_; ///< Feature-transformer biases.
     /// @brief Output weights: first kHiddenSize weight the side-to-move accumulator, next kHiddenSize the other.
     alignas(64) std::array<int16_t, 2 * kHiddenSize> output_weights_;
