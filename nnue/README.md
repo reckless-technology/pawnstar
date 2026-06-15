@@ -106,9 +106,10 @@ and `game.SetUseNnue(...)`), read-only after load and shared by all Lazy SMP thr
 | `bullet/pawnstar.rs`      | the trainer (arch `768→512×2→1`, SCReLU, QA/QB/SCALE) |
 | `bullet/pawnstar_eval.rs` | reference evaluator for the `test_nnue` cross-check |
 | `make_openings.sh`        | build an EPD openings book from self-play data |
-| `train_pipeline.sh`       | combine → convert → shuffle → train → export the net |
-| `run_sprt.sh`             | SPRT / match of NNUE vs the hand-crafted eval |
-| `run_experiment.sh`       | one-shot: openings + train + SPRT from an existing dataset |
+| `train_pipeline.sh`       | train → export a net, from either self-play text shards or a bulletformat `.data` |
+| `verify_net.sh`           | cross-check (engine == trainer) + incremental-accumulator gate for a trained net |
+| `run_sprt.sh`             | SPRT / match: NNUE vs HCE (default) or net-vs-net, at fixed depth or time control |
+| `run_experiment.sh`       | one-shot: openings + train + **verify** + SPRT from an existing dataset |
 
 **Prerequisites:** `clang++`/`make` (engine), Rust/`cargo` (bullet), `fastchess` on `PATH` (SPRT). For
 GPU training, a CUDA toolkit (`CUDA_PATH`, default `~/cuda-12.2`) **and** a driver new enough for the
@@ -126,8 +127,10 @@ tools/run_experiment.sh ~/pawnstar_nnue/data net.bin    # openings + train + SPR
 ```
 
 Then load `net.bin` in the engine (§3). To train on CPU: `BULLET_FEATURES="" tools/run_experiment.sh …`.
-`run_experiment.sh <data_dir> <net.bin> [superbatches=40] [sprt_rounds=500] [depth=8]` simply chains
-`make_openings.sh` → `train_pipeline.sh` → `run_sprt.sh`.
+`run_experiment.sh <data_dir | shuffled.data> <net.bin> [superbatches=40] [sprt_rounds=500] [depth=8]`
+chains `make_openings.sh` → `train_pipeline.sh` → `verify_net.sh` → `run_sprt.sh`. The first argument
+may also be an already-converted bulletformat `.data` file (how the shipped nets were trained — see §7);
+in that case there are no text shards to sample openings from, so supply your own with `OPENINGS=…`.
 
 ## 6. Step-by-step
 
@@ -160,15 +163,19 @@ preserved `seed*.txt` shards in the directory, so you can keep earlier data by r
 
 ### Training
 
-`train_pipeline.sh <data_dir> <out_net.bin> [end_superbatch=30]`:
+`train_pipeline.sh <data_dir | shuffled.data> <out_net.bin> [end_superbatch=40]` auto-detects its input
+from the first argument:
 
-1. combines `data_*.txt` + `seed*.txt` → `all.txt`;
-2. ensures bullet is set up, builds `bullet-utils` and the trainer (`$BULLET_FEATURES`, default
+1. ensures bullet is set up, builds `bullet-utils` and the trainer (`$BULLET_FEATURES`, default
    `--features cuda`);
-3. `bullet-utils convert --from text` → `all.data` (bullet `ChessBoard`, 32 bytes/record);
-4. `bullet-utils shuffle` → `shuffled.data` (self-play data is highly correlated — shuffling matters);
-5. trains, computing `batches_per_superbatch = positions / 16384` so a superbatch ≈ one epoch;
-6. copies `<data_dir>/checkpoints/pawnstar-<end_superbatch>/quantised.bin` → `out_net.bin`.
+2. **if the argument is a `.data` file** (already bulletformat — e.g. public PlentyChess data, the way
+   the shipped nets were trained), it is used directly and steps 3–4 are skipped; **if it is a
+   directory**, the self-play shards `data_*.txt` + `seed*.txt` are combined → `all.txt`,
+   `bullet-utils convert --from text` → `all.data` (bullet `ChessBoard`, 32 bytes/record), then
+   `bullet-utils shuffle` → `shuffled.data` (self-play data is highly correlated — shuffling matters);
+3. trains, computing `batches_per_superbatch = positions / 16384` so a superbatch ≈ one epoch;
+4. copies `<work_dir>/checkpoints/pawnstar-<end_superbatch>/quantised.bin` → `out_net.bin`, where
+   `<work_dir>` is the data directory (text mode) or the `.data` file's directory (bulletformat mode).
 
 Trainer hyperparameters ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)): `HIDDEN_SIZE=512`,
 AdamW, `batch_size=16384`, loss `sigmoid(out)` squared-error against
@@ -215,21 +222,32 @@ every node (and again after every undo, to catch reverse-update bugs). With no a
 so `make check` stays green; run it with a net (e.g. `./build/test_nnue_incremental nnue/pawnstar-v4.bin`)
 after any change to the accumulator, feature indexing, or make/undo.
 
+`verify_net.sh <net.bin>` bundles both checks into one gate: it regenerates the reference evals for
+*that* net (reusing the FENs from `test/nnue_reference.txt`) with `pawnstar_eval`, then runs `test_nnue`
+and `test_nnue_incremental`. `run_experiment.sh` runs it between training and the SPRT — a net that
+fails it has a width/format mismatch, so any match result would be meaningless. Run it standalone after
+training a net outside the one-shot flow.
+
 ### Strength testing (the verdict)
 
 NNUE scores differ from the HCE reference scores, so `test_bratko_kopec` stays an **HCE-only** test
 (run with `UseNNUE` off; do not retune its references for NNUE). Real strength is measured by game
 play. `run_sprt.sh <net.bin> <openings.epd> [rounds=500] [depth=8]` runs:
 
-- the **same** `build/pawnstar` binary as both engines, differing only by UCI options
-  (`UseNNUE`/`EvalFile`), with `PAWNSTAR_THREADS=1`;
+- the candidate as NNUE with `<net.bin>`; the **opponent is HCE** by default (`UseNNUE=false`). Set
+  `BASELINE_NET=<other.bin>` to instead compare **two nets** — the architecture program's actual test
+  (e.g. v5(1024) vs v4(512)), since NNUE now beats HCE and ships on by default;
+- the **same** `build/pawnstar` binary for both engines, differing only by UCI options
+  (`UseNNUE`/`EvalFile`), with `PAWNSTAR_THREADS=1`. Different net *widths* need different builds
+  (`kHiddenSize` is compile-time), so a cross-width SPRT points `BIN_A`/`BIN_B` at two separately-built
+  binaries;
 - **fixed depth** (default 8) — pawnstar has no `go nodes`, and fixed depth isolates eval *quality* from
-  NNUE's per-node speed. To measure the equal-*time* effect (e.g. incremental vs full-refresh, or NNUE
-  vs HCE on the clock) run a `tc=`-based match instead (`fastchess … -each tc=8+0.08`);
+  NNUE's per-node speed. To measure the equal-*time* effect (incremental vs full-refresh, a wider net's
+  speed cost, or NNUE vs HCE on the clock) set `TC=8+0.08` for a time-control match instead;
 - **win/draw adjudication** (`-resign movecount=3 score=600`, `-draw movenumber=40 movecount=8
   score=20`) to keep games short and decisive (recommended, not required — the old fixed game-history
   cap that crashed long games is gone; the history is a dynamic `std::vector` now);
-- `-sprt elo0=0 elo1=10 alpha=0.05 beta=0.05` and concurrency `nproc`.
+- `-sprt elo0=$ELO0 elo1=$ELO1 alpha=0.05 beta=0.05` (default bounds 0 / 10) and concurrency `nproc`.
 
 fastchess prints "Illegal PV move" warnings occasionally — these are cosmetic (a junk move in the
 printed PV tail; the actual best move played is legal).
@@ -325,10 +343,13 @@ cp ~/pawnstar_nnue/v4/checkpoints/pawnstar-40/quantised.bin /path/to/pawnstar/nn
 # 6. Regenerate the engine-vs-trainer cross-check reference for the new net (§6), then verify.
 cd /path/to/pawnstar
 cut -d'|' -f1 test/nnue_reference.txt > /tmp/fens.txt      # reuse the existing FENs (first field)
-"$EVAL" nnue/pawnstar-v4.bin /tmp/fens.txt > test/nnue_reference.txt
+"$EVAL" nnue/pawnstar-v4.bin /tmp/fens.txt > test/nnue_reference.txt   # re-baseline the checked-in reference
 ./build/test_nnue nnue/pawnstar-v4.bin test/nnue_reference.txt   # expect max |diff| <= 2 cp (engine == trainer)
 ./build/test_nnue_incremental nnue/pawnstar-v4.bin              # incremental accumulator == full refresh
 make check                                                      # all suites, including the NNUE ones
+# (tools/verify_net.sh nnue/pawnstar-v4.bin runs the two test_nnue checks in one step, against a
+#  throwaway reference — but shipping a new net still needs the re-baseline line above to update
+#  the checked-in test/nnue_reference.txt.)
 
 # 7. (optional) Strength-test vs the HCE at fixed depth; reuse any EPD opening book.
 tools/run_sprt.sh nnue/pawnstar-v4.bin /path/to/openings.epd
