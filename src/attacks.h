@@ -7,11 +7,9 @@
 
 #include <immintrin.h>
 
-#ifndef USE_PEXT_BITBOARDS
-#define USE_PEXT_BITBOARDS 1
-#endif
-
-#if USE_PEXT_BITBOARDS
+// Use the hardware PEXT path when the compiler targets BMI2 (the default `-mbmi2` build); otherwise fall
+// back to the slower traditional sliding-attack generator below.
+#if defined(__BMI2__)
 
 #if __GNUC__
 #pragma GCC diagnostic push
