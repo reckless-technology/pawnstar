@@ -274,8 +274,8 @@ remains the default.
 "perspective" net using the standard `Chess768` feature set:
 
 ```
-768 inputs per perspective  ->  256 feature transformer (x2 perspectives)
-SCReLU,  concat[side-to-move | opponent] = 512  ->  1 output (centipawns, side-to-move relative)
+768 inputs per perspective  ->  512 feature transformer (x2 perspectives)
+SCReLU,  concat[side-to-move | opponent] = 1024  ->  1 output (centipawns, side-to-move relative)
 ```
 
 The 768 inputs are (piece colour × piece type × square). Two accumulators are built — one from the
@@ -308,11 +308,12 @@ CUDA toolkit and a driver supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATUR
 Because NNUE scores differ from the hand-crafted scores, NNUE strength is measured by game play (an SPRT
 of NNUE vs the hand-crafted eval), not by `test_bratko_kopec`.
 
-**Shipped nets.** Two trained nets live in [nnue/](nnue): `nnue/pawnstar-v1.bin` (Pawnstar self-play
-labels) *loses* to the HCE by ~67 Elo, whereas `nnue/pawnstar-v2.bin` (trained on **public PlentyChess
-self-play** — strong-engine labels) *beats* the HCE by a wide margin at fixed depth. The lesson was label
-quality, not quantity. See [nnue/README.md](nnue/README.md) §7 for the numbers and exact step-by-step
-recreation of `pawnstar-v2.bin`.
+**Shipped net.** [nnue/pawnstar-v4.bin](nnue/pawnstar-v4.bin) is a 512-wide net trained on ~60M positions
+of **public PlentyChess self-play** (strong-engine labels) that beats the HCE by a wide margin. The
+experiments that produced it: training on Pawnstar's own self-play *lost* to the HCE (label quality, not
+quantity, is what mattered); scaling that data ~12× gave nothing more (the net was capacity-limited);
+**doubling the width to 512 then added +55 Elo (fixed depth) / +71 Elo (time control)**. See
+[nnue/README.md §7](nnue/README.md) for the full lineage and exact recreation steps.
 
 ### Opening book
 
@@ -351,7 +352,7 @@ builds and runs seven standalone test executables:
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
 
-`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v2.bin`: `test_nnue` against the
+`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v4.bin`: `test_nnue` against the
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
 asserts the incremental accumulator matches a full refresh at every node, and `test_bratko_kopec_nnue`
 which searches the 24 BK positions with the net (single-threaded, deterministic) and reports how many of
@@ -423,7 +424,7 @@ Pawnstar has no official CCRL rating. The figures currently tracked are:
 - **Move generation** — roughly 700 million legal moves per second on a modern laptop core.
 - **Bratko-Kopec** — 24/24 at every depth from 8 through 12 (the default depth 8 runs in `make check`).
 - **Strength (rough).** The hand-crafted evaluation measures ~2350 Elo (CCRL-ballpark, anchored against
-  reference engines at a fast time control). `nnue/pawnstar-v2.bin` beats the HCE by a large margin at
+  reference engines at a fast time control). `nnue/pawnstar-v4.bin` beats the HCE by a large margin at
   fixed depth. At equal *time*, the incremental accumulator is worth ~+80 Elo over a full refresh and the
   AVX2 SIMD kernels a further ~+180 Elo over the scalar versions (both by SPRT).
 
@@ -442,7 +443,7 @@ the published node counts for the standard positions.
 - **NNUE is experimental.** It is off by default; the hand-crafted evaluation is the normal evaluator.
   The accumulator is maintained incrementally across make/undo and the kernels are AVX2-vectorised, so it
   is fast enough to be competitive on equal time (it already beats the HCE — see Benchmarks), but it is
-  still a small 256-wide `Chess768` net without king buckets.
+  still a 512-wide `Chess768` net without king buckets.
 
 ## Contributing
 

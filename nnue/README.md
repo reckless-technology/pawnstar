@@ -15,11 +15,11 @@ In-engine code: [src/nnue.h](../src/nnue.h), [src/nnue.cpp](../src/nnue.cpp). Th
 A simple "perspective" network using bullet's standard `Chess768` feature set:
 
 ```
-768 inputs per perspective  ->  256 feature transformer (weights shared across both perspectives)
-SCReLU,  concat[side-to-move | opponent] = 512  ->  1 output  (centipawns, side-to-move relative)
+768 inputs per perspective  ->  512 feature transformer (weights shared across both perspectives)
+SCReLU,  concat[side-to-move | opponent] = 1024  ->  1 output  (centipawns, side-to-move relative)
 ```
 
-Constants (must match the trainer): `kInputSize=768`, `kHiddenSize=256`, `kQA=255`, `kQB=64`,
+Constants (must match the trainer): `kInputSize=768`, `kHiddenSize=512`, `kQA=255`, `kQB=64`,
 `kScale=400`.
 
 **Features.** The 768 inputs per perspective are `colour (2) × piece type (6) × square (64)`. For a
@@ -32,7 +32,7 @@ black-perspective index = (1-colour) * 384 + (pt-1)*64 + (square ^ 0x38)   # 0x3
 
 Two accumulators are built (white-perspective and black-perspective), each seeded with `feature_bias`
 and then summing the feature column of every piece. At evaluation the **side-to-move** accumulator is
-fed to the first 256 output weights and the opponent's to the second 256. This is mathematically
+fed to the first 512 output weights and the opponent's to the second 512. This is mathematically
 identical to bullet's `Chess768::map_features` (verified by the cross-check in §6).
 
 **Forward pass** (mirrors bullet's `simple` example exactly; `screlu(x) = clamp(x,0,QA)²`):
@@ -62,14 +62,14 @@ little-endian `int16`, in this order:
 
 | section | count (int16) | scale |
 |---|---|---|
-| `feature_weights` | `768 * 256 = 196608` (column-major: `feature*256 + i`) | QA |
-| `feature_bias` | `256` | QA |
-| `output_weights` | `2 * 256 = 512` (first 256 = stm, next 256 = ntm) | QB |
+| `feature_weights` | `768 * 512 = 393216` (column-major: `feature*512 + i`) | QA |
+| `feature_bias` | `512` | QA |
+| `output_weights` | `2 * 512 = 1024` (first 512 = stm, next 512 = ntm) | QB |
 | `output_bias` | `1` (scalar) | QA·QB |
 
-Packed size is `(196608 + 256 + 512 + 1) * 2 = 394754` bytes. bullet pads the trailing 1-element
-`output_bias` tensor up to a 64-byte boundary, so its files are **394816 bytes**; the loader requires
-`size >= 394754` and ignores any trailing padding. A size below that is rejected (wrong hidden size /
+Packed size is `(393216 + 512 + 1024 + 1) * 2 = 789506` bytes. bullet pads the trailing 1-element
+`output_bias` tensor up to a 64-byte boundary, so its files are **789568 bytes**; the loader requires
+`size >= 789506` and ignores any trailing padding. A size below that is rejected (wrong hidden size /
 format). The forward-pass math and quantisation are kept in lock-step with the trainer
 ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies they agree to within rounding.
 
@@ -99,7 +99,7 @@ and `game.SetUseNnue(...)`), read-only after load and shared by all Lazy SMP thr
 | `gen_data.cpp`            | self-play data generator (built by `make tools` → `build/gen_data`) |
 | `run_gendata.sh`          | launch N parallel self-play shards |
 | `setup_bullet.sh`         | clone bullet at the pinned commit + install/register our trainer examples |
-| `bullet/pawnstar.rs`      | the trainer (arch `768→256×2→1`, SCReLU, QA/QB/SCALE) |
+| `bullet/pawnstar.rs`      | the trainer (arch `768→512×2→1`, SCReLU, QA/QB/SCALE) |
 | `bullet/pawnstar_eval.rs` | reference evaluator for the `test_nnue` cross-check |
 | `make_openings.sh`        | build an EPD openings book from self-play data |
 | `train_pipeline.sh`       | combine → convert → shuffle → train → export the net |
@@ -166,7 +166,7 @@ preserved `seed*.txt` shards in the directory, so you can keep earlier data by r
 5. trains, computing `batches_per_superbatch = positions / 16384` so a superbatch ≈ one epoch;
 6. copies `<data_dir>/checkpoints/pawnstar-<end_superbatch>/quantised.bin` → `out_net.bin`.
 
-Trainer hyperparameters ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)): `HIDDEN_SIZE=256`,
+Trainer hyperparameters ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)): `HIDDEN_SIZE=512`,
 AdamW, `batch_size=16384`, loss `sigmoid(out)` squared-error against
 `target = wdl·result + (1-wdl)·sigmoid(score/SCALE)` with `ConstantWDL=0.5`, `StepLR{start=0.001,
 gamma=0.3, step=SBS/3}`, `eval_scale=400`. Overridable via env: `PAWNSTAR_DATA`, `PAWNSTAR_BPS`,
@@ -198,17 +198,17 @@ awk -F' \\| ' 'NR%500==0 {print $1}' ~/pawnstar_nnue/data/data_*.txt | head -200
 `pawnstar_eval` uses bullet's own `Chess768` feature extraction and `simple`-example inference, so a
 match confirms our feature indexing, perspective/orientation, SCReLU and dequantisation are all correct.
 
-The repo checks in `test/nnue_reference.txt` — 250 reference evals for the shipped `pawnstar-v2.bin` —
-and `make check` runs `test_nnue nnue/pawnstar-v2.bin test/nnue_reference.txt` automatically (current
+The repo checks in `test/nnue_reference.txt` — 250 reference evals for the shipped `pawnstar-v4.bin` —
+and `make check` runs `test_nnue nnue/pawnstar-v4.bin test/nnue_reference.txt` automatically (current
 engine: max |diff| 0 cp). The reference's first field is the FEN, so regenerate it after shipping a *new*
-net with: `cut -d'|' -f1 test/nnue_reference.txt > fens.txt && "$EVAL" nnue/pawnstar-v2.bin fens.txt >
+net with: `cut -d'|' -f1 test/nnue_reference.txt > fens.txt && "$EVAL" nnue/pawnstar-v4.bin fens.txt >
 test/nnue_reference.txt`. With no arguments `test_nnue` is a no-op, so `make check` stays green if the
 net/reference are absent.
 
 A second test, `test_nnue_incremental <net.bin>`, plays random move sequences through a `SearchState`
 and asserts the incrementally-maintained accumulator evaluates **bit-identically** to a full refresh at
 every node (and again after every undo, to catch reverse-update bugs). With no argument it is a no-op,
-so `make check` stays green; run it with a net (e.g. `./build/test_nnue_incremental nnue/pawnstar-v2.bin`)
+so `make check` stays green; run it with a net (e.g. `./build/test_nnue_incremental nnue/pawnstar-v4.bin`)
 after any change to the accumulator, feature indexing, or make/undo.
 
 ### Strength testing (the verdict)
@@ -232,40 +232,43 @@ printed PV tail; the actual best move played is legal).
 
 ## 7. Shipped nets
 
-The repo ships two reference nets in this directory. Both are 256-hidden bullet nets (394816 bytes,
-trained 40 superbatches on GPU) and load the same way — **off by default**, since the HCE remains the
-engine's normal evaluator unless you switch:
+The repo ships one reference net, **[pawnstar-v4.bin](pawnstar-v4.bin)** (512-hidden bullet net, 789568
+bytes, `md5 a9c7308e…`) — **off by default**, since the HCE remains the engine's normal evaluator
+unless you switch:
 
 ```
-setoption name EvalFile value nnue/pawnstar-v2.bin
+setoption name EvalFile value nnue/pawnstar-v4.bin
 setoption name UseNNUE  value true
 ```
 
-| net | training data | vs HCE (fixed depth 8) |
-|---|---|---|
-| **[pawnstar-v2.bin](pawnstar-v2.bin)** *(recommended; md5 `ca2239fb…`)* | ~60M positions of **public PlentyChess** self-play (bulletformat, strong-engine labels) | **≈ +330 Elo** (≈87%) |
-| [pawnstar-v1.bin](pawnstar-v1.bin) *(md5 `d967b96f…`)* | ~3.6M Pawnstar **HCE** self-play (3.37M depth-6 + 235k depth-8 seed) | **−67 Elo** (40%) |
+**`pawnstar-v4.bin`** is trained on ~60M positions of **public PlentyChess** self-play (bulletformat,
+strong-engine labels) with a 512-wide transformer. It beats the handcrafted eval by a wide margin
+(its 256-wide predecessor scored ~87% / ≈ +330 Elo vs HCE at fixed depth, and v4 adds another
+**+55 ± 20 Elo** over that 256 net — see the lineage below).
 
-**The decisive lesson is label quality, not quantity.** `pawnstar-v1`, trained only on Pawnstar's own
-handcrafted-eval self-play, *loses* to the HCE — and a smaller ~1.0M-position predecessor lost by
-−151 Elo, so more data only halved the gap, never closing it. `pawnstar-v2`, trained on a public
-dataset of **strong-engine** (PlentyChess) self-play, *beats* the HCE by a wide margin — roughly a
-400 Elo swing from the data source alone (SPRT at fixed depth 8, `run_sprt.sh`).
+**Lineage — what moved the needle (all SPRT-measured):**
+
+| step | change | result |
+|---|---|---|
+| v1 (256) | Pawnstar's own **HCE self-play** (~3.6M) | **loses** to HCE (−67 Elo; a 1.0M predecessor was −151) |
+| v2 (256) | **public PlentyChess** data (~60M) | **beats** HCE ≈ +330 Elo — *label quality*, not quantity, was the lever |
+| v3 (256) | ~12× more PlentyChess data (~750M) | **no gain** over v2 (+9.5 ± 13.6, inconclusive) — 256 net is *capacity-limited* |
+| **v4 (512)** | **double the width**, same 60M as v2 | **+55 ± 20 Elo fixed-depth, +71 ± 25 at time control** over v2 — once data saturates, *net size* is the lever |
 
 PlentyChess data: <https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat> (public,
-already bulletformat — `bullet-utils validate` a shard, `cat` a few together, `shuffle`, then train per
-§6, skipping the text-`convert` step).
+already bulletformat — `bullet-utils validate` a shard first (some are corrupt, e.g. `11496.data`),
+`cat` a few clean ones together, `shuffle`, then train per §6, skipping the text-`convert` step).
 
-Caveats: these SPRTs are at **fixed depth**, which neutralises per-node speed differences. The
-**incremental accumulator has since landed** — worth ~+80 Elo over the old full-refresh at equal time
-(SPRT), and the AVX2 SIMD kernels a further ~+180 Elo over the scalar versions at equal time (SPRT) — so
-NNUE is now fully competitive on the clock.
-For absolute context the HCE measures ~2350 Elo (CCRL-ballpark), so `pawnstar-v2` is a large step up.
-NNUE remains **off by default**; set `UseNNUE`/`EvalFile` (or the §3 env vars) to use it.
+The eval is also fast on the clock: the **incremental accumulator** (~+80 Elo equal-time vs full
+refresh) and **AVX2 SIMD kernels** (~+180 Elo equal-time vs scalar) mean v4 wins on time as well as
+depth despite the wider net. For absolute context the HCE measures ~2350 Elo (CCRL-ballpark), so
+`pawnstar-v4` is a large step up. NNUE remains **off by default**; set `UseNNUE`/`EvalFile` (or the §3
+env vars) to use it. Next levers: more data for the *512* net (v4 used only 60M), or a wider net still
+(1024) / king-buckets.
 
-### Recreating `pawnstar-v2.bin`
+### Recreating `pawnstar-v4.bin`
 
-`pawnstar-v2.bin` was trained on ~60M positions of **public PlentyChess self-play**, already in
+`pawnstar-v4.bin` was trained on ~60M positions of **public PlentyChess self-play**, already in
 bulletformat (32-byte `bullet::ChessBoard` records), so the text→`convert` step is skipped. GPU training
 is GPU-nondeterministic, so this reproduces a *functionally equivalent* net, not a byte-identical one.
 
@@ -298,17 +301,17 @@ COUNT=$(( $(stat -c%s shuffled.data) / 32 ))
   cargo run --release --features cuda --example pawnstar )   # drop --features cuda to train on CPU
 
 # 5. Export the quantised net into the repo.
-cp ~/pawnstar_nnue/v2/checkpoints/pawnstar-40/quantised.bin nnue/pawnstar-v2.bin
+cp ~/pawnstar_nnue/v2/checkpoints/pawnstar-40/quantised.bin nnue/pawnstar-v4.bin
 
 # 6. Verify, then strength-test vs the HCE (reuse any openings.epd — e.g. one built by make_openings.sh
 #    from self-play data, or any EPD opening book; make_openings.sh cannot read bulletformat).
-./build/test_nnue_incremental nnue/pawnstar-v2.bin
-tools/run_sprt.sh nnue/pawnstar-v2.bin /path/to/openings.epd
+./build/test_nnue_incremental nnue/pawnstar-v4.bin
+tools/run_sprt.sh nnue/pawnstar-v4.bin /path/to/openings.epd
 ```
 
 The PlentyChess repo has many more (~10–12 GB) shards; add more `.data` files at step 1/3 for a larger
 set (raise the LR-schedule end with `PAWNSTAR_SBS` accordingly). The trainer architecture and
-quantisation in [pawnstar.rs](../tools/bullet/pawnstar.rs) (768→256, SCReLU, QA/QB/SCALE) must stay
+quantisation in [pawnstar.rs](../tools/bullet/pawnstar.rs) (768→512, SCReLU, QA/QB/SCALE) must stay
 unchanged so the engine can load the result (§2).
 
 ## 8. Reproducibility
@@ -324,7 +327,7 @@ location with `BULLET=…`.
 - **`undefined symbol: cuFuncLoad` when building bullet with `--features cuda`** — the NVIDIA driver is
   too old (it lacks the CUDA ≥ 12.3 driver API). Upgrade the driver to ≥ 545, or train on CPU with
   `BULLET_FEATURES=""`.
-- **`NNUE: net '…' is N bytes, expected at least 394754`** — the file isn't a 256-hidden bullet net in
+- **`NNUE: net '…' is N bytes, expected at least 789506`** — the file isn't a 512-hidden bullet net in
   the expected format (wrong `HIDDEN_SIZE`, wrong architecture, or truncated).
 - **Engine "disconnects" mid-match** — the old long-game history overflow is fixed (the game history is
   a dynamic `std::vector` now), so this should be rare; if it recurs it is an actual crash worth a debug
