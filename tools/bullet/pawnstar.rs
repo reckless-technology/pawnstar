@@ -1,6 +1,7 @@
 /*
-Pawnstar NNUE trainer: arch (768 -> HIDDEN_SIZE)x2 -> 1, SCReLU, matching the in-engine inference in
-src/nnue.cpp. Based on bullet's `simple` example. Configured via environment variables:
+Pawnstar NNUE trainer: arch (768xNUM_BUCKETS king-bucketed -> HIDDEN_SIZE)x2 -> 1, SCReLU, matching the
+in-engine inference in src/nnue.cpp (the KING_BUCKETS map below must stay byte-identical to its
+kKingBucketMap). Based on bullet's `simple` example. Configured via environment variables:
 
     PAWNSTAR_DATA   path to a BulletFormat .data file        (default: data/pawnstar.data)
     PAWNSTAR_BPS    batches_per_superbatch (~ dataset/16384)  (default: 1000)
@@ -11,7 +12,7 @@ The final quantised net is written to <out>/pawnstar-<sbs>/pawnstar-<sbs>.bin in
 headerless format, which src/nnue.cpp loads directly.
 */
 use bullet_lib::{
-    game::inputs::Chess768,
+    game::inputs::{ChessBuckets, get_num_buckets},
     nn::optimiser::AdamW,
     trainer::{
         save::SavedFormat,
@@ -26,6 +27,22 @@ const SCALE: i32 = 400;
 const QA: i16 = 255;
 const QB: i16 = 64;
 
+// King-square -> weight-bank map. MUST be byte-identical to kKingBucketMap in src/nnue.cpp (file/rank
+// quadrant: files a-d vs e-h, own half ranks 1-4 vs far half ranks 5-8). Indexed by each perspective's
+// own king square (bullet orients our_ksq/opp_ksq per perspective, matching the engine's white/black).
+#[rustfmt::skip]
+const KING_BUCKETS: [usize; 64] = [
+    0, 0, 0, 0, 1, 1, 1, 1,
+    0, 0, 0, 0, 1, 1, 1, 1,
+    0, 0, 0, 0, 1, 1, 1, 1,
+    0, 0, 0, 0, 1, 1, 1, 1,
+    2, 2, 2, 2, 3, 3, 3, 3,
+    2, 2, 2, 2, 3, 3, 3, 3,
+    2, 2, 2, 2, 3, 3, 3, 3,
+    2, 2, 2, 2, 3, 3, 3, 3,
+];
+const NUM_BUCKETS: usize = get_num_buckets(&KING_BUCKETS);
+
 fn env_or<T: std::str::FromStr>(key: &str, default: T) -> T {
     std::env::var(key).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
 }
@@ -39,8 +56,9 @@ fn main() {
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
         .optimiser(AdamW)
-        .inputs(Chess768)
-        // Save order/quantisation must match src/nnue.h (Network layout) and bullet's `simple` example.
+        .inputs(ChessBuckets::new(KING_BUCKETS))
+        // Save order/quantisation must match src/nnue.h (Network layout). l1w is NOT transposed (no output
+        // buckets). l0w grows to 768*NUM_BUCKETS feature rows, laid out bucket-major (bucket*768 + feat).
         .save_format(&[
             SavedFormat::id("l0w").round().quantise::<i16>(QA),
             SavedFormat::id("l0b").round().quantise::<i16>(QA),
@@ -49,7 +67,7 @@ fn main() {
         ])
         .loss_fn(|output, target| output.sigmoid().squared_error(target))
         .build(|builder, stm_inputs, ntm_inputs| {
-            let l0 = builder.new_affine("l0", 768, HIDDEN_SIZE);
+            let l0 = builder.new_affine("l0", 768 * NUM_BUCKETS, HIDDEN_SIZE);
             let l1 = builder.new_affine("l1", 2 * HIDDEN_SIZE, 1);
             // SCReLU activation (matches src/nnue.cpp).
             let stm_hidden = l0.forward(stm_inputs).screlu();
