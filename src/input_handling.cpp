@@ -139,6 +139,7 @@ void handle_setoption(Game &game, std::span<std::string> args)
     else if (name == "EvalFile")
     {
         game.NnueNetwork().Load(value);
+        game.eval_cache.Clear(); // cached evals belong to the previous net
     }
 }
 

@@ -19,6 +19,7 @@ void Game::NewGame(std::string_view fen_string)
 {
     time_control = ChessClock{};
     is_cancel_pending.store(false, std::memory_order_relaxed);
+    eval_cache.Clear(); // evals are net-specific; start each game with a clean cache
     positions_.clear();
     positions_.reserve(1024); // typical games stay well under this; avoids reallocations during normal play
     positions_.push_back(Position::FromString(fen_string));

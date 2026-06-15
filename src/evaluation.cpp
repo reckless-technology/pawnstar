@@ -24,9 +24,19 @@ int EvaluatePosition(const SearchState &state, int alpha, int beta)
     // which are specific to the handcrafted scores.
     if (state.game.NnueActive())
     {
-        // Use the incrementally-maintained accumulator (kept in sync by SearchState make/undo) rather than
-        // rebuilding it from scratch here.
-        return state.game.NnueNetwork().Evaluate(state.CurrentAccumulator(), position.ColorToMove());
+        // Memoise the (net-specific) NNUE eval by Zobrist hash: a cache hit skips the forward pass. The
+        // accumulator is still maintained incrementally by SearchState make/undo; the cache only saves the
+        // dot-product. The cache is cleared whenever the net changes (NewGame / EvalFile load).
+        const zobrist_t hash = position.Hash();
+        int             cached;
+        if (state.game.eval_cache.Probe(hash, cached))
+        {
+            INCREMENT("eval hash hits");
+            return cached;
+        }
+        const int score = state.game.NnueNetwork().Evaluate(state.CurrentAccumulator(), position.ColorToMove());
+        state.game.eval_cache.Store(hash, score);
+        return score;
     }
     std::array<int, 2> scores;
     // Phase 1: Evaluate material values alone.

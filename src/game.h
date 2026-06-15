@@ -8,6 +8,7 @@
 
 #include "chess_clock.h"
 #include "constants.h"
+#include "eval_cache.h"
 #include "nnue.h"
 #include "opening_book.h"
 #include "position.h"
@@ -19,12 +20,15 @@ class Game
   public:
     TranspositionTable transposition_table; ///< The transposition table (shared by all Lazy SMP threads).
     TranspositionTable quiescent_table;     ///< Special TT for quiescence search (shared by all threads).
+    EvalCache          eval_cache;          ///< Lockless NNUE evaluation cache (shared by all threads).
     ChessClock         time_control;        ///< Clock controls for the current game.
     OpeningBook        book;                ///< The opening book.
     std::atomic<bool>  is_cancel_pending;   ///< Shared stop flag: set on timeout, UCI stop, or search completion.
 
     /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
-    Game() : transposition_table{kHashtableMegabytes}, quiescent_table{kQHashtableMb}, is_cancel_pending{false}
+    Game()
+        : transposition_table{kHashtableMegabytes}, quiescent_table{kQHashtableMb}, eval_cache{kEvalCacheMb},
+          is_cancel_pending{false}
     {
         NewGame();
     }
