@@ -3,6 +3,10 @@
 # install our trainer + reference-evaluator examples, and register them in bullet's Cargo.toml.
 # Idempotent: safe to re-run.
 #
+# The installed examples (tools/bullet/pawnstar.rs, pawnstar_eval.rs) hard-code the net width
+# (HIDDEN_SIZE / HIDDEN), which MUST equal the engine's nnue::kHiddenSize (512 for the shipped v4 net).
+# Change all three together to train a different-width architecture.
+#
 # Usage: setup_bullet.sh
 # Env:   BULLET   bullet checkout location (default ~/pawnstar_nnue/bullet)
 #
