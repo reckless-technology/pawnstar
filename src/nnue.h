@@ -33,7 +33,7 @@ namespace nnue
 {
 
 constexpr int kInputSize  = 768; ///< Features per perspective: 2 colors * 6 piece types * 64 squares.
-constexpr int kHiddenSize = 256; ///< Feature-transformer / accumulator width per perspective.
+constexpr int kHiddenSize = 512; ///< Feature-transformer / accumulator width per perspective.
 
 // Quantisation constants. These MUST match the bullet trainer configuration that produced the net.
 constexpr int kQA    = 255; ///< Feature-transformer weight/activation scale (SCReLU clamp).

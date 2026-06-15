@@ -12,7 +12,7 @@ use std::io::{BufRead, BufReader, Read};
 
 use bulletformat::ChessBoard;
 
-const HIDDEN: usize = 256;
+const HIDDEN: usize = 512;
 const QA: i32 = 255;
 const QB: i32 = 64;
 const SCALE: i32 = 400;
