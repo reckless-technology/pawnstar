@@ -419,10 +419,13 @@ location with `BULLET=…`.
 - **`undefined symbol: cuFuncLoad` when building bullet with `--features cuda`** — the NVIDIA driver is
   too old (it lacks the CUDA ≥ 12.3 driver API). Upgrade the driver to ≥ 545, or train on CPU with
   `BULLET_FEATURES=""`.
-- **`NNUE: net '…' is N bytes, expected at least 3148802`** — the file isn't a 512-wide / 4-king-bucket
-  bullet net in the expected format (wrong `HIDDEN_SIZE`, wrong bucket count, wrong architecture, or
-  truncated). Note the size-gate only catches nets that are *too small*; a *larger* (e.g. wider) net is
-  silently misread, so always build the engine/tests at the net's architecture before verifying.
+- **`NNUE: file is …, engine expects …`** (stamped net) or **`NNUE: net '…' is N bytes, expected 3148802
+  (raw, unstamped) — wrong architecture or format`** (raw net) — the file doesn't match this build's
+  architecture (wrong `HIDDEN_SIZE`, bucket count, quantisation, or a truncated/corrupt file). Both are
+  hard rejections: a *stamped* net is validated field-by-field against the engine's compile-time constants,
+  and a *raw* net must match the payload size **exactly** (the window `kNetFileBytes ≤ size < kNetFileBytes
+  +64`, §2). So an incompatible net is never silently misread — including a *larger* (e.g. wider) one, the
+  case the old `>=` floor missed. Stamp nets with `tools/stamp_net` so the rejection message is precise.
 - **Engine "disconnects" mid-match** — the old long-game history overflow is fixed (the game history is
   a dynamic `std::vector` now), so this should be rare; if it recurs it is an actual crash worth a debug
   build. Adjudication (`run_sprt.sh`) is still recommended to keep matches short and decisive.
