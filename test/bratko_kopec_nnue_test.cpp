@@ -35,10 +35,9 @@
 namespace bk
 {
 
-/// @brief Lowest and highest depths the accepted-move sets were recorded over (inclusive).
-constexpr int kMinDepth     = 8;
-constexpr int kMaxDepth     = 11;
-constexpr int kDefaultDepth = 8; ///< Depth used when none is given on the command line.
+/// @brief Depth used when none is given on the command line. The accepted-move sets were recorded over
+/// depths 8–11 inclusive (their union); see the file header.
+constexpr int kDefaultDepth = 8;
 
 /// @brief A Bratko-Kopec position and the moves accepted as correct for it.
 struct BkCase
