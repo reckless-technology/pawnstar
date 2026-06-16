@@ -67,6 +67,19 @@ else
 	CXXFLAGS += -g -O3 -D NDEBUG
 endif
 
+# Link-time optimization (ThinLTO), on by default for release builds. LTO lets the optimizer inline and
+# specialize across translation units, which plain per-TU -O3 cannot do — it matters most for the small
+# hot-path methods that callers reach across .cpp boundaries. CXXFLAGS feeds both the compile and link
+# steps, so adding the flag here enables LTO end to end. Disable with `make LTO=0`; forced off for the
+# sanitizer DEBUG build, where LTO interferes with instrumentation and slows the build for no benefit.
+LTO ?= 1
+ifeq ($(DEBUG), 1)
+	LTO := 0
+endif
+ifeq ($(LTO), 1)
+	CXXFLAGS += -flto=thin
+endif
+
 .PHONY: all tests check prep clean gen doc tools
 
 all: prep $(PROGRAM_EXE)
