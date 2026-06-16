@@ -100,12 +100,12 @@ See [NNUE evaluation](#nnue-evaluation) below for how it works and how to train 
 ### Board representation
 
 `Position` ([src/position.h](src/position.h)) is the central immutable state class. It stores
-per-piece-type bitboards in `pieces_` and per-colour bitboards in `colors_`, a 64-entry square→piece
+per-piece-type bitboards in `pieces` and per-colour bitboards in `colors` (public members), a 64-entry square→piece
 array for O(1) lookup, the incrementally-maintained Zobrist hash, castling rights, the en passant
 square, the half-move clock, and a `checkers` bitboard. `MakeMove` and `MakeNullMove` return a brand
 new `Position` by value (copy-make); there is no unmake.
 
-`pieces_` is a `std::array<Bitboard, 7>` indexed by piece type, but **`pieces_[0]` (the `kNone` slot)
+`pieces` is a `std::array<Bitboard, 7>` indexed by piece type, but **`pieces[0]` (the `kNone` slot)
 holds the occupied-squares set** — the union of all pieces of both colours — rather than a piece
 bitboard; the six real piece types occupy indices 1–6. This lets occupancy queries and the `pext`-based
 attack lookups read it directly without recomputing a union.
