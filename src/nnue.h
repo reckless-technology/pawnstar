@@ -15,9 +15,10 @@
 ///
 /// A net is owned by the Game (one instance, read-only after Network::Load) and shared by all Lazy SMP
 /// threads, which call only its const methods. The accumulator is maintained incrementally across
-/// make/undo (see SearchState); Network::Refresh rebuilds it from scratch. The weights are produced by
-/// the `bullet` trainer and loaded from bullet's *native* quantised .bin (see nnue/README.md), a
-/// headerless, tightly packed little-endian struct in this exact order (bullet save_format):
+/// make/undo (see SearchState); Network::Refresh rebuilds it from scratch. A shipped net is prepended
+/// with a self-describing NetHeader (see below) that the loader validates against this build; the weight
+/// payload itself is the `bullet` trainer's native quantised output (see nnue/README.md), a tightly
+/// packed little-endian struct in this exact order (bullet save_format):
 ///
 ///   feature_weights : int16[kFeatureRows * kHiddenSize]  (column-major: feature * kHiddenSize + i), scale QA
 ///   feature_bias    : int16[kHiddenSize]                                                           , scale QA
@@ -39,19 +40,63 @@ class Position;
 namespace nnue
 {
 
-constexpr int kInputSize     = 768; ///< Features per perspective per bucket: 2 colors * 6 types * 64 squares.
-constexpr int kNumKingBuckets = 4;  ///< King-square buckets; each perspective selects one weight bank.
-constexpr int kFeatureRows   = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
-constexpr int kHiddenSize    = 512; ///< Feature-transformer / accumulator width per perspective.
+constexpr int kInputSize      = 768; ///< Features per perspective per bucket: 2 colors * 6 types * 64 squares.
+constexpr int kNumKingBuckets = 4;   ///< King-square buckets; each perspective selects one weight bank.
+constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
+constexpr int kHiddenSize     = 512; ///< Feature-transformer / accumulator width per perspective.
 
 // Quantisation constants. These MUST match the bullet trainer configuration that produced the net.
 constexpr int kQA    = 255; ///< Feature-transformer weight/activation scale (SCReLU clamp).
 constexpr int kQB    = 64;  ///< Output-layer weight scale.
 constexpr int kScale = 400; ///< Maps the raw network output to centipawns.
 
-/// @brief Total size of a valid net file: every weight is a little-endian int16, tightly packed, no header.
+/// @brief Total size of the quantised weight payload: every weight a little-endian int16, tightly packed.
 constexpr std::size_t kNetFileBytes =
     (static_cast<std::size_t>(kFeatureRows) * kHiddenSize + kHiddenSize + 2 * kHiddenSize + 1) * sizeof(int16_t);
+
+/// @brief Magic identifying a Pawnstar-stamped NNUE file ("PSN" + format version byte).
+constexpr char          kNetMagic[4]      = {'P', 'S', 'N', '1'};
+constexpr std::uint16_t kNetFormatVersion = 1; ///< Header format version (bump on incompatible header changes).
+
+/// @brief Self-describing 32-byte header prepended to a shipped net so an incompatible file is rejected
+/// rather than silently misread. The architecture fields must equal the engine's compile-time constants;
+/// the loader checks every one. Raw (headerless) bullet output is still accepted via an exact size check.
+#pragma pack(push, 1)
+
+struct NetHeader
+{
+    char          magic[4];       ///< kNetMagic.
+    std::uint16_t format_version; ///< kNetFormatVersion.
+    std::uint16_t input_size;     ///< kInputSize (features per perspective per bucket).
+    std::uint16_t king_buckets;   ///< kNumKingBuckets.
+    std::uint16_t hidden_size;    ///< kHiddenSize.
+    std::int16_t  qa;             ///< kQA.
+    std::int16_t  qb;             ///< kQB.
+    std::int16_t  scale;          ///< kScale.
+    std::uint8_t  reserved[14];   ///< Zero-padding to a round 32 bytes.
+};
+
+#pragma pack(pop)
+static_assert(sizeof(NetHeader) == 32, "NetHeader must be exactly 32 bytes");
+
+/// @brief The header describing the architecture this engine was compiled for.
+/// @return A NetHeader populated from the compile-time NNUE constants.
+inline NetHeader ExpectedNetHeader()
+{
+    NetHeader h{};
+    h.magic[0]       = kNetMagic[0];
+    h.magic[1]       = kNetMagic[1];
+    h.magic[2]       = kNetMagic[2];
+    h.magic[3]       = kNetMagic[3];
+    h.format_version = kNetFormatVersion;
+    h.input_size     = static_cast<std::uint16_t>(kInputSize);
+    h.king_buckets   = static_cast<std::uint16_t>(kNumKingBuckets);
+    h.hidden_size    = static_cast<std::uint16_t>(kHiddenSize);
+    h.qa             = static_cast<std::int16_t>(kQA);
+    h.qb             = static_cast<std::int16_t>(kQB);
+    h.scale          = static_cast<std::int16_t>(kScale);
+    return h;
+}
 
 /// @brief The two perspective accumulators (each the feature-transformer output, width kHiddenSize).
 /// Maintained incrementally across make/undo so a node's evaluation does not rebuild it from scratch.

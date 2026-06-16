@@ -70,8 +70,7 @@ the scalar one (verified by `test_nnue`).
 
 ## 2. File format
 
-The engine loads bullet's **native quantised `.bin`** directly — headerless, tightly packed,
-little-endian `int16`, in this order:
+The **payload** is bullet's native quantised weights — tightly packed, little-endian `int16`, in this order:
 
 | section | count (int16) | scale |
 |---|---|---|
@@ -80,14 +79,27 @@ little-endian `int16`, in this order:
 | `output_weights` | `2 * 512 = 1024` (first 512 = stm, next 512 = ntm) | QB |
 | `output_bias` | `1` (scalar) | QA·QB |
 
-Packed size is `(1572864 + 512 + 1024 + 1) * 2 = 3148802` bytes. bullet pads the trailing 1-element
-`output_bias` tensor up to a 64-byte boundary, so its files are **3148864 bytes**; the loader requires
-`size >= 3148802` and ignores any trailing padding. The size-gate only rejects nets that are *too
-small*, so a build of one architecture can silently misread a *larger* net — build the engine/tests at
-the net's width/architecture before verifying. (The retired Chess768/512 nets — v4 and earlier — packed
-to `(768*512 + 512 + 1024 + 1)*2 = 789506` bytes, files 789568, and a king-bucket engine cannot load
-them.) The forward-pass math and quantisation are kept in lock-step with the
-trainer ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies they agree to within rounding.
+Packed payload is `(1572864 + 512 + 1024 + 1) * 2 = 3148802` bytes; bullet pads the trailing 1-element
+`output_bias` tensor up to a 64-byte boundary, so its raw output is **3148864 bytes**.
+
+**Self-describing header.** A shipped net is prepended with a **32-byte `NetHeader`** (`src/nnue.h`):
+a magic (`"PSN1"`), a format version, and the architecture parameters — `kInputSize`, `kNumKingBuckets`,
+`kHiddenSize`, `kQA`, `kQB`, `kScale`. So `nnue/pawnstar-v6.bin` is **3148896 bytes** (32 + 3148864). The
+loader (`Network::Load`) accepts two layouts:
+
+- **Stamped** (magic present): every architecture field is checked against the engine's compile-time
+  constants; any mismatch is rejected with a descriptive message (e.g. `file is …buckets1…, engine
+  expects …buckets4…`) — so an incompatible net can never be silently misread.
+- **Raw** (no magic, e.g. a freshly-exported bullet `quantised.bin`): accepted only when its size equals
+  the payload exactly, within bullet's `<64`-byte padding (`kNetFileBytes ≤ size < kNetFileBytes+64`).
+  This exact window — not a `>=` floor — is what rejects a *larger* (e.g. wider) raw net rather than
+  misreading it.
+
+Stamp a raw net with `tools/stamp_net` (`make tools`); the header values come from the building engine's
+constants, so it can only stamp a net that matches this build. The forward-pass math and quantisation are
+kept in lock-step with the trainer ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies
+they agree to within rounding. (The retired Chess768/512 nets — v4 and earlier — had a 789506-byte payload
+and were headerless; a king-bucket engine cannot load them.)
 
 ## 3. Using a net in the engine
 
@@ -116,9 +128,10 @@ and `game.SetUseNnue(...)`), read-only after load and shared by all Lazy SMP thr
 | file | purpose |
 |------|---------|
 | `gen_data.cpp`            | self-play data generator (built by `make tools` → `build/gen_data`) |
+| `stamp_net.cpp`           | prepend the self-describing `NetHeader` to a raw bullet net (`make tools` → `build/stamp_net`) |
 | `run_gendata.sh`          | launch N parallel self-play shards |
 | `setup_bullet.sh`         | clone bullet at the pinned commit + install/register our trainer examples |
-| `bullet/pawnstar.rs`      | the trainer (arch `768→512×2→1`, SCReLU, QA/QB/SCALE) |
+| `bullet/pawnstar.rs`      | the trainer (arch `768×4 king-bucketed → 512×2 → 1`, SCReLU, QA/QB/SCALE) |
 | `bullet/pawnstar_eval.rs` | reference evaluator for the `test_nnue` cross-check |
 | `make_openings.sh`        | build an EPD openings book from self-play data |
 | `train_pipeline.sh`       | train → export a net, from either self-play text shards or a bulletformat `.data` |
@@ -360,8 +373,10 @@ cat 11008.data 13349.data /path/to/60M/all.data > all.data
   PAWNSTAR_SBS=40 PAWNSTAR_OUT=~/pawnstar_nnue/v6/checkpoints \
   cargo run --release --features cuda --example pawnstar )   # drop --features cuda to train on CPU
 
-# 5. Export the quantised net into the repo (the 4-bucket net is 3148864 bytes).
-cp ~/pawnstar_nnue/v6/checkpoints/pawnstar-40/quantised.bin /path/to/pawnstar/nnue/pawnstar-v6.bin
+# 5. Stamp the raw net with the self-describing header and ship it (stamped file is 3148896 bytes).
+#    stamp_net embeds this build's architecture, so it can only stamp a net matching the engine (§2).
+make tools                           # builds build/stamp_net
+./build/stamp_net ~/pawnstar_nnue/v6/checkpoints/pawnstar-40/quantised.bin /path/to/pawnstar/nnue/pawnstar-v6.bin
 
 # 6. Regenerate the engine-vs-trainer cross-check reference for the new net (§6), then verify.
 cd /path/to/pawnstar

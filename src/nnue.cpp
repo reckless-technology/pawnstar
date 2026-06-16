@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <utility>
 
@@ -107,6 +108,7 @@ inline int WhiteBucket(const Position &p)
 {
     return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kWhite]).Lsb()];
 }
+
 inline int BlackBucket(const Position &p)
 {
     return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kBlack]).Lsb() ^ kRankFlip];
@@ -160,18 +162,59 @@ bool Network::Load(const std::string &path)
         std::fprintf(stderr, "info string NNUE: cannot open net file '%s'\n", path.c_str());
         return false;
     }
-    // The file is bullet's headerless quantised .bin; the size guards against arch/format mismatch. bullet
-    // pads the trailing 1-element output_bias tensor up to a 64-byte boundary, so the file may be a little
-    // larger than the tightly packed weights; we read the weights and ignore any trailing padding.
     const std::streamoff size = in.tellg();
-    if (static_cast<std::size_t>(size) < kNetFileBytes)
-    {
-        std::fprintf(stderr,
-                     "info string NNUE: net '%s' is %lld bytes, expected at least %zu (wrong hidden size / format)\n",
-                     path.c_str(), static_cast<long long>(size), kNetFileBytes);
-        return false;
-    }
     in.seekg(0);
+
+    // Two accepted layouts:
+    //  (1) A Pawnstar-stamped file: a 32-byte NetHeader (magic + architecture) followed by the payload.
+    //      Every architecture field is checked against this engine's constants, so an incompatible net is
+    //      rejected with a clear message instead of being silently misread.
+    //  (2) Raw bullet output (no header): accepted only when its size matches the expected payload exactly
+    //      (within bullet's <64-byte trailing-tensor padding). This exact window — not the old `>=` — is
+    //      what stops a *larger* (e.g. wider) net being silently misread.
+    std::streamoff payload_offset = 0;
+    NetHeader      header{};
+    if (static_cast<std::size_t>(size) >= sizeof(NetHeader))
+    {
+        in.read(reinterpret_cast<char *>(&header), sizeof(header));
+        in.seekg(0);
+    }
+    if (std::memcmp(header.magic, kNetMagic, sizeof(kNetMagic)) == 0)
+    {
+        // Stamped file: validate the architecture fields against this build.
+        const NetHeader expected = ExpectedNetHeader();
+        if (header.format_version != expected.format_version || header.input_size != expected.input_size ||
+            header.king_buckets != expected.king_buckets || header.hidden_size != expected.hidden_size ||
+            header.qa != expected.qa || header.qb != expected.qb || header.scale != expected.scale)
+        {
+            std::fprintf(stderr,
+                         "info string NNUE: net '%s' is incompatible — file is "
+                         "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d, engine expects "
+                         "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d\n",
+                         path.c_str(), header.format_version, header.input_size, header.king_buckets,
+                         header.hidden_size, header.qa, header.qb, header.scale, expected.format_version,
+                         expected.input_size, expected.king_buckets, expected.hidden_size, expected.qa, expected.qb,
+                         expected.scale);
+            return false;
+        }
+        payload_offset = sizeof(NetHeader);
+    }
+    else
+    {
+        // Headerless raw bullet net: require the payload size exactly (bullet pads the trailing tensor up
+        // to a 64-byte boundary, so allow up to 63 bytes of trailing padding, but no more and no less).
+        const std::size_t sz = static_cast<std::size_t>(size);
+        if (sz < kNetFileBytes || sz >= kNetFileBytes + 64)
+        {
+            std::fprintf(stderr,
+                         "info string NNUE: net '%s' is %lld bytes, expected %zu (raw, unstamped) — wrong "
+                         "architecture or format\n",
+                         path.c_str(), static_cast<long long>(size), kNetFileBytes);
+            return false;
+        }
+    }
+
+    in.seekg(payload_offset);
     // Read in bullet's save order: feature_weights, feature_bias, output_weights, output_bias.
     in.read(reinterpret_cast<char *>(feature_weights_.data()), feature_weights_.size() * sizeof(int16_t));
     in.read(reinterpret_cast<char *>(feature_bias_.data()), feature_bias_.size() * sizeof(int16_t));
