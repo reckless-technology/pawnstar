@@ -2,7 +2,8 @@
 
 Pawnstar is a [UCI](https://en.wikipedia.org/wiki/Universal_Chess_Interface) chess engine written in
 C++20. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
-a lockless transposition table, and a tapered hand-crafted evaluation.
+a lockless transposition table, and a king-bucketed NNUE evaluation (on by default, with a tapered
+hand-crafted evaluation as fallback).
 
 Legal move generation runs at roughly 700 million moves per second on a modern laptop.
 
@@ -291,8 +292,9 @@ read-only after load and shared by all search threads. Its accumulator is **main
 across make/undo on each thread's `SearchState` — only the feature columns for the pieces that moved are
 updated — except when a king crosses a bucket boundary, which rebuilds that one perspective's
 accumulator. This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
-`int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) and loaded directly from the
-[bullet](https://github.com/jw1912/bullet) trainer's native `.bin`.
+`int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) from the
+[bullet](https://github.com/jw1912/bullet) trainer, with a small self-describing header so an
+incompatible net is rejected rather than misread (see [nnue/README.md](nnue/README.md)).
 
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
 [nnue/README.md](nnue/README.md). The shipped nets are trained on **public PlentyChess** bulletformat
@@ -451,8 +453,9 @@ the published node counts for the standard positions.
 - **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
 - **NNUE is experimental but on by default.** The engine loads the shipped net at startup (HCE fallback
   if absent, or with `UseNNUE`/`PAWNSTAR_NNUE=0`). The accumulator is maintained incrementally across
-  make/undo and the kernels are AVX2-vectorised, so it is fast on the clock and beats the HCE (see
-  Benchmarks); it is still a 512-wide `Chess768` net without king buckets.
+  make/undo (with a refresh when a king crosses a bucket boundary) and the kernels are AVX2-vectorised,
+  so it is fast on the clock and beats the HCE (see Benchmarks); the shipped net is a 512-wide,
+  4-king-bucket `ChessBuckets` net (v6).
 
 ## Contributing
 
