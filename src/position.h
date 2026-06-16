@@ -122,13 +122,13 @@ class Position
     /// @brief All occupied squares. @return Occupancy bitboard.
     constexpr Bitboard OccupiedSquares() const
     {
-        return pieces_[kNone];
+        return pieces[kNone];
     }
 
     /// @brief All empty squares. @return Vacant-square bitboard.
     constexpr Bitboard VacantSquares() const
     {
-        return ~pieces_[kNone];
+        return ~pieces[kNone];
     }
 
     /// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
@@ -173,9 +173,9 @@ class Position
         return en_passant_square_;
     }
 
-    std::array<Bitboard, 7> pieces_; ///< @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the
+    std::array<Bitboard, 7> pieces; ///< @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the
                                      ///< occupied-squares bitboard
-    std::array<Bitboard, 2> colors_; ///< @brief Per-color bitboards indexed by Color.
+    std::array<Bitboard, 2> colors; ///< @brief Per-color bitboards indexed by Color.
 
   private:
     constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
@@ -210,11 +210,11 @@ constexpr Bitboard Position::AttacksTo(Square location, Color color) const
 {
     const Bitboard occupied_squares = OccupiedSquares();
     Bitboard       result =
-        color == kWhite ? kPawnAttacksBlack[location] & pieces_[kPawn] : kPawnAttacksWhite[location] & pieces_[kPawn];
-    result |= (kKnightAttacks[location] & pieces_[kKnight]) | (kKingAttacks[location] & pieces_[kKing]);
-    result |= RookAttacks(occupied_squares, location) & (pieces_[kRook] | pieces_[kQueen]);
-    result |= BishopAttacks(occupied_squares, location) & (pieces_[kBishop] | pieces_[kQueen]);
-    result &= colors_[color];
+        color == kWhite ? kPawnAttacksBlack[location] & pieces[kPawn] : kPawnAttacksWhite[location] & pieces[kPawn];
+    result |= (kKnightAttacks[location] & pieces[kKnight]) | (kKingAttacks[location] & pieces[kKing]);
+    result |= RookAttacks(occupied_squares, location) & (pieces[kRook] | pieces[kQueen]);
+    result |= BishopAttacks(occupied_squares, location) & (pieces[kBishop] | pieces[kQueen]);
+    result &= colors[color];
     return result;
 }
 
@@ -227,9 +227,9 @@ constexpr Bitboard Position::AttacksTo(Square location, Color color) const
 template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves() const
 {
     const Bitboard occupied_squares = OccupiedSquares();
-    const Bitboard friendly_pieces  = colors_[color];
+    const Bitboard friendly_pieces  = colors[color];
     const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
-    const Bitboard enemy_pawns      = pieces_[kPawn] & enemy_pieces;
+    const Bitboard enemy_pawns      = pieces[kPawn] & enemy_pieces;
     const Square   king_locn        = king_location_[color];
 
     MoveList moves;
@@ -244,7 +244,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     for (auto &[piece, attack_fn] : piece_attackers)
     {
-        const Bitboard b = pieces_[piece] & enemy_pieces;
+        const Bitboard b = pieces[piece] & enemy_pieces;
         for (Square s : b)
         {
             forbidden_king_squares |= attack_fn(occupied_except_king, s);
@@ -296,7 +296,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // Generate knight, bishop, rook and queen moves.
     for (auto &[piece, attack_fn] : piece_attackers_except_king)
     {
-        const Bitboard b = pieces_[piece] & friendly_pieces;
+        const Bitboard b = pieces[piece] & friendly_pieces;
         for (Square from : b)
         {
             const Bitboard attacks         = attack_fn(occupied_squares, from) & pins.AllowedSquares(from);
@@ -373,11 +373,11 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     if constexpr (color == kWhite)
     {
-        pawns              = pieces_[kPawn] & colors_[kWhite];
+        pawns              = pieces[kPawn] & colors[kWhite];
         single_pushes      = pawns.ShiftNorth() & ~occupied_squares;
         double_pushes      = single_pushes.ShiftNorth() & ~occupied_squares & kRank4;
-        captures_west      = pawns.ShiftNorthwest() & colors_[kBlack];
-        captures_east      = pawns.ShiftNortheast() & colors_[kBlack];
+        captures_west      = pawns.ShiftNorthwest() & colors[kBlack];
+        captures_east      = pawns.ShiftNortheast() & colors[kBlack];
         en_passant_sources = en_passant_square_ ? kPawnAttacksBlack[en_passant_square_] & pawns : kNoSquares;
         promotions         = single_pushes & kRank8;
         promotions_west    = captures_west & kRank8;
@@ -388,11 +388,11 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     }
     else
     {
-        pawns              = pieces_[kPawn] & colors_[kBlack];
+        pawns              = pieces[kPawn] & colors[kBlack];
         single_pushes      = pawns.ShiftSouth() & ~occupied_squares;
         double_pushes      = single_pushes.ShiftSouth() & ~occupied_squares & kRank5;
-        captures_west      = pawns.ShiftSouthwest() & colors_[kWhite];
-        captures_east      = pawns.ShiftSoutheast() & colors_[kWhite];
+        captures_west      = pawns.ShiftSouthwest() & colors[kWhite];
+        captures_east      = pawns.ShiftSoutheast() & colors[kWhite];
         en_passant_sources = en_passant_square_ ? kPawnAttacksWhite[en_passant_square_] & pawns : kNoSquares;
         promotions         = single_pushes & kRank1;
         promotions_west    = captures_west & kRank1;
@@ -500,7 +500,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
                     occupied_squares ^ Bitboard(captured_pawn_locn) ^ Bitboard(from);
                 const Bitboard horizontal_attacks =
                     RookAttacks(pseudo_occupied_squares, king_locn) & (kWest[king_locn] | kEast[king_locn]);
-                if ((horizontal_attacks & enemy_pieces & (pieces_[kRook] | pieces_[kQueen])).IsEmpty())
+                if ((horizontal_attacks & enemy_pieces & (pieces[kRook] | pieces[kQueen])).IsEmpty())
                 {
                     // We can make this move since it's not a discovered check.
                     moves.push_back(Move::EpCapture(from, to));

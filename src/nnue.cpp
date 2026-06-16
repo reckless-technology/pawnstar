@@ -107,12 +107,12 @@ inline std::size_t Row(int bucket, int color, int piece, int sq, bool black)
 /// @brief A perspective's king bucket: index the map with that perspective's king square, oriented to it.
 inline int WhiteBucket(const Position &p)
 {
-    return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kWhite]).Lsb()];
+    return kKingBucketMap[(p.pieces[kKing] & p.colors[kWhite]).Lsb()];
 }
 
 inline int BlackBucket(const Position &p)
 {
-    return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kBlack]).Lsb() ^ kRankFlip];
+    return kKingBucketMap[(p.pieces[kKing] & p.colors[kBlack]).Lsb() ^ kRankFlip];
 }
 } // namespace
 
@@ -122,10 +122,10 @@ void Network::RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position
     side = feature_bias_;
     for (int color = kWhite; color <= kBlack; ++color)
     {
-        const Bitboard friendly = position.colors_[color];
+        const Bitboard friendly = position.colors[color];
         for (int piece = kPawn; piece <= kKing; ++piece)
         {
-            for (Square s : position.pieces_[piece] & friendly)
+            for (Square s : position.pieces[piece] & friendly)
             {
                 AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
             }
@@ -140,8 +140,8 @@ void Network::DiffSide(std::array<int16_t, kHiddenSize> &side, const Position &f
     {
         for (int piece = kPawn; piece <= kKing; ++piece)
         {
-            const Bitboard from_bb = from.pieces_[piece] & from.colors_[color];
-            const Bitboard to_bb   = to.pieces_[piece] & to.colors_[color];
+            const Bitboard from_bb = from.pieces[piece] & from.colors[color];
+            const Bitboard to_bb   = to.pieces[piece] & to.colors[color];
             for (Square s : from_bb & ~to_bb)
             {
                 SubColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
@@ -276,8 +276,8 @@ void Network::Update(Accumulator &acc, const Position &from, const Position &to)
         {
             for (int piece = kPawn; piece <= kKing; ++piece)
             {
-                const Bitboard from_bb = from.pieces_[piece] & from.colors_[color];
-                const Bitboard to_bb   = to.pieces_[piece] & to.colors_[color];
+                const Bitboard from_bb = from.pieces[piece] & from.colors[color];
+                const Bitboard to_bb   = to.pieces[piece] & to.colors[color];
                 for (Square s : from_bb & ~to_bb)
                 {
                     SubColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);

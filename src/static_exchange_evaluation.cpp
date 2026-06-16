@@ -11,12 +11,12 @@ constexpr std::array<int, 7> piece_values{0, 100, 300, 300, 500, 900, 10000};
 /// @brief Bitboards of piece on the board used for static exchange evaluation.
 struct SeeBoard
 {
-    std::array<Bitboard, 7> pieces_; ///< Per-piece-type bitboards indexed by Piece (index 0 / kNone unused).
-    std::array<Bitboard, 2> colors_; ///< Per-color bitboards indexed by Color.
+    std::array<Bitboard, 7> pieces; ///< Per-piece-type bitboards indexed by Piece (index 0 / kNone unused).
+    std::array<Bitboard, 2> colors; ///< Per-color bitboards indexed by Color.
 
     /// @brief Construct the working board from a position.
     /// @param p Position to copy piece bitboards from.
-    constexpr SeeBoard(const Position &p) : pieces_(p.pieces_), colors_(p.colors_)
+    constexpr SeeBoard(const Position &p) : pieces(p.pieces), colors(p.colors)
     {
     }
 };
@@ -60,7 +60,7 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
     const Bitboard      knight_attacks     = kKnightAttacks[location];
     const Bitboard      king_attacks       = kKingAttacks[location];
     const Bitboard      square             = Bitboard(location);
-    Bitboard            occupied           = bb.pieces_[kNone]; // pieces_[kNone] holds the occupied-squares bitboard
+    Bitboard            occupied           = bb.pieces[kNone]; // pieces[kNone] holds the occupied-squares bitboard
     std::array<int, 32> scores;
     int                 ply;
     // First pass: perform all the captures onto the square least valuable piece first.
@@ -71,40 +71,40 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         Bitboard       bishop_attacks;
         Bitboard       rook_attacks;
         const Bitboard pawn_attacks     = color == kWhite ? white_pawn_attacks : black_pawn_attacks;
-        const Bitboard attacking_pieces = bb.colors_[color];
-        Bitboard       attackers        = pawn_attacks & attacking_pieces & bb.pieces_[kPawn];
+        const Bitboard attacking_pieces = bb.colors[color];
+        Bitboard       attackers        = pawn_attacks & attacking_pieces & bb.pieces[kPawn];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kPawn;
             goto FoundAttacker;
         }
-        attackers = knight_attacks & attacking_pieces & bb.pieces_[kKnight];
+        attackers = knight_attacks & attacking_pieces & bb.pieces[kKnight];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kKnight;
             goto FoundAttacker;
         }
         bishop_attacks = BishopAttacks(occupied, location);
-        attackers      = bishop_attacks & attacking_pieces & bb.pieces_[kBishop];
+        attackers      = bishop_attacks & attacking_pieces & bb.pieces[kBishop];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kBishop;
             goto FoundAttacker;
         }
         rook_attacks = RookAttacks(occupied, location);
-        attackers    = rook_attacks & attacking_pieces & bb.pieces_[kRook];
+        attackers    = rook_attacks & attacking_pieces & bb.pieces[kRook];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kRook;
             goto FoundAttacker;
         }
-        attackers = (bishop_attacks | rook_attacks) & attacking_pieces & bb.pieces_[kQueen];
+        attackers = (bishop_attacks | rook_attacks) & attacking_pieces & bb.pieces[kQueen];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kQueen;
             goto FoundAttacker;
         }
-        attackers = king_attacks & attacking_pieces & bb.pieces_[kKing];
+        attackers = king_attacks & attacking_pieces & bb.pieces[kKing];
         if (attackers.IsNotEmpty())
         {
             capturing_piece = kKing;
@@ -117,10 +117,10 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
 
     FoundAttacker:
         attackers.IsolateLsb();
-        bb.pieces_[piece_on_square] ^= square;
-        bb.colors_[EnemyOf(color)] ^= square;
-        bb.pieces_[capturing_piece] ^= attackers | square;
-        bb.colors_[color] ^= attackers | square;
+        bb.pieces[piece_on_square] ^= square;
+        bb.colors[EnemyOf(color)] ^= square;
+        bb.pieces[capturing_piece] ^= attackers | square;
+        bb.colors[color] ^= attackers | square;
         occupied ^= attackers;
         scores[ply]     = piece_values[piece_on_square];
         piece_on_square = capturing_piece;
@@ -129,8 +129,8 @@ static int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
         if (piece_on_square == kPawn && (square & (kRank1 | kRank8)).IsNotEmpty())
         {
             piece_on_square = kQueen;
-            bb.pieces_[kPawn] ^= square;
-            bb.pieces_[kQueen] ^= square;
+            bb.pieces[kPawn] ^= square;
+            bb.pieces[kQueen] ^= square;
         }
     }
     // Second pass: unwind the capture stack and propagate values back to the top for material winning sequences.
