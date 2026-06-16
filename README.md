@@ -2,8 +2,7 @@
 
 Pawnstar is a [UCI](https://en.wikipedia.org/wiki/Universal_Chess_Interface) chess engine written in
 C++20. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
-a lockless transposition table, and a king-bucketed NNUE evaluation (on by default, with a tapered
-hand-crafted evaluation as fallback).
+a lockless transposition table, and a king-bucketed NNUE evaluation (the engine's sole evaluator).
 
 Legal move generation runs at roughly 700 million moves per second on a modern laptop.
 
@@ -16,8 +15,7 @@ Legal move generation runs at roughly 700 million moves per second on a modern l
 - Lockless 128-bit transposition table using Hyatt's XOR trick.
 - Null-move pruning, late-move reductions, killer and per-thread history move ordering.
 - Quiescence search over captures with its own transposition table.
-- Tapered evaluation: material, piece-square tables, pawn structure, king safety and mobility.
-- **NNUE** evaluation (efficiently-updatable neural network) **on by default**, switchable at runtime (the hand-crafted eval remains as a fallback).
+- **NNUE** evaluation (efficiently-updatable neural network) — a king-bucketed perspective net, the engine's only evaluator. A net is loaded at startup; load a different one at runtime with `setoption name EvalFile`.
 - Optional opening book (`pawnstar.book`).
 
 ## Requirements
@@ -69,7 +67,7 @@ Run as a UCI engine (connect via Arena, Cute Chess, or any UCI-compatible GUI):
 In addition to the standard UCI commands, a few engine-specific commands are available at the prompt:
 
 ```
-eval        print the static evaluation of the current position (and which evaluator is active)
+eval        print the NNUE static evaluation of the current position
 nnue        print the raw NNUE evaluation of the current position
 getboard    print the FEN of the current position
 bookmoves   list opening-book moves for the current position
@@ -77,27 +75,24 @@ dbg         dump internal diagnostic counters
 help        list all commands
 ```
 
-### Enabling NNUE evaluation
+### The NNUE net
 
-NNUE is **on by default**: at startup the engine loads the shipped net `nnue/pawnstar-v6.bin` (resolved
-relative to the working directory, like `pawnstar.book`) and evaluates with it. If the net isn't found it
-logs a notice and falls back to the hand-crafted evaluation. **Run the engine from the repository root**
-(or set `EvalFile`) so the default net is found. To use a different net or toggle NNUE at runtime:
+NNUE is Pawnstar's **only** evaluator, so a net is required. At startup the engine loads the shipped net
+`nnue/pawnstar-v6.bin` (resolved relative to the working directory, like `pawnstar.book`). If the net
+cannot be loaded it prints an error and **exits** — so **run the engine from the repository root** (or set
+`PAWNSTAR_EVALFILE`) so the default net is found. To use a different net:
 
 ```
-setoption name EvalFile value /path/to/net.bin
-setoption name UseNNUE value false   # force the hand-crafted eval (default is true)
+setoption name EvalFile value /path/to/net.bin      # load a different net at runtime
 ```
 
-or via environment variables at launch (these override the defaults):
+or via an environment variable at launch:
 
 ```bash
 PAWNSTAR_EVALFILE=/path/to/net.bin ./build/pawnstar   # use a different net
-PAWNSTAR_NNUE=0 ./build/pawnstar                       # disable NNUE (hand-crafted eval)
 ```
 
-`eval` reports which evaluator is in use. See [NNUE evaluation](#nnue-evaluation-experimental) below for
-how it works and how to train a net.
+See [NNUE evaluation](#nnue-evaluation) below for how it works and how to train a net.
 
 ## Architecture
 
@@ -253,26 +248,23 @@ detected and treated as a miss. Concurrent writers race benignly (last writer wi
 
 ### Evaluation
 
-`EvaluatePosition` ([src/evaluation.cpp](src/evaluation.cpp)) is tapered between opening/middlegame and
-endgame based on remaining material, and sums:
-
-- **Material** with a bishop-pair bonus.
-- **Piece-square tables** per piece type, with separate midgame and endgame king tables.
-- **Pawn structure** — passed, isolated, unsupported, doubled and defended pawns.
-- **King safety** — pawn-shelter and friendly-piece-proximity terms, open-file penalties.
-- **Mobility** — bishop and rook mobility, excluding pawn-defended targets.
+`EvaluatePosition` ([src/evaluation.cpp](src/evaluation.cpp)) is **NNUE-only**: after a draw
+short-circuit it returns the network's score for the incrementally-maintained accumulator (memoised by
+Zobrist hash in an eval cache). See [NNUE evaluation](#nnue-evaluation) below. Earlier versions also had a
+tapered hand-crafted evaluation (material, piece-square tables, pawn structure, king safety, mobility);
+it was removed once NNUE became the sole evaluator.
 
 Static exchange evaluation (`EvaluateStaticExchange`,
-[src/static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a
-square; it is used to order captures and promotions during search (see above) and is covered by
-`test_see`.
+[src/static_exchange_evaluation.h](src/static_exchange_evaluation.h)) is independent of the NNUE eval: it
+resolves a capture sequence on a square, is used to order captures and promotions during search (see
+above) and to prune losing captures in quiescence, and is covered by `test_see`.
 
-### NNUE evaluation (experimental)
+### NNUE evaluation
 
-Pawnstar can optionally replace the hand-crafted evaluation with an **NNUE** (Efficiently Updatable
-Neural Network) — a small neural net trained to score positions. It is **on by default** (the shipped net
-is loaded at startup) and switchable at runtime (see
-[Enabling NNUE evaluation](#enabling-nnue-evaluation) above); the hand-crafted eval is the fallback.
+Pawnstar evaluates exclusively with an **NNUE** (Efficiently Updatable Neural Network) — a neural net
+trained to score positions. It is the engine's only evaluator: the shipped net is loaded at startup (the
+engine exits if it cannot be loaded), and a different net can be loaded at runtime (see
+[The NNUE net](#the-nnue-net) above).
 
 **How it works.** The network ([src/nnue.cpp](src/nnue.cpp), [src/nnue.h](src/nnue.h)) is a
 "perspective" net using bullet's king-bucketed `ChessBuckets` feature set:
@@ -311,12 +303,14 @@ tools/run_experiment.sh ~/pawnstar_nnue/shuffled.data net.bin   # train, verify,
 trainer, plus the incremental accumulator vs a full refresh), then runs the SPRT. Load the net with
 `setoption name EvalFile`. The same two checks are wired into `make check` via `test_nnue` and
 `test_nnue_incremental` (see [Test suite](#test-suite)); GPU training needs a CUDA toolkit and a driver
-supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""` to train on CPU. Because NNUE scores differ
-from the hand-crafted scores, NNUE strength is measured by game play (SPRT), not by `test_bratko_kopec`.
+supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""` to train on CPU. NNUE strength is measured by
+game play (SPRT — now always net-vs-net, since the hand-crafted baseline was removed), not by the
+Bratko-Kopec suite.
 
 **Shipped net.** [nnue/pawnstar-v6.bin](nnue/pawnstar-v6.bin) is a 512-wide, **4-king-bucket** net
-trained on ~818M positions of **public PlentyChess** data that beats the HCE by a wide margin. Lineage,
-all SPRT-measured: Pawnstar self-play *lost* to the HCE (label quality, not quantity, was the lever);
+trained on ~818M positions of **public PlentyChess** data. Lineage, all SPRT-measured (against the
+since-removed hand-crafted eval, "HCE", in the early steps): Pawnstar self-play *lost* to the HCE (label
+quality, not quantity, was the lever);
 scaling that data ~12× gave nothing (capacity-limited); **doubling the width 256→512 added +55 Elo (fixed
 depth) / +71 (time control)** — that is v4; doubling again to **1024 gave ~0 at fixed depth and −74 on the
 clock** (rejected — 60M saturates the 512 net). **King buckets were flat on 60M (data-starved) but on
@@ -356,10 +350,8 @@ builds and runs seven standalone test executables:
 | Executable | Description |
 |---|---|
 | `build/test_see` | 24 static exchange evaluation cases |
-| `build/test_pawn_structure` | 12 pawn structure tests, 72 individual checks |
 | `build/test_perft` | Move-generation regression on the standard PERFT positions |
-| `build/test_bratko_kopec` | 24 Bratko-Kopec search positions, handcrafted eval (default depth 8) |
-| `build/test_bratko_kopec_nnue` | The same 24 positions searched with the NNUE net; reports moves solved |
+| `build/test_bratko_kopec_nnue` | 24 Bratko-Kopec positions searched with the NNUE net; reports moves solved |
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
 
@@ -373,20 +365,12 @@ via `$(wildcard …)`, so these degrade to a green no-op only if those files are
 [nnue/README.md](nnue/README.md)). `test_bratko_kopec_nnue` gates only on search correctness (a legal
 move for every position), not the solve count, so a retrained net cannot break the build.
 
-The handcrafted Bratko-Kopec test (`test_bratko_kopec`) checks the parallel *score* against baked
-references; the NNUE variant checks the *move*, since NNUE scores are on a different scale. NNUE does not
-change the handcrafted Bratko-Kopec scores, so leave `UseNNUE` off when regenerating those references.
-
-The Bratko-Kopec test takes an optional depth argument in the range 8–12, e.g.
-`./build/test_bratko_kopec 12`. Because the Lazy SMP search is non-deterministic, the test does not
-check the move played — it checks the **score**. Each position stores baked single-threaded reference
-scores for depths 8–12 (regenerate them with `PAWNSTAR_THREADS=1 ./build/test_bratko_kopec 12`), and a
-position passes when its parallel score falls within the span of those references across all depths
-8–12, widened by ±50 cp. (Lazy SMP desynchronizes effective depth in both directions, so a nominal
-depth-D result can match any stored depth's score.) At the shallowest depth (8) the search is least
-stable, so depth 8 additionally accepts any best move recorded in that position's depth-8 move set. This
-tolerates the legitimate move/score variation of Lazy SMP while still catching real search or evaluation
-regressions. The suite passes 24/24 at every depth from 8 through 12.
+The Bratko-Kopec suite is the **move-based** `test_bratko_kopec_nnue` (the classic metric — did the engine
+find a good move). It takes an optional depth argument in the range 8–12, e.g.
+`./build/test_bratko_kopec_nnue nnue/pawnstar-v6.bin 12`, and searches single-threaded for a reproducible
+solve count. There is no score-based Bratko-Kopec test: NNUE scores are non-deterministic under Lazy SMP
+and on a different scale. The earlier score-based `test_bratko_kopec` and the `test_pawn_structure` suite
+tested the removed hand-crafted evaluation and were deleted with it.
 
 ## Documentation
 
@@ -433,10 +417,10 @@ A few deliberate choices shape the codebase:
 Pawnstar has no official CCRL rating. The figures currently tracked are:
 
 - **Move generation** — roughly 700 million legal moves per second on a modern laptop core.
-- **Bratko-Kopec** — 24/24 at every depth from 8 through 12 (the default depth 8 runs in `make check`).
-- **Strength (rough).** The hand-crafted evaluation measures ~2350 Elo (CCRL-ballpark, anchored against
-  reference engines at a fast time control). `nnue/pawnstar-v6.bin` beats the HCE by a large margin at
-  fixed depth. At equal *time*, the incremental accumulator is worth ~+80 Elo over a full refresh and the
+- **Bratko-Kopec** — `test_bratko_kopec_nnue` solves 18/24 at depth 8 with the shipped net (runs in `make check`).
+- **Strength (rough).** `nnue/pawnstar-v6.bin` measures roughly ~2850–2900 Elo (CCRL-ballpark, anchored
+  against reference engines at a fast time control) — far above the since-removed hand-crafted eval
+  (~2350). At equal *time*, the incremental accumulator is worth ~+80 Elo over a full refresh and the
   AVX2 SIMD kernels a further ~+180 Elo over the scalar versions (both by SPRT).
 
 `make check` is the regression baseline; the perft suite verifies move-generation correctness against
@@ -451,11 +435,10 @@ the published node counts for the standard positions.
 - **Thread count** defaults to `hardware_concurrency()` and is not exposed as a UCI option, though it
   can be overridden with the `PAWNSTAR_THREADS` environment variable.
 - **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
-- **NNUE is experimental but on by default.** The engine loads the shipped net at startup (HCE fallback
-  if absent, or with `UseNNUE`/`PAWNSTAR_NNUE=0`). The accumulator is maintained incrementally across
-  make/undo (with a refresh when a king crosses a bucket boundary) and the kernels are AVX2-vectorised,
-  so it is fast on the clock and beats the HCE (see Benchmarks); the shipped net is a 512-wide,
-  4-king-bucket `ChessBuckets` net (v6).
+- **NNUE is the only evaluator.** The engine loads the shipped net at startup and **exits** if it cannot
+  (there is no hand-crafted fallback). The accumulator is maintained incrementally across make/undo (with
+  a refresh when a king crosses a bucket boundary) and the kernels are AVX2-vectorised, so it is fast on
+  the clock; the shipped net is a 512-wide, 4-king-bucket `ChessBuckets` net (v6).
 
 ## Contributing
 

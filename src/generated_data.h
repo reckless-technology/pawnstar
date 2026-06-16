@@ -7,8 +7,8 @@
 using zobrist_t = uint64_t; ///< Zobrist hash value type.
 
 /// @file generated_data.h Declares data which is generated at compile time by the program "generate_constants.cpp" and
-/// contains various precomputed constants that are used by pawnstar to speed up positional hashing, move generation,
-/// attack detection and pawn structure analysis.
+/// contains various precomputed constants that are used by pawnstar to speed up positional hashing, move generation
+/// and attack detection.
 
 ///@brief An entry in the pext bitboard move generator array.
 /// Each entry contains information to generate sliding moves for either a bishop or a rook, for one square.
@@ -38,17 +38,6 @@ extern const std::array<Bitboard, 64>     kBishopAttacks;          ///< Bishop a
 extern const std::array<Bitboard, 64>     kRookAttacks;            ///< Rook attacks on an empty board per square.
 extern const std::array<Bitboard, 64>     kQueenAttacks;           ///< Queen attacks on an empty board per square.
 extern const std::array<Bitboard, 64>     kKingAttacks;            ///< Squares attacked by a king on each square.
-extern const std::array<Bitboard, 64>     kKingAttacks2;           ///< King attacks extended two squares (king safety).
-extern const std::array<Bitboard, 64>     kKingPawnShelterWhite;   ///< White king pawn-shelter squares per king square.
-extern const std::array<Bitboard, 64>     kKingPawnShelterBlack;   ///< Black king pawn-shelter squares per king square.
-extern const std::array<Bitboard, 64>     kPassedPawnMaskWhite;    ///< Squares that must be clear for a white passer.
-extern const std::array<Bitboard, 64>     kPassedPawnMaskBlack;    ///< Squares that must be clear for a black passer.
-extern const std::array<Bitboard, 64>     kIsolatedPawnMaskWhite;  ///< Adjacent-file mask for white pawn isolation.
-extern const std::array<Bitboard, 64>     kIsolatedPawnMaskBlack;  ///< Adjacent-file mask for black pawn isolation.
-extern const std::array<Bitboard, 64>     kSupportedPawnMaskWhite; ///< Support window for a white pawn per square.
-extern const std::array<Bitboard, 64>     kSupportedPawnMaskBlack; ///< Support window for a black pawn per square.
-extern const std::array<Bitboard, 64>     kDoubledPawnMaskWhite;   ///< Same-file squares ahead for a white pawn.
-extern const std::array<Bitboard, 64>     kDoubledPawnMaskBlack;   ///< Same-file squares ahead for a black pawn.
 extern const std::array<zobrist_t, 16>    kCastlingRightsHashes;   ///< Zobrist hash per castling-rights value.
 extern const std::array<zobrist_t, 64>    kEnPassantHashes;        ///< Zobrist hash per en passant square.
 extern const std::array<PextBitboard, 64> kBishopPexts;            ///< Bishop pext lookup tables per square.

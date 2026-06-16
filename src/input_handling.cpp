@@ -54,9 +54,13 @@ void handle_freebook(Game &game, std::span<std::string>)
 /// @param game Game to act on.
 void handle_eval(Game &game, std::span<std::string>)
 {
+    if (!game.NnueActive())
+    {
+        std::cout << "info string no NNUE net loaded (use setoption name EvalFile value <path>)\n";
+        return;
+    }
     SearchState tmp{game};
-    const char *evaluator = game.NnueActive() ? "nnue" : "handcrafted";
-    std::cout << std::format("evaluation {} ({})\n", EvaluatePosition(tmp, kAlpha, kBeta), evaluator);
+    std::cout << std::format("evaluation {} (nnue)\n", EvaluatePosition(tmp));
 }
 
 /// @brief Handle the "nnue" command: print the raw NNUE evaluation of the current position (diagnostic).
@@ -96,13 +100,12 @@ void handle_uci(Game &, std::span<std::string>)
 {
     std::cout << "id name Pawnstar\n";
     std::cout << "id author Jonny Reckless\n";
-    std::cout << "option name UseNNUE type check default true\n";
     std::cout << "option name EvalFile type string default <empty>\n";
     std::cout << "uciok\n";
 }
 
 /// @brief Handle the "setoption" command: "setoption name <Name> value <Value>".
-/// Recognises UseNNUE (toggle the NNUE evaluator) and EvalFile (load a net file).
+/// Recognises EvalFile (load a different NNUE net file). NNUE is the only evaluator.
 /// @param args Command arguments.
 void handle_setoption(Game &game, std::span<std::string> args)
 {
@@ -128,15 +131,7 @@ void handle_setoption(Game &game, std::span<std::string> args)
             *target += args[i];
         }
     }
-    if (name == "UseNNUE")
-    {
-        game.SetUseNnue(value == "true" || value == "1");
-        if (game.UseNnue() && !game.NnueNetwork().IsLoaded())
-        {
-            std::cout << "info string NNUE enabled but no net is loaded; set EvalFile first\n";
-        }
-    }
-    else if (name == "EvalFile")
+    if (name == "EvalFile")
     {
         game.NnueNetwork().Load(value);
         game.eval_cache.Clear(); // cached evals belong to the previous net
@@ -337,7 +332,7 @@ constexpr std::array handlers =
     Handler { COMMAND(nnue),           "Display the raw NNUE evaluation of the current position"},
     Handler { COMMAND(position),       "Set the position and series of moves"},
     Handler { COMMAND(quit),           "Exit the program"},
-    Handler { COMMAND(setoption),      "Set a UCI option (UseNNUE, EvalFile)"},
+    Handler { COMMAND(setoption),      "Set a UCI option (EvalFile)"},
     Handler { COMMAND(stop),           "Stop searching and return best move found"},
     Handler { COMMAND(uci),            "Enter UCI protocol"},
     Handler { COMMAND(ucinewgame),     "UCI mode start new game"}

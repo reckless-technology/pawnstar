@@ -1,16 +1,17 @@
-# NNUE evaluation (experimental)
+# NNUE evaluation
 
-Pawnstar has an **NNUE** (Efficiently Updatable Neural Network) evaluation alongside the hand-crafted
-evaluation (HCE). It is **on by default** — at startup the engine loads the shipped net
-`nnue/pawnstar-v6.bin` (relative to the working directory) and evaluates with it, falling back to the
-HCE if the net is absent or NNUE is disabled. This document is the complete reference for how the net
-works, how to enable/disable it, and how to generate data, train, validate and strength-test a net.
+Pawnstar evaluates **exclusively** with an **NNUE** (Efficiently Updatable Neural Network) — it is the
+engine's only evaluator (the former hand-crafted evaluation, "HCE", was removed). At startup the engine
+loads the shipped net `nnue/pawnstar-v6.bin` (relative to the working directory) and evaluates with it;
+if the net cannot be loaded there is no fallback, so the engine prints an error and exits. This document
+is the complete reference for how the net works, how to load a net, and how to generate data, train,
+validate and strength-test a net.
 
 The shipped net (`pawnstar-v6.bin`) is a 512-wide, **4-king-bucket** `ChessBuckets` net. §1, §2 and §6
 describe that architecture; §7 has the lineage (including the retired Chess768 nets and the rejected
 1024-wide experiment).
 
-In-engine code: [src/nnue.h](../src/nnue.h), [src/nnue.cpp](../src/nnue.cpp). The branch into NNUE is in
+In-engine code: [src/nnue.h](../src/nnue.h), [src/nnue.cpp](../src/nnue.cpp). The net is called from
 [src/evaluation.cpp](../src/evaluation.cpp) (`EvaluatePosition`). Tooling: [tools/](../tools).
 
 ---
@@ -103,24 +104,23 @@ and were headerless; a king-bucket engine cannot load them.)
 
 ## 3. Using a net in the engine
 
-```
-setoption name EvalFile value /path/to/net.bin
-setoption name UseNNUE  value true
-```
-
-or via environment variables at launch:
+A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v6.bin` (cwd-relative) at
+startup and exits if it cannot. To use a *different* net, point the engine at it — at launch:
 
 ```bash
-PAWNSTAR_EVALFILE=/path/to/net.bin PAWNSTAR_NNUE=1 ./build/pawnstar
+PAWNSTAR_EVALFILE=/path/to/net.bin ./build/pawnstar
 ```
 
-NNUE is **on by default** — `main.cpp` loads `nnue/pawnstar-v6.bin` (cwd-relative) and enables it at
-startup, so the commands above are only needed to use a *different* net or to disable NNUE
-(`setoption name UseNNUE value false`, or `PAWNSTAR_NNUE=0`). `UseNNUE`/`EvalFile` are advertised in the
-`uci` response (UseNNUE default true). The `eval` command reports which evaluator is active; `nnue`
-prints the raw network eval of the current position. The net is a single
-`nnue::Network` instance owned by the `Game` (UCI `setoption` routes to `game.NnueNetwork().Load(...)`
-and `game.SetUseNnue(...)`), read-only after load and shared by all Lazy SMP threads through their
+or at runtime:
+
+```
+setoption name EvalFile value /path/to/net.bin
+```
+
+`EvalFile` is advertised in the `uci` response; there is no `UseNNUE` option (nothing to toggle to). The
+`eval` command prints the NNUE evaluation of the current position; `nnue` prints the raw network eval. The
+net is a single `nnue::Network` instance owned by the `Game` (UCI `setoption` routes to
+`game.NnueNetwork().Load(...)`), read-only after load and shared by all Lazy SMP threads through their
 `Game&` — they call only its `const` methods.
 
 ## 4. Tooling
@@ -136,7 +136,7 @@ and `game.SetUseNnue(...)`), read-only after load and shared by all Lazy SMP thr
 | `make_openings.sh`        | build an EPD openings book from self-play data |
 | `train_pipeline.sh`       | train → export a net, from either self-play text shards or a bulletformat `.data` |
 | `verify_net.sh`           | cross-check (engine == trainer) + incremental-accumulator gate for a trained net |
-| `run_sprt.sh`             | SPRT / match: NNUE vs HCE (default) or net-vs-net, at fixed depth or time control |
+| `run_sprt.sh`             | SPRT / match: net-vs-net (set `BASELINE_NET`), at fixed depth or time control |
 | `rate.sh`                 | anchored absolute-Elo estimate vs rated reference engines (you supply the opponent binaries) |
 | `run_experiment.sh`       | one-shot: openings + train + **verify** + SPRT from an existing dataset |
 
@@ -166,7 +166,7 @@ in that case there are no text shards to sample openings from, so supply your ow
 ### Data generation
 
 `build/gen_data <out_file> <num_games> <seed> [depth=8] [random_plies=8]` plays self-play games with the
-**current** evaluator and writes one record per quiet position:
+loaded NNUE net (`PAWNSTAR_EVALFILE`, default `nnue/pawnstar-v6.bin`) and writes one record per quiet position:
 
 ```
 <fen> | <white_relative_eval_cp> | <wdl>        # wdl: 1.0 win / 0.5 draw / 0.0 loss, White's POV
@@ -235,10 +235,10 @@ awk -F' \\| ' 'NR%500==0 {print $1}' ~/pawnstar_nnue/data/data_*.txt | head -200
 ./build/test_nnue net.bin ref.txt        # expects: max |diff| <= 2 cp (quantisation rounding)
 ```
 
-`pawnstar_eval` uses bullet's own feature extraction (`ChessBuckets` on this branch, `Chess768` on
-`main`) and the same SCReLU inference, so a match confirms our feature indexing, king bucketing,
-perspective/orientation, SCReLU and dequantisation are all correct. It must be built at the same width
-and feature set as the engine, or the cross-check fails by design.
+`pawnstar_eval` uses bullet's own feature extraction (`ChessBuckets`) and the same SCReLU inference, so a
+match confirms our feature indexing, king bucketing, perspective/orientation, SCReLU and dequantisation
+are all correct. It must be built at the same width and feature set as the engine, or the cross-check
+fails by design.
 
 The repo checks in `test/nnue_reference.txt` — 250 reference evals for the shipped `pawnstar-v6.bin` —
 and `make check` runs `test_nnue nnue/pawnstar-v6.bin test/nnue_reference.txt` automatically (current
@@ -261,20 +261,17 @@ training a net outside the one-shot flow.
 
 ### Strength testing (the verdict)
 
-NNUE scores differ from the HCE reference scores, so `test_bratko_kopec` stays an **HCE-only** test
-(run with `UseNNUE` off; do not retune its references for NNUE). Real strength is measured by game
-play. `run_sprt.sh <net.bin> <openings.epd> [rounds=500] [depth=8]` runs:
+NNUE strength is measured by game play. NNUE is the only evaluator, so an SPRT is always **net-vs-net**.
+`run_sprt.sh <net.bin> <openings.epd> [rounds=500] [depth=8]` runs:
 
-- the candidate as NNUE with `<net.bin>`; the **opponent is HCE** by default (`UseNNUE=false`). Set
-  `BASELINE_NET=<other.bin>` to instead compare **two nets** — the architecture program's actual test
-  (e.g. v5(1024) vs v4(512)), since NNUE now beats HCE and ships on by default;
-- the **same** `build/pawnstar` binary for both engines, differing only by UCI options
-  (`UseNNUE`/`EvalFile`), with `PAWNSTAR_THREADS=1`. Different net *widths* need different builds
-  (`kHiddenSize` is compile-time), so a cross-width SPRT points `BIN_A`/`BIN_B` at two separately-built
-  binaries;
+- the candidate as `<net.bin>` against a **required** `BASELINE_NET=<other.bin>` opponent — the
+  architecture program's test (e.g. v6 vs v4). Net selection is purely via the `EvalFile` option;
+- the **same** `build/pawnstar` binary for both engines, differing only by `EvalFile`, with
+  `PAWNSTAR_THREADS=1`. Different net *widths* need different builds (`kHiddenSize` is compile-time), so a
+  cross-width SPRT points `BIN_A`/`BIN_B` at two separately-built binaries;
 - **fixed depth** (default 8) — pawnstar has no `go nodes`, and fixed depth isolates eval *quality* from
-  NNUE's per-node speed. To measure the equal-*time* effect (incremental vs full-refresh, a wider net's
-  speed cost, or NNUE vs HCE on the clock) set `TC=8+0.08` for a time-control match instead;
+  per-node speed. To measure the equal-*time* effect (incremental vs full-refresh, or a wider net's speed
+  cost) set `TC=8+0.08` for a time-control match instead;
 - **win/draw adjudication** (`-resign movecount=3 score=600`, `-draw movenumber=40 movecount=8
   score=20`) to keep games short and decisive (recommended, not required — the old fixed game-history
   cap that crashed long games is gone; the history is a dynamic `std::vector` now);
@@ -291,18 +288,16 @@ the mean. It anchors only as well as those opponents and the chosen TC, so treat
 ## 7. Shipped nets
 
 The repo ships one reference net, **[pawnstar-v6.bin](pawnstar-v6.bin)** (512-wide, 4-king-bucket bullet
-net, 3148864 bytes) — loaded and used **by default** at startup (the engine resolves it relative to the
-working directory). To use a different net, or to switch evaluators at runtime:
+net, 3148864 bytes) — loaded at startup as the engine's only evaluator (resolved relative to the working
+directory). To use a different net at runtime:
 
 ```
-setoption name EvalFile value nnue/pawnstar-v6.bin
-setoption name UseNNUE  value true
+setoption name EvalFile value /path/to/other-net.bin
 ```
 
 **`pawnstar-v6.bin`** is trained on ~818M positions of **public PlentyChess** data (bulletformat,
-strong-engine labels) with a 512-wide transformer and 4 king buckets. It beats the handcrafted eval by a
-wide margin and beats the previous shipped net (v4) by **+47 ± 18 Elo at fixed depth and +17 ± 12 on the
-clock** — see the lineage below.
+strong-engine labels) with a 512-wide transformer and 4 king buckets. It beats the previous shipped net
+(v4) by **+47 ± 18 Elo at fixed depth and +17 ± 12 on the clock** — see the lineage below.
 
 **Lineage — what moved the needle (all SPRT-measured):**
 
@@ -323,10 +318,10 @@ already bulletformat — `bullet-utils validate` a shard first (some are corrupt
 The eval is also fast on the clock: the **incremental accumulator** (~+80 Elo equal-time vs full
 refresh), **AVX2 SIMD kernels** (~+180 Elo equal-time vs scalar), and the **eval cache** + **single-pass
 `Update`** (which closed the king-bucket speed gap to v4 from ~2.2× to ~1.18×) mean v6 wins on time as
-well as depth despite the 4× larger feature table. For absolute context the HCE measures ~2350 Elo
-(CCRL-ballpark) and v4 ~2900, so the NNUE is a large step up — which is why it is the engine's **default**
-evaluator (disable with `UseNNUE false` / `PAWNSTAR_NNUE=0`). Next lever: more data still (v6 used ~818M;
-the dataset has ~21B positions available), and/or more/finer king buckets now that buckets have paid off.
+well as depth despite the 4× larger feature table. For absolute context the since-removed HCE measured
+~2350 Elo (CCRL-ballpark) and v4 ~2900, so NNUE is a large step up — which is why it is the engine's only
+evaluator. Next lever: more data still (v6 used ~818M; the dataset has ~21B positions available), and/or
+more/finer king buckets now that buckets have paid off.
 
 ### Recreating `pawnstar-v6.bin` (step by step)
 

@@ -36,9 +36,7 @@ DEPS                = $(OBJECTS:.o=.d)
 
 TEST_PERFT_EXE      = $(BUILD_DIR)/test_perft
 TEST_SEE_EXE        = $(BUILD_DIR)/test_see
-TEST_BK_EXE         = $(BUILD_DIR)/test_bratko_kopec
 TEST_BK_NNUE_EXE    = $(BUILD_DIR)/test_bratko_kopec_nnue
-TEST_PS_EXE         = $(BUILD_DIR)/test_pawn_structure
 TEST_NNUE_EXE       = $(BUILD_DIR)/test_nnue
 TEST_NNUE_INC_EXE   = $(BUILD_DIR)/test_nnue_incremental
 # Shipped net + checked-in trainer reference, used by `make check` to exercise NNUE inference and the
@@ -47,9 +45,7 @@ NNUE_NET            = $(wildcard nnue/pawnstar-v6.bin)
 NNUE_REF            = $(wildcard test/nnue_reference.txt)
 TEST_OBJECTS        = $(BUILD_DIR)/perft.o \
                       $(BUILD_DIR)/see.o \
-                      $(BUILD_DIR)/bratko_kopec.o \
                       $(BUILD_DIR)/bratko_kopec_nnue.o \
-                      $(BUILD_DIR)/pawn_structure.o \
                       $(BUILD_DIR)/nnue_test.o \
                       $(BUILD_DIR)/nnue_incremental.o
 TEST_DEPS           = $(TEST_OBJECTS:.o=.d)
@@ -71,26 +67,24 @@ all: prep $(PROGRAM_EXE)
 
 tools: prep $(TOOL_GENDATA_EXE) $(TOOL_STAMP_EXE)
 
-tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_BK_NNUE_EXE) $(TEST_PS_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE)
+tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE)
 
 # Run every suite in one shell, chained with && so the first failure aborts (and the summary below is
 # skipped). On full success report the wall-clock time spent running the tests (not the build).
 check: tests
 	@start=$$(date +%s%3N); \
 	$(TEST_PERFT_EXE) && \
-	$(TEST_BK_EXE) && \
 	$(TEST_BK_NNUE_EXE) $(NNUE_NET) && \
 	$(TEST_NNUE_EXE) $(NNUE_NET) $(NNUE_REF) && \
 	$(TEST_NNUE_INC_EXE) $(NNUE_NET) && \
 	$(TEST_SEE_EXE) && \
-	$(TEST_PS_EXE) && \
 	echo "all tests passed in $$(( $$(date +%s%3N) - start )) ms"
 
 prep:
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_EXE) $(TEST_BK_NNUE_EXE) $(TEST_PS_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) \
+	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) \
 	      $(TOOL_GENDATA_EXE) $(BUILD_DIR)/gen_data.o $(BUILD_DIR)/gen_data.d \
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
 	      $(OBJECTS) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
@@ -125,13 +119,7 @@ $(TEST_PERFT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/perft.o
 $(TEST_SEE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/see.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TEST_BK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/bratko_kopec.o
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
 $(TEST_BK_NNUE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/bratko_kopec_nnue.o
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
-$(TEST_PS_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/pawn_structure.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(TEST_NNUE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_test.o

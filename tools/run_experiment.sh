@@ -3,8 +3,9 @@
 #
 # The data source can be a directory of self-play text shards (generate with run_gendata.sh first) or an
 # already-converted bulletformat .data file (e.g. public PlentyChess data, which is how the shipped nets
-# were trained — train_pipeline.sh auto-detects which). The SPRT defaults to candidate-vs-HCE; set
-# BASELINE_NET to compare two nets instead (see run_sprt.sh for TC / cross-width options).
+# were trained — train_pipeline.sh auto-detects which). NNUE is the only evaluator, so the SPRT is
+# net-vs-net: set BASELINE_NET=<baseline net.bin> to choose the opponent (see run_sprt.sh for TC /
+# cross-width options).
 #
 # Usage: run_experiment.sh <data_dir | shuffled.data> <net.bin> [superbatches] [sprt_rounds] [depth]
 #

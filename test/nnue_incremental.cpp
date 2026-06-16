@@ -77,7 +77,6 @@ int main(int argc, char **argv)
         std::cout << "test_nnue_incremental: failed to load net '" << argv[1] << "'\n";
         return 1;
     }
-    game.SetUseNnue(true);
     if (!game.NnueActive())
     {
         std::cout << "test_nnue_incremental: NNUE not active after load\n";

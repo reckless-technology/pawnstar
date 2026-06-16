@@ -93,7 +93,7 @@ static inline NullMoveResult AttemptNullMove(SearchState &state, int depth, int 
         beta == alpha + 1 &&      // this is not a PV node
         friendly.PopCount() > 3)  // we have at least 4 friendly pieces
     {
-        const int eval_score = EvaluatePosition(state, alpha, beta);
+        const int eval_score = EvaluatePosition(state);
         if (eval_score >= beta)
         {
             INCREMENT("null move");
@@ -147,7 +147,7 @@ int Search(SearchState &state, int depth, int ply, int alpha, int beta, Variatio
     if (ply == kMaxPly)
     {
         INCREMENT("max ply reached");
-        return EvaluatePosition(state, alpha, beta);
+        return EvaluatePosition(state);
     }
     // Determine if there is an entry in the transposition table for this position.
     const auto transposition = state.game.transposition_table.FindTransposition(state.CurrentPosition().Hash());

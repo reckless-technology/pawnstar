@@ -11,8 +11,7 @@
 #
 # Env:
 #   ENGINE       candidate engine binary           (default: <repo>/build/pawnstar)
-#   NET          NNUE net for the candidate, or "hce" to force the handcrafted eval
-#                                                  (default: <repo>/nnue/pawnstar-v6.bin)
+#   NET          NNUE net for the candidate       (default: <repo>/nnue/pawnstar-v6.bin)
 #   OPENINGS     EPD opening book                  (required)
 #   TC           time control                      (default: 8+0.08)
 #   GAMES        games per anchor                  (default: 100)
@@ -36,14 +35,10 @@ OUT="${OUT:-./rating_out}"
 [ "$#" -ge 1 ] || { echo "usage: $0 <name:rating:cmd> [...]   (see header for env)"; exit 2; }
 mkdir -p "$OUT"
 
-# Single-threaded candidate (deterministic-ish, frees cores); options decide NNUE vs HCE, not the env.
+# Single-threaded candidate (deterministic-ish, frees cores); the EvalFile option picks the net.
 export PAWNSTAR_THREADS=1
 unset PAWNSTAR_NNUE PAWNSTAR_EVALFILE
-if [ "$NET" = "hce" ]; then
-    cand_opts=(option.UseNNUE=false)
-else
-    cand_opts=(option.UseNNUE=true "option.EvalFile=$NET")
-fi
+cand_opts=("option.EvalFile=$NET")
 
 : > "$OUT/summary.txt"
 estimates=()

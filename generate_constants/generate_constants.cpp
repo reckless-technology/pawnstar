@@ -157,101 +157,6 @@ constexpr uint64_t KingAttacks(uint8_t sq)
     return KingFill(Bitboard(sq));
 }
 
-/// @brief King attacks in 2 moves.
-/// @param sq Square index.
-/// @return Squares reachable by a king in 2 moves.
-constexpr uint64_t KingAttacks2(uint8_t sq)
-{
-    return KingFill(KingFill(Bitboard(sq))) & ~Bitboard(sq);
-}
-
-/// @brief King pawn shelter white.
-/// @param sq King square index.
-/// @return Pawns in front of the King.
-constexpr uint64_t KingPawnShelterWhite(uint8_t sq)
-{
-    const uint64_t b = Bitboard(sq);
-    return sq == 4 ? 0 : ShiftNorthwest(b) | ShiftNorth(b) | ShiftNortheast(b); // Ignore square e1.
-}
-
-/// @brief King pawn shelter black.
-/// @param sq King square index.
-/// @return Pawns in front of the King.
-constexpr uint64_t KingPawnShelterBlack(uint8_t sq)
-{
-    const uint64_t b = Bitboard(sq);
-    return sq == 60 ? 0 : ShiftSouthwest(b) | ShiftSouth(b) | ShiftSoutheast(b); // Ignore square e8.
-}
-
-/// @brief Passed pawn mask for white.
-/// @param sq Square index.
-/// @return Squares which must be free of black pawns for a white pawn on sq to be passed.
-constexpr uint64_t PassedPawnMaskWhite(uint8_t sq)
-{
-    const uint64_t b = RayFrom(sq, kNorth);
-    return b | ShiftWest(b) | ShiftEast(b);
-}
-
-/// @brief Passed pawn mask for black.
-/// @param sq Square index.
-/// @return Squares which must be free of white pawns for a black pawn on sq to be passed.
-constexpr uint64_t PassedPawnMaskBlack(uint8_t sq)
-{
-    const uint64_t b = RayFrom(sq, kSouth);
-    return b | ShiftWest(b) | ShiftEast(b);
-}
-
-/// @brief Isolated pawn mask for white.
-/// @param sq Square index.
-/// @return Squares which must contain at least one white pawn else the pawn on sq is isolated.
-constexpr uint64_t IsolatedPawnMaskWhite(uint8_t sq)
-{
-    const uint64_t b = kFileA << FileOf(sq);
-    return ShiftWest(b) | ShiftEast(b);
-}
-
-/// @brief Isolated pawn mask for black.
-/// @param sq Square index.
-/// @return Squares which must contain at least one black pawn else the pawn on sq is isolated.
-constexpr uint64_t IsolatedPawnMaskBlack(uint8_t sq)
-{
-    return IsolatedPawnMaskWhite(sq); // Files are symmetrical.
-}
-
-/// @brief Supported pawn mask white.
-/// @param sq Square index.
-/// @return Squares which if containing a friendly pawn can potentially defend the pawn on sq.
-constexpr uint64_t SupportedPawnMaskWhite(uint8_t sq)
-{
-    const uint64_t b = RayFrom(sq, kSouth) | Bitboard(sq);
-    return ShiftWest(b) | ShiftEast(b);
-}
-
-/// @brief Supported pawn mask black.
-/// @param sq Square index.
-/// @return Squares which if containing a friendly pawn can potentially defend the pawn on sq.
-constexpr uint64_t SupportedPawnMaskBlack(uint8_t sq)
-{
-    const uint64_t b = RayFrom(sq, kNorth) | Bitboard(sq);
-    return ShiftWest(b) | ShiftEast(b);
-}
-
-/// @brief Doubled pawn mask white.
-/// @param sq Square index.
-/// @return Squares which if containing a friendly pawn, make the pawn on sq doubled.
-constexpr uint64_t DoubledPawnMaskWhite(uint8_t sq)
-{
-    return RayFrom(sq, kNorth);
-}
-
-/// @brief Doubled pawn mask black.
-/// @param sq Square index.
-/// @return Squares which if containing a friendly pawn, make the pawn on sq doubled.
-constexpr uint64_t DoubledPawnMaskBlack(uint8_t sq)
-{
-    return RayFrom(sq, kSouth);
-}
-
 /// @brief Intervening squares on colinear ray.
 /// @param from Source square index.
 /// @param to Destination square index.
@@ -435,7 +340,7 @@ struct Generator
 };
 
 /// @brief Generators for the main precomputed Bitboard arrays.
-constexpr std::array<Generator, 26> bitboard_generators = {{
+constexpr std::array<Generator, 15> bitboard_generators = {{
     // clang-format off
     { "kNorth",                     [](uint8_t sq) constexpr { return RayFrom(sq, kNorth);                                          }   },
     { "kNortheast",                 [](uint8_t sq) constexpr { return RayFrom(sq, kNortheast);                                      }   },
@@ -452,17 +357,6 @@ constexpr std::array<Generator, 26> bitboard_generators = {{
     { "kRookAttacks",               RookAttacksOnEmptyBoard                                                                             },
     { "kQueenAttacks",              QueenAttacksOnEmptyBoard                                                                            },
     { "kKingAttacks",               KingAttacks                                                                                         },
-    { "kKingAttacks2",              KingAttacks2                                                                                        },
-    { "kKingPawnShelterWhite",      KingPawnShelterWhite                                                                                },
-    { "kKingPawnShelterBlack",      KingPawnShelterBlack                                                                                },
-    { "kPassedPawnMaskWhite",       PassedPawnMaskWhite,                                                                                },
-    { "kIsolatedPawnMaskWhite",     IsolatedPawnMaskWhite,                                                                              },
-    { "kSupportedPawnMaskWhite",    SupportedPawnMaskWhite,                                                                             },
-    { "kDoubledPawnMaskWhite",      DoubledPawnMaskWhite,                                                                               },
-    { "kPassedPawnMaskBlack",       PassedPawnMaskBlack,                                                                                },
-    { "kIsolatedPawnMaskBlack",     IsolatedPawnMaskBlack,                                                                              },
-    { "kSupportedPawnMaskBlack",    SupportedPawnMaskBlack,                                                                             },
-    { "kDoubledPawnMaskBlack",      DoubledPawnMaskBlack,                                                                               },
     // clang-format on
 }};
 

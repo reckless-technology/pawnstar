@@ -72,7 +72,6 @@ int main(int argc, char *argv[])
         std::cerr << "test_bratko_kopec_nnue: failed to load net '" << net_path << "'\n";
         return 1;
     }
-    game.SetUseNnue(true);
     if (!game.NnueActive())
     {
         std::cerr << "test_bratko_kopec_nnue: NNUE not active after load\n";

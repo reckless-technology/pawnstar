@@ -46,21 +46,17 @@ int main()
     {
         std::cout << "info string Unable to open book file.\n";
     }
-    // NNUE evaluation is ON by default, loading the shipped net from the working directory (like the
-    // opening book). Env vars override: PAWNSTAR_EVALFILE=<path> picks a different net, PAWNSTAR_NNUE=0
-    // disables NNUE. UCI setoption (UseNNUE / EvalFile) also works. If the net can't be loaded, the
-    // engine falls back to the handcrafted evaluation.
+    // NNUE is the only evaluator, so a net is required. Load the shipped net from the working directory
+    // (like the opening book); PAWNSTAR_EVALFILE=<path> overrides the path, and UCI `setoption name
+    // EvalFile value <path>` loads a different net at runtime. If the net cannot be loaded there is no
+    // evaluation to fall back to, so the engine reports the error and exits.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
     const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v6.bin";
-    const bool        net_loaded = game.NnueNetwork().Load(net_path);
-    const char       *use_env   = std::getenv("PAWNSTAR_NNUE");
-    const bool        use_nnue =
-        use_env ? (std::string_view(use_env) == "1" || std::string_view(use_env) == "true") : true;
-    game.SetUseNnue(use_nnue);
-    if (use_nnue && !net_loaded)
+    if (!game.NnueNetwork().Load(net_path))
     {
-        std::cout << "info string NNUE enabled but net '" << net_path
-                  << "' not found; using the handcrafted evaluation (set EvalFile to a valid net)\n";
+        std::cout << "info string FATAL: could not load NNUE net '" << net_path
+                  << "'. NNUE is the only evaluator; set PAWNSTAR_EVALFILE to a valid net.\n";
+        return 1;
     }
     DebugXClear();
     std::cout << "ready\n";

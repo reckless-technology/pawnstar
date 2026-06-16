@@ -1,9 +1,11 @@
 #pragma once
-/// @file bratko_kopec_cases.h Shared Bratko-Kopec test positions and per-depth single-threaded reference data.
+/// @file bratko_kopec_cases.h Bratko-Kopec test positions and per-position reference best moves.
 ///
-/// Used by both the handcrafted-eval suite (test/bratko_kopec.cpp, which checks the parallel *score*
-/// against these references) and the NNUE suite (test/bratko_kopec_nnue.cpp, which searches with the net
-/// and checks the *move*, since NNUE scores differ from these handcrafted references).
+/// Used by the NNUE suite (test/bratko_kopec_nnue.cpp), which searches each position with the net and
+/// checks the *move* (the classic Bratko-Kopec metric — did the engine find a good move). Only the `moves`
+/// field is consulted. The `score` field holds legacy single-threaded reference scores from when a
+/// score-based handcrafted-eval suite also used this data; the handcrafted evaluator has since been
+/// removed (NNUE is the only evaluator), so the scores are retained as reference but no longer checked.
 
 #include <array>
 #include <string>
@@ -21,7 +23,7 @@ constexpr int kDepthCount = kMaxDepth - kMinDepth + 1;
 /// @brief Single-threaded reference result at one search depth.
 struct BkDepth
 {
-    int                             score; ///< Reference score in centipawns (handcrafted eval).
+    int                             score; ///< Legacy handcrafted-eval reference score in cp (no longer checked).
     std::array<std::string_view, 4> moves; ///< Reference best move(s); empty entries ignored.
 };
 

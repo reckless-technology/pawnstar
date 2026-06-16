@@ -20,7 +20,7 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
     if (ply == kMaxPly)
     {
         INCREMENT("quiescent max ply");
-        return EvaluatePosition(state, alpha, beta);
+        return EvaluatePosition(state);
     }
     if (state.CurrentPosition().IsInCheck())
     {
@@ -35,7 +35,7 @@ int SearchQuiescent(SearchState &state, int depth, int ply, int alpha, int beta)
         INCREMENT("quiescent table beta cutoffs");
         return transposition->score();
     }
-    int score = EvaluatePosition(state, alpha, beta);
+    int score = EvaluatePosition(state);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");

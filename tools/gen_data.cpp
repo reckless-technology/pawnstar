@@ -1,7 +1,7 @@
 /// @file gen_data.cpp Self-play training-data generator for the experimental NNUE evaluation.
 ///
-/// Plays games against itself with the *current* (handcrafted) evaluation at a fixed search depth and
-/// writes one record per quiet position:
+/// Plays games against itself with the loaded NNUE net (PAWNSTAR_EVALFILE, default nnue/pawnstar-v6.bin)
+/// at a fixed search depth and writes one record per quiet position:
 ///
 ///     <fen> | <white_relative_eval_cp> | <wdl>
 ///
@@ -75,9 +75,9 @@ bool IsTerminal(Game &game, double &white_result)
 }
 
 /// @brief Play one self-play game, appending its quiet positions to out (with the final result baked in).
-void PlayGame(std::ofstream &out, std::mt19937_64 &rng, int depth, int random_plies)
+/// @param game A Game with an NNUE net already loaded; reset to the start position here and reused across games.
+void PlayGame(Game &game, std::ofstream &out, std::mt19937_64 &rng, int depth, int random_plies)
 {
-    Game game;
     game.NewGame();
     game.time_control.clock_type = ChessClock::kFixedDepth;
     game.time_control.depth      = depth;
@@ -166,6 +166,18 @@ int main(int argc, char **argv)
 
     // Force a deterministic single-threaded search and silence UCI info output.
     setenv("PAWNSTAR_THREADS", "1", 1);
+
+    // NNUE is the only evaluator, so self-play needs a loaded net. Load once and reuse across games.
+    const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
+    const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v6.bin";
+    Game              game;
+    if (!game.NnueNetwork().Load(net_path))
+    {
+        std::cerr << "gen_data: FATAL: could not load NNUE net '" << net_path
+                  << "' (set PAWNSTAR_EVALFILE). NNUE is the only evaluator.\n";
+        return 1;
+    }
+
     NullBuffer    null_buffer;
     std::streambuf *old_cout = std::cout.rdbuf(&null_buffer);
 
@@ -173,7 +185,7 @@ int main(int argc, char **argv)
     std::mt19937_64 rng(seed);
     for (int g = 0; g < num_games; ++g)
     {
-        PlayGame(out, rng, depth, random_plies);
+        PlayGame(game, out, rng, depth, random_plies);
         if (((g + 1) % 50) == 0)
         {
             std::cerr << "info string gen_data seed=" << seed << " game " << (g + 1) << '/' << num_games << '\n';

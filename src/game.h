@@ -67,23 +67,14 @@ class Game
         return nnue_network_;
     }
 
-    /// @brief Select whether NNUE evaluation is used (the UCI UseNNUE option). @param on true to enable.
-    void SetUseNnue(bool on)
-    {
-        use_nnue_ = on;
-    }
-    /// @brief Whether the UseNNUE option is currently selected (independent of whether a net is loaded).
-    /// @return true if NNUE is selected.
-    bool UseNnue() const
-    {
-        return use_nnue_;
-    }
-
-    /// @brief Whether NNUE evaluation is usable right now: selected via UseNNUE and a net is loaded.
+    /// @brief Whether NNUE evaluation is usable: a net is loaded. NNUE is the engine's only evaluator, so
+    /// a loaded net is required to search (main.cpp loads one at startup and exits if it cannot). This gate
+    /// stays meaningful for tooling/tests that construct a Game without loading a net (e.g. perft/SEE),
+    /// where the accumulator is simply not maintained.
     /// @return true if the search should evaluate with the network.
     bool NnueActive() const
     {
-        return use_nnue_ && nnue_network_.IsLoaded();
+        return nnue_network_.IsLoaded();
     }
 
     /// @brief Start a new game from the given position (see definition for details).
@@ -117,5 +108,4 @@ class Game
     std::thread           worker_thread_;      ///< Worker thread for searching moves.
     std::vector<Position> positions_;          ///< Game position history (grows with the game; no fixed cap).
     nnue::Network         nnue_network_;       ///< NNUE network instance (loaded via EvalFile; read-only in search).
-    bool                  use_nnue_ = false;   ///< Whether the UseNNUE option selects NNUE evaluation.
 };
