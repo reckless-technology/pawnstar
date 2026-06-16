@@ -16,6 +16,12 @@ class Position;
 /// Moves which are available from that position. The same move may be in the moves vector multiple times if it appears
 /// in several lines of play, i.e. the frequency of occurence of a move in the list is proportional to the liklihood
 /// that we want to play it.
+///
+/// A move written with a trailing '?' suffix in the book file (e.g. "f2f4?") is *questionable*: it is a legal move
+/// that the engine recognises and replays so that the rest of the line is still parsed, but which the engine will
+/// never itself select. This lets a line teach a response to a dubious move (be ready for it as the defender)
+/// without ever initiating it. Questionable moves are kept in a separate map for display only; GetMove never
+/// returns them.
 class OpeningBook
 {
   public:
@@ -39,6 +45,7 @@ class OpeningBook
     bool InitializeFromStream(std::istream &ss);
     /// @brief Parse a single line of play and add its moves to the book (see definition for details).
     bool                                   ParseLineOfPlay(std::string_view line);
-    std::map<zobrist_t, std::vector<Move>> book_; ///< Map of position hash to available moves (with repeats).
-    std::mt19937                           prng_; ///< PRNG used to randomly select among book moves.
+    std::map<zobrist_t, std::vector<Move>> book_;         ///< Map of position hash to playable moves (with repeats).
+    std::map<zobrist_t, std::vector<Move>> questionable_; ///< Recognised-but-never-played '?' moves (display only).
+    std::mt19937                           prng_;         ///< PRNG used to randomly select among book moves.
 };

@@ -54,6 +54,7 @@ Move OpeningBook::GetMove(zobrist_t hash)
 void OpeningBook::Free()
 {
     book_.clear();
+    questionable_.clear();
 }
 
 /// @brief Print available book moves for a position
@@ -75,10 +76,25 @@ void OpeningBook::DisplayAvailableMoves(const Position &position)
     {
         std::cout << std::format("{:<8} {:3}\n", move.ToString(), freq);
     }
+    // Questionable moves are recognised but never played; show them flagged with '?' for diagnostics.
+    if (questionable_.count(position.Hash()))
+    {
+        std::unordered_map<Move, int, Move> q_counts;
+        for (const auto &move : questionable_[position.Hash()])
+        {
+            ++q_counts[move];
+        }
+        for (const auto &[move, freq] : q_counts)
+        {
+            std::cout << std::format("{:<8} {:3}  (questionable, never played)\n", move.ToString() + "?", freq);
+        }
+    }
 }
 
 /// @brief Parse a single line of play and add it to the book. '#' denotes a comment and the rest of the line
-/// will be ignored. Move numbers are ignored.
+/// will be ignored. Move numbers are ignored. A move with a trailing '?' (e.g. "f2f4?") is *questionable*: it is
+/// replayed so the rest of the line still parses, but recorded in questionable_ rather than book_, so GetMove
+/// never returns it.
 /// @param line The line of play
 /// @return true on success
 bool OpeningBook::ParseLineOfPlay(std::string_view line)
@@ -98,13 +114,19 @@ bool OpeningBook::ParseLineOfPlay(std::string_view line)
         {
             return true; // Done with this line.
         }
+        // A trailing '?' marks a questionable move: recognise and replay it, but never select it.
+        const bool questionable = move_string.back() == '?';
+        if (questionable)
+        {
+            move_string.pop_back();
+        }
         const zobrist_t hash  = position.Hash();
         auto            moves = position.GenerateLegalMoves();
         auto            i =
             std::ranges::find_if(moves, [&move_string](const Move &move) { return move.ToString() == move_string; });
         if (i != moves.end())
         {
-            book_[hash].push_back(*i);
+            (questionable ? questionable_ : book_)[hash].push_back(*i);
             position = position.MakeMove(*i);
         }
         else

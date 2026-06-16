@@ -36,13 +36,17 @@ export PAWNSTAR_THREADS=1
 # inherits a net path from the environment.
 unset PAWNSTAR_NNUE PAWNSTAR_EVALFILE
 
-# Fixed depth by default; time control if TC is set.
+# Per-engine clock spec: a fixed search depth (isolates eval quality) unless TC is set (measures real
+# strength including the speed cost of a heavier net). Built as an array so it expands to one -each token.
 if [ -n "${TC:-}" ]; then
     tc_args=(tc="$TC")
 else
     tc_args=(depth="$DEPTH")
 fi
 
+# The two engines differ ONLY by their EvalFile (the net). -games 2 -repeat plays each opening twice with
+# colours reversed; the draw/resign adjudication ends decided games early to save time without biasing the
+# result; -sprt stops as soon as elo0 vs elo1 is decided at the given alpha/beta error rates.
 fastchess \
     -engine cmd="$BIN_A" name=cand option.EvalFile="$NET" \
     -engine cmd="$BIN_B" name=base option.EvalFile="$BASELINE_NET" \

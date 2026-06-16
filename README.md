@@ -34,7 +34,7 @@ make doc       # generate Doxygen HTML into doc/html
 make clean     # remove build artifacts and generated docs
 ```
 
-A pre-compilation step builds and runs `generate_constants/generate_constants.cpp`, which emits
+A pre-compilation step builds and runs `src/generate_constants.cpp`, which emits
 `src/generated_data.cpp` (the precomputed bitboard attack and Zobrist tables). This file is
 gitignored and regenerated on every build.
 
@@ -392,7 +392,6 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 | `test/` | Standalone test programs |
 | `tools/` | NNUE data generation, bullet trainer sources, and training/SPRT scripts |
 | `nnue/` | NNUE training pipeline documentation |
-| `generate_constants/` | Build-time generator for the precomputed lookup tables |
 | `Doxyfile` | Doxygen configuration |
 | `LICENSE` | GNU General Public License v3 |
 
@@ -457,7 +456,7 @@ the published node counts for the standard positions.
    clang-format -i src/<file>            # or your editor's format-on-save
    ```
    The generated `src/generated_data.cpp` is exempt — it is machine-emitted and gitignored.
-3. Only edit `generate_constants/generate_constants.cpp` when the precomputed-table logic actually
+3. Only edit `src/generate_constants.cpp` when the precomputed-table logic actually
    changes; never edit `src/generated_data.cpp` by hand.
 4. Keep new public declarations Doxygen-commented so `make doc` stays complete.
 

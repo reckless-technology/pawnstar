@@ -43,7 +43,7 @@ int main()
                  "(________) \n"
                  "/________\\\n"
                  "Pawnstar: a UCI compatible chess engine\n"
-                 "(C) Jonny Reckless 2009 - 2024\n"
+                 "(C) Jonny Reckless 2009 - 2026\n"
                  "Compiled: " __DATE__ " " __TIME__ "\n";
 
     Game game{};
@@ -61,8 +61,7 @@ int main()
     const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v7.bin";
     if (!game.NnueNetwork().Load(net_path))
     {
-        const std::size_t embedded_size =
-            static_cast<std::size_t>(pawnstar_embedded_net_end - pawnstar_embedded_net);
+        const std::size_t embedded_size = static_cast<std::size_t>(pawnstar_embedded_net_end - pawnstar_embedded_net);
         std::cout << "info string NNUE: file load failed; falling back to the embedded net (" << embedded_size
                   << " bytes)\n";
         if (!game.NnueNetwork().LoadFromMemory(pawnstar_embedded_net, embedded_size, "embedded"))

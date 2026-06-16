@@ -40,22 +40,28 @@ export PAWNSTAR_THREADS=1
 unset PAWNSTAR_NNUE PAWNSTAR_EVALFILE
 cand_opts=("option.EvalFile=$NET")
 
-: > "$OUT/summary.txt"
+: > "$OUT/summary.txt"   # truncate the summary; each anchor appends one line
 estimates=()
 for anchor in "$@"; do
+    # Split the "name:rating:cmd" triple. cmd may itself contain ':' (rare), so take name and rating off the
+    # front with %% / # expansions and leave the remainder as the command path.
     name="${anchor%%:*}"; rest="${anchor#*:}"; rating="${rest%%:*}"; cmd="${rest#*:}"
     if [ ! -x "$cmd" ]; then
         echo "$name: opponent binary not found/executable: $cmd" | tee -a "$OUT/summary.txt"
         continue
     fi
     log="$OUT/vs_$name.log"
+    # Play GAMES games as paired rounds (-games 2 -repeat = each opening played once with each colour, so
+    # GAMES/2 rounds). The opponent is pinned to 1 thread / 64 MB hash for a fair, reproducible-ish match.
     fastchess -engine cmd="$ENGINE" name=pawnstar "${cand_opts[@]}" \
               -engine cmd="$cmd" name="$name" option.Threads=1 option.Hash=64 \
               -each proto=uci tc="$TC" -rounds $(( GAMES / 2 )) -games 2 -repeat \
               -openings file="$OPENINGS" format=epd order=random -concurrency "$CONCURRENCY" > "$log" 2>&1 || true
+    # Scrape fastchess's final report: the score line (for display) and the measured Elo difference.
     pts=$(grep -E '^Games:|Points:' "$log" | tail -1)
     diff=$(grep '^Elo:' "$log" | tail -1 | sed -E 's/^Elo: (-?[0-9.]+).*/\1/')
     if [ -n "${diff:-}" ]; then
+        # Absolute estimate = the opponent's known rating + our measured difference against it.
         est=$(awk -v r="$rating" -v d="$diff" 'BEGIN{printf "%.0f", r + d}')
         estimates+=("$est")
         echo "$name (anchor ~$rating): diff=$diff  -> ~$est   [$pts]" | tee -a "$OUT/summary.txt"
@@ -64,8 +70,9 @@ for anchor in "$@"; do
     fi
 done
 
+# Average the per-anchor estimates into one number (more anchors -> less dependence on any single one).
 if [ "${#estimates[@]}" -gt 0 ]; then
     mean=$(printf '%s\n' "${estimates[@]}" | awk '{s+=$1; n++} END{printf "%.0f", s/n}')
     echo "mean anchored estimate over ${#estimates[@]} anchor(s): ~$mean" | tee -a "$OUT/summary.txt"
 fi
-echo DONE > "$OUT/STATUS"
+echo DONE > "$OUT/STATUS"   # completion marker for any watching script

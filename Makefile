@@ -6,12 +6,13 @@ BUILD_DIR           = build
 DOC_DIR             = doc/html
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
 GENERATED_DATA      = src/generated_data.cpp
-GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
+GENERATOR_SOURCE    = src/generate_constants.cpp
 GENERATOR_EXE       = $(BUILD_DIR)/gen_constants
 TEST_DIR            = test
 TOOLS_DIR           = tools
 TOOL_GENDATA_EXE    = $(BUILD_DIR)/gen_data
 TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net
+TOOL_FILTERBOOK_EXE = $(BUILD_DIR)/filter_book
 
 ENGINE_SOURCES      = \
 	debug_hashtable.cpp \
@@ -43,15 +44,17 @@ TEST_SEE_EXE        = $(BUILD_DIR)/test_see
 TEST_BK_NNUE_EXE    = $(BUILD_DIR)/test_bratko_kopec_nnue
 TEST_NNUE_EXE       = $(BUILD_DIR)/test_nnue
 TEST_NNUE_INC_EXE   = $(BUILD_DIR)/test_nnue_incremental
+TEST_BOOK_EXE       = $(BUILD_DIR)/test_opening_book
 # Shipped net + checked-in trainer reference, used by `make check` to exercise NNUE inference and the
 # incremental accumulator. Resolved with wildcard so the checks degrade to a no-op (still green) if absent.
 NNUE_NET            = $(wildcard nnue/pawnstar-v7.bin)
 NNUE_REF            = $(wildcard test/nnue_reference.txt)
-TEST_OBJECTS        = $(BUILD_DIR)/perft.o \
-                      $(BUILD_DIR)/see.o \
-                      $(BUILD_DIR)/bratko_kopec_nnue.o \
+TEST_OBJECTS        = $(BUILD_DIR)/perft_test.o \
+                      $(BUILD_DIR)/see_test.o \
+                      $(BUILD_DIR)/bratko_kopec_nnue_test.o \
                       $(BUILD_DIR)/nnue_test.o \
-                      $(BUILD_DIR)/nnue_incremental.o
+                      $(BUILD_DIR)/nnue_incremental_test.o \
+                      $(BUILD_DIR)/opening_book_test.o
 TEST_DEPS           = $(TEST_OBJECTS:.o=.d)
 
 # Diagnostic counters (DEBUGX) are compiled in by default; build with RELEASE=1 to omit them.
@@ -69,9 +72,9 @@ endif
 
 all: prep $(PROGRAM_EXE)
 
-tools: prep $(TOOL_GENDATA_EXE) $(TOOL_STAMP_EXE)
+tools: prep $(TOOL_GENDATA_EXE) $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE)
 
-tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE)
+tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE)
 
 # Run every suite in one shell, chained with && so the first failure aborts (and the summary below is
 # skipped). On full success report the wall-clock time spent running the tests (not the build).
@@ -82,15 +85,17 @@ check: tests
 	$(TEST_NNUE_EXE) $(NNUE_NET) $(NNUE_REF) && \
 	$(TEST_NNUE_INC_EXE) $(NNUE_NET) && \
 	$(TEST_SEE_EXE) && \
+	$(TEST_BOOK_EXE) && \
 	echo "all tests passed in $$(( $$(date +%s%3N) - start )) ms"
 
 prep:
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) \
+	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) \
 	      $(TOOL_GENDATA_EXE) $(BUILD_DIR)/gen_data.o $(BUILD_DIR)/gen_data.d \
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
+	      $(TOOL_FILTERBOOK_EXE) $(BUILD_DIR)/filter_book.o $(BUILD_DIR)/filter_book.d \
 	      $(OBJECTS) $(EMBED_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
 	      $(GENERATED_DATA) $(GENERATOR_EXE)
 
@@ -122,19 +127,22 @@ $(PROGRAM_EXE): $(OBJECTS) $(EMBED_OBJECT)
 	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS) $(EMBED_OBJECT)
 
 # Link test executables against all engine objects (no main.o).
-$(TEST_PERFT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/perft.o
+$(TEST_PERFT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/perft_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TEST_SEE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/see.o
+$(TEST_SEE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/see_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TEST_BK_NNUE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/bratko_kopec_nnue.o
+$(TEST_BK_NNUE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/bratko_kopec_nnue_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(TEST_NNUE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TEST_NNUE_INC_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_incremental.o
+$(TEST_NNUE_INC_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_incremental_test.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+$(TEST_BOOK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/opening_book_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 # Link the self-play data generator against all engine objects.
@@ -143,6 +151,10 @@ $(TOOL_GENDATA_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/gen_data.o
 
 # Link the net-stamping tool (header-only use of nnue.h constants; no engine objects needed).
 $(TOOL_STAMP_EXE): $(BUILD_DIR)/stamp_net.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+# Link the opening-book filter against all engine objects (it drives the NNUE search).
+$(TOOL_FILTERBOOK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/filter_book.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 # Compile the generator executable.

@@ -16,14 +16,15 @@
 #   tools/run_experiment.sh ~/pawnstar_nnue/data net.bin    # openings + train + verify + SPRT
 set -euo pipefail
 
-DATA_IN="${1:?data_dir or shuffled.data}"
-NET="${2:?net.bin}"
-SBS="${3:-40}"
-ROUNDS="${4:-500}"
-DEPTH="${5:-8}"
+DATA_IN="${1:?data_dir or shuffled.data}"   # self-play shard dir OR a pre-converted .data file
+NET="${2:?net.bin}"                          # output net path (also the SPRT candidate)
+SBS="${3:-40}"                               # superbatches to train (passed to train_pipeline.sh)
+ROUNDS="${4:-500}"                           # SPRT rounds
+DEPTH="${5:-8}"                              # SPRT fixed search depth (ignored if run_sprt.sh sees TC)
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
-# Openings need text shards. With a pre-converted .data file, supply your own openings.epd instead.
+# Openings can be derived from text shards; a pre-converted .data file carries no FENs we can sample, so the
+# caller must supply their own OPENINGS=<openings.epd> in that case.
 if [ -d "$DATA_IN" ]; then
     bash "$REPO/tools/make_openings.sh" "$DATA_IN"
     OPENINGS="$DATA_IN/openings.epd"
@@ -31,6 +32,7 @@ else
     OPENINGS="${OPENINGS:?with bulletformat data, set OPENINGS=<openings.epd>}"
 fi
 
-bash "$REPO/tools/train_pipeline.sh" "$DATA_IN" "$NET" "$SBS"
-bash "$REPO/tools/verify_net.sh" "$NET"
-bash "$REPO/tools/run_sprt.sh" "$NET" "$OPENINGS" "$ROUNDS" "$DEPTH"
+# The four pipeline stages, in order. Any failure aborts the run (set -e), so a bad net never reaches SPRT.
+bash "$REPO/tools/train_pipeline.sh" "$DATA_IN" "$NET" "$SBS"   # train + quantise + export
+bash "$REPO/tools/verify_net.sh" "$NET"                         # gate: engine eval == trainer eval
+bash "$REPO/tools/run_sprt.sh" "$NET" "$OPENINGS" "$ROUNDS" "$DEPTH"  # net-vs-baseline SPRT

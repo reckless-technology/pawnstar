@@ -77,7 +77,7 @@ Move types: `kNonCapture`, `kCapture`, `kPawnDoublePush`, `kEpCapture`, `kCastli
 
 ### Attack generation
 
-`Attacks` ([attacks.h](src/attacks.h)) uses BMI2 `_pext_u64` for sliding-piece attacks: for each square the occupancy bits relevant to that slider are extracted with `pext`, used to index a per-square attack table. Tables live in `src/generated_data.cpp` (generated at build time by `generate_constants/generate_constants.cpp`; gitignored and regenerated on every `make`).
+`Attacks` ([attacks.h](src/attacks.h)) uses BMI2 `_pext_u64` for sliding-piece attacks: for each square the occupancy bits relevant to that slider are extracted with `pext`, used to index a per-square attack table. Tables live in `src/generated_data.cpp` (generated at build time by `src/generate_constants.cpp`; gitignored and regenerated on every `make`).
 
 Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_data.cpp`.
 
@@ -155,4 +155,4 @@ SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_excha
 
 ### Generated data
 
-[generate_constants/](generate_constants/) is a standalone program that outputs [src/generated_data.cpp](src/generated_data.cpp). Only modify `generate_constants.cpp` when attack mask logic changes. The output is gitignored and regenerated on every `make`.
+[generate_constants.cpp](src/generate_constants.cpp) is a standalone program (built separately, not part of the engine link) that outputs [src/generated_data.cpp](src/generated_data.cpp). Only modify `generate_constants.cpp` when attack mask logic changes. The output is gitignored and regenerated on every `make`.

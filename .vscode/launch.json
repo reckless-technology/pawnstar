@@ -28,8 +28,8 @@
             "miDebuggerPath": "/usr/bin/gdb",
             "request": "launch",
             "stopAtEntry": true,
-            "cwd": "${workspaceFolder}/generate_constants",
-            "program": "${workspaceFolder}/generate_constants/gen_constants",
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/build/gen_constants",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
