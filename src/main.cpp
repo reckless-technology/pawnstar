@@ -7,6 +7,7 @@
 #include "transposition_table.h"
 
 #include <execinfo.h>
+#include <filesystem>
 #include <iostream>
 #include <signal.h>
 #include <stdio.h>
@@ -17,6 +18,41 @@
 
 /// @brief Process a single line of UCI input (defined in input_handling.cpp).
 void ProcessInput(Game &game, std::string_view line);
+
+namespace
+{
+/// @brief Locate a resource file shipped with the engine (the net or the opening book).
+/// Tries the path as given (relative to the current working directory) first, then relative to the
+/// running executable's directory and that directory's parent (so the engine finds nnue/ and the book
+/// when launched from anywhere, e.g. build/pawnstar living one level below the repo-root resources).
+/// Returns the first candidate that exists, or the original path if none do (so the caller's existing
+/// not-found handling — and the embedded-net fallback — still applies).
+/// @param relpath Resource path relative to the project root (e.g. "pawnstar.book").
+/// @return A path that exists if one was found, otherwise @p relpath unchanged.
+std::string LocateResource(const std::string &relpath)
+{
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (fs::exists(relpath, ec))
+    {
+        return relpath;
+    }
+    const fs::path exe = fs::read_symlink("/proc/self/exe", ec);
+    if (!ec)
+    {
+        const fs::path exe_dir = exe.parent_path();
+        for (const fs::path &base : {exe_dir, exe_dir.parent_path()})
+        {
+            const fs::path candidate = base / relpath;
+            if (fs::exists(candidate, ec))
+            {
+                return candidate.string();
+            }
+        }
+    }
+    return relpath;
+}
+} // namespace
 
 // The shipped NNUE net embedded into the binary (see src/embedded_net.S), used as a fallback when the
 // on-disk net cannot be loaded. Linked into the engine executable only (not the test binaries).
@@ -47,7 +83,7 @@ int main()
                  "Compiled: " __DATE__ " " __TIME__ "\n";
 
     Game game{};
-    if (!game.book.Initialize("pawnstar.book"))
+    if (!game.book.Initialize(LocateResource("pawnstar.book")))
     {
         std::cout << "info string Unable to open book file.\n";
     }
@@ -58,7 +94,7 @@ int main()
     // engine always has a working evaluator. Only if even that fails — which would mean the build is
     // corrupt — does the engine give up.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
-    const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v7.bin";
+    const std::string net_path  = eval_file ? eval_file : LocateResource("nnue/pawnstar-v7.bin");
     if (!game.NnueNetwork().Load(net_path))
     {
         const std::size_t embedded_size = static_cast<std::size_t>(pawnstar_embedded_net_end - pawnstar_embedded_net);
