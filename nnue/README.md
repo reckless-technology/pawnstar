@@ -137,6 +137,7 @@ and `game.SetUseNnue(...)`), read-only after load and shared by all Lazy SMP thr
 | `train_pipeline.sh`       | train → export a net, from either self-play text shards or a bulletformat `.data` |
 | `verify_net.sh`           | cross-check (engine == trainer) + incremental-accumulator gate for a trained net |
 | `run_sprt.sh`             | SPRT / match: NNUE vs HCE (default) or net-vs-net, at fixed depth or time control |
+| `rate.sh`                 | anchored absolute-Elo estimate vs rated reference engines (you supply the opponent binaries) |
 | `run_experiment.sh`       | one-shot: openings + train + **verify** + SPRT from an existing dataset |
 
 **Prerequisites:** `clang++`/`make` (engine), Rust/`cargo` (bullet), `fastchess` on `PATH` (SPRT). For
@@ -281,6 +282,11 @@ play. `run_sprt.sh <net.bin> <openings.epd> [rounds=500] [depth=8]` runs:
 
 fastchess prints "Illegal PV move" warnings occasionally — these are cosmetic (a junk move in the
 printed PV tail; the actual best move played is legal).
+
+For an **absolute** rating (rather than a net-vs-net delta), `rate.sh <name:rating:cmd> ...` plays the
+engine against one or more externally-rated reference engines (e.g. the CCRL engines bundled with Arena —
+which you supply, as they are not in the repo) and reports `anchor_rating + measured_diff` per anchor plus
+the mean. It anchors only as well as those opponents and the chosen TC, so treat the result as a ballpark.
 
 ## 7. Shipped nets
 
