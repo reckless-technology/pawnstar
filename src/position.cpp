@@ -24,8 +24,8 @@ using std::vector;
 Position Position::MakeNullMove() const
 {
     Position position{*this};
-    position.state_flags_ |= kIsNullMove;
-    position.state_flags_ ^= kIsBlackToMove;
+    position.is_null_move_  = true;
+    position.color_to_move_ = EnemyOf(position.color_to_move_);
     position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
     position.hash_ ^= kBlackMoveHash;
     position.en_passant_square_ = Square{(uint8_t)0};
@@ -93,7 +93,7 @@ Position Position::MakeMove(const Move &move) const
     const Piece  piece = move.piece();
 
     Position position{*this};
-    position.state_flags_ &= ~kIsNullMove;
+    position.is_null_move_ = false;
     position.castling_rights_.AfterMove(move);
     position.hash_ ^= position.castling_rights_.Hash() ^ castling_rights_.Hash();
     position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
@@ -164,7 +164,7 @@ Position Position::MakeMove(const Move &move) const
         }
         break;
     }
-    position.state_flags_ ^= kIsBlackToMove;
+    position.color_to_move_ = EnemyOf(color);
     position.hash_ ^= kBlackMoveHash;
     position.full_move_count_ += color; // Increments after black's move.
     position.king_location_[color] = (position.pieces[kKing] & position.colors[color]).Lsb();
@@ -220,7 +220,7 @@ Position Position::FromString(std::string_view fen_string)
     ss >> color_to_move;
     if (color_to_move == "b")
     {
-        position.state_flags_ |= kIsBlackToMove;
+        position.color_to_move_ = kBlack;
     }
     position.king_location_[kWhite] = (position.pieces[kKing] & position.colors[kWhite]).Lsb();
     position.king_location_[kBlack] = (position.pieces[kKing] & position.colors[kBlack]).Lsb();
@@ -300,7 +300,7 @@ std::string Position::ToString() const
         }
     }
     // Side to move
-    ss << ' ' << (state_flags_ & kIsBlackToMove ? 'b' : 'w') << ' ';
+    ss << ' ' << (color_to_move_ == kBlack ? 'b' : 'w') << ' ';
     // Castling rights
     ss << castling_rights_.ToFenString();
     ss << ' ';
@@ -366,7 +366,7 @@ bool Position::IsDrawByMaterial() const
 /// @return the 64 bit hash
 constexpr zobrist_t Position::ComputeHash() const
 {
-    zobrist_t hash = state_flags_ & kIsBlackToMove ? kBlackMoveHash : 0ull;
+    zobrist_t hash = color_to_move_ == kBlack ? kBlackMoveHash : 0ull;
     hash ^= castling_rights_.Hash();
     hash ^= kEnPassantHashes[en_passant_square_];
     constexpr std::array piece_types{kPawn, kKnight, kBishop, kRook, kQueen, kKing};

@@ -74,13 +74,13 @@ class Position
     /// @brief Whether the last move was a null move. @return true if a null move.
     constexpr bool IsNullMove() const
     {
-        return !!(state_flags_ & kIsNullMove);
+        return is_null_move_;
     }
 
     /// @brief Colour to move. @return The side to move.
     constexpr Color ColorToMove() const
     {
-        return state_flags_ & kIsBlackToMove ? kBlack : kWhite;
+        return color_to_move_;
     }
 
     /// @brief All occupied squares. @return Occupancy bitboard.
@@ -157,11 +157,8 @@ class Position
     uint8_t               reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
     uint8_t               full_move_count_;       ///< Number of full moves (zero indexed).
     CastlingRights        castling_rights_;       ///< Castling rights flags.
-    uint8_t               state_flags_;           ///< Position state flags.
-
-    /// @brief Bit values for state flags.
-    constexpr static uint8_t kIsBlackToMove = 0x01; ///< Set when it is black's turn to move.
-    constexpr static uint8_t kIsNullMove    = 0x02; ///< Set when the last move was a null move.
+    bool                  is_null_move_;          ///< Whether the last move was a null (pass) move.
+    Color                 color_to_move_;         ///< Side to move (occupies what was trailing padding).
 };
 
 static_assert(sizeof(Position) == 160);
