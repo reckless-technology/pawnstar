@@ -8,7 +8,9 @@
       ],
       "cppStandard": "c++20",
       "defines": [
-        "DEBUGX=1"
+        "DEBUGX=1",
+        "__AVX2__=1",
+        "__BMI2__=1"
       ],
       "configurationProvider": "ms-vscode.makefile-tools",
       "cStandard": "c17",
