@@ -51,7 +51,7 @@ int main()
     // EvalFile value <path>` loads a different net at runtime. If the net cannot be loaded there is no
     // evaluation to fall back to, so the engine reports the error and exits.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
-    const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v6.bin";
+    const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v7.bin";
     if (!game.NnueNetwork().Load(net_path))
     {
         std::cout << "info string FATAL: could not load NNUE net '" << net_path

@@ -1,6 +1,6 @@
 /// @file gen_data.cpp Self-play training-data generator for the experimental NNUE evaluation.
 ///
-/// Plays games against itself with the loaded NNUE net (PAWNSTAR_EVALFILE, default nnue/pawnstar-v6.bin)
+/// Plays games against itself with the loaded NNUE net (PAWNSTAR_EVALFILE, default nnue/pawnstar-v7.bin)
 /// at a fixed search depth and writes one record per quiet position:
 ///
 ///     <fen> | <white_relative_eval_cp> | <wdl>
@@ -169,7 +169,7 @@ int main(int argc, char **argv)
 
     // NNUE is the only evaluator, so self-play needs a loaded net. Load once and reuse across games.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
-    const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v6.bin";
+    const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v7.bin";
     Game              game;
     if (!game.NnueNetwork().Load(net_path))
     {
