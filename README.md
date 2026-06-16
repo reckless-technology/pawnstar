@@ -4,7 +4,7 @@ Pawnstar is a [UCI](https://en.wikipedia.org/wiki/Universal_Chess_Interface) che
 C++20. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
 a lockless transposition table, and a king-bucketed NNUE evaluation (the engine's sole evaluator).
 
-Legal move generation runs at roughly 700 million moves per second on a modern laptop.
+Legal move generation runs at roughly 600 million moves per second on a modern laptop.
 
 ## Features
 
