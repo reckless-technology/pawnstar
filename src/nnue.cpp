@@ -380,7 +380,7 @@ int Network::Evaluate(const Position &position) const
     // accumulator then run the shared forward pass, so both paths are guaranteed identical.
     Accumulator acc;
     Refresh(acc, position);
-    return Evaluate(acc, position.ColorToMove());
+    return Evaluate(acc, position.color_to_move);
 }
 
 } // namespace nnue

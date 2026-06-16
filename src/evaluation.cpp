@@ -28,7 +28,7 @@ int EvaluatePosition(const SearchState &state)
         INCREMENT("eval hash hits");
         return cached;
     }
-    const int score = state.game.NnueNetwork().Evaluate(state.CurrentAccumulator(), position.ColorToMove());
+    const int score = state.game.NnueNetwork().Evaluate(state.CurrentAccumulator(), position.color_to_move);
     state.game.eval_cache.Store(hash, score);
     return score;
 }

@@ -218,10 +218,10 @@ struct NullMoveResult
 static inline NullMoveResult AttemptNullMove(SearchState &state, int depth, int ply, int alpha, int beta)
 {
     const Position &position = state.CurrentPosition();
-    const Color     color    = position.ColorToMove();
+    const Color     color    = position.color_to_move;
     // Only try null move pruning if all conditions are met.
     const Bitboard friendly = position.colors[color];
-    if (!position.IsNullMove() && // previous move was not a null move
+    if (!position.is_null_move && // previous move was not a null move
         !position.IsInCheck() &&  // we are not in check
         beta == alpha + 1 &&      // this is not a PV node
         friendly.PopCount() > 3)  // we have at least 4 friendly pieces

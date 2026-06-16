@@ -186,8 +186,8 @@ void handle_go(Game &game, std::span<std::string> args)
         else // kAwaitValue: token is the integer argument for `pending`
         {
             const int value = stoi(token);
-            if ((pending == "wtime" && game.CurrentPosition().ColorToMove() == kWhite) ||
-                (pending == "btime" && game.CurrentPosition().ColorToMove() == kBlack))
+            if ((pending == "wtime" && game.CurrentPosition().color_to_move == kWhite) ||
+                (pending == "btime" && game.CurrentPosition().color_to_move == kBlack))
             {
                 game.time_control.clock_type   = ChessClock::kStandard;
                 game.time_control.ms_remaining = value;

@@ -55,13 +55,13 @@ class Position
     /// @brief Generate all legal moves. @return The legal move list.
     constexpr MoveList GenerateLegalMoves() const
     {
-        return ColorToMove() == kWhite ? GenMoves<kWhite, true>() : GenMoves<kBlack, true>();
+        return color_to_move == kWhite ? GenMoves<kWhite, true>() : GenMoves<kBlack, true>();
     }
 
     /// @brief Generate legal captures and promotions only. @return The legal capture list.
     constexpr MoveList GenerateLegalCaptures() const
     {
-        return ColorToMove() == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();
+        return color_to_move == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();
     }
 
     /// @brief Whether a square is attacked by a colour. @param s Target square. @param c Attacking colour. @return true
@@ -69,18 +69,6 @@ class Position
     constexpr bool IsAttacked(Square s, Color c) const
     {
         return AttacksTo(s, c).IsNotEmpty();
-    }
-
-    /// @brief Whether the last move was a null move. @return true if a null move.
-    constexpr bool IsNullMove() const
-    {
-        return is_null_move_;
-    }
-
-    /// @brief Colour to move. @return The side to move.
-    constexpr Color ColorToMove() const
-    {
-        return color_to_move_;
     }
 
     /// @brief All occupied squares. @return Occupancy bitboard.
@@ -157,8 +145,10 @@ class Position
     uint8_t               reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
     uint8_t               full_move_count_;       ///< Number of full moves (zero indexed).
     CastlingRights        castling_rights_;       ///< Castling rights flags.
-    bool                  is_null_move_;          ///< Whether the last move was a null (pass) move.
-    Color                 color_to_move_;         ///< Side to move (occupies what was trailing padding).
+
+  public:
+    bool  is_null_move;  ///< @brief Whether the last move was a null (pass) move.
+    Color color_to_move; ///< @brief Side to move. Declared last so it occupies what was the trailing padding byte.
 };
 
 static_assert(sizeof(Position) == 160);

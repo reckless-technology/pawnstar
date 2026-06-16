@@ -38,10 +38,10 @@ std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move m
     if (promoted != Piece::kNone)
     {
         return {piece_values[captured] + piece_values[promoted] - piece_values[kPawn] -
-                    EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), move.promoted()),
+                    EvaluateSwapOff(bb, move.to(), dst_position.color_to_move, move.promoted()),
                 is_checking};
     }
-    return {piece_values[captured] - EvaluateSwapOff(bb, move.to(), dst_position.ColorToMove(), piece), is_checking};
+    return {piece_values[captured] - EvaluateSwapOff(bb, move.to(), dst_position.color_to_move, piece), is_checking};
 }
 
 /// @brief Determine the swap off value for a capture on a square.

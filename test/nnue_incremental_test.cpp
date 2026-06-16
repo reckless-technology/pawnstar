@@ -27,7 +27,7 @@ void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
 {
     const Position      &p   = state.CurrentPosition();
     const nnue::Network &net = state.game.NnueNetwork();
-    const int            inc = net.Evaluate(state.CurrentAccumulator(), p.ColorToMove());
+    const int            inc = net.Evaluate(state.CurrentAccumulator(), p.color_to_move);
     const int            ref = net.Evaluate(p); // full refresh
     ++g_checks;
     if (inc != ref)
@@ -52,7 +52,7 @@ void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
         state.UndoMove();
     }
     // After undoing every child the accumulator must again match this position's full refresh.
-    const int inc_after = net.Evaluate(state.CurrentAccumulator(), p.ColorToMove());
+    const int inc_after = net.Evaluate(state.CurrentAccumulator(), p.color_to_move);
     ++g_checks;
     if (inc_after != ref)
     {

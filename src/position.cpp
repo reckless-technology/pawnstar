@@ -24,8 +24,8 @@ using std::vector;
 Position Position::MakeNullMove() const
 {
     Position position{*this};
-    position.is_null_move_  = true;
-    position.color_to_move_ = EnemyOf(position.color_to_move_);
+    position.is_null_move  = true;
+    position.color_to_move = EnemyOf(position.color_to_move);
     position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
     position.hash_ ^= kBlackMoveHash;
     position.en_passant_square_ = Square{(uint8_t)0};
@@ -87,13 +87,13 @@ static constexpr Square C8{"C8"}; ///< Black queenside castling king destination
 /// @return new Position following the move.
 Position Position::MakeMove(const Move &move) const
 {
-    const Color  color = ColorToMove();
+    const Color  color = color_to_move;
     const Square from  = move.from();
     const Square to    = move.to();
     const Piece  piece = move.piece();
 
     Position position{*this};
-    position.is_null_move_ = false;
+    position.is_null_move = false;
     position.castling_rights_.AfterMove(move);
     position.hash_ ^= position.castling_rights_.Hash() ^ castling_rights_.Hash();
     position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
@@ -164,7 +164,7 @@ Position Position::MakeMove(const Move &move) const
         }
         break;
     }
-    position.color_to_move_ = EnemyOf(color);
+    position.color_to_move = EnemyOf(color);
     position.hash_ ^= kBlackMoveHash;
     position.full_move_count_ += color; // Increments after black's move.
     position.king_location_[color] = (position.pieces[kKing] & position.colors[color]).Lsb();
@@ -220,7 +220,7 @@ Position Position::FromString(std::string_view fen_string)
     ss >> color_to_move;
     if (color_to_move == "b")
     {
-        position.color_to_move_ = kBlack;
+        position.color_to_move = kBlack;
     }
     position.king_location_[kWhite] = (position.pieces[kKing] & position.colors[kWhite]).Lsb();
     position.king_location_[kBlack] = (position.pieces[kKing] & position.colors[kBlack]).Lsb();
@@ -255,7 +255,7 @@ Position Position::FromString(std::string_view fen_string)
     }
     position.hash_ = position.ComputeHash();
     // Is this position check?
-    const Color color  = position.ColorToMove();
+    const Color color  = position.color_to_move;
     position.checkers_ = position.AttacksTo(position.king_location_[color], EnemyOf(color));
     return position;
 }
@@ -300,7 +300,7 @@ std::string Position::ToString() const
         }
     }
     // Side to move
-    ss << ' ' << (color_to_move_ == kBlack ? 'b' : 'w') << ' ';
+    ss << ' ' << (color_to_move == kBlack ? 'b' : 'w') << ' ';
     // Castling rights
     ss << castling_rights_.ToFenString();
     ss << ' ';
@@ -366,7 +366,7 @@ bool Position::IsDrawByMaterial() const
 /// @return the 64 bit hash
 constexpr zobrist_t Position::ComputeHash() const
 {
-    zobrist_t hash = color_to_move_ == kBlack ? kBlackMoveHash : 0ull;
+    zobrist_t hash = color_to_move == kBlack ? kBlackMoveHash : 0ull;
     hash ^= castling_rights_.Hash();
     hash ^= kEnPassantHashes[en_passant_square_];
     constexpr std::array piece_types{kPawn, kKnight, kBishop, kRook, kQueen, kKing};

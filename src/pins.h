@@ -16,7 +16,7 @@ class Pins
     constexpr Pins(const Position &position)
     {
         pinned_pieces_                  = kNoSquares;
-        const Color    color            = position.ColorToMove();
+        const Color    color            = position.color_to_move;
         const Bitboard occupied_squares = position.OccupiedSquares();
         const Bitboard friendly_pieces  = position.colors[color];
         const Square   king_location    = position.KingLocation(color);
