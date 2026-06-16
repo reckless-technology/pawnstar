@@ -7,7 +7,7 @@ DOC_DIR             = doc/html
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
 GENERATED_DATA      = src/generated_data.cpp
 GENERATOR_SOURCE    = generate_constants/generate_constants.cpp
-GENERATOR_EXE       = generate_constants/gen_constants
+GENERATOR_EXE       = $(BUILD_DIR)/gen_constants
 TEST_DIR            = test
 TOOLS_DIR           = tools
 TOOL_GENDATA_EXE    = $(BUILD_DIR)/gen_data
@@ -96,7 +96,7 @@ clean:
 	      $(OBJECTS) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
 	      $(GENERATED_DATA) $(GENERATOR_EXE)
 
-gen: $(GENERATOR_EXE)
+gen: prep $(GENERATOR_EXE)
 
 # Generate API documentation with doxygen (output configured by the Doxyfile).
 doc:
@@ -149,7 +149,7 @@ $(TOOL_STAMP_EXE): $(BUILD_DIR)/stamp_net.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 # Compile the generator executable.
-$(GENERATOR_EXE): $(GENERATOR_SOURCE)
+$(GENERATOR_EXE): $(GENERATOR_SOURCE) | prep
 	$(CXX) $(CXXFLAGS) -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
 
 # Invoke the generator executable to create the generated data source file.
