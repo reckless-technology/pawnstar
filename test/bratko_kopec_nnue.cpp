@@ -1,14 +1,13 @@
 /// @file bratko_kopec_nnue.cpp Bratko-Kopec search-quality suite using the NNUE evaluation.
 ///
-/// Companion to bratko_kopec.cpp. It searches the same 24 positions (bratko_kopec_cases.h) but with the
-/// NNUE evaluator active, and reports how many find a documented best move. NNUE scores are on a different
-/// scale from the handcrafted reference scores, so this suite checks the *move* (the classic Bratko-Kopec
-/// metric — did the engine find a good move), not the score. A position counts as "solved" when the move
-/// found is among that position's reference moves (the union across the single-threaded depth-8..12 sets).
+/// It searches the 24 positions in bratko_kopec_cases.h with the NNUE evaluator and checks the *move* (the
+/// classic Bratko-Kopec metric — did the engine find a good move). A position is "solved" when the move
+/// found is among that position's accepted moves (the set of best moves the engine produces over depths
+/// 8–11; see bratko_kopec_cases.h). The search is forced single-threaded (`PAWNSTAR_THREADS=1`) so it is
+/// deterministic, and the suite is a hard gate: it must solve all 24.
 ///
-/// The search is forced single-threaded (`PAWNSTAR_THREADS=1`) so the result is deterministic. The
-/// net is taken from argv[1]; with no argument the suite is skipped (so `make check` stays green when the
-/// net is absent). Optional argv[2] sets the search depth (default 8).
+/// The net is taken from argv[1]; with no argument the suite is skipped (so `make check` stays green when
+/// the net is absent). Optional argv[2] sets the search depth (default 8).
 ///
 /// Usage:  test_bratko_kopec_nnue [net.bin] [depth]
 
@@ -27,32 +26,11 @@
 #include <iostream>
 #include <string>
 #include <string_view>
-#include <vector>
-
-namespace
-{
-/// @brief Distinct reference moves for a position: the union across its depth-8..12 reference sets.
-std::vector<std::string_view> AcceptedMoves(const bk::BkCase &tc)
-{
-    std::vector<std::string_view> moves;
-    for (const bk::BkDepth &d : tc.depths)
-    {
-        for (std::string_view mv : d.moves)
-        {
-            if (!mv.empty() && std::find(moves.begin(), moves.end(), mv) == moves.end())
-            {
-                moves.push_back(mv);
-            }
-        }
-    }
-    return moves;
-}
-} // namespace
 
 /// @brief Run the Bratko-Kopec suite with NNUE evaluation.
 /// @param argc Argument count. @param argv [net.bin] [depth].
-/// @return Non-zero only on a real failure (net load error, or a search returning no move); the
-///         solved count is reported as a quality metric, not a hard gate.
+/// @return Non-zero on any failure: net load error, a search returning no move, or any position whose best
+///         move is not among its accepted moves (the suite must solve all 24).
 int main(int argc, char *argv[])
 {
     if (argc < 2)
@@ -61,7 +39,7 @@ int main(int argc, char *argv[])
         return 0;
     }
     const std::string net_path = argv[1];
-    const int         depth    = argc > 2 ? std::atoi(argv[2]) : bk::kMinDepth;
+    const int         depth    = argc > 2 ? std::atoi(argv[2]) : bk::kDefaultDepth;
 
     // Deterministic single-threaded search so the solved count is reproducible.
     setenv("PAWNSTAR_THREADS", "1", 1);
@@ -99,10 +77,9 @@ int main(int argc, char *argv[])
 
         const std::string got_move = m.ToString();
 
-        const std::vector<std::string_view> accepted = AcceptedMoves(tc);
-        const bool                          found    = m != Move::None();
-        const bool                          match =
-            found && std::find(accepted.begin(), accepted.end(), got_move) != accepted.end();
+        const bool found = m != Move::None();
+        const bool match =
+            found && std::find(tc.moves.begin(), tc.moves.end(), got_move) != tc.moves.end();
         if (!found)
         {
             ++errors; // a legal move should always come back for these positions
@@ -112,21 +89,24 @@ int main(int argc, char *argv[])
             ++solved;
         }
 
-        std::string accepted_str;
-        for (std::string_view mv : accepted)
-        {
-            if (!accepted_str.empty())
-            {
-                accepted_str += ' ';
-            }
-            accepted_str += mv;
-        }
-        std::cout << std::format("[{}] pos{:02d} got={}/{:<6} bestmoves=[{}] {}ms {}\n", match ? "SOLVED" : " miss ",
-                                 i + 1, got_move, m.score(), accepted_str, elapsed_ms, tc.fen);
+        std::cout << std::format("[{}] pos{:02d} got={}/{:<6} accepted=[{}] {}ms {}\n", match ? "SOLVED" : " MISS ",
+                                 i + 1, got_move, m.score(), bk::AcceptedMovesString(tc), elapsed_ms, tc.fen);
     }
 
     auto total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t_overall).count();
-    std::cout << std::format("\nNNUE Bratko-Kopec: solved {}/24 at depth {}  total {}ms  (net {})\n", solved, depth,
-                             total_ms, net_path);
-    return errors > 0 ? 1 : 0;
+    const int total = (int)bk::kCases.size();
+    std::cout << std::format("\nNNUE Bratko-Kopec: solved {}/{} at depth {}  total {}ms  (net {})\n", solved, total,
+                             depth, total_ms, net_path);
+    if (errors > 0)
+    {
+        std::cout << "FAIL: " << errors << " position(s) returned no move\n";
+        return 1;
+    }
+    if (solved != total)
+    {
+        std::cout << std::format("FAIL: solved {}/{} (expected all {})\n", solved, total, total);
+        return 1;
+    }
+    std::cout << "BRATKO-KOPEC NNUE PASS\n";
+    return 0;
 }
