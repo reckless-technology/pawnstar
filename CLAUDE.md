@@ -138,6 +138,8 @@ Aging is O(1): the table holds a `generation_` counter that `Age()` increments b
 
 Scores are tapered between opening/middlegame and endgame phases based on remaining material.
 
+**The handcrafted eval (HCE) is intentionally frozen.** NNUE (v6) is the default and outplays it by ~500+ Elo, a gap that hand-tuning cannot close (this is the settled lesson of computer chess — it's why NNUE exists). Do **not** invest in tuning the HCE to match NNUE. It is kept deliberately as (1) the fallback when no/incompatible net loads, and (2) the stable, deterministic baseline that anchors the score-based `test_bratko_kopec` (which NNUE can't replace — different scale, non-deterministic SMP) plus `test_see` and the pawn-structure tests. Evaluation effort belongs in NNUE (data, king buckets) and in search.
+
 SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_exchange_evaluation.h)) resolves a capture sequence on a square; `EvaluateStaticExchange` returns `{score, is_checking}`. It is used to order captures and promotions in `ScoreAndSortMoves` (see Move ordering above), to prune losing captures in quiescence search, and is exercised by `test_see`.
 
 ### NNUE evaluation (optional, experimental)
