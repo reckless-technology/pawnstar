@@ -21,9 +21,6 @@ ENGINE_SOURCES      = \
 	nnue.cpp \
 	opening_book.cpp \
 	position.cpp \
-	search_alphabeta.cpp \
-	search_quiescent.cpp \
-	search_root_node.cpp \
 	search_state.cpp \
 	static_exchange_evaluation.cpp \
 	transposition_table.cpp \

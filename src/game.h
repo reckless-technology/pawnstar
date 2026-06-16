@@ -93,6 +93,10 @@ class Game
     void StartThinking();
     /// @brief Signal the search to stop and join the worker thread.
     void StopThinking();
+    /// @brief Search the current position and return the best move (see definition in search_root_node.cpp).
+    /// Returns a book move immediately on a book hit; otherwise runs the Lazy SMP iterative-deepening search.
+    /// @return The best move, or Move::None if there are no legal moves.
+    Move SearchRootNode();
     /// @brief Whether the game has ended (checkmate, stalemate or draw).
     /// @return true if the game is over.
     bool IsGameOver() const;

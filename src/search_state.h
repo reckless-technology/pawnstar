@@ -9,9 +9,11 @@
 #include "position.h"
 #include "stack_list.h"
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <iterator>
 #include <vector>
 
 class Game;
@@ -22,6 +24,27 @@ struct HashEntry
     zobrist_t hash;                  ///< Zobrist hash of the position.
     uint8_t   reversible_move_count; ///< Half-move clock at this position.
 };
+
+/// @brief A variation (typically principal variation) is a line of play or series of moves.
+using Variation = StackList<Move, kMaxPly>;
+
+/// @brief Result of searching a single move: its score and whether it gives check.
+struct SingleMoveResult
+{
+    int  score;       ///< Alpha-beta score for the move.
+    bool is_checking; ///< True if the move gives check.
+};
+
+/// @brief When the PV changes we need to copy the new PV up the tree recursively.
+/// @param dst Destination PV.
+/// @param src Source PV.
+/// @param best_move New best move at this position.
+constexpr void CopyVariation(Variation &dst, const Variation &src, const Move &best_move)
+{
+    dst.clear();
+    dst.push_back(best_move);
+    std::copy(src.begin(), src.end(), std::back_inserter(dst));
+}
 
 /// @brief Per-thread search state for the parallel alpha-beta search.
 /// Each Lazy SMP thread owns an independent SearchState with its own position stack, hash history,
@@ -78,6 +101,29 @@ class SearchState
     /// @param moves Move list to score and sort.
     /// @param ply Current search ply (used for the history heuristic).
     void ScoreAndSortMoves(MoveList &moves, int ply) const;
+
+    /// @brief Fail-soft negamax alpha-beta search of the current node (defined in search_state.cpp).
+    /// @param depth Depth to search. @param ply Distance from root. @param alpha Alpha. @param beta Beta.
+    /// @param parent_pv Principal variation at the parent node. @return The alpha-beta score for this node.
+    int Search(int depth, int ply, int alpha, int beta, Variation &parent_pv);
+
+    /// @brief Search a single move from the current node (defined in search_state.cpp).
+    /// @return The move's score and whether it gives check.
+    SingleMoveResult SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv,
+                                      int move_index);
+
+    /// @brief Quiescence search over captures from the current node (defined in search_state.cpp).
+    /// @return The quiescent score for this node.
+    int SearchQuiescent(int depth, int ply, int alpha, int beta);
+
+    /// @brief Run iterative deepening on this search state — one Lazy SMP thread (defined in search_root_node.cpp).
+    /// The main thread (@p thread_id 0) prints info, applies time management and produces the authoritative move.
+    /// @param move_list This thread's copy of the root move list (re-sorted per iteration).
+    /// @param best_move Best move from the shallow ordering pass (seed).
+    /// @param thread_id Thread index (0 = authoritative main thread); drives the iteration-skip schedule.
+    /// @param start_ms Search start time (elapsed ms). @param ms_allocated Soft time budget (standard clock).
+    /// @return The best move found by this thread.
+    Move IterativeDeepen(MoveList move_list, Move best_move, int thread_id, int64_t start_ms, int ms_allocated);
 
     /// @brief Whether the current position is a draw by threefold repetition.
     /// @return true if drawn by repetition.

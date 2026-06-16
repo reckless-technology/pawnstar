@@ -16,7 +16,6 @@
 #include "game.h"
 #include "move.h"
 #include "position.h"
-#include "search.h"
 
 #include <algorithm>
 #include <array>
@@ -141,7 +140,7 @@ int main(int argc, char *argv[])
         game.time_control.depth      = depth;
         DebugXClear();
         auto t_start    = Clock::now();
-        Move m          = SearchRootNode(game);
+        Move m          = game.SearchRootNode();
         auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t_start).count();
         DebugXWrite();
 
