@@ -183,7 +183,8 @@ fixed-time clocks bypass the heuristic.
   the scout beats alpha.
 - **Null-move pruning** — when not in check and the previous move was not itself a null move, a null
   move is searched at reduced depth (`depth − 4`, i.e. R = 3); a resulting score `≥ beta` prunes the
-  node.
+  node. (Reducing less — `depth − 3` — was SPRT-tested at 8+0.08 and lost ≈16 Elo over 1000 games
+  [−15.99 ± 16.16], so the `depth − 4` cut stands.)
 - **Late-move reductions (LMR)** — at null-window nodes, any late move (past the 4th) outside a check
   sequence at `depth > 2` is searched one ply shallower, with a second ply shaved off past the 7th
   move at `depth > 3`. A reduced search that beats alpha is re-searched at full depth.
