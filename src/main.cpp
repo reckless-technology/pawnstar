@@ -18,6 +18,11 @@
 /// @brief Process a single line of UCI input (defined in input_handling.cpp).
 void ProcessInput(Game &game, std::string_view line);
 
+// The shipped NNUE net embedded into the binary (see src/embedded_net.S), used as a fallback when the
+// on-disk net cannot be loaded. Linked into the engine executable only (not the test binaries).
+extern "C" const unsigned char pawnstar_embedded_net[];
+extern "C" const unsigned char pawnstar_embedded_net_end[];
+
 /// @brief Program entry point. Prints the banner, loads the book, then runs the UCI input loop.
 /// @return Process exit code.
 int main()
@@ -48,15 +53,24 @@ int main()
     }
     // NNUE is the only evaluator, so a net is required. Load the shipped net from the working directory
     // (like the opening book); PAWNSTAR_EVALFILE=<path> overrides the path, and UCI `setoption name
-    // EvalFile value <path>` loads a different net at runtime. If the net cannot be loaded there is no
-    // evaluation to fall back to, so the engine reports the error and exits.
+    // EvalFile value <path>` loads a different net at runtime. If the on-disk net cannot be loaded (wrong
+    // cwd, missing/renamed file), fall back to the copy embedded in the binary (src/embedded_net.S) so the
+    // engine always has a working evaluator. Only if even that fails — which would mean the build is
+    // corrupt — does the engine give up.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
     const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v7.bin";
     if (!game.NnueNetwork().Load(net_path))
     {
-        std::cout << "info string FATAL: could not load NNUE net '" << net_path
-                  << "'. NNUE is the only evaluator; set PAWNSTAR_EVALFILE to a valid net.\n";
-        return 1;
+        const std::size_t embedded_size =
+            static_cast<std::size_t>(pawnstar_embedded_net_end - pawnstar_embedded_net);
+        std::cout << "info string NNUE: file load failed; falling back to the embedded net (" << embedded_size
+                  << " bytes)\n";
+        if (!game.NnueNetwork().LoadFromMemory(pawnstar_embedded_net, embedded_size, "embedded"))
+        {
+            std::cout << "info string FATAL: could not load the NNUE net from '" << net_path
+                      << "' or the embedded fallback. The build may be corrupt.\n";
+            return 1;
+        }
     }
     DebugXClear();
     std::cout << "ready\n";

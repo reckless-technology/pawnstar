@@ -33,6 +33,10 @@ SOURCES             = $(ENGINE_SOURCES) main.cpp
 ENGINE_OBJECTS      = $(addprefix $(BUILD_DIR)/, $(ENGINE_SOURCES:.cpp=.o))
 OBJECTS             = $(ENGINE_OBJECTS) $(BUILD_DIR)/main.o
 DEPS                = $(OBJECTS:.o=.d)
+# The shipped NNUE net embedded into the engine binary (.incbin) as a runtime-load fallback. Linked into
+# the engine executable only — the test binaries load nets explicitly and don't need it.
+EMBED_NET           = nnue/pawnstar-v7.bin
+EMBED_OBJECT        = $(BUILD_DIR)/embedded_net.o
 
 TEST_PERFT_EXE      = $(BUILD_DIR)/test_perft
 TEST_SEE_EXE        = $(BUILD_DIR)/test_see
@@ -87,7 +91,7 @@ clean:
 	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) \
 	      $(TOOL_GENDATA_EXE) $(BUILD_DIR)/gen_data.o $(BUILD_DIR)/gen_data.d \
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
-	      $(OBJECTS) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
+	      $(OBJECTS) $(EMBED_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
 	      $(GENERATED_DATA) $(GENERATOR_EXE)
 
 gen: prep $(GENERATOR_EXE)
@@ -108,9 +112,14 @@ $(BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp
 $(BUILD_DIR)/%.o: $(TOOLS_DIR)/%.cpp
 	$(CXX) -c $(CXXFLAGS) -MMD -MP -o $@ $<
 
-# Link the main executable.
-$(PROGRAM_EXE): $(OBJECTS)
-	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS)
+# Assemble the embedded net object (.incbin of the shipped net). Rebuilds if the net changes. Plain
+# compile — the C++ flags don't apply to the .S stub. The .incbin path is relative to the make cwd (root).
+$(EMBED_OBJECT): src/embedded_net.S $(EMBED_NET) | prep
+	$(CXX) -c -o $@ src/embedded_net.S
+
+# Link the main executable (with the embedded-net object).
+$(PROGRAM_EXE): $(OBJECTS) $(EMBED_OBJECT)
+	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS) $(EMBED_OBJECT)
 
 # Link test executables against all engine objects (no main.o).
 $(TEST_PERFT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/perft.o

@@ -78,9 +78,10 @@ help        list all commands
 ### The NNUE net
 
 NNUE is Pawnstar's **only** evaluator, so a net is required. At startup the engine loads the shipped net
-`nnue/pawnstar-v7.bin` (resolved relative to the working directory, like `pawnstar.book`). If the net
-cannot be loaded it prints an error and **exits** — so **run the engine from the repository root** (or set
-`PAWNSTAR_EVALFILE`) so the default net is found. To use a different net:
+`nnue/pawnstar-v7.bin` (resolved relative to the working directory, like `pawnstar.book`). If that file
+can't be loaded (wrong cwd, missing/renamed file), the engine **falls back to a copy of the net embedded
+in the binary** at build time, so it always has a working evaluator; it only errors out if both the file
+and the embedded copy fail. To use a different net:
 
 ```
 setoption name EvalFile value /path/to/net.bin      # load a different net at runtime
@@ -262,9 +263,9 @@ above) and to prune losing captures in quiescence, and is covered by `test_see`.
 ### NNUE evaluation
 
 Pawnstar evaluates exclusively with an **NNUE** (Efficiently Updatable Neural Network) — a neural net
-trained to score positions. It is the engine's only evaluator: the shipped net is loaded at startup (the
-engine exits if it cannot be loaded), and a different net can be loaded at runtime (see
-[The NNUE net](#the-nnue-net) above).
+trained to score positions. It is the engine's only evaluator: the shipped net is loaded at startup (with
+a copy embedded in the binary as a fallback if the file can't be loaded), and a different net can be
+loaded at runtime (see [The NNUE net](#the-nnue-net) above).
 
 **How it works.** The network ([src/nnue.cpp](src/nnue.cpp), [src/nnue.h](src/nnue.h)) is a
 "perspective" net using bullet's king-bucketed `ChessBuckets` feature set:

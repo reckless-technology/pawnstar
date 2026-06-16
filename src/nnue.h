@@ -113,9 +113,16 @@ struct Accumulator
 class Network
 {
   public:
-    /// @brief Load quantised weights from a bullet native .bin. On failure logs to stderr and stays unloaded.
+    /// @brief Load quantised weights from a bullet native .bin file. On failure logs to stderr and stays
+    /// unloaded. Reads the file into memory and defers to LoadFromMemory.
     /// @param path Path to the net file. @return true on success.
     bool Load(const std::string &path);
+
+    /// @brief Load quantised weights from an in-memory image of a net file (stamped or raw), using the same
+    /// header detection and architecture validation as Load. Used for the engine's embedded fallback net.
+    /// @param data Pointer to the net image. @param size Image size in bytes.
+    /// @param origin Label for log messages (e.g. a path or "embedded"). @return true on success.
+    bool LoadFromMemory(const std::uint8_t *data, std::size_t size, const std::string &origin);
 
     /// @brief Whether a network has been successfully loaded (evaluation is only usable when true).
     /// @return true if a net is loaded.

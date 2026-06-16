@@ -3,9 +3,9 @@
 Pawnstar evaluates **exclusively** with an **NNUE** (Efficiently Updatable Neural Network) — it is the
 engine's only evaluator (the former hand-crafted evaluation, "HCE", was removed). At startup the engine
 loads the shipped net `nnue/pawnstar-v7.bin` (relative to the working directory) and evaluates with it;
-if the net cannot be loaded there is no fallback, so the engine prints an error and exits. This document
-is the complete reference for how the net works, how to load a net, and how to generate data, train,
-validate and strength-test a net.
+if that file can't be loaded the engine falls back to a copy of the net embedded in the binary (§3), and
+errors out only if both fail. This document is the complete reference for how the net works, how to load a
+net, and how to generate data, train, validate and strength-test a net.
 
 The shipped net (`pawnstar-v7.bin`) is a 512-wide, **4-king-bucket** `ChessBuckets` net. §1, §2 and §6
 describe that architecture; §7 has the lineage (including the retired Chess768 nets and the rejected
@@ -105,7 +105,12 @@ and were headerless; a king-bucket engine cannot load them.)
 ## 3. Using a net in the engine
 
 A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v7.bin` (cwd-relative) at
-startup and exits if it cannot. To use a *different* net, point the engine at it — at launch:
+startup. **Embedded fallback:** a byte-identical copy of the shipped net is compiled into the engine
+binary (`src/embedded_net.S` `.incbin`'s `nnue/pawnstar-v7.bin`; linked into the engine only, not the test
+binaries). If the on-disk file can't be loaded — wrong cwd, missing or renamed file, or a stamped net that
+fails architecture validation — the engine loads the embedded copy via `Network::LoadFromMemory` (same
+header detection/validation as `Network::Load`), so it always has a working evaluator; it exits only if
+both the file and the embedded copy fail. To use a *different* net, point the engine at it — at launch:
 
 ```bash
 PAWNSTAR_EVALFILE=/path/to/net.bin ./build/pawnstar
@@ -400,7 +405,8 @@ cut -d'|' -f1 test/nnue_reference.txt > /tmp/fens.txt          # reuse the exist
 #    The search is single-threaded/deterministic per depth; the accepted set is the union over depths 8-11.
 #    (Transcribe each position's got= move into test/bratko_kopec_cases.h, then verify 24/24 at each depth.)
 for d in 8 9 10 11; do ./build/test_bratko_kopec_nnue nnue/pawnstar-v7.bin $d | grep -E 'pos|solved'; done
-make clean && make check                                       # all suites green with the new net
+make clean && make check          # all suites green; this also re-embeds the new net (src/embedded_net.S
+                                  # .incbin's nnue/pawnstar-v7.bin, a Makefile prerequisite of the engine)
 
 # 8. Strength-test vs the previous net (BASELINE_NET) at fixed depth and time control.
 BASELINE_NET=/path/to/previous-net.bin tools/run_sprt.sh nnue/pawnstar-v7.bin /path/to/openings.epd 1000 8

@@ -8,6 +8,7 @@
 #include <cstring>
 #include <fstream>
 #include <utility>
+#include <vector>
 
 #if defined(__AVX2__)
 #include <immintrin.h>
@@ -164,24 +165,39 @@ bool Network::Load(const std::string &path)
     }
     const std::streamoff size = in.tellg();
     in.seekg(0);
+    std::vector<std::uint8_t> buffer(static_cast<std::size_t>(size < 0 ? 0 : size));
+    if (!buffer.empty())
+    {
+        in.read(reinterpret_cast<char *>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+    }
+    if (!in)
+    {
+        std::fprintf(stderr, "info string NNUE: error reading net file '%s'\n", path.c_str());
+        return false;
+    }
+    return LoadFromMemory(buffer.data(), buffer.size(), path);
+}
+
+bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, const std::string &origin)
+{
+    loaded_ = false;
 
     // Two accepted layouts:
-    //  (1) A Pawnstar-stamped file: a 32-byte NetHeader (magic + architecture) followed by the payload.
+    //  (1) A Pawnstar-stamped image: a 32-byte NetHeader (magic + architecture) followed by the payload.
     //      Every architecture field is checked against this engine's constants, so an incompatible net is
     //      rejected with a clear message instead of being silently misread.
     //  (2) Raw bullet output (no header): accepted only when its size matches the expected payload exactly
     //      (within bullet's <64-byte trailing-tensor padding). This exact window — not the old `>=` — is
     //      what stops a *larger* (e.g. wider) net being silently misread.
-    std::streamoff payload_offset = 0;
-    NetHeader      header{};
-    if (static_cast<std::size_t>(size) >= sizeof(NetHeader))
+    std::size_t payload_offset = 0;
+    NetHeader   header{};
+    if (size >= sizeof(NetHeader))
     {
-        in.read(reinterpret_cast<char *>(&header), sizeof(header));
-        in.seekg(0);
+        std::memcpy(&header, data, sizeof(header));
     }
     if (std::memcmp(header.magic, kNetMagic, sizeof(kNetMagic)) == 0)
     {
-        // Stamped file: validate the architecture fields against this build.
+        // Stamped image: validate the architecture fields against this build.
         const NetHeader expected = ExpectedNetHeader();
         if (header.format_version != expected.format_version || header.input_size != expected.input_size ||
             header.king_buckets != expected.king_buckets || header.hidden_size != expected.hidden_size ||
@@ -191,7 +207,7 @@ bool Network::Load(const std::string &path)
                          "info string NNUE: net '%s' is incompatible — file is "
                          "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d, engine expects "
                          "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d\n",
-                         path.c_str(), header.format_version, header.input_size, header.king_buckets,
+                         origin.c_str(), header.format_version, header.input_size, header.king_buckets,
                          header.hidden_size, header.qa, header.qb, header.scale, expected.format_version,
                          expected.input_size, expected.king_buckets, expected.hidden_size, expected.qa, expected.qb,
                          expected.scale);
@@ -203,30 +219,36 @@ bool Network::Load(const std::string &path)
     {
         // Headerless raw bullet net: require the payload size exactly (bullet pads the trailing tensor up
         // to a 64-byte boundary, so allow up to 63 bytes of trailing padding, but no more and no less).
-        const std::size_t sz = static_cast<std::size_t>(size);
-        if (sz < kNetFileBytes || sz >= kNetFileBytes + 64)
+        if (size < kNetFileBytes || size >= kNetFileBytes + 64)
         {
             std::fprintf(stderr,
-                         "info string NNUE: net '%s' is %lld bytes, expected %zu (raw, unstamped) — wrong "
+                         "info string NNUE: net '%s' is %zu bytes, expected %zu (raw, unstamped) — wrong "
                          "architecture or format\n",
-                         path.c_str(), static_cast<long long>(size), kNetFileBytes);
+                         origin.c_str(), size, kNetFileBytes);
             return false;
         }
     }
 
-    in.seekg(payload_offset);
-    // Read in bullet's save order: feature_weights, feature_bias, output_weights, output_bias.
-    in.read(reinterpret_cast<char *>(feature_weights_.data()), feature_weights_.size() * sizeof(int16_t));
-    in.read(reinterpret_cast<char *>(feature_bias_.data()), feature_bias_.size() * sizeof(int16_t));
-    in.read(reinterpret_cast<char *>(output_weights_.data()), output_weights_.size() * sizeof(int16_t));
-    in.read(reinterpret_cast<char *>(&output_bias_), sizeof(output_bias_));
-    if (!in)
+    // The packed payload (feature_weights, feature_bias, output_weights, output_bias) is exactly
+    // kNetFileBytes; the image may have a header before it and bullet padding after it.
+    if (size < payload_offset + kNetFileBytes)
     {
-        std::fprintf(stderr, "info string NNUE: net file '%s' truncated\n", path.c_str());
+        std::fprintf(stderr, "info string NNUE: net '%s' truncated\n", origin.c_str());
         return false;
     }
+
+    // Copy in bullet's save order: feature_weights, feature_bias, output_weights, output_bias.
+    const std::uint8_t *p = data + payload_offset;
+    std::memcpy(feature_weights_.data(), p, feature_weights_.size() * sizeof(int16_t));
+    p += feature_weights_.size() * sizeof(int16_t);
+    std::memcpy(feature_bias_.data(), p, feature_bias_.size() * sizeof(int16_t));
+    p += feature_bias_.size() * sizeof(int16_t);
+    std::memcpy(output_weights_.data(), p, output_weights_.size() * sizeof(int16_t));
+    p += output_weights_.size() * sizeof(int16_t);
+    std::memcpy(&output_bias_, p, sizeof(output_bias_));
+
     loaded_ = true;
-    std::fprintf(stderr, "info string NNUE: loaded net '%s'\n", path.c_str());
+    std::fprintf(stderr, "info string NNUE: loaded net '%s'\n", origin.c_str());
     return true;
 }
 
