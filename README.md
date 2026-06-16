@@ -35,7 +35,7 @@ make clean     # remove build artifacts and generated docs
 ```
 
 A pre-compilation step builds and runs `generate_constants/generate_constants.cpp`, which emits
-`src/generated_data.cpp` (the precomputed bitboard, Zobrist and pawn-structure tables). This file is
+`src/generated_data.cpp` (the precomputed bitboard attack and Zobrist tables). This file is
 gitignored and regenerated on every build.
 
 Debug build with AddressSanitizer + UndefinedBehaviorSanitizer:
@@ -278,8 +278,8 @@ The 768 base inputs are (piece colour × piece type × square). Each perspective
 banks** by its own king's square (a file/rank quadrant map), so the feature row is `bucket*768 + base`.
 Two accumulators are built — one from the side-to-move's perspective and one from the opponent's (board
 vertically mirrored) — passed through a squared-clipped-ReLU activation and a single output layer that
-produces a centipawn score. `EvaluatePosition` branches to the net when NNUE is enabled, bypassing the
-hand-crafted terms. The network is an `nnue::Network` instance owned by the `Game` (no globals),
+produces a centipawn score. `EvaluatePosition` evaluates with the net directly (after a draw
+short-circuit) — NNUE is the only evaluator. The network is an `nnue::Network` instance owned by the `Game` (no globals),
 read-only after load and shared by all search threads. Its accumulator is **maintained incrementally**
 across make/undo on each thread's `SearchState` — only the feature columns for the pieces that moved are
 updated — except when a king crosses a bucket boundary, which rebuilds that one perspective's
@@ -407,7 +407,7 @@ A few deliberate choices shape the codebase:
   fixed-capacity stack containers. The per-search hash history is a `std::vector` reserved once when the
   `SearchState` is constructed, and the game history is a `std::vector` that grows only as real moves are
   played — so the node-by-node search loop itself performs no dynamic allocation.
-- **Everything precomputed that can be.** Attack tables, Zobrist keys and pawn-structure masks are
+- **Everything precomputed that can be.** Attack tables and Zobrist keys are
   emitted at build time by `generate_constants`, so the engine binary starts instantly and the hot
   paths are pure lookups.
 - **Lockless sharing.** Under Lazy SMP the transposition tables and the cancellation flag are the only
