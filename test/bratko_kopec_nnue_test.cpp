@@ -1,9 +1,9 @@
 /// @file bratko_kopec_nnue.cpp Bratko-Kopec search-quality suite using the NNUE evaluation.
 ///
-/// It searches the 24 positions in bratko_kopec_cases.h with the NNUE evaluator and checks the *move* (the
-/// classic Bratko-Kopec metric — did the engine find a good move). A position is "solved" when the move
-/// found is among that position's accepted moves (the set of best moves the engine produces over depths
-/// 8–11; see bratko_kopec_cases.h). The search is forced single-threaded (`PAWNSTAR_THREADS=1`) so it is
+/// It searches the 24 positions in the kCases array (defined below) with the NNUE evaluator and checks the
+/// *move* (the classic Bratko-Kopec metric — did the engine find a good move). A position is "solved" when
+/// the move found is among that position's accepted moves (the set of best moves the engine produces over
+/// depths 8–11; see kCases below). The search is forced single-threaded (`PAWNSTAR_THREADS=1`) so it is
 /// deterministic, and the suite is a hard gate: it must solve all 24.
 ///
 /// The net is taken from argv[1]; with no argument the suite is skipped (so `make check` stays green when

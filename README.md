@@ -291,16 +291,16 @@ incompatible net is rejected rather than misread (see [nnue/README.md](nnue/READ
 
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
 [nnue/README.md](nnue/README.md). The shipped nets are trained on **public PlentyChess** bulletformat
-data (strong-engine labels), using the bullet trainer (GPU or CPU); Pawnstar self-play
-(`tools/run_gendata.sh`) is the original bootstrap source. The minimal flow:
+data (strong-engine labels), using the bullet trainer (GPU or CPU). The minimal flow:
 
 ```bash
 tools/setup_bullet.sh                                       # clone + register the bullet trainer (pinned commit)
-tools/run_experiment.sh ~/pawnstar_nnue/shuffled.data net.bin   # train, verify, then SPRT (set OPENINGS=...)
+OPENINGS=~/openings.epd \
+  tools/run_experiment.sh ~/pawnstar_nnue/shuffled.data net.bin   # train, verify, then SPRT
 ```
 
-`run_experiment.sh` accepts either a self-play shard directory or an already-converted bulletformat
-`.data` file; it produces `net.bin`, **verifies** it (`tools/verify_net.sh`: engine inference vs the
+`run_experiment.sh` takes an already-converted bulletformat `.data` file (plus your own `OPENINGS`
+EPD book); it produces `net.bin`, **verifies** it (`tools/verify_net.sh`: engine inference vs the
 trainer, plus the incremental accumulator vs a full refresh), then runs the SPRT. Load the net with
 `setoption name EvalFile`. The same two checks are wired into `make check` via `test_nnue` and
 `test_nnue_incremental` (see [Test suite](#test-suite)); GPU training needs a CUDA toolkit and a driver
@@ -362,7 +362,7 @@ builds and runs seven standalone test executables:
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
 asserts the incremental accumulator matches a full refresh at every node, and `test_bratko_kopec_nnue`
 which searches the 24 BK positions with the net (single-threaded, deterministic) and **must solve all 24**
-— each position's best move must be in its accepted-move set in `test/bratko_kopec_cases.h`. The Makefile
+— each position's best move must be in its accepted-move set (the `kCases` array in `test/bratko_kopec_nnue_test.cpp`). The Makefile
 passes the net/reference via `$(wildcard …)`, so these degrade to a green no-op only if those files are
 absent. When you ship a new net, regenerate **both** `test/nnue_reference.txt` (bullet `pawnstar_eval`)
 and the BK accepted moves (the net-specific union over depths 8–11) — see [nnue/README.md](nnue/README.md)

@@ -2,7 +2,8 @@
 # End-to-end NNUE training pipeline. Trains a quantised net and exports it to a path the engine loads.
 #
 # Two input modes (auto-detected from the first argument):
-#   * a DIRECTORY of self-play text shards (data_*.txt / seed*.txt from run_gendata.sh) -> combined,
+#   * a DIRECTORY of text shards (data_*.txt / seed*.txt in bullet's "FEN | eval | wdl" text format)
+#     -> combined,
 #     converted to bulletformat, and shuffled before training; or
 #   * an already-converted bulletformat .data FILE (e.g. public PlentyChess data, already shuffled) ->
 #     trained directly, skipping the combine/convert/shuffle steps.

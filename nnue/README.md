@@ -132,18 +132,15 @@ net is a single `nnue::Network` instance owned by the `Game` (UCI `setoption` ro
 
 | file | purpose |
 |------|---------|
-| `gen_data.cpp`            | self-play data generator (built by `make tools` → `build/gen_data`) |
 | `stamp_net.cpp`           | prepend the self-describing `NetHeader` to a raw bullet net (`make tools` → `build/stamp_net`) |
-| `run_gendata.sh`          | launch N parallel self-play shards |
 | `setup_bullet.sh`         | clone bullet at the pinned commit + install/register our trainer examples |
 | `bullet/pawnstar.rs`      | the trainer (arch `768×4 king-bucketed → 512×2 → 1`, SCReLU, QA/QB/SCALE) |
 | `bullet/pawnstar_eval.rs` | reference evaluator for the `test_nnue` cross-check |
-| `make_openings.sh`        | build an EPD openings book from self-play data |
-| `train_pipeline.sh`       | train → export a net, from either self-play text shards or a bulletformat `.data` |
+| `train_pipeline.sh`       | train → export a net from a bulletformat `.data` file (or a directory of text shards) |
 | `verify_net.sh`           | cross-check (engine == trainer) + incremental-accumulator gate for a trained net |
 | `run_sprt.sh`             | SPRT / match: net-vs-net (set `BASELINE_NET`), at fixed depth or time control |
 | `rate.sh`                 | anchored absolute-Elo estimate vs rated reference engines (you supply the opponent binaries) |
-| `run_experiment.sh`       | one-shot: openings + train + **verify** + SPRT from an existing dataset |
+| `run_experiment.sh`       | one-shot: train + **verify** + SPRT from an existing `.data` dataset |
 
 **Prerequisites:** `clang++`/`make` (engine), Rust/`cargo` (bullet), `fastchess` on `PATH` (SPRT). For
 GPU training, a CUDA toolkit (`CUDA_PATH`, default `~/cuda-12.2`) **and** a driver new enough for the
@@ -154,59 +151,42 @@ training is practical.
 ## 5. Quick start (minimal retrain)
 
 ```bash
-tools/setup_bullet.sh                                   # once: clone + register bullet (pinned commit)
-make tools                                              # build build/gen_data
-tools/run_gendata.sh ~/pawnstar_nnue/data 12 100000 8   # 12 procs, depth-8 self-play (pkill -x gen_data to stop)
-tools/run_experiment.sh ~/pawnstar_nnue/data net.bin    # openings + train + SPRT  ->  net.bin
+tools/setup_bullet.sh                                          # once: clone + register bullet (pinned commit)
+OPENINGS=~/openings.epd \
+  tools/run_experiment.sh ~/pawnstar_nnue/shuffled.data net.bin   # train + verify + SPRT  ->  net.bin
 ```
 
-Then load `net.bin` in the engine (§3). To train on CPU: `BULLET_FEATURES="" tools/run_experiment.sh …`.
-`run_experiment.sh <data_dir | shuffled.data> <net.bin> [superbatches=40] [sprt_rounds=500] [depth=8]`
-chains `make_openings.sh` → `train_pipeline.sh` → `verify_net.sh` → `run_sprt.sh`. The first argument
-may also be an already-converted bulletformat `.data` file (how the shipped nets were trained — see §7);
-in that case there are no text shards to sample openings from, so supply your own with `OPENINGS=…`.
+Then load `net.bin` in the engine (§3). To train on CPU: `BULLET_FEATURES="" … tools/run_experiment.sh …`.
+`run_experiment.sh <shuffled.data> <net.bin> [superbatches=40] [sprt_rounds=500] [depth=8]` chains
+`train_pipeline.sh` → `verify_net.sh` → `run_sprt.sh`. The data argument is an already-converted
+bulletformat `.data` file (how the shipped nets were trained — see §7); it carries no FENs to sample
+openings from, so supply your own SPRT opening book with `OPENINGS=…`.
 
 ## 6. Step-by-step
 
-### Data generation
+### Data
 
-`build/gen_data <out_file> <num_games> <seed> [depth=8] [random_plies=8]` plays self-play games with the
-loaded NNUE net (`PAWNSTAR_EVALFILE`, default `nnue/pawnstar-v7.bin`) and writes one record per quiet position:
+The shipped nets are trained on **public PlentyChess** bulletformat data — a pre-converted, shuffled
+`.data` file (bullet `ChessBoard` records, 32 bytes each). That file is the input to training below.
 
-```
-<fen> | <white_relative_eval_cp> | <wdl>        # wdl: 1.0 win / 0.5 draw / 0.0 loss, White's POV
-```
-
-This is exactly the text format bullet's `convert --from text` expects (white-relative score and
-result). Details:
-
-- The search runs **single-threaded** (the driver forces `PAWNSTAR_THREADS=1`), so each process pins
-  one core and games are deterministic for a given seed — run many processes for throughput.
-- `random_plies` random opening moves per game add diversity (not recorded).
-- Only **quiet, not-in-check** positions with `|eval| < 3000` cp are recorded (clean targets).
-- Games end on checkmate/stalemate/50-move/repetition/insufficient-material, on resign adjudication
-  (`|score| > 1500` for 4 consecutive plies), or at a 200-ply cap (a data-quality bound — the engine's
-  game history is a dynamic `std::vector` now, so game length is no longer a correctness limit).
-
-`run_gendata.sh <out_dir> <num_processes> <games_per_process> <depth> [random_plies]` launches the
-shards (`data_<i>.txt` + `log_<i>.txt`). Throughput at depth 8 is ~8–9 positions/sec/core
-(~150k/hour across 12 cores); lower the depth for more, noisier data. Stop with `pkill -x gen_data` —
-partial shards are valid. `train_pipeline.sh` combines both freshly generated `data_*.txt` and any
-preserved `seed*.txt` shards in the directory, so you can keep earlier data by renaming its shards to
-`seed*.txt`.
+`train_pipeline.sh` also accepts a directory of text shards (`data_*.txt` / `seed*.txt`) in bullet's
+`convert --from text` format — one record per line, `<fen> | <white_relative_eval_cp> | <wdl>` (wdl:
+1.0 win / 0.5 draw / 0.0 loss, White's POV) — which it combines, converts, and shuffles. (Pawnstar's
+own self-play generator, which produced such shards, was the original bootstrap source and has been
+removed; bring text shards from any source in this format, or use a `.data` file directly.)
 
 ### Training
 
-`train_pipeline.sh <data_dir | shuffled.data> <out_net.bin> [end_superbatch=40]` auto-detects its input
+`train_pipeline.sh <shuffled.data | data_dir> <out_net.bin> [end_superbatch=40]` auto-detects its input
 from the first argument:
 
 1. ensures bullet is set up, builds `bullet-utils` and the trainer (`$BULLET_FEATURES`, default
    `--features cuda`);
 2. **if the argument is a `.data` file** (already bulletformat — e.g. public PlentyChess data, the way
    the shipped nets were trained), it is used directly and steps 3–4 are skipped; **if it is a
-   directory**, the self-play shards `data_*.txt` + `seed*.txt` are combined → `all.txt`,
+   directory**, the text shards `data_*.txt` + `seed*.txt` are combined → `all.txt`,
    `bullet-utils convert --from text` → `all.data` (bullet `ChessBoard`, 32 bytes/record), then
-   `bullet-utils shuffle` → `shuffled.data` (self-play data is highly correlated — shuffling matters);
+   `bullet-utils shuffle` → `shuffled.data` (correlated data needs shuffling);
 3. trains, computing `batches_per_superbatch = positions / 16384` so a superbatch ≈ one epoch;
 4. copies `<work_dir>/checkpoints/pawnstar-<end_superbatch>/quantised.bin` → `out_net.bin`, where
    `<work_dir>` is the data directory (text mode) or the `.data` file's directory (bulletformat mode).
@@ -220,9 +200,9 @@ gamma=0.3, step=SBS/3}`, `eval_scale=400`. Overridable via env: `PAWNSTAR_DATA`,
 
 ### Openings
 
-`make_openings.sh <data_dir> [out.epd] [count=1000]` samples distinct early-game positions
-(`fullmove <= 5`) from the shards into an EPD book, so matches start from varied, roughly balanced
-positions. Use at least `sprt_rounds` openings to avoid repeats.
+The SPRT needs an EPD opening book (`OPENINGS=…`) of varied, roughly balanced early-game positions so
+matches don't all start from the same spot. Supply your own — any standard EPD opening set works. Use at
+least `sprt_rounds` positions to avoid repeats.
 
 ### Validate inference (cross-check)
 
@@ -234,8 +214,8 @@ The engine's inference must reproduce the trainer's. Build the reference evaluat
 (cd ~/pawnstar_nnue/bullet/crates/bullet_lib && cargo build --release --example pawnstar_eval)
 EVAL=~/pawnstar_nnue/bullet/target/release/examples/pawnstar_eval
 
-# sample FENs from the data, get reference evals, compare with the engine
-awk -F' \\| ' 'NR%500==0 {print $1}' ~/pawnstar_nnue/data/data_*.txt | head -200 > fens.txt
+# get a FEN list (reuse the checked-in reference FENs; or supply your own, one FEN per line, both colours)
+cut -d'|' -f1 test/nnue_reference.txt > fens.txt
 "$EVAL" net.bin fens.txt > ref.txt
 ./build/test_nnue net.bin ref.txt        # expects: max |diff| <= 2 cp (quantisation rounding)
 ```
@@ -403,7 +383,8 @@ cut -d'|' -f1 test/nnue_reference.txt > /tmp/fens.txt          # reuse the exist
 
 # 7. Regenerate the Bratko-Kopec accepted moves for the new net (the eval changed), then full check.
 #    The search is single-threaded/deterministic per depth; the accepted set is the union over depths 8-11.
-#    (Transcribe each position's got= move into test/bratko_kopec_cases.h, then verify 24/24 at each depth.)
+#    (Transcribe each position's got= move into the kCases array in test/bratko_kopec_nnue_test.cpp, then
+#    verify 24/24 at each depth.)
 for d in 8 9 10 11; do ./build/test_bratko_kopec_nnue nnue/pawnstar-v7.bin $d | grep -E 'pos|solved'; done
 make clean && make check          # all suites green; this also re-embeds the new net (src/embedded_net.S
                                   # .incbin's nnue/pawnstar-v7.bin, a Makefile prerequisite of the engine)

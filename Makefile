@@ -10,7 +10,6 @@ GENERATOR_SOURCE    = src/generate_constants.cpp
 GENERATOR_EXE       = $(BUILD_DIR)/gen_constants
 TEST_DIR            = test
 TOOLS_DIR           = tools
-TOOL_GENDATA_EXE    = $(BUILD_DIR)/gen_data
 TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net
 TOOL_FILTERBOOK_EXE = $(BUILD_DIR)/filter_book
 
@@ -72,7 +71,7 @@ endif
 
 all: prep $(PROGRAM_EXE)
 
-tools: prep $(TOOL_GENDATA_EXE) $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE)
+tools: prep $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE)
 
 tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE)
 
@@ -93,7 +92,6 @@ prep:
 
 clean:
 	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) \
-	      $(TOOL_GENDATA_EXE) $(BUILD_DIR)/gen_data.o $(BUILD_DIR)/gen_data.d \
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
 	      $(TOOL_FILTERBOOK_EXE) $(BUILD_DIR)/filter_book.o $(BUILD_DIR)/filter_book.d \
 	      $(OBJECTS) $(EMBED_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
@@ -143,10 +141,6 @@ $(TEST_NNUE_INC_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_incremental_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(TEST_BOOK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/opening_book_test.o
-	$(CXX) $(CXXFLAGS) -o $@ $^
-
-# Link the self-play data generator against all engine objects.
-$(TOOL_GENDATA_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/gen_data.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 # Link the net-stamping tool (header-only use of nnue.h constants; no engine objects needed).
