@@ -42,7 +42,7 @@ TEST_NNUE_EXE       = $(BUILD_DIR)/test_nnue
 TEST_NNUE_INC_EXE   = $(BUILD_DIR)/test_nnue_incremental
 # Shipped net + checked-in trainer reference, used by `make check` to exercise NNUE inference and the
 # incremental accumulator. Resolved with wildcard so the checks degrade to a no-op (still green) if absent.
-NNUE_NET            = $(wildcard nnue/pawnstar-v4.bin)
+NNUE_NET            = $(wildcard nnue/pawnstar-v6.bin)
 NNUE_REF            = $(wildcard test/nnue_reference.txt)
 TEST_OBJECTS        = $(BUILD_DIR)/perft.o \
                       $(BUILD_DIR)/see.o \

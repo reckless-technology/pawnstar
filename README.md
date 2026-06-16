@@ -78,7 +78,7 @@ help        list all commands
 
 ### Enabling NNUE evaluation
 
-NNUE is **on by default**: at startup the engine loads the shipped net `nnue/pawnstar-v4.bin` (resolved
+NNUE is **on by default**: at startup the engine loads the shipped net `nnue/pawnstar-v6.bin` (resolved
 relative to the working directory, like `pawnstar.book`) and evaluates with it. If the net isn't found it
 logs a notice and falls back to the hand-crafted evaluation. **Run the engine from the repository root**
 (or set `EvalFile`) so the default net is found. To use a different net or toggle NNUE at runtime:
@@ -273,11 +273,6 @@ Neural Network) — a small neural net trained to score positions. It is **on by
 is loaded at startup) and switchable at runtime (see
 [Enabling NNUE evaluation](#enabling-nnue-evaluation) above); the hand-crafted eval is the fallback.
 
-> **Branch note (`kingbuckets-4`):** this branch is the king-buckets experiment — it uses bullet's
-> king-bucketed `ChessBuckets` feature set (4 buckets) and so cannot load the shipped Chess768 net. The
-> description below reflects this branch. `main` ships the Chess768 512-wide `nnue/pawnstar-v4.bin`
-> described under "Shipped net" below; a king-bucket net ships only if its SPRT vs v4 wins.
-
 **How it works.** The network ([src/nnue.cpp](src/nnue.cpp), [src/nnue.h](src/nnue.h)) is a
 "perspective" net using bullet's king-bucketed `ChessBuckets` feature set:
 
@@ -317,13 +312,16 @@ trainer, plus the incremental accumulator vs a full refresh), then runs the SPRT
 supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""` to train on CPU. Because NNUE scores differ
 from the hand-crafted scores, NNUE strength is measured by game play (SPRT), not by `test_bratko_kopec`.
 
-**Shipped net.** [nnue/pawnstar-v4.bin](nnue/pawnstar-v4.bin) (on `main`) is a 512-wide **Chess768** net
-trained on ~60M positions of **public PlentyChess** data that beats the HCE by a wide margin. Lineage,
+**Shipped net.** [nnue/pawnstar-v6.bin](nnue/pawnstar-v6.bin) is a 512-wide, **4-king-bucket** net
+trained on ~818M positions of **public PlentyChess** data that beats the HCE by a wide margin. Lineage,
 all SPRT-measured: Pawnstar self-play *lost* to the HCE (label quality, not quantity, was the lever);
 scaling that data ~12× gave nothing (capacity-limited); **doubling the width 256→512 added +55 Elo (fixed
 depth) / +71 (time control)** — that is v4; doubling again to **1024 gave ~0 at fixed depth and −74 on the
-clock** (rejected — 60M saturates the 512 net). The current experiment (this branch) adds **king buckets**
-to the 512 arch, pending its SPRT vs v4. See [nnue/README.md §7](nnue/README.md) for the full lineage and
+clock** (rejected — 60M saturates the 512 net). **King buckets were flat on 60M (data-starved) but on
+~818M gave +47 fixed depth and +17 on the clock** — the v6 net — once two speed fixes (an 8 MB lockless
+eval cache and a single-pass accumulator update) clawed back the wider table's per-move cost. The Chess768
+v4 net was retired when v6 shipped (a king-bucket engine cannot load it). See
+[nnue/README.md §7](nnue/README.md) for the full lineage and
 exact recreation steps.
 
 ### Opening book
@@ -363,7 +361,7 @@ builds and runs seven standalone test executables:
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
 
-`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v4.bin`: `test_nnue` against the
+`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v6.bin`: `test_nnue` against the
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
 asserts the incremental accumulator matches a full refresh at every node, and `test_bratko_kopec_nnue`
 which searches the 24 BK positions with the net (single-threaded, deterministic) and reports how many of
@@ -435,7 +433,7 @@ Pawnstar has no official CCRL rating. The figures currently tracked are:
 - **Move generation** — roughly 700 million legal moves per second on a modern laptop core.
 - **Bratko-Kopec** — 24/24 at every depth from 8 through 12 (the default depth 8 runs in `make check`).
 - **Strength (rough).** The hand-crafted evaluation measures ~2350 Elo (CCRL-ballpark, anchored against
-  reference engines at a fast time control). `nnue/pawnstar-v4.bin` beats the HCE by a large margin at
+  reference engines at a fast time control). `nnue/pawnstar-v6.bin` beats the HCE by a large margin at
   fixed depth. At equal *time*, the incremental accumulator is worth ~+80 Elo over a full refresh and the
   AVX2 SIMD kernels a further ~+180 Elo over the scalar versions (both by SPRT).
 

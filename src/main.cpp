@@ -51,7 +51,7 @@ int main()
     // disables NNUE. UCI setoption (UseNNUE / EvalFile) also works. If the net can't be loaded, the
     // engine falls back to the handcrafted evaluation.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
-    const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v4.bin";
+    const std::string net_path  = eval_file ? eval_file : "nnue/pawnstar-v6.bin";
     const bool        net_loaded = game.NnueNetwork().Load(net_path);
     const char       *use_env   = std::getenv("PAWNSTAR_NNUE");
     const bool        use_nnue =
