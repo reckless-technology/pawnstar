@@ -40,18 +40,6 @@ class Position
     /// @return The resulting position.
     Position MakeNullMove() const;
 
-    /// @brief Whether the side that just moved left its own king safe (position is legal).
-    /// @return true if the position is legal.
-    bool IsLegal() const;
-
-    /// @brief Whether the side to move is checkmated.
-    /// @return true if checkmate.
-    bool IsCheckmate() const;
-
-    /// @brief Whether the side to move is stalemated.
-    /// @return true if stalemate.
-    bool IsStalemate() const;
-
     /// @brief Whether the position is a draw by insufficient material.
     /// @return true if drawn by material.
     bool IsDrawByMaterial() const;
@@ -81,30 +69,6 @@ class Position
     constexpr bool IsAttacked(Square s, Color c) const
     {
         return AttacksTo(s, c).IsNotEmpty();
-    }
-
-    /// @brief Whether white may castle kingside. @return true if allowed.
-    constexpr bool MayWhiteCastleKingside() const
-    {
-        return castling_rights_.MayWhiteCastleKingside();
-    }
-
-    /// @brief Whether white may castle queenside. @return true if allowed.
-    constexpr bool MayWhiteCastleQueenside() const
-    {
-        return castling_rights_.MayWhiteCastleQueenside();
-    }
-
-    /// @brief Whether black may castle kingside. @return true if allowed.
-    constexpr bool MayBlackCastleKingside() const
-    {
-        return castling_rights_.MayBlackCastleKingside();
-    }
-
-    /// @brief Whether black may castle queenside. @return true if allowed.
-    constexpr bool MayBlackCastleQueenside() const
-    {
-        return castling_rights_.MayBlackCastleQueenside();
     }
 
     /// @brief Whether the last move was a null move. @return true if a null move.
@@ -328,12 +292,13 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
         {
             if constexpr (color == kWhite)
             {
-                if (MayWhiteCastleKingside() && (occupied_squares & (Bitboard("F1") | Bitboard("G1"))).IsEmpty() &&
-                    !IsAttacked("F1", kBlack) && !IsAttacked("G1", kBlack))
+                if (castling_rights_.MayWhiteCastleKingside() &&
+                    (occupied_squares & (Bitboard("F1") | Bitboard("G1"))).IsEmpty() && !IsAttacked("F1", kBlack) &&
+                    !IsAttacked("G1", kBlack))
                 {
                     moves.push_back(Move::Castling("E1", "G1"));
                 }
-                if (MayWhiteCastleQueenside() &&
+                if (castling_rights_.MayWhiteCastleQueenside() &&
                     (occupied_squares & (Bitboard("B1") | Bitboard("C1") | Bitboard("D1"))).IsEmpty() &&
                     !IsAttacked("D1", kBlack) && !IsAttacked("C1", kBlack))
                 {
@@ -342,12 +307,13 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             }
             else
             {
-                if (MayBlackCastleKingside() && (occupied_squares & (Bitboard("F8") | Bitboard("G8"))).IsEmpty() &&
-                    !IsAttacked("F8", kWhite) && !IsAttacked("G8", kWhite))
+                if (castling_rights_.MayBlackCastleKingside() &&
+                    (occupied_squares & (Bitboard("F8") | Bitboard("G8"))).IsEmpty() && !IsAttacked("F8", kWhite) &&
+                    !IsAttacked("G8", kWhite))
                 {
                     moves.push_back(Move::Castling("E8", "G8"));
                 }
-                if (MayBlackCastleQueenside() &&
+                if (castling_rights_.MayBlackCastleQueenside() &&
                     (occupied_squares & (Bitboard("B8") | Bitboard("C8") | Bitboard("D8"))).IsEmpty() &&
                     !IsAttacked("D8", kWhite) && !IsAttacked("C8", kWhite))
                 {

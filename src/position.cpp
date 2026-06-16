@@ -362,21 +362,6 @@ bool Position::IsDrawByMaterial() const
     }
 }
 
-/// @brief Determine if the current position state is a legal chess position:
-/// a) each side shall have strictly 1 king
-/// b) kings shall not be adjacent
-/// c) the side not on move shall not be in check
-/// @return true if legal
-bool Position::IsLegal() const
-{
-    const Color    color      = ColorToMove();
-    const Bitboard white_king = pieces[kKing] & colors[kWhite];
-    const Bitboard black_king = pieces[kKing] & colors[kBlack];
-    return white_king.PopCount() == 1 && black_king.PopCount() == 1 && white_king != black_king &&
-           (kKingAttacks[white_king.Lsb()] & black_king).IsEmpty() &&
-           !IsAttacked(king_location_[EnemyOf(color)], color);
-}
-
 /// @brief Compute the Zobrist hash for a chess position.
 /// @return the 64 bit hash
 constexpr zobrist_t Position::ComputeHash() const
@@ -399,18 +384,4 @@ constexpr zobrist_t Position::ComputeHash() const
         }
     }
     return hash;
-}
-
-/// @brief Whether the side to move is stalemated (not in check, no legal moves).
-/// @return true if stalemate.
-bool Position::IsStalemate() const
-{
-    return !IsInCheck() && GenerateLegalMoves().size() == 0;
-}
-
-/// @brief Whether the side to move is checkmated (in check, no legal moves).
-/// @return true if checkmate.
-bool Position::IsCheckmate() const
-{
-    return IsInCheck() && GenerateLegalMoves().size() == 0;
 }

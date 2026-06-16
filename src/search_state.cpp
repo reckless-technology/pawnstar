@@ -125,7 +125,7 @@ bool SearchState::IsDrawByFiftyMoves() const
 
 /// @brief Check for three-fold repetition using the compact hash history.
 /// Walks backwards through hash_stack_ two entries at a time (same side to move),
-/// starting four half-moves before the current position, matching the logic in Game::IsDrawByRepetition.
+/// starting four half-moves before the current position.
 bool SearchState::IsDrawByRepetition() const
 {
     const zobrist_t hash        = CurrentPosition().Hash();

@@ -97,15 +97,6 @@ class Game
     /// Returns a book move immediately on a book hit; otherwise runs the Lazy SMP iterative-deepening search.
     /// @return The best move, or Move::None if there are no legal moves.
     Move SearchRootNode();
-    /// @brief Whether the game has ended (checkmate, stalemate or draw).
-    /// @return true if the game is over.
-    bool IsGameOver() const;
-    /// @brief Whether the current position is a draw by threefold repetition.
-    /// @return true if drawn by repetition.
-    bool IsDrawByRepetition() const;
-    /// @brief Whether the current position is a draw by the fifty-move rule.
-    /// @return true if drawn by the fifty-move rule.
-    bool IsDrawByFiftyMoves() const;
 
   private:
     void                  SearchThreadEntry(); ///< Entry point of the search worker thread.

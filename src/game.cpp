@@ -56,42 +56,6 @@ void Game::UndoMove()
     positions_.pop_back();
 }
 
-/// @brief Determine if the game is a draw by the 50 move rule.
-/// @return true if 50 move draw.
-bool Game::IsDrawByFiftyMoves() const
-{
-    if (CurrentPosition().ReversibleMoveCount() >= 100)
-    {
-        INCREMENT("draws by 50 moves");
-        return true;
-    }
-    return false;
-}
-
-/// @brief Determine if the game is a draw by repetition.
-/// @return true if draw by repetition.
-bool Game::IsDrawByRepetition() const
-{
-    int             repetitions = 2;
-    const zobrist_t hash        = CurrentPosition().Hash();
-    // Start looking 4 half moves back, i.e. 2 moves ago, for repeated positions. Index-based so an early
-    // game (fewer than 5 positions) simply skips the loop rather than forming an out-of-range iterator.
-    for (int i = (int)positions_.size() - 5; i >= 0; i -= 2)
-    {
-        const Position &pos = positions_[i];
-        if (pos.Hash() == hash && --repetitions == 0)
-        {
-            INCREMENT("draws by repetition Game");
-            return true;
-        }
-        if (pos.ReversibleMoveCount() == 0)
-        {
-            return false;
-        }
-    }
-    return false;
-}
-
 /// @brief Play a move from the given string and update game state accordingly.
 /// @param move_str The string containing the move to be made, e.g. "e2e4", "e7e8q" (promotion), "e1g1" (castling).
 /// @return The move which was made, or Move::None in the case the string did not contain a legal move for this
@@ -110,38 +74,6 @@ Move Game::PlayMove(std::string_view move_str)
     return Move::None();
 }
 
-/// @brief Check to see for the end of the game.
-/// @return true if the game is over.
-bool Game::IsGameOver() const
-{
-    if (CurrentPosition().IsCheckmate())
-    {
-        std::cout << (CurrentPosition().ColorToMove() == kBlack ? "1-0 {white mates}\n" : "0-1 {black mates}\n");
-        return true;
-    }
-    if (CurrentPosition().IsStalemate())
-    {
-        std::cout << "1/2-1/2 {stalemate}\n";
-        return true;
-    }
-    if (IsDrawByRepetition())
-    {
-        std::cout << "1/2-1/2 {draw by repetition}\n";
-        return true;
-    }
-    if (CurrentPosition().IsDrawByMaterial())
-    {
-        std::cout << "1/2-1/2 {draw by insufficient material}\n";
-        return true;
-    }
-    if (IsDrawByFiftyMoves())
-    {
-        std::cout << "1/2-1/2 {draw by 50 reversible moves}\n";
-        return true;
-    }
-    return false;
-}
-
 /// @brief Entry point for the search worker thread.
 void Game::SearchThreadEntry()
 {
@@ -150,7 +82,6 @@ void Game::SearchThreadEntry()
     {
         PlayMove(move);
         std::cout << std::format("bestmove {}\n", move.ToString());
-        IsGameOver();
     }
 }
 
