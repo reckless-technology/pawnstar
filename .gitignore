@@ -1,4 +1,5 @@
 build/
+doc/html/
 src/generated_data.cpp
 generate_constants/gen_constants
 
