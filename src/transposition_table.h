@@ -69,6 +69,13 @@ class TranspositionTable
     void                         Age();
     std::pair<std::size_t, int>  UsageStats() const;
 
+    /// @brief Prefetch the cell a future FindTransposition(@p hash) will read, hiding the cache-miss
+    /// latency of the random table access. Result-neutral. @param hash Zobrist hash to be probed soon.
+    void Prefetch(zobrist_t hash) const
+    {
+        __builtin_prefetch(&table_[hash % size_], 0 /*read*/, 1 /*low temporal locality*/);
+    }
+
   private:
     /// @brief One lockless table cell. Stores @c key = hash ^ data alongside @c data (the packed move
     /// bits). A reader accepts the entry only if @c key ^ @c data equals the probe hash, so a torn pair

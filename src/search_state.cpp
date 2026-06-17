@@ -21,7 +21,7 @@
 /// hash_stack_ is populated with all ancestor positions (positions 0..N-1 where N is
 /// the current position), so that IsDrawByRepetition can walk backwards through the full
 /// game history.
-SearchState::SearchState(Game &g) : game(g)
+SearchState::SearchState(Game &g) : game(g), cont_hist_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
 {
     const std::vector<Position> &pos = g.Positions();
     // Reserve the whole game history plus the deepest the search can descend, so no push_back during the
@@ -84,11 +84,12 @@ void SearchState::MakeNullMove()
 ///   - the two killer moves for this ply: just below winning captures, above all quiet moves,
 ///   - quiet moves: their history count, clamped below the killers,
 ///   - losing captures (negative SEE): scored by their (negative) SEE, so they sort below quiet moves.
-void SearchState::ScoreAndSortMoves(MoveList &moves, int ply) const
+void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) const
 {
     static constexpr int kWinningCaptureBase = 1 << 20;         // 1,048,576: winning captures / promotions
     static constexpr int kKillerBase         = 1 << 19;         // 524,288: killers sit just below winning captures
-    static constexpr int kMaxQuiet           = kKillerBase - 1; // history scores clamp just below the killers
+    static constexpr int kCountermoveScore   = kKillerBase - 1; // countermove: just below the two killers
+    static constexpr int kMaxQuiet           = kKillerBase - 2; // history scores clamp just below the countermove
     const Position      &position            = CurrentPosition();
     const Move           killer0             = killers[ply][0];
     const Move           killer1             = killers[ply][1];
@@ -108,9 +109,14 @@ void SearchState::ScoreAndSortMoves(MoveList &moves, int ply) const
         {
             sort = kKillerBase;
         }
-        else // quiet move: history count, clamped below the killers
+        else if (IsCountermove(prev_move, move)) // countermove: best quiet refutation to the previous move
         {
-            sort = (int)std::min<uint32_t>(history.GetCount(ply, move), (uint32_t)kMaxQuiet);
+            sort = kCountermoveScore;
+        }
+        else // quiet move: main history + 1-ply continuation history, clamped below the countermove
+        {
+            const uint32_t h = history.GetCount(ply, move) + (uint32_t)ContHistScore(prev_move, move);
+            sort             = (int)std::min<uint32_t>(h, (uint32_t)kMaxQuiet);
         }
         move.AssignScore(sort);
     }
@@ -183,23 +189,26 @@ SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int alpha, in
         break;
     }
     state.PlayMove(move);
+    // Prefetch the child's TT cell now; the recursive Search probes it after its own prologue, by which
+    // time the (random-access, cache-missing) line should be resident. Result-neutral speed win.
+    state.game.transposition_table.Prefetch(state.CurrentPosition().Hash());
     const bool is_checking = state.CurrentPosition().IsInCheck();
     int        score;
     if (beta > alpha + 1 && move_index > 0 && !was_in_check && !is_checking)
     {
         // Try principal variation search.
         INCREMENT("pvs attempts");
-        score = -state.Search(child_depth, ply + 1, -alpha - 1, -alpha, pv);
+        score = -state.Search(child_depth, ply + 1, -alpha - 1, -alpha, pv, move);
         if (score > alpha)
         {
             INCREMENT("pvs fails");
             INCREMENT_IF(ply == 0, "pvs fails root ply");
-            score = -state.Search(child_depth, ply + 1, -beta, -alpha, pv);
+            score = -state.Search(child_depth, ply + 1, -beta, -alpha, pv, move);
         }
     }
     else
     {
-        score = -state.Search(child_depth, ply + 1, -beta, -alpha, pv);
+        score = -state.Search(child_depth, ply + 1, -beta, -alpha, pv, move);
     }
     state.UndoMove();
     return {score, is_checking};
@@ -231,7 +240,7 @@ static inline NullMoveResult AttemptNullMove(SearchState &state, int depth, int 
             INCREMENT("null move");
             Variation dummy{};
             state.MakeNullMove();
-            int score = -state.Search(depth - 4, ply + 1, -beta, -alpha, dummy);
+            int score = -state.Search(depth - 4, ply + 1, -beta, -alpha, dummy, Move::None());
             state.UndoMove();
             if (state.IsCancelled())
             {
@@ -248,7 +257,7 @@ static inline NullMoveResult AttemptNullMove(SearchState &state, int depth, int 
     return {alpha, kAlpha};
 }
 
-int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &parent_pv)
+int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move)
 {
     SearchState &state = *this;
     INCREMENT("alpha beta calls");
@@ -338,9 +347,11 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             state.game.transposition_table.RecordTransposition(Transposition{
                 state.CurrentPosition().Hash(), transposition->move, score, depth, Transposition::NodeType::kCut});
             state.history.RecordGoodMove(ply, transposition->move);
+            state.RecordContHist(prev_move, transposition->move);
             if (transposition->move.IsQuiet())
             {
                 state.RecordKiller(ply, transposition->move);
+                state.RecordCountermove(prev_move, transposition->move);
             }
             return score;
         }
@@ -351,6 +362,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             alpha            = score;
             has_raised_alpha = true;
             state.history.RecordGoodMove(ply, transposition->move);
+            state.RecordContHist(prev_move, transposition->move);
         }
     }
 
@@ -365,7 +377,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
         INCREMENT("stalemates");
         return kDrawScore;
     }
-    state.ScoreAndSortMoves(move_list, ply);
+    state.ScoreAndSortMoves(move_list, ply, prev_move);
 
     // Search the moves one at a time. Parallelism comes from Lazy SMP (independent whole-tree
     // searches sharing the transposition table), not from splitting this node.
@@ -413,9 +425,11 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             state.game.transposition_table.RecordTransposition(
                 Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
             state.history.RecordGoodMove(ply, move);
+            state.RecordContHist(prev_move, move);
             if (move.IsQuiet())
             {
                 state.RecordKiller(ply, move);
+                state.RecordCountermove(prev_move, move);
             }
             return score;
         }
@@ -430,6 +444,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
                 alpha            = score;
                 has_raised_alpha = true;
                 state.history.RecordGoodMove(ply, move);
+                state.RecordContHist(prev_move, move);
             }
         }
     }
@@ -442,6 +457,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
         state.game.transposition_table.RecordTransposition(
             Transposition{state.CurrentPosition().Hash(), best_move, alpha, depth, Transposition::NodeType::kPv});
         state.history.RecordGoodMove(ply, best_move);
+        state.RecordContHist(prev_move, best_move);
         CopyVariation(parent_pv, pv, best_move);
     }
     else
@@ -468,7 +484,7 @@ int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
         // We can't handle checks in quiescence.
         INCREMENT("quiescent checks");
         Variation dummy{};
-        return state.Search(depth, ply, alpha, beta, dummy);
+        return state.Search(depth, ply, alpha, beta, dummy, Move::None());
     }
     auto transposition = state.game.quiescent_table.FindTransposition(state.CurrentPosition().Hash());
     if (transposition && transposition->score() >= beta)
@@ -518,7 +534,7 @@ int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
         }
     }
     MoveList move_list{state.CurrentPosition().GenerateLegalCaptures()};
-    state.ScoreAndSortMoves(move_list, ply);
+    state.ScoreAndSortMoves(move_list, ply, Move::None());
     for (Move &move : move_list)
     {
         if (transposition && transposition->move == move)

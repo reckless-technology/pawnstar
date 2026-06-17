@@ -14,6 +14,7 @@
 #include <atomic>
 #include <cstdint>
 #include <iterator>
+#include <memory>
 #include <vector>
 
 class Game;
@@ -100,12 +101,15 @@ class SearchState
     /// @brief Assign ordering scores to a move list and sort it best-first.
     /// @param moves Move list to score and sort.
     /// @param ply Current search ply (used for the history heuristic).
-    void ScoreAndSortMoves(MoveList &moves, int ply) const;
+    /// @param prev_move The move played to reach this node (for countermove / continuation history).
+    void ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) const;
 
     /// @brief Fail-soft negamax alpha-beta search of the current node (defined in search_state.cpp).
     /// @param depth Depth to search. @param ply Distance from root. @param alpha Alpha. @param beta Beta.
-    /// @param parent_pv Principal variation at the parent node. @return The alpha-beta score for this node.
-    int Search(int depth, int ply, int alpha, int beta, Variation &parent_pv);
+    /// @param parent_pv Principal variation at the parent node.
+    /// @param prev_move The move played at the parent to reach this node (Move::None at root / after null).
+    /// @return The alpha-beta score for this node.
+    int Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move);
 
     /// @brief Search a single move from the current node (defined in search_state.cpp).
     /// @return The move's score and whether it gives check.
@@ -152,10 +156,58 @@ class SearchState
         }
     }
 
+    /// @brief Table key for a move in the countermove / continuation-history tables: (piece, to-square).
+    /// Move::None (piece 0, to 0) maps to 0, a harmless dedicated slot.
+    static constexpr int ContKey(Move m)
+    {
+        return m.piece() * 64 + m.to();
+    }
+    static constexpr int kContKeys = 7 * 64; ///< Distinct (piece, to) keys: pieces 0..6 × 64 squares.
+
+    /// @brief Continuation-history score for playing @p move after @p prev (0 if prev/move not quiet-tracked).
+    int ContHistScore(Move prev, Move move) const
+    {
+        return cont_hist_[ContKey(prev) * kContKeys + ContKey(move)];
+    }
+
+    /// @brief Whether @p move is the recorded countermove (best quiet refutation) to @p prev.
+    bool IsCountermove(Move prev, Move move) const
+    {
+        return countermoves_[ContKey(prev)] == move;
+    }
+
+    /// @brief Reward a quiet @p move that was good (raised alpha or cut) as a follow-up to @p prev.
+    /// Captures are ignored (they are ordered by SEE, not history). Saturating count, like HistoryTable.
+    void RecordContHist(Move prev, Move move)
+    {
+        if (move.IsQuiet())
+        {
+            int16_t &c = cont_hist_[ContKey(prev) * kContKeys + ContKey(move)];
+            if (c < 16384)
+            {
+                ++c;
+            }
+        }
+    }
+
+    /// @brief Record a quiet @p move that caused a beta cutoff as the countermove to @p prev.
+    void RecordCountermove(Move prev, Move move)
+    {
+        if (move.IsQuiet())
+        {
+            countermoves_[ContKey(prev)] = move;
+        }
+    }
+
   private:
     StackList<Position, kMaxPly + 4> positions_;    ///< Per-thread copy-make position stack.
     nnue::Accumulator                accumulator_{}; ///< NNUE accumulator for the tip position (incremental).
     /// @brief Hash history from game-start through parent of current node (game history + search depth).
     /// A std::vector (reserved up-front in the constructor) so an arbitrarily long game cannot overflow it.
     std::vector<HashEntry> hash_stack_;
+    /// @brief Best quiet refutation to each previous move (countermove heuristic), indexed by ContKey(prev).
+    std::array<Move, kContKeys> countermoves_{};
+    /// @brief 1-ply continuation history: how often a quiet move was good after a given previous move.
+    /// Heap-allocated (per-thread, ~0.4 MB) and indexed [ContKey(prev) * kContKeys + ContKey(move)].
+    std::unique_ptr<int16_t[]> cont_hist_;
 };
