@@ -388,7 +388,12 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             if (depth > 3 && move_index > 6)
             {
                 --lmr_depth;
-                INCREMENT("late move reduction extreme");
+                INCREMENT("late move reduction x2");
+                if (history.GetCount(ply, move) == 0)
+                {
+                    --lmr_depth;
+                    INCREMENT("late move reduction x3");
+                }
             }
         }
 
