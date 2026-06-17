@@ -37,20 +37,23 @@ enum Direction
 constexpr uint64_t kFileA = 0x0101010101010101; ///< The a-file (LERF mapping).
 constexpr uint64_t kFileH = kFileA << 7;        ///< The h-file.
 
-constexpr uint8_t  FileOf(uint8_t sq) { return sq & 7; }
-constexpr uint8_t  RankOf(uint8_t sq) { return sq >> 3; }
-constexpr uint64_t SqBB(uint8_t sq) { return 1ull << sq; }
-constexpr uint64_t SqBB(int x, int y) { return 1ull << (x + 8 * y); }
-constexpr bool     IsInBoard(int x, int y) { return x == (x & 7) && y == (y & 7); }
+// clang-format off
+constexpr uint8_t  FileOf(uint8_t sq)         { return sq & 7;                       } ///< Square index -> file (0..7).
+constexpr uint8_t  RankOf(uint8_t sq)         { return sq >> 3;                      } ///< Square index -> rank (0..7).
+constexpr uint64_t SqBB(uint8_t sq)           { return 1ull << sq;                   } ///< Square index -> single-square Bitboard.
+constexpr uint64_t SqBB(int x, int y)         { return 1ull << (x + 8 * y);          } ///< (file, rank) -> single-square Bitboard.
+constexpr bool     IsInBoard(int x, int y)    { return x == (x & 7) && y == (y & 7); } ///< Is (file, rank) on the board?
 
-constexpr uint64_t ShiftNorth(uint64_t b) { return b << 8; }
-constexpr uint64_t ShiftNortheast(uint64_t b) { return (b & ~kFileH) << 9; }
-constexpr uint64_t ShiftEast(uint64_t b) { return (b & ~kFileH) << 1; }
-constexpr uint64_t ShiftSoutheast(uint64_t b) { return (b & ~kFileH) >> 7; }
-constexpr uint64_t ShiftSouth(uint64_t b) { return b >> 8; }
-constexpr uint64_t ShiftSouthwest(uint64_t b) { return (b & ~kFileA) >> 9; }
-constexpr uint64_t ShiftWest(uint64_t b) { return (b & ~kFileA) >> 1; }
-constexpr uint64_t ShiftNorthwest(uint64_t b) { return (b & ~kFileA) << 7; }
+constexpr uint64_t ShiftNorth(uint64_t b)     { return b << 8;                       } ///< Shift a Bitboard one square north.
+constexpr uint64_t ShiftNortheast(uint64_t b) { return (b & ~kFileH) << 9;           } ///< Shift a Bitboard one square northeast.
+constexpr uint64_t ShiftEast(uint64_t b)      { return (b & ~kFileH) << 1;           } ///< Shift a Bitboard one square east.
+constexpr uint64_t ShiftSoutheast(uint64_t b) { return (b & ~kFileH) >> 7;           } ///< Shift a Bitboard one square southeast.
+constexpr uint64_t ShiftSouth(uint64_t b)     { return b >> 8;                       } ///< Shift a Bitboard one square south.
+constexpr uint64_t ShiftSouthwest(uint64_t b) { return (b & ~kFileA) >> 9;           } ///< Shift a Bitboard one square southwest.
+constexpr uint64_t ShiftWest(uint64_t b)      { return (b & ~kFileA) >> 1;           } ///< Shift a Bitboard one square west.
+constexpr uint64_t ShiftNorthwest(uint64_t b) { return (b & ~kFileA) << 7;           } ///< Shift a Bitboard one square northwest.
+
+// clang-format on
 
 using ShiftFn = uint64_t (*)(uint64_t);
 constexpr std::array<ShiftFn, 8> kShiftFunctions{ShiftNorth, ShiftNortheast, ShiftEast, ShiftSoutheast,
@@ -89,10 +92,12 @@ constexpr uint64_t BishopAttacksOnEmptyBoard(uint8_t sq)
 {
     return RayFrom(sq, kNortheast) | RayFrom(sq, kNorthwest) | RayFrom(sq, kSoutheast) | RayFrom(sq, kSouthwest);
 }
+
 constexpr uint64_t RookAttacksOnEmptyBoard(uint8_t sq)
 {
     return RayFrom(sq, kNorth) | RayFrom(sq, kSouth) | RayFrom(sq, kEast) | RayFrom(sq, kWest);
 }
+
 constexpr uint64_t QueenAttacksOnEmptyBoard(uint8_t sq)
 {
     return BishopAttacksOnEmptyBoard(sq) | RookAttacksOnEmptyBoard(sq);
@@ -125,8 +130,8 @@ constexpr uint64_t InterveningSquares(uint8_t from, uint8_t to)
 constexpr uint64_t RayOccupancyMask(uint8_t sq, Direction direction)
 {
     uint64_t   result      = 0;
-    uint64_t   last_square  = 0;
-    const auto fn           = kShiftFunctions[direction];
+    uint64_t   last_square = 0;
+    const auto fn          = kShiftFunctions[direction];
     for (uint64_t b = fn(SqBB(sq)); b != 0; b = fn(b))
     {
         result |= b;
@@ -134,11 +139,13 @@ constexpr uint64_t RayOccupancyMask(uint8_t sq, Direction direction)
     }
     return result ^ last_square;
 }
+
 constexpr uint64_t BishopOccupancyMask(uint8_t sq)
 {
     return RayOccupancyMask(sq, kNortheast) | RayOccupancyMask(sq, kNorthwest) | RayOccupancyMask(sq, kSoutheast) |
            RayOccupancyMask(sq, kSouthwest);
 }
+
 constexpr uint64_t RookOccupancyMask(uint8_t sq)
 {
     return RayOccupancyMask(sq, kNorth) | RayOccupancyMask(sq, kSouth) | RayOccupancyMask(sq, kEast) |
@@ -160,11 +167,13 @@ constexpr uint64_t RayAttacks(uint64_t occupied_squares, uint8_t sq, Direction d
     }
     return result;
 }
+
 constexpr uint64_t BishopAttacks(uint64_t occupied_squares, uint8_t sq)
 {
     return RayAttacks(occupied_squares, sq, kNortheast) | RayAttacks(occupied_squares, sq, kSoutheast) |
            RayAttacks(occupied_squares, sq, kSouthwest) | RayAttacks(occupied_squares, sq, kNorthwest);
 }
+
 constexpr uint64_t RookAttacks(uint64_t occupied_squares, uint8_t sq)
 {
     return RayAttacks(occupied_squares, sq, kNorth) | RayAttacks(occupied_squares, sq, kEast) |
@@ -203,8 +212,8 @@ constexpr std::array<Bitboard, 64> MakeBitboards(BBFn fn)
 PextBitboard ComputePext(uint8_t sq, MaskFn mask_fn, AttFn attack_fn)
 {
     PextBitboard   entry;
-    const uint64_t mask = mask_fn(sq);
-    entry.occupancy_mask = Bitboard{mask};
+    const uint64_t mask               = mask_fn(sq);
+    entry.occupancy_mask              = Bitboard{mask};
     const auto            occupancies = EnumerateMaskCombinations(mask);
     std::vector<uint64_t> dense(occupancies.size(), 0);
     for (auto occupancy : occupancies)
@@ -255,8 +264,8 @@ constexpr MultiDimArray<Bitboard, 64, 64>::type MakeInterveningSquares()
 struct ZobristTables
 {
     MultiDimArray<zobrist_t, 2, 6, 64>::type piece_square{};
-    std::array<zobrist_t, 16>               castling{};
-    std::array<zobrist_t, 64>               en_passant{};
+    std::array<zobrist_t, 16>                castling{};
+    std::array<zobrist_t, 64>                en_passant{};
 };
 
 ZobristTables MakeZobrist()
@@ -307,5 +316,5 @@ const std::array<PextBitboard, 64> kRookPexts   = MakePexts(RookOccupancyMask, R
 const MultiDimArray<Bitboard, 64, 64>::type kInterveningSquares = MakeInterveningSquares();
 
 const MultiDimArray<zobrist_t, 2, 6, 64>::type kPieceSquareHashes    = g_zobrist.piece_square;
-const std::array<zobrist_t, 16>               kCastlingRightsHashes  = g_zobrist.castling;
-const std::array<zobrist_t, 64>               kEnPassantHashes       = g_zobrist.en_passant;
+const std::array<zobrist_t, 16>                kCastlingRightsHashes = g_zobrist.castling;
+const std::array<zobrist_t, 64>                kEnPassantHashes      = g_zobrist.en_passant;
