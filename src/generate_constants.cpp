@@ -340,16 +340,12 @@ struct Generator
 };
 
 /// @brief Generators for the main precomputed Bitboard arrays.
-constexpr std::array<Generator, 15> bitboard_generators = {{
+constexpr std::array<Generator, 8> bitboard_generators = {{
     // clang-format off
-    { "kNorth",                     [](uint8_t sq) constexpr { return RayFrom(sq, kNorth);                                          }   },
-    { "kNortheast",                 [](uint8_t sq) constexpr { return RayFrom(sq, kNortheast);                                      }   },
-    { "kEast",                      [](uint8_t sq) constexpr { return RayFrom(sq, kEast);                                           }   },
-    { "kSoutheast",                 [](uint8_t sq) constexpr { return RayFrom(sq, kSoutheast);                                      }   },
-    { "kSouth",                     [](uint8_t sq) constexpr { return RayFrom(sq, kSouth);                                          }   },
-    { "kSouthwest",                 [](uint8_t sq) constexpr { return RayFrom(sq, kSouthwest);                                      }   },
-    { "kWest",                      [](uint8_t sq) constexpr { return RayFrom(sq, kWest);                                           }   },
-    { "kNorthwest",                 [](uint8_t sq) constexpr { return RayFrom(sq, kNorthwest);                                      }   },
+    // kEastWest is the only ray table still emitted: the union of the east and west rays from each square,
+    // used by GenMoves' en passant horizontal-check (the king's rank). The other ray directions were only
+    // needed by the removed non-PEXT sliding-attack fallback.
+    { "kEastWest",                  [](uint8_t sq) constexpr { return RayFrom(sq, kEast) | RayFrom(sq, kWest);                       }   },
     { "kPawnAttacksWhite",          [](uint8_t sq) constexpr { return ShiftNorthwest(Bitboard(sq)) | ShiftNortheast(Bitboard(sq));  }   },
     { "kPawnAttacksBlack",          [](uint8_t sq) constexpr { return ShiftSouthwest(Bitboard(sq)) | ShiftSoutheast(Bitboard(sq));  }   },
     { "kKnightAttacks",             KnightAttacks                                                                                       },

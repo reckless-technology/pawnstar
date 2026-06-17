@@ -23,14 +23,7 @@ struct PextBitboard
     std::span<const uint8_t>  indices;        ///< Indices into the discrete attack vector array.
 };
 
-extern const std::array<Bitboard, 64>     kNorth;                  ///< Ray of squares north of each square.
-extern const std::array<Bitboard, 64>     kNortheast;              ///< Ray of squares northeast of each square.
-extern const std::array<Bitboard, 64>     kEast;                   ///< Ray of squares east of each square.
-extern const std::array<Bitboard, 64>     kSoutheast;              ///< Ray of squares southeast of each square.
-extern const std::array<Bitboard, 64>     kSouth;                  ///< Ray of squares south of each square.
-extern const std::array<Bitboard, 64>     kSouthwest;              ///< Ray of squares southwest of each square.
-extern const std::array<Bitboard, 64>     kWest;                   ///< Ray of squares west of each square.
-extern const std::array<Bitboard, 64>     kNorthwest;              ///< Ray of squares northwest of each square.
+extern const std::array<Bitboard, 64>     kEastWest;               ///< East|west rays from each square (king's rank, en passant).
 extern const std::array<Bitboard, 64>     kPawnAttacksWhite;       ///< Squares attacked by a white pawn on each square.
 extern const std::array<Bitboard, 64>     kPawnAttacksBlack;       ///< Squares attacked by a black pawn on each square.
 extern const std::array<Bitboard, 64>     kKnightAttacks;          ///< Squares attacked by a knight on each square.

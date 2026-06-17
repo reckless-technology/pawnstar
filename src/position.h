@@ -440,7 +440,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
                 const Bitboard pseudo_occupied_squares =
                     occupied_squares ^ Bitboard(captured_pawn_locn) ^ Bitboard(from);
                 const Bitboard horizontal_attacks =
-                    RookAttacks(pseudo_occupied_squares, king_locn) & (kWest[king_locn] | kEast[king_locn]);
+                    RookAttacks(pseudo_occupied_squares, king_locn) & kEastWest[king_locn];
                 if ((horizontal_attacks & enemy_pieces & (pieces[kRook] | pieces[kQueen])).IsEmpty())
                 {
                     // We can make this move since it's not a discovered check.
