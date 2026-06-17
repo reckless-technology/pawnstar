@@ -2,14 +2,14 @@
 
 Pawnstar evaluates **exclusively** with an **NNUE** (Efficiently Updatable Neural Network) — it is the
 engine's only evaluator (the former hand-crafted evaluation, "HCE", was removed). At startup the engine
-loads the shipped net `nnue/pawnstar-v7.bin` (relative to the working directory) and evaluates with it;
+loads the shipped net `nnue/pawnstar-v8.bin` (relative to the working directory) and evaluates with it;
 if that file can't be loaded the engine falls back to a copy of the net embedded in the binary (§3), and
 errors out only if both fail. This document is the complete reference for how the net works, how to load a
 net, and how to generate data, train, validate and strength-test a net.
 
-The shipped net (`pawnstar-v7.bin`) is a 512-wide, **4-king-bucket** `ChessBuckets` net. §1, §2 and §6
-describe that architecture; §7 has the lineage (including the retired Chess768 nets and the rejected
-1024-wide experiment).
+The shipped net (`pawnstar-v8.bin`) is a **1024-wide, single-bank (no king buckets)** `ChessBuckets` net
+(i.e. plain Chess768 at width 1024). §1, §2 and §6 describe that architecture; §7 has the lineage
+(including the retired Chess768 256/512 nets and the retired 512-wide 4-king-bucket v6/v7).
 
 In-engine code: [src/nnue.h](../src/nnue.h), [src/nnue.cpp](../src/nnue.cpp). The net is called from
 [src/evaluation.cpp](../src/evaluation.cpp) (`EvaluatePosition`). Tooling: [tools/](../tools).
@@ -18,21 +18,23 @@ In-engine code: [src/nnue.h](../src/nnue.h), [src/nnue.cpp](../src/nnue.cpp). Th
 
 ## 1. Architecture
 
-A "perspective" network using bullet's king-bucketed `ChessBuckets` feature set:
+A "perspective" network using bullet's `ChessBuckets` feature set (the shipped net uses a single bank —
+no king buckets):
 
 ```
-768 inputs per (perspective, king bucket)  ->  512 feature transformer (weights shared across perspectives)
-SCReLU,  concat[side-to-move | opponent] = 1024  ->  1 output  (centipawns, side-to-move relative)
+768 inputs per (perspective, king bucket)  ->  1024 feature transformer (weights shared across perspectives)
+SCReLU,  concat[side-to-move | opponent] = 2048  ->  1 output  (centipawns, side-to-move relative)
 ```
 
-Constants (must match the trainer): `kInputSize=768` (features per bucket), `kNumKingBuckets=4`,
-`kFeatureRows=768*4=3072`, `kHiddenSize=512`, `kQA=255`, `kQB=64`, `kScale=400`.
+Constants (must match the trainer): `kInputSize=768` (features per bucket), `kNumKingBuckets=1`,
+`kFeatureRows=768*1=768`, `kHiddenSize=1024`, `kQA=255`, `kQB=64`, `kScale=400`.
 
-**Features.** The 768 base inputs per perspective are `colour (2) × piece type (6) × square (64)`. Each
-perspective then selects one of **4 weight banks** by *its own* king's square (in that perspective's
-orientation) through the 64-entry `kKingBucketMap` (a file/rank quadrant: files a–d vs e–h, own half
-ranks 1–4 vs far half 5–8). For a piece of `colour` (0=white, 1=black), type `pt` (pawn=1 … king=6) on
-`square`, with `wb`/`bb` the white/black king buckets:
+**Features.** The 768 base inputs per perspective are `colour (2) × piece type (6) × square (64)`. The
+shipped net has a single weight bank (`kKingBucketMap` all-zero → `wb = bb = 0`, no king buckets), so the
+feature row is just the Chess768 index below. The bucket mechanism is retained and generalises: with N
+banks each perspective selects one by *its own* king's square (in that perspective's orientation) through
+the 64-entry `kKingBucketMap`. For a piece of `colour` (0=white, 1=black), type `pt` (pawn=1 … king=6) on
+`square`, with `wb`/`bb` the white/black king buckets (both 0 for the shipped net):
 
 ```
 white-perspective row = wb*768 + colour     * 384 + (pt-1)*64 + square
@@ -41,8 +43,8 @@ black-perspective row = bb*768 + (1-colour) * 384 + (pt-1)*64 + (square ^ 0x38) 
 
 Two accumulators are built (white-perspective and black-perspective), each seeded with `feature_bias`
 and then summing the feature column of every piece in its king bucket's bank. At evaluation the
-**side-to-move** accumulator is fed to the first 512 output weights and the opponent's to the second
-512. This is mathematically identical to bullet's `ChessBuckets::map_features` with the same bucket map
+**side-to-move** accumulator is fed to the first 1024 output weights and the opponent's to the second
+1024. This is mathematically identical to bullet's `ChessBuckets::map_features` with the same bucket map
 (verified by the cross-check in §6). The bucket map MUST stay byte-identical across `src/nnue.cpp`,
 `tools/bullet/pawnstar.rs` and `tools/bullet/pawnstar_eval.rs`.
 
@@ -75,22 +77,22 @@ The **payload** is bullet's native quantised weights — tightly packed, little-
 
 | section | count (int16) | scale |
 |---|---|---|
-| `feature_weights` | `768*4 * 512 = 1572864` (column-major: `row*512 + i`, rows bucket-major) | QA |
-| `feature_bias` | `512` | QA |
-| `output_weights` | `2 * 512 = 1024` (first 512 = stm, next 512 = ntm) | QB |
+| `feature_weights` | `768*1 * 1024 = 786432` (column-major: `row*1024 + i`, rows bucket-major) | QA |
+| `feature_bias` | `1024` | QA |
+| `output_weights` | `2 * 1024 = 2048` (first 1024 = stm, next 1024 = ntm) | QB |
 | `output_bias` | `1` (scalar) | QA·QB |
 
-Packed payload is `(1572864 + 512 + 1024 + 1) * 2 = 3148802` bytes; bullet pads the trailing 1-element
-`output_bias` tensor up to a 64-byte boundary, so its raw output is **3148864 bytes**.
+Packed payload is `(786432 + 1024 + 2048 + 1) * 2 = 1579010` bytes; bullet pads the trailing 1-element
+`output_bias` tensor up to a 64-byte boundary, so its raw output is **1579072 bytes**.
 
 **Self-describing header.** A shipped net is prepended with a **32-byte `NetHeader`** (`src/nnue.h`):
 a magic (`"PSN1"`), a format version, and the architecture parameters — `kInputSize`, `kNumKingBuckets`,
-`kHiddenSize`, `kQA`, `kQB`, `kScale`. So `nnue/pawnstar-v7.bin` is **3148896 bytes** (32 + 3148864). The
+`kHiddenSize`, `kQA`, `kQB`, `kScale`. So `nnue/pawnstar-v8.bin` is **1579104 bytes** (32 + 1579072). The
 loader (`Network::Load`) accepts two layouts:
 
 - **Stamped** (magic present): every architecture field is checked against the engine's compile-time
-  constants; any mismatch is rejected with a descriptive message (e.g. `file is …buckets1…, engine
-  expects …buckets4…`) — so an incompatible net can never be silently misread.
+  constants; any mismatch is rejected with a descriptive message (e.g. `file is …buckets4…hidden512…,
+  engine expects …buckets1…hidden1024…`) — so an incompatible net can never be silently misread.
 - **Raw** (no magic, e.g. a freshly-exported bullet `quantised.bin`): accepted only when its size equals
   the payload exactly, within bullet's `<64`-byte padding (`kNetFileBytes ≤ size < kNetFileBytes+64`).
   This exact window — not a `>=` floor — is what rejects a *larger* (e.g. wider) raw net rather than
@@ -99,14 +101,15 @@ loader (`Network::Load`) accepts two layouts:
 Stamp a raw net with `tools/stamp_net` (`make tools`); the header values come from the building engine's
 constants, so it can only stamp a net that matches this build. The forward-pass math and quantisation are
 kept in lock-step with the trainer ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies
-they agree to within rounding. (The retired Chess768/512 nets — v4 and earlier — had a 789506-byte payload
-and were headerless; a king-bucket engine cannot load them.)
+they agree to within rounding. (The retired nets had different sizes/headers — e.g. the Chess768 512-wide
+v4 a 789506-byte payload, the 512×4 king-bucketed v6/v7 a 3148802-byte payload — so this 1024-wide build
+size/header-gates them out.)
 
 ## 3. Using a net in the engine
 
-A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v7.bin` (cwd-relative) at
+A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v8.bin` (cwd-relative) at
 startup. **Embedded fallback:** a byte-identical copy of the shipped net is compiled into the engine
-binary (`src/embedded_net.S` `.incbin`'s `nnue/pawnstar-v7.bin`; linked into the engine only, not the test
+binary (`src/embedded_net.S` `.incbin`'s `nnue/pawnstar-v8.bin`; linked into the engine only, not the test
 binaries). If the on-disk file can't be loaded — wrong cwd, missing or renamed file, or a stamped net that
 fails architecture validation — the engine loads the embedded copy via `Network::LoadFromMemory` (same
 header detection/validation as `Network::Load`), so it always has a working evaluator; it exits only if
@@ -134,7 +137,7 @@ net is a single `nnue::Network` instance owned by the `Game` (UCI `setoption` ro
 |------|---------|
 | `stamp_net.cpp`           | prepend the self-describing `NetHeader` to a raw bullet net (`make tools` → `build/stamp_net`) |
 | `setup_bullet.sh`         | clone bullet at the pinned commit + install/register our trainer examples |
-| `bullet/pawnstar.rs`      | the trainer (arch `768×4 king-bucketed → 512×2 → 1`, SCReLU, QA/QB/SCALE) |
+| `bullet/pawnstar.rs`      | the trainer (arch `768 single-bank → 1024×2 → 1`, SCReLU, QA/QB/SCALE) |
 | `bullet/pawnstar_eval.rs` | reference evaluator for the `test_nnue` cross-check |
 | `train_pipeline.sh`       | train → export a net from a bulletformat `.data` file (or a directory of text shards) |
 | `verify_net.sh`           | cross-check (engine == trainer) + incremental-accumulator gate for a trained net |
@@ -225,17 +228,17 @@ match confirms our feature indexing, king bucketing, perspective/orientation, SC
 are all correct. It must be built at the same width and feature set as the engine, or the cross-check
 fails by design.
 
-The repo checks in `test/nnue_reference.txt` — 250 reference evals for the shipped `pawnstar-v7.bin` —
-and `make check` runs `test_nnue nnue/pawnstar-v7.bin test/nnue_reference.txt` automatically (current
+The repo checks in `test/nnue_reference.txt` — 250 reference evals for the shipped `pawnstar-v8.bin` —
+and `make check` runs `test_nnue nnue/pawnstar-v8.bin test/nnue_reference.txt` automatically (current
 engine: max |diff| 0 cp). The reference's first field is the FEN, so regenerate it after shipping a *new*
-net with: `cut -d'|' -f1 test/nnue_reference.txt > fens.txt && "$EVAL" nnue/pawnstar-v7.bin fens.txt >
+net with: `cut -d'|' -f1 test/nnue_reference.txt > fens.txt && "$EVAL" nnue/pawnstar-v8.bin fens.txt >
 test/nnue_reference.txt`. With no arguments `test_nnue` is a no-op, so `make check` stays green if the
 net/reference are absent.
 
 A second test, `test_nnue_incremental <net.bin>`, plays random move sequences through a `SearchState`
 and asserts the incrementally-maintained accumulator evaluates **bit-identically** to a full refresh at
 every node (and again after every undo, to catch reverse-update bugs). With no argument it is a no-op,
-so `make check` stays green; run it with a net (e.g. `./build/test_nnue_incremental nnue/pawnstar-v7.bin`)
+so `make check` stays green; run it with a net (e.g. `./build/test_nnue_incremental nnue/pawnstar-v8.bin`)
 after any change to the accumulator, feature indexing, or make/undo.
 
 `verify_net.sh <net.bin>` bundles both checks into one gate: it regenerates the reference evals for
@@ -250,7 +253,7 @@ NNUE strength is measured by game play. NNUE is the only evaluator, so an SPRT i
 `run_sprt.sh <net.bin> <openings.epd> [rounds=500] [depth=8]` runs:
 
 - the candidate as `<net.bin>` against a **required** `BASELINE_NET=<other.bin>` opponent — the
-  architecture program's test (e.g. v7 vs v6). Net selection is purely via the `EvalFile` option;
+  architecture program's test (e.g. v8 vs v7). Net selection is purely via the `EvalFile` option;
 - the **same** `build/pawnstar` binary for both engines, differing only by `EvalFile`, with
   `PAWNSTAR_THREADS=1`. Different net *widths* need different builds (`kHiddenSize` is compile-time), so a
   cross-width SPRT points `BIN_A`/`BIN_B` at two separately-built binaries;
@@ -272,19 +275,20 @@ the mean. It anchors only as well as those opponents and the chosen TC, so treat
 
 ## 7. Shipped nets
 
-The repo ships one reference net, **[pawnstar-v7.bin](pawnstar-v7.bin)** (512-wide, 4-king-bucket bullet
-net; stamped file 3148896 bytes) — loaded at startup as the engine's only evaluator (resolved relative to
-the working directory). To use a different net at runtime:
+The repo ships one reference net, **[pawnstar-v8.bin](pawnstar-v8.bin)** (1024-wide, single-bank /
+no-king-buckets bullet net; stamped file 1579104 bytes) — loaded at startup as the engine's only evaluator
+(resolved relative to the working directory). To use a different net at runtime:
 
 ```
 setoption name EvalFile value /path/to/other-net.bin
 ```
 
-**`pawnstar-v7.bin`** is trained on ~2.31B positions of **public PlentyChess** data (bulletformat,
-strong-engine labels) with a 512-wide transformer and 4 king buckets. It beats the previous shipped net
-(v6) by **+29.96 ± 14.05 Elo at fixed depth 8 and +20.73 ± 12.73 on the clock (8+0.08)** — both H1
-accepted. Same architecture as v6, so no speed trade-off: the gain is pure eval quality from more data.
-See the lineage below.
+**`pawnstar-v8.bin`** is trained on ~2.31B positions of **public PlentyChess** data (bulletformat,
+strong-engine labels) with a 1024-wide transformer and **no king buckets** (a single weight bank). It beats
+the previous shipped net (v7, 512×4) by **+31.9 ± 16.6 Elo at 40/20** (LLR 2.95, H1 accepted; 972 games,
+54.6%) — and at **half the file size** (1.58 MB vs v7's 3.15 MB). At the 2.31B data scale, doubling the
+width to 1024 beats king-bucketing: fewer feature rows (768×1 vs 768×4) but a wider hidden layer, which is
+both stronger and lighter on the clock. See the lineage below.
 
 **Lineage — what moved the needle (all SPRT-measured):**
 
@@ -297,39 +301,43 @@ See the lineage below.
 | v5 (1024) | **double width again**, same 60M | **rejected**: +2 ± 16 fixed-depth (dead even), **−74 ± 25 on the clock** — 60M *saturates* the 512 net; width only pays off with more data. Branch `bignet-1024`, not shipped |
 | kb (512 + 4 king buckets) | king buckets, **same 60M** | **flat** (~−8 fixed depth) — the higher-capacity feature set is *data-starved* on 60M |
 | v6 (512 + 4 king buckets) | king buckets, **~818M** | **+47 ± 18 fixed-depth, +17 ± 12 on the clock** over v4 — *more data* unlocked the king buckets (shipped, later retired). Needed two engine speed fixes (the eval cache and a single-pass `Update`) to turn an initial −74 clock result positive |
-| **v7 (512 + 4 king buckets)** | **~2.31B** (v6's 818M + 4 more big shards), same arch, SBS 40→120 (~3 epochs) | **+29.96 ± 14.05 fixed-depth, +20.73 ± 12.73 on the clock** over v6 — *still more data*; same arch/speed, so the eval-quality gain carries straight to the clock. **shipped** |
+| v7 (512 + 4 king buckets) | **~2.31B** (v6's 818M + 4 more big shards), same arch, SBS 40→120 (~3 epochs) | **+29.96 ± 14.05 fixed-depth, +20.73 ± 12.73 on the clock** over v6 — *still more data*; same arch/speed, so the eval-quality gain carries straight to the clock (later retired) |
+| **v8 (1024, no king buckets)** | **double the width, drop king buckets**, same 2.31B as v7 | **+31.9 ± 16.6 Elo at 40/20** over v7 (LLR 2.95, H1; 972 games) — at the full data scale width beats buckets, **at half the file size** (fewer feature rows, wider hidden). Reverses v5's 60M result now that data no longer saturates 1024. **shipped** |
 
 PlentyChess data: <https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat> (public,
 already bulletformat — `bullet-utils validate` a shard first (some are corrupt, e.g. `11496.data`),
 `cat` a few clean ones together, `shuffle`, then train per §6, skipping the text-`convert` step).
 
 The eval is also fast on the clock: the **incremental accumulator** (~+80 Elo equal-time vs full
-refresh), **AVX2 SIMD kernels** (~+180 Elo equal-time vs scalar), and the **eval cache** + **single-pass
-`Update`** mean NNUE wins on time as well as depth despite the 4× larger feature table. For absolute
-context the since-removed HCE measured ~2350 Elo (CCRL-ballpark) and v6 ~2900, so v7 sits a little above
-that. **The repeated lesson: more data is still the lever** — v6 was data-limited at 818M, and v7's 2.31B
-is still only ~11% of the ~21B available. Next levers: yet more data, and — now that king buckets pay off
-and the 512 keeps improving with data — revisiting a wider transformer (1024) or more/finer king buckets,
-which the larger pool may finally justify.
+refresh), **AVX2 SIMD kernels** (~+180 Elo equal-time vs scalar), and the **eval cache** mean NNUE wins on
+time as well as depth — and v8's single-bank table is actually *smaller* than v7's (fewer feature rows), so
+it is lighter on memory too. For absolute context the since-removed HCE measured ~2350 Elo (CCRL-ballpark)
+and v6/v7 ~2900, so v8 sits a little above that. **The repeated lesson: more data is the lever** — and at
+the 2.31B scale the extra width finally pays (v8's 2.31B is still only ~11% of the ~21B available). Next
+levers: yet more data, then revisit 1024 *with* king buckets (the two winning levers combined) or a wider
+transformer still.
 
-### Recreating `pawnstar-v7.bin` (step by step)
+### Recreating `pawnstar-v8.bin` (step by step)
 
-`pawnstar-v7.bin` is a **512-wide, 4-king-bucket** net trained on **~2.31 billion** positions of **public
-PlentyChess** data — v6's 818M pool (two big shards `11008`+`13349` + the original 60M) **plus four more
-big shards** (`11128`, `12128`, `12932`, `13227`). The data is already in bulletformat (32-byte
-`bullet::ChessBoard` records), so the text→`convert` step is skipped. GPU training is nondeterministic, so
-this reproduces a *functionally equivalent* net, not a byte-identical one. The whole pipeline is also
-captured in the orchestrator `~/pawnstar_nnue/run_v7.sh` (download → shuffle → train → verify → SPRT).
+`pawnstar-v8.bin` is a **1024-wide, single-bank (no king buckets)** net trained on the **same ~2.31 billion**
+positions as v7 — v6's 818M pool (two big shards `11008`+`13349` + the original 60M) **plus four more big
+shards** (`11128`, `12128`, `12932`, `13227`). Only the architecture differs from v7 (wider, no buckets).
+The data is already in bulletformat (32-byte `bullet::ChessBoard` records), so the text→`convert` step is
+skipped. GPU training is nondeterministic, so this reproduces a *functionally equivalent* net, not a
+byte-identical one. The whole pipeline is also captured in the orchestrator
+`~/pawnstar_nnue/bignet1024/run.sh` (train → verify → SPRT vs v7).
 
-The key requirement: the **architecture must match everywhere** — `kHiddenSize=512`, `kNumKingBuckets=4`
-and the `kKingBucketMap` in [src/nnue.h](../src/nnue.h)/[src/nnue.cpp](../src/nnue.cpp) must equal
+The key requirement: the **architecture must match everywhere** — `kHiddenSize=1024`, `kNumKingBuckets=1`
+and the all-zero `kKingBucketMap` in [src/nnue.h](../src/nnue.h)/[src/nnue.cpp](../src/nnue.cpp) must equal
 `HIDDEN_SIZE` and the `KING_BUCKETS` array in [tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs) and
 [tools/bullet/pawnstar_eval.rs](../tools/bullet/pawnstar_eval.rs). `setup_bullet.sh` copies those `.rs`
-files into bullet, so as long as the repo is on the king-bucket arch the trainer matches the engine.
+files into bullet, so as long as the repo is on this arch the trainer matches the engine.
 
 ```bash
 cd /path/to/pawnstar                 # repo root (so ./build and nnue/ paths resolve)
-make                                 # build the engine (king-bucket arch)
+# NOTE: v8 reuses v7's exact 2.31B pool; only the arch changed (1024-wide, single bank / no king buckets).
+# If you still have ~/pawnstar_nnue/v7/shuffled.data, skip steps 1-3 and go straight to step 4.
+make                                 # build the engine (1024 single-bank arch)
 make tests                           # build test_nnue / test_nnue_incremental / test_bratko_kopec_nnue
 make tools                           # build build/stamp_net
 
@@ -359,18 +367,18 @@ cat ~/pawnstar_nnue/kbbig/shuffled.data 11128.data 12128.data 12932.data 13227.d
 echo "pool: $(( $(stat -c%s shuffled.data) / 32 )) positions"   # ~2.31e9
 rm -f all.data 1[12]*.data 132*.data                            # reclaim disk
 
-# 4. Train the SAME 512x4 arch but LONGER than v6 so it actually learns from the extra data:
-#    BPS=3688 (= 60M/16384) and SBS=120 => ~7.25B samples seen (~3 epochs of the 2.31B pool, vs v6's
-#    SBS=40 / ~1 epoch). LR schedule auto-scales (StepLR step = SBS/3). ~2-3 h on a GTX 1050 Ti.
+# 4. Train the 1024-wide single-bank (no king buckets) arch on the same pool/schedule as v7 — only the
+#    arch differs. BPS=3688 (= 60M/16384) and SBS=120 => ~7.25B samples seen (~3 epochs of the 2.31B
+#    pool). LR schedule auto-scales (StepLR step = SBS/3). ~2-3 h on a GTX 1050 Ti.
 ( cd "$BULLET/crates/bullet_lib" && \
   PAWNSTAR_DATA=~/pawnstar_nnue/v7/shuffled.data PAWNSTAR_BPS=3688 \
   PAWNSTAR_SBS=120 PAWNSTAR_OUT=~/pawnstar_nnue/v7/checkpoints \
   cargo run --release --features cuda --example pawnstar )   # drop --features cuda to train on CPU
 
 # 5. Keep the RAW quantised net AND a stamped copy. The raw net is what bullet writes; the stamped net
-#    (32-byte NetHeader prepended, 3148896 bytes) is what ships. stamp_net embeds this build's arch (§2).
+#    (32-byte NetHeader prepended, 1579104 bytes) is what ships. stamp_net embeds this build's arch (§2).
 RAW=~/pawnstar_nnue/v7/checkpoints/pawnstar-120/quantised.bin
-./build/stamp_net "$RAW" /path/to/pawnstar/nnue/pawnstar-v7.bin
+./build/stamp_net "$RAW" /path/to/pawnstar/nnue/pawnstar-v8.bin
 
 # 6. Verify (§6). GOTCHA: pawnstar_eval is NOT header-aware, so generate the reference from the *RAW*
 #    net; test_nnue / test_nnue_incremental are header-aware and accept either. (Stamping before the
@@ -378,20 +386,20 @@ RAW=~/pawnstar_nnue/v7/checkpoints/pawnstar-120/quantised.bin
 cd /path/to/pawnstar
 cut -d'|' -f1 test/nnue_reference.txt > /tmp/fens.txt          # reuse the existing FENs (first field)
 "$EVAL" "$RAW" /tmp/fens.txt > test/nnue_reference.txt          # re-baseline the checked-in reference (RAW net)
-./build/test_nnue nnue/pawnstar-v7.bin test/nnue_reference.txt  # expect max |diff| <= 2 cp (engine == trainer)
-./build/test_nnue_incremental nnue/pawnstar-v7.bin             # incremental accumulator == full refresh
+./build/test_nnue nnue/pawnstar-v8.bin test/nnue_reference.txt  # expect max |diff| <= 2 cp (engine == trainer)
+./build/test_nnue_incremental nnue/pawnstar-v8.bin             # incremental accumulator == full refresh
 
 # 7. Regenerate the Bratko-Kopec accepted moves for the new net (the eval changed), then full check.
 #    The search is single-threaded/deterministic per depth; the accepted set is the union over depths 8-11.
 #    (Transcribe each position's got= move into the kCases array in test/bratko_kopec_nnue_test.cpp, then
 #    verify 24/24 at each depth.)
-for d in 8 9 10 11; do ./build/test_bratko_kopec_nnue nnue/pawnstar-v7.bin $d | grep -E 'pos|solved'; done
+for d in 8 9 10 11; do ./build/test_bratko_kopec_nnue nnue/pawnstar-v8.bin $d | grep -E 'pos|solved'; done
 make clean && make check          # all suites green; this also re-embeds the new net (src/embedded_net.S
-                                  # .incbin's nnue/pawnstar-v7.bin, a Makefile prerequisite of the engine)
+                                  # .incbin's nnue/pawnstar-v8.bin, a Makefile prerequisite of the engine)
 
 # 8. Strength-test vs the previous net (BASELINE_NET) at fixed depth and time control.
-BASELINE_NET=/path/to/previous-net.bin tools/run_sprt.sh nnue/pawnstar-v7.bin /path/to/openings.epd 1000 8
-BASELINE_NET=/path/to/previous-net.bin TC=8+0.08 tools/run_sprt.sh nnue/pawnstar-v7.bin /path/to/openings.epd 1000
+BASELINE_NET=/path/to/previous-net.bin tools/run_sprt.sh nnue/pawnstar-v8.bin /path/to/openings.epd 1000 8
+BASELINE_NET=/path/to/previous-net.bin TC=8+0.08 tools/run_sprt.sh nnue/pawnstar-v8.bin /path/to/openings.epd 1000
 ```
 
 To train a **stronger** net, add yet more clean PlentyChess shards at steps 1–3 (the dataset has ~168
@@ -414,7 +422,7 @@ location with `BULLET=…`.
 - **`undefined symbol: cuFuncLoad` when building bullet with `--features cuda`** — the NVIDIA driver is
   too old (it lacks the CUDA ≥ 12.3 driver API). Upgrade the driver to ≥ 545, or train on CPU with
   `BULLET_FEATURES=""`.
-- **`NNUE: file is …, engine expects …`** (stamped net) or **`NNUE: net '…' is N bytes, expected 3148802
+- **`NNUE: file is …, engine expects …`** (stamped net) or **`NNUE: net '…' is N bytes, expected 1579010
   (raw, unstamped) — wrong architecture or format`** (raw net) — the file doesn't match this build's
   architecture (wrong `HIDDEN_SIZE`, bucket count, quantisation, or a truncated/corrupt file). Both are
   hard rejections: a *stamped* net is validated field-by-field against the engine's compile-time constants,

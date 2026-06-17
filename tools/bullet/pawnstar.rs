@@ -22,24 +22,25 @@ use bullet_lib::{
     value::{ValueTrainerBuilder, loader},
 };
 
-const HIDDEN_SIZE: usize = 512;
+const HIDDEN_SIZE: usize = 1024;
 const SCALE: i32 = 400;
 const QA: i16 = 255;
 const QB: i16 = 64;
 
-// King-square -> weight-bank map. MUST be byte-identical to kKingBucketMap in src/nnue.cpp (file/rank
-// quadrant: files a-d vs e-h, own half ranks 1-4 vs far half ranks 5-8). Indexed by each perspective's
-// own king square (bullet orients our_ksq/opp_ksq per perspective, matching the engine's white/black).
+// King-square -> weight-bank map. MUST be byte-identical to kKingBucketMap in src/nnue.cpp. The shipped net
+// is all-zero: a single bank, i.e. no king buckets (plain Chess768); NUM_BUCKETS auto-derives to 1. For a
+// bucketed net put the per-square bank indices here (indexed by each perspective's own king square — bullet
+// orients our_ksq/opp_ksq per perspective, matching the engine's white/black).
 #[rustfmt::skip]
 const KING_BUCKETS: [usize; 64] = [
-    0, 0, 0, 0, 1, 1, 1, 1,
-    0, 0, 0, 0, 1, 1, 1, 1,
-    0, 0, 0, 0, 1, 1, 1, 1,
-    0, 0, 0, 0, 1, 1, 1, 1,
-    2, 2, 2, 2, 3, 3, 3, 3,
-    2, 2, 2, 2, 3, 3, 3, 3,
-    2, 2, 2, 2, 3, 3, 3, 3,
-    2, 2, 2, 2, 3, 3, 3, 3,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0,
 ];
 const NUM_BUCKETS: usize = get_num_buckets(&KING_BUCKETS);
 

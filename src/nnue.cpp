@@ -75,17 +75,19 @@ inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *colu
 
 /// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
 /// own* orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map
-/// serves both perspectives. Layout: file/rank quadrant — files a-d vs e-h, own half (ranks 1-4) vs far
-/// half (ranks 5-8). MUST be byte-identical to the array passed to ChessBuckets::new in tools/bullet/*.rs.
+/// serves both perspectives. MUST be byte-identical to the array passed to ChessBuckets::new in
+/// tools/bullet/*.rs. The shipped net is all-zero: a single weight bank (no king buckets, kNumKingBuckets=1),
+/// i.e. plain Chess768. The map is retained so a future bucketed net only needs to change these values
+/// (and kNumKingBuckets) to match.
 constexpr std::array<int, 64> kKingBucketMap = {
-    0, 0, 0, 0, 1, 1, 1, 1, // rank 1 (own back rank)
-    0, 0, 0, 0, 1, 1, 1, 1, // rank 2
-    0, 0, 0, 0, 1, 1, 1, 1, // rank 3
-    0, 0, 0, 0, 1, 1, 1, 1, // rank 4
-    2, 2, 2, 2, 3, 3, 3, 3, // rank 5
-    2, 2, 2, 2, 3, 3, 3, 3, // rank 6
-    2, 2, 2, 2, 3, 3, 3, 3, // rank 7
-    2, 2, 2, 2, 3, 3, 3, 3, // rank 8
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
 };
 
 /// @brief Feature row for a piece in one perspective's bucket bank.

@@ -2,7 +2,7 @@
 
 Pawnstar is a [UCI](https://en.wikipedia.org/wiki/Universal_Chess_Interface) chess engine written in
 C++20. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
-a lockless transposition table, and a king-bucketed NNUE evaluation (the engine's sole evaluator).
+a lockless transposition table, and a perspective NNUE evaluation (the engine's sole evaluator).
 
 Legal move generation runs at roughly 600 million moves per second on a modern laptop.
 
@@ -16,7 +16,7 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 - Null-move pruning, late-move reductions, and per-thread move ordering (killers, countermove, main +
   1-ply continuation history).
 - Quiescence search over captures with its own transposition table.
-- **NNUE** evaluation (efficiently-updatable neural network) — a king-bucketed perspective net, the engine's only evaluator. A net is loaded at startup; load a different one at runtime with `setoption name EvalFile`.
+- **NNUE** evaluation (efficiently-updatable neural network) — a perspective net (currently 1024-wide, no king buckets), the engine's only evaluator. A net is loaded at startup; load a different one at runtime with `setoption name EvalFile`.
 - Optional opening book (`pawnstar.book`).
 
 ## Requirements
@@ -79,7 +79,7 @@ help        list all commands
 ### The NNUE net
 
 NNUE is Pawnstar's **only** evaluator, so a net is required. At startup the engine loads the shipped net
-`nnue/pawnstar-v7.bin` (resolved relative to the working directory, like `pawnstar.book`). If that file
+`nnue/pawnstar-v8.bin` (resolved relative to the working directory, like `pawnstar.book`). If that file
 can't be loaded (wrong cwd, missing/renamed file), the engine **falls back to a copy of the net embedded
 in the binary** at build time, so it always has a working evaluator; it only errors out if both the file
 and the embedded copy fail. To use a different net:
@@ -281,23 +281,24 @@ a copy embedded in the binary as a fallback if the file can't be loaded), and a 
 loaded at runtime (see [The NNUE net](#the-nnue-net) above).
 
 **How it works.** The network ([src/nnue.cpp](src/nnue.cpp), [src/nnue.h](src/nnue.h)) is a
-"perspective" net using bullet's king-bucketed `ChessBuckets` feature set:
+"perspective" net using bullet's `ChessBuckets` feature set:
 
 ```
-768 inputs per (perspective, king bucket)  ->  512 feature transformer (x2 perspectives)
-SCReLU,  concat[side-to-move | opponent] = 1024  ->  1 output (centipawns, side-to-move relative)
+768 inputs per (perspective, king bucket)  ->  1024 feature transformer (x2 perspectives)
+SCReLU,  concat[side-to-move | opponent] = 2048  ->  1 output (centipawns, side-to-move relative)
 ```
 
-The 768 base inputs are (piece colour × piece type × square). Each perspective selects one of **4 weight
-banks** by its own king's square (a file/rank quadrant map), so the feature row is `bucket*768 + base`.
-Two accumulators are built — one from the side-to-move's perspective and one from the opponent's (board
-vertically mirrored) — passed through a squared-clipped-ReLU activation and a single output layer that
-produces a centipawn score. `EvaluatePosition` evaluates with the net directly (after a draw
-short-circuit) — NNUE is the only evaluator. The network is an `nnue::Network` instance owned by the `Game` (no globals),
-read-only after load and shared by all search threads. Its accumulator is **maintained incrementally**
-across make/undo on each thread's `SearchState` — only the feature columns for the pieces that moved are
-updated — except when a king crosses a bucket boundary, which rebuilds that one perspective's
-accumulator. This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
+The 768 base inputs are (piece colour × piece type × square). The shipped net uses a **single weight bank
+(no king buckets)** — plain Chess768 — so the feature row is just `base`; the bucket mechanism is retained
+and generalises (a bucketed net would select one of N banks by its own king's square, feature row
+`bucket*768 + base`). Two accumulators are built — one from the side-to-move's perspective and one from the
+opponent's (board vertically mirrored) — passed through a squared-clipped-ReLU activation and a single
+output layer that produces a centipawn score. `EvaluatePosition` evaluates with the net directly (after a
+draw short-circuit) — NNUE is the only evaluator. The network is an `nnue::Network` instance owned by the
+`Game` (no globals), read-only after load and shared by all search threads. Its accumulator is **maintained
+incrementally** across make/undo on each thread's `SearchState` — only the feature columns for the pieces
+that moved are updated (a king crossing a bucket boundary would rebuild that one perspective's accumulator,
+but with a single bank that never happens). This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
 `int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) from the
 [bullet](https://github.com/jw1912/bullet) trainer, with a small self-describing header so an
 incompatible net is rejected rather than misread (see [nnue/README.md](nnue/README.md)).
@@ -321,20 +322,21 @@ supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""` to train on CPU. NN
 game play (SPRT — now always net-vs-net, since the hand-crafted baseline was removed), not by the
 Bratko-Kopec suite.
 
-**Shipped net.** [nnue/pawnstar-v7.bin](nnue/pawnstar-v7.bin) is a 512-wide, **4-king-bucket** net
-trained on **~2.31B** positions of **public PlentyChess** data. Lineage, all SPRT-measured (against the
-since-removed hand-crafted eval, "HCE", in the early steps): Pawnstar self-play *lost* to the HCE (label
-quality, not quantity, was the lever);
-scaling that data ~12× gave nothing (capacity-limited); **doubling the width 256→512 added +55 Elo (fixed
-depth) / +71 (time control)** — that is v4; doubling again to **1024 gave ~0 at fixed depth and −74 on the
-clock** (rejected — 60M saturates the 512 net). **King buckets were flat on 60M (data-starved) but on
-~818M gave +47 fixed depth and +17 on the clock** — the v6 net — once two speed fixes (an 8 MB lockless
-eval cache and a single-pass accumulator update) clawed back the wider table's per-move cost. Then
-**scaling the same arch to ~2.31B gave +29.96 fixed depth and +20.73 on the clock — the v7 net (shipped)**;
-same architecture, so the eval-quality gain carries straight to the clock. Each shipped net retires its
-predecessor (v4 retired at v6, v6 at v7). The recurring lesson: **more data is the lever** (v7's 2.31B is
-still only ~11% of the ~21B available). See [nnue/README.md §7](nnue/README.md) for the full lineage and
-exact recreation steps.
+**Shipped net.** [nnue/pawnstar-v8.bin](nnue/pawnstar-v8.bin) is a **1024-wide, single-bank (no king
+buckets)** net trained on **~2.31B** positions of **public PlentyChess** data. Lineage, all SPRT-measured
+(against the since-removed hand-crafted eval, "HCE", in the early steps): Pawnstar self-play *lost* to the
+HCE (label quality, not quantity, was the lever); scaling that data ~12× gave nothing (capacity-limited);
+**doubling the width 256→512 added +55 Elo (fixed depth) / +71 (time control)** — that is v4; doubling
+again to **1024 on 60M gave ~0 at fixed depth and −74 on the clock** (rejected *then* — 60M saturates the
+512 net). **King buckets were flat on 60M (data-starved) but on ~818M gave +47 fixed depth and +17 on the
+clock** — the v6 net — once two speed fixes (an 8 MB lockless eval cache and a single-pass accumulator
+update) clawed back the wider table's per-move cost. **Scaling that 512×4 arch to ~2.31B gave +29.96 fixed
+depth and +20.73 on the clock — the v7 net**. Then, at that same 2.31B data, **doubling the width to 1024
+*without* king buckets (a single bank) beat v7 by +31.9 ± 16.6 Elo at 40/20 — and at half the file size —
+reversing the old 60M result now that the data no longer saturates the wider net: the v8 net (shipped)**.
+Each shipped net retires its predecessor (v4 at v6, v6 at v7, v7 at v8). The recurring lesson: **more data
+is the lever** (v8's 2.31B is still only ~11% of the ~21B available). See [nnue/README.md §7](nnue/README.md)
+for the full lineage and exact recreation steps.
 
 ### Opening book
 
@@ -371,7 +373,7 @@ builds and runs seven standalone test executables:
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
 
-`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v7.bin`: `test_nnue` against the
+`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v8.bin`: `test_nnue` against the
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
 asserts the incremental accumulator matches a full refresh at every node, and `test_bratko_kopec_nnue`
 which searches the 24 BK positions with the net (single-threaded, deterministic) and **must solve all 24**
@@ -383,7 +385,7 @@ and the BK accepted moves (the net-specific union over depths 8–11) — see [n
 
 The Bratko-Kopec suite is the **move-based** `test_bratko_kopec_nnue` (the classic metric — did the engine
 find a good move). It takes an optional depth argument, e.g.
-`./build/test_bratko_kopec_nnue nnue/pawnstar-v7.bin 10`, and searches single-threaded for a reproducible
+`./build/test_bratko_kopec_nnue nnue/pawnstar-v8.bin 10`, and searches single-threaded for a reproducible
 result; the accepted moves are recorded over depths 8–11, so it solves 24/24 at each of those depths.
 There is no score-based Bratko-Kopec test: NNUE scores are non-deterministic under Lazy SMP
 and on a different scale. The earlier score-based `test_bratko_kopec` and the `test_pawn_structure` suite
@@ -434,9 +436,9 @@ Pawnstar has no official CCRL rating. The figures currently tracked are:
 
 - **Move generation** — roughly 700 million legal moves per second on a modern laptop core.
 - **Bratko-Kopec** — `test_bratko_kopec_nnue` solves 24/24 at each depth 8–11 with the shipped net (depth 8 runs in `make check`).
-- **Strength (rough).** `nnue/pawnstar-v7.bin` measures roughly ~2900+ Elo (CCRL-ballpark, anchored
-  against reference engines at a fast time control; v7 is +20.73 ± 12.73 over v6, which measured ~2900) —
-  far above the since-removed hand-crafted eval (~2350). At equal *time*, the incremental accumulator is
+- **Strength (rough).** `nnue/pawnstar-v8.bin` measures roughly ~2900+ Elo (CCRL-ballpark, anchored
+  against reference engines at a fast time control; v8 is +31.9 ± 16.6 over v7 at 40/20, and v7 measured
+  ~2900) — far above the since-removed hand-crafted eval (~2350). At equal *time*, the incremental accumulator is
   worth ~+80 Elo over a full refresh and the AVX2 SIMD kernels a further ~+180 Elo over the scalar
   versions (both by SPRT).
 
@@ -454,8 +456,9 @@ the published node counts for the standard positions.
 - **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
 - **NNUE is the only evaluator.** The engine loads the shipped net at startup and **exits** if it cannot
   (there is no hand-crafted fallback). The accumulator is maintained incrementally across make/undo (with
-  a refresh when a king crosses a bucket boundary) and the kernels are AVX2-vectorised, so it is fast on
-  the clock; the shipped net is a 512-wide, 4-king-bucket `ChessBuckets` net (v7).
+  a refresh when a king crosses a bucket boundary, which never happens with the single-bank shipped net)
+  and the kernels are AVX2-vectorised, so it is fast on the clock; the shipped net is a 1024-wide,
+  single-bank (no king buckets) `ChessBuckets` net (v8).
 
 ## Contributing
 

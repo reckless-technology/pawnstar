@@ -1,16 +1,18 @@
 #pragma once
 /// @file nnue.h NNUE (efficiently-updatable neural network) evaluation — the engine's only evaluator.
 ///
-/// The network is a "perspective" net with bullet's king-bucketed `ChessBuckets` feature set:
+/// The network is a "perspective" net with bullet's `ChessBuckets` feature set:
 ///
 ///   768 inputs per (perspective, king bucket)  ->  kHiddenSize feature transformer  (x2 perspectives)
 ///   SCReLU activation, concat[own | opponent] = 2*kHiddenSize  ->  1 output (centipawns, stm relative)
 ///
-/// Each perspective selects one of kNumKingBuckets weight banks by *its own* king's square (in that
-/// perspective's orientation): the feature row is `bucket * 768 + chess768_index`. This matches bullet's
-/// `ChessBuckets::new(kKingBucketMap)` exactly (the same 64-entry map; see nnue.cpp). A king move that
-/// crosses a bucket boundary changes that whole perspective's bank, so its accumulator is refreshed
-/// rather than diffed (at most one king moves per ply, so at most one perspective refreshes per Update).
+/// The shipped net is **1024-wide with kNumKingBuckets = 1** — a single weight bank, i.e. plain Chess768
+/// with no king buckets (at the 2.31B-position data scale this beat the 512-wide 4-bucket v7 by ~+32 Elo
+/// at 40/20). The bucket mechanism is retained and generalises over kNumKingBuckets: each perspective
+/// selects one of kNumKingBuckets banks by *its own* king's square (in that perspective's orientation), the
+/// feature row being `bucket * 768 + chess768_index`, matching bullet's `ChessBuckets::new(kKingBucketMap)`
+/// (the same 64-entry map; see nnue.cpp). A king move that crosses a bucket boundary refreshes that whole
+/// perspective's bank rather than diffing it (with a single bank, boundary crossings never occur).
 ///
 /// A net is owned by the Game (one instance, read-only after Network::Load) and shared by all Lazy SMP
 /// threads, which call only its const methods. The accumulator is maintained incrementally across
@@ -40,9 +42,9 @@ namespace nnue
 {
 
 constexpr int kInputSize      = 768; ///< Features per perspective per bucket: 2 colors * 6 types * 64 squares.
-constexpr int kNumKingBuckets = 4;   ///< King-square buckets; each perspective selects one weight bank.
+constexpr int kNumKingBuckets = 1;   ///< King-square weight banks (1 = single bank, i.e. no king buckets).
 constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
-constexpr int kHiddenSize     = 512; ///< Feature-transformer / accumulator width per perspective.
+constexpr int kHiddenSize     = 1024; ///< Feature-transformer / accumulator width per perspective.
 
 // Quantisation constants. These MUST match the bullet trainer configuration that produced the net.
 constexpr int kQA    = 255; ///< Feature-transformer weight/activation scale (SCReLU clamp).

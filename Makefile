@@ -29,7 +29,7 @@ OBJECTS             = $(ENGINE_OBJECTS) $(BUILD_DIR)/main.o
 DEPS                = $(OBJECTS:.o=.d)
 # The shipped NNUE net embedded into the engine binary (.incbin) as a runtime-load fallback. Linked into
 # the engine executable only — the test binaries load nets explicitly and don't need it.
-EMBED_NET           = nnue/pawnstar-v7.bin
+EMBED_NET           = nnue/pawnstar-v8.bin
 EMBED_OBJECT        = $(BUILD_DIR)/embedded_net.o
 
 TEST_PERFT_EXE      = $(BUILD_DIR)/test_perft
@@ -40,7 +40,7 @@ TEST_NNUE_INC_EXE   = $(BUILD_DIR)/test_nnue_incremental
 TEST_BOOK_EXE       = $(BUILD_DIR)/test_opening_book
 # Shipped net + checked-in trainer reference, used by `make check` to exercise NNUE inference and the
 # incremental accumulator. Resolved with wildcard so the checks degrade to a no-op (still green) if absent.
-NNUE_NET            = $(wildcard nnue/pawnstar-v7.bin)
+NNUE_NET            = $(wildcard nnue/pawnstar-v8.bin)
 NNUE_REF            = $(wildcard test/nnue_reference.txt)
 TEST_OBJECTS        = $(BUILD_DIR)/perft_test.o \
                       $(BUILD_DIR)/see_test.o \
