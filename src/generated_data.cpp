@@ -57,7 +57,7 @@ constexpr std::array<ShiftFn, 8> kShiftFunctions{ShiftNorth, ShiftNortheast, Shi
                                                  ShiftSouth, ShiftSouthwest, ShiftWest, ShiftNorthwest};
 
 /// @brief Ray from a square in one direction (excludes the source square).
-uint64_t RayFrom(uint8_t sq, Direction direction)
+constexpr uint64_t RayFrom(uint8_t sq, Direction direction)
 {
     uint64_t   result = 0;
     const auto fn     = kShiftFunctions[direction];
@@ -68,7 +68,7 @@ uint64_t RayFrom(uint8_t sq, Direction direction)
     return result;
 }
 
-uint64_t KnightAttacks(uint8_t sq)
+constexpr uint64_t KnightAttacks(uint8_t sq)
 {
     constexpr std::array<std::pair<int, int>, 8> kKnightVectors{
         {{-2, -1}, {-2, 1}, {-1, -2}, {-1, 2}, {1, -2}, {1, 2}, {2, -1}, {2, 1}}};
@@ -85,20 +85,20 @@ uint64_t KnightAttacks(uint8_t sq)
     return result;
 }
 
-uint64_t BishopAttacksOnEmptyBoard(uint8_t sq)
+constexpr uint64_t BishopAttacksOnEmptyBoard(uint8_t sq)
 {
     return RayFrom(sq, kNortheast) | RayFrom(sq, kNorthwest) | RayFrom(sq, kSoutheast) | RayFrom(sq, kSouthwest);
 }
-uint64_t RookAttacksOnEmptyBoard(uint8_t sq)
+constexpr uint64_t RookAttacksOnEmptyBoard(uint8_t sq)
 {
     return RayFrom(sq, kNorth) | RayFrom(sq, kSouth) | RayFrom(sq, kEast) | RayFrom(sq, kWest);
 }
-uint64_t QueenAttacksOnEmptyBoard(uint8_t sq)
+constexpr uint64_t QueenAttacksOnEmptyBoard(uint8_t sq)
 {
     return BishopAttacksOnEmptyBoard(sq) | RookAttacksOnEmptyBoard(sq);
 }
 
-uint64_t KingAttacks(uint8_t sq)
+constexpr uint64_t KingAttacks(uint8_t sq)
 {
     const uint64_t b = SqBB(sq);
     return ShiftNorth(b) | ShiftNortheast(b) | ShiftEast(b) | ShiftSoutheast(b) | ShiftSouth(b) | ShiftSouthwest(b) |
@@ -106,7 +106,7 @@ uint64_t KingAttacks(uint8_t sq)
 }
 
 /// @brief Squares strictly between two colinear squares (0 if not colinear).
-uint64_t InterveningSquares(uint8_t from, uint8_t to)
+constexpr uint64_t InterveningSquares(uint8_t from, uint8_t to)
 {
     constexpr std::array<Direction, 8> kDirections{kNorth, kNortheast, kEast, kSoutheast,
                                                    kSouth, kSouthwest, kWest, kNorthwest};
@@ -122,7 +122,7 @@ uint64_t InterveningSquares(uint8_t from, uint8_t to)
 }
 
 /// @brief Occupancy mask for one direction (excludes the final edge square, which never blocks).
-uint64_t RayOccupancyMask(uint8_t sq, Direction direction)
+constexpr uint64_t RayOccupancyMask(uint8_t sq, Direction direction)
 {
     uint64_t   result      = 0;
     uint64_t   last_square  = 0;
@@ -134,19 +134,19 @@ uint64_t RayOccupancyMask(uint8_t sq, Direction direction)
     }
     return result ^ last_square;
 }
-uint64_t BishopOccupancyMask(uint8_t sq)
+constexpr uint64_t BishopOccupancyMask(uint8_t sq)
 {
     return RayOccupancyMask(sq, kNortheast) | RayOccupancyMask(sq, kNorthwest) | RayOccupancyMask(sq, kSoutheast) |
            RayOccupancyMask(sq, kSouthwest);
 }
-uint64_t RookOccupancyMask(uint8_t sq)
+constexpr uint64_t RookOccupancyMask(uint8_t sq)
 {
     return RayOccupancyMask(sq, kNorth) | RayOccupancyMask(sq, kSouth) | RayOccupancyMask(sq, kEast) |
            RayOccupancyMask(sq, kWest);
 }
 
 /// @brief Sliding move targets in one direction, stopping at (and including) the first occupied square.
-uint64_t RayAttacks(uint64_t occupied_squares, uint8_t sq, Direction direction)
+constexpr uint64_t RayAttacks(uint64_t occupied_squares, uint8_t sq, Direction direction)
 {
     uint64_t   result = 0;
     const auto fn     = kShiftFunctions[direction];
@@ -160,19 +160,19 @@ uint64_t RayAttacks(uint64_t occupied_squares, uint8_t sq, Direction direction)
     }
     return result;
 }
-uint64_t BishopAttacks(uint64_t occupied_squares, uint8_t sq)
+constexpr uint64_t BishopAttacks(uint64_t occupied_squares, uint8_t sq)
 {
     return RayAttacks(occupied_squares, sq, kNortheast) | RayAttacks(occupied_squares, sq, kSoutheast) |
            RayAttacks(occupied_squares, sq, kSouthwest) | RayAttacks(occupied_squares, sq, kNorthwest);
 }
-uint64_t RookAttacks(uint64_t occupied_squares, uint8_t sq)
+constexpr uint64_t RookAttacks(uint64_t occupied_squares, uint8_t sq)
 {
     return RayAttacks(occupied_squares, sq, kNorth) | RayAttacks(occupied_squares, sq, kEast) |
            RayAttacks(occupied_squares, sq, kSouth) | RayAttacks(occupied_squares, sq, kWest);
 }
 
 /// @brief Enumerate every subset of a bit mask (Hacker's Delight carry-rippler).
-std::vector<uint64_t> EnumerateMaskCombinations(uint64_t mask)
+constexpr std::vector<uint64_t> EnumerateMaskCombinations(uint64_t mask)
 {
     std::vector<uint64_t> result;
     uint64_t              n = 0;
@@ -189,7 +189,7 @@ using MaskFn = uint64_t (*)(uint8_t);
 using AttFn  = uint64_t (*)(uint64_t, uint8_t);
 
 /// @brief Build a 64-entry Bitboard table from a per-square generator.
-std::array<Bitboard, 64> MakeBitboards(BBFn fn)
+constexpr std::array<Bitboard, 64> MakeBitboards(BBFn fn)
 {
     std::array<Bitboard, 64> table{};
     for (uint8_t sq = 0; sq != 64; ++sq)
@@ -237,7 +237,7 @@ std::array<PextBitboard, 64> MakePexts(MaskFn mask_fn, AttFn attack_fn)
     return table;
 }
 
-MultiDimArray<Bitboard, 64, 64>::type MakeInterveningSquares()
+constexpr MultiDimArray<Bitboard, 64, 64>::type MakeInterveningSquares()
 {
     MultiDimArray<Bitboard, 64, 64>::type table{};
     for (uint8_t from = 0; from != 64; ++from)
