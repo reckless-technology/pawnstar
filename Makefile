@@ -5,7 +5,6 @@ CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2 -ma
 BUILD_DIR           = build
 DOC_DIR             = doc/html
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
-GENERATED_DATA      = src/generated_data.cpp
 TEST_DIR            = test
 TOOLS_DIR           = tools
 TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net
@@ -22,7 +21,7 @@ ENGINE_SOURCES      = \
 	search_state.cpp \
 	static_exchange_evaluation.cpp \
 	transposition_table.cpp \
-	$(notdir $(GENERATED_DATA))
+	generated_data.cpp
 
 SOURCES             = $(ENGINE_SOURCES) main.cpp
 ENGINE_OBJECTS      = $(addprefix $(BUILD_DIR)/, $(ENGINE_SOURCES:.cpp=.o))
