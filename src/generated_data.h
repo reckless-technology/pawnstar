@@ -30,7 +30,6 @@ extern const std::array<Bitboard, 64>     kPawnAttacksBlack;       ///< Squares 
 extern const std::array<Bitboard, 64>     kKnightAttacks;          ///< Squares attacked by a knight on each square.
 extern const std::array<Bitboard, 64>     kBishopAttacks;          ///< Bishop attacks on an empty board per square.
 extern const std::array<Bitboard, 64>     kRookAttacks;            ///< Rook attacks on an empty board per square.
-extern const std::array<Bitboard, 64>     kQueenAttacks;           ///< Queen attacks on an empty board per square.
 extern const std::array<Bitboard, 64>     kKingAttacks;            ///< Squares attacked by a king on each square.
 extern const std::array<zobrist_t, 16>    kCastlingRightsHashes;   ///< Zobrist hash per castling-rights value.
 extern const std::array<zobrist_t, 64>    kEnPassantHashes;        ///< Zobrist hash per en passant square.

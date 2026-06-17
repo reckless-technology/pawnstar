@@ -98,11 +98,6 @@ constexpr uint64_t RookAttacksOnEmptyBoard(uint8_t sq)
     return RayFrom(sq, kNorth) | RayFrom(sq, kSouth) | RayFrom(sq, kEast) | RayFrom(sq, kWest);
 }
 
-constexpr uint64_t QueenAttacksOnEmptyBoard(uint8_t sq)
-{
-    return BishopAttacksOnEmptyBoard(sq) | RookAttacksOnEmptyBoard(sq);
-}
-
 constexpr uint64_t KingAttacks(uint8_t sq)
 {
     const uint64_t b = SqBB(sq);
@@ -259,42 +254,48 @@ constexpr MultiDimArray<Bitboard, 64, 64>::type MakeInterveningSquares()
     return table;
 }
 
-/// @brief All Zobrist tables, filled from a single fixed-seed PRNG in the historical draw order
-/// (piece-square, then castling rights, then en passant) so the values match the old generated file.
-struct ZobristTables
-{
-    MultiDimArray<zobrist_t, 2, 6, 64>::type piece_square{};
-    std::array<zobrist_t, 16>                castling{};
-    std::array<zobrist_t, 64>                en_passant{};
-};
+/// @brief The Zobrist tables are filled from this single fixed-seed PRNG. The three table globals below
+/// are defined in the historical draw order (piece-square, then castling rights, then en passant); within
+/// this translation unit they are dynamically initialised in definition order, so the PRNG is drawn in
+/// that order and the values match the old generated file. No table is stored twice.
+std::mt19937_64 g_zobrist_prng{0xAA55AA55AA55AA55ull};
 
-ZobristTables MakeZobrist()
+MultiDimArray<zobrist_t, 2, 6, 64>::type MakePieceSquareHashes()
 {
-    std::mt19937_64 prng{0xAA55AA55AA55AA55ull};
-    ZobristTables   z;
+    MultiDimArray<zobrist_t, 2, 6, 64>::type table{};
     for (int color = 0; color != 2; ++color)
     {
         for (int piece = 0; piece != 6; ++piece) // pawn..king
         {
             for (uint8_t sq = 0; sq != 64; ++sq)
             {
-                z.piece_square[color][piece][sq] = prng();
+                table[color][piece][sq] = g_zobrist_prng();
             }
         }
     }
+    return table;
+}
+
+std::array<zobrist_t, 16> MakeCastlingRightsHashes()
+{
+    std::array<zobrist_t, 16> table{};
     for (uint8_t i = 0; i != 16; ++i)
     {
-        z.castling[i] = prng();
+        table[i] = g_zobrist_prng();
     }
+    return table;
+}
+
+std::array<zobrist_t, 64> MakeEnPassantHashes()
+{
+    std::array<zobrist_t, 64> table{};
     for (uint8_t i = 0; i != 64; ++i)
     {
         const uint8_t rank = RankOf(i);
-        z.en_passant[i]    = (rank == 2 || rank == 5) ? prng() : 0;
+        table[i]           = (rank == 2 || rank == 5) ? g_zobrist_prng() : 0;
     }
-    return z;
+    return table;
 }
-
-const ZobristTables g_zobrist = MakeZobrist();
 } // namespace
 
 // ── The precomputed tables, computed once at program startup (dynamic initialisation). ──────────────
@@ -307,7 +308,6 @@ const std::array<Bitboard, 64> kPawnAttacksBlack =
 const std::array<Bitboard, 64> kKnightAttacks = MakeBitboards(KnightAttacks);
 const std::array<Bitboard, 64> kBishopAttacks = MakeBitboards(BishopAttacksOnEmptyBoard);
 const std::array<Bitboard, 64> kRookAttacks   = MakeBitboards(RookAttacksOnEmptyBoard);
-const std::array<Bitboard, 64> kQueenAttacks  = MakeBitboards(QueenAttacksOnEmptyBoard);
 const std::array<Bitboard, 64> kKingAttacks   = MakeBitboards(KingAttacks);
 
 const std::array<PextBitboard, 64> kBishopPexts = MakePexts(BishopOccupancyMask, BishopAttacks);
@@ -315,6 +315,7 @@ const std::array<PextBitboard, 64> kRookPexts   = MakePexts(RookOccupancyMask, R
 
 const MultiDimArray<Bitboard, 64, 64>::type kInterveningSquares = MakeInterveningSquares();
 
-const MultiDimArray<zobrist_t, 2, 6, 64>::type kPieceSquareHashes    = g_zobrist.piece_square;
-const std::array<zobrist_t, 16>                kCastlingRightsHashes = g_zobrist.castling;
-const std::array<zobrist_t, 64>                kEnPassantHashes      = g_zobrist.en_passant;
+// Defined in this exact order so the shared g_zobrist_prng is drawn in the historical sequence.
+const MultiDimArray<zobrist_t, 2, 6, 64>::type kPieceSquareHashes    = MakePieceSquareHashes();
+const std::array<zobrist_t, 16>                kCastlingRightsHashes = MakeCastlingRightsHashes();
+const std::array<zobrist_t, 64>                kEnPassantHashes      = MakeEnPassantHashes();

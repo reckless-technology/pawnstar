@@ -83,8 +83,9 @@ tools: prep $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE)
 tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE)
 
 # Run every suite in one shell, chained with && so the first failure aborts (and the summary below is
-# skipped). On full success report the wall-clock time spent running the tests (not the build).
-check: tests
+# skipped). On full success report the wall-clock time spent running the tests (not the build). Depends on
+# `tools` as well so a broken helper (e.g. filter_book) fails the check instead of rotting unnoticed.
+check: tests tools
 	@start=$$(date +%s%3N); \
 	$(TEST_PERFT_EXE) && \
 	$(TEST_BK_NNUE_EXE) $(NNUE_NET) && \
