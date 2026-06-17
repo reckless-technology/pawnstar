@@ -187,7 +187,10 @@ fixed-time clocks bypass the heuristic.
   [−15.99 ± 16.16], so the `depth − 4` cut stands.)
 - **Late-move reductions (LMR)** — at null-window nodes, any late move (past the 4th) outside a check
   sequence at `depth > 2` is searched one ply shallower, with a second ply shaved off past the 7th
-  move at `depth > 3`. A reduced search that beats alpha is re-searched at full depth.
+  move at `depth > 3`, and a third ply if that very-late move also has **zero history count** (the
+  least-promising quiets are pruned hardest). A reduced search that beats alpha is re-searched at full
+  depth. The third-ply reduction was SPRT-tested: roughly neutral at fast 8+0.08, but **+11 Elo
+  (±18, 578 games)** at 40 moves/minute — a time-control-dependent gain that deeper trees reward.
 - **Search extensions** for promotions and en passant captures.
 - **Move ordering** — the TT move first, then winning/equal captures and promotions by static exchange
   evaluation, then the two killer moves for the ply, then quiet moves by history-heuristic count, and

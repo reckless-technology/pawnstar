@@ -93,7 +93,7 @@ The search functions were consolidated onto the classes that own their state: `G
 - Transposition table probe/store (exact PV, lower-bound CUT, upper-bound ALL).
 - Principal variation search (PVS): full window on the first move, null-window scout on the rest, re-search on a fail-high.
 - Null-move pruning.
-- Late-move reduction (LMR): reduces any late move (after the 4th) outside a check sequence at depth > 2, with an extra reduction after the 7th. (Each thread searches its tree sequentially — there is no in-tree split.)
+- Late-move reduction (LMR): reduces any late move (after the 4th) outside a check sequence at depth > 2, with an extra reduction after the 7th (depth > 3), and a third reduction if that very-late move also has zero history count (SPRT-tested: ~neutral at fast 8+0.08, +11 Elo at 40 moves/min — a time-control-dependent gain). (Each thread searches its tree sequentially — there is no in-tree split.)
 - Killer move heuristic (2 killers per ply): a quiet move that causes a beta cutoff is stored via `SearchState::RecordKiller`.
 - History heuristic (`HistoryTable`) for move ordering — **per-thread** (owned by `SearchState`), so there is no cross-thread contention on its counters.
 
