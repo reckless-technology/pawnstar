@@ -77,12 +77,6 @@ class Position
         return pieces[kNone];
     }
 
-    /// @brief All empty squares. @return Vacant-square bitboard.
-    constexpr Bitboard VacantSquares() const
-    {
-        return ~pieces[kNone];
-    }
-
     /// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
     constexpr Piece PieceAt(Square location) const
     {
@@ -117,12 +111,6 @@ class Position
     constexpr uint8_t ReversibleMoveCount() const
     {
         return reversible_move_count_;
-    }
-
-    /// @brief En passant target square. @return The en passant square (0 if none).
-    constexpr Square EnPassantIndex() const
-    {
-        return en_passant_square_;
     }
 
     std::array<Bitboard, 7> pieces; ///< @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the

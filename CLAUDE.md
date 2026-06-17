@@ -54,12 +54,12 @@ Pawnstar is a UCI chess engine using bitboard board representation and parallel 
 ### Board representation
 
 `Position` ([position.h](src/position.h)) is the central state class. It stores:
-- Six per-piece bitboards (`pawns_`, `knights_`, `bishops_`, `rooks_`, `queens_`, `kings_`) plus two per-color bitboards (`white_pieces_`, `black_pieces_`).
+- A public `pieces[7]` array of per-piece-type bitboards (indexed by `Piece`; index 0 / `kNone` holds the occupied-squares set) and a public `colors[2]` array of per-color bitboards.
 - A `squares_[64]` array for O(1) square→piece lookup.
 - Zobrist hash, castling rights (`CastlingRights`), en passant square, half-move clock, and a checkers bitboard (squares giving check to the side to move).
-- State flags packed into `state_flags_` (color to move, null-move marker).
+- A public `bool is_null_move` (null-move marker) and a public `Color color_to_move` (side to move), the latter declared last so it occupies what was otherwise a trailing padding byte (`sizeof(Position) == 160`).
 
-`Position` is immutable after construction. `MakeMove` and `MakeNullMove` return a new `Position` by value. `GenerateLegalMoves` / `GenerateLegalCaptures` dispatch to the templated `GenMoves<Color, bool>()`, which uses `Pins` to filter pseudo-legal moves.
+`Position` is immutable after construction. `MakeMove` and `MakeNullMove` return a new `Position` by value. `GenerateLegalMoves` / `GenerateLegalCaptures` dispatch to the templated `GenMoves<Color, bool>()`, which uses `Pins` to filter pseudo-legal moves. `pieces`/`colors`/`is_null_move`/`color_to_move` are public data members read directly (no getters); UCI does not declare game results, so there are no `IsGameOver`/`IsCheckmate`/`IsStalemate` helpers.
 
 `Bitboard` ([bitboard.h](src/bitboard.h)) wraps a `uint64_t` with bitwise operations and a range-based iterator over set bits (`Square` values).
 
@@ -85,9 +85,11 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 
 ### Search
 
-**Iterative deepening** — `SearchRootNode` ([search_root_node.cpp](src/search_root_node.cpp)) drives iterative deepening from `kStartDepth` (3) upwards, maintaining a principal variation. The per-iteration loop lives in the static `IterativeDeepen` helper, which every Lazy SMP thread runs. It runs on a dedicated worker thread started by `Game::StartThinking`; the UCI `stop` command sets `game.is_cancel_pending`.
+The search functions were consolidated onto the classes that own their state: `Game::SearchRootNode` lives in [game.cpp](src/game.cpp), and `Search`/`SearchSingleMove`/`SearchQuiescent`/`IterativeDeepen` are `SearchState` members in [search_state.cpp](src/search_state.cpp). The old standalone `search.h`, `search_alphabeta.cpp`, `search_quiescent.cpp` and `search_root_node.cpp` no longer exist.
 
-**Alpha-beta** — `SearchAlphaBeta` ([search_alphabeta.cpp](src/search_alphabeta.cpp)) is a fail-soft negamax with:
+**Iterative deepening** — `Game::SearchRootNode` ([game.cpp](src/game.cpp)) drives iterative deepening from `kStartDepth` (3) upwards, maintaining a principal variation. The per-iteration loop is `SearchState::IterativeDeepen`, which every Lazy SMP thread runs. It runs on a dedicated worker thread started by `Game::StartThinking`; the UCI `stop` command sets `game.is_cancel_pending`.
+
+**Alpha-beta** — `SearchState::Search` ([search_state.cpp](src/search_state.cpp)) is a fail-soft negamax with:
 - Transposition table probe/store (exact PV, lower-bound CUT, upper-bound ALL).
 - Principal variation search (PVS): full window on the first move, null-window scout on the rest, re-search on a fail-high.
 - Null-move pruning.
@@ -97,9 +99,9 @@ Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_dat
 
 **Move ordering** — `SearchState::ScoreAndSortMoves` assigns each move a 23-bit ordering score stored in the `Move` itself, in descending bands: winning/equal captures and promotions (`kWinningCaptureBase` + SEE score), the two killer moves for the ply (just below winning captures), quiet moves (history count, clamped below the killers), and finally losing captures (their negative SEE, sorting below quiet moves). The TT move is searched first, before the list is generated and sorted.
 
-**Quiescence search** — `SearchQuiescent` ([search_quiescent.cpp](src/search_quiescent.cpp)) searches captures only, using its own transposition table. It applies SEE pruning: a capture with negative SEE that does not give check is skipped rather than searched.
+**Quiescence search** — `SearchState::SearchQuiescent` ([search_state.cpp](src/search_state.cpp)) searches captures only, using its own transposition table. It applies SEE pruning: a capture with negative SEE that does not give check is skipped rather than searched.
 
-**Parallel search (Lazy SMP)** — `SearchRootNode` spawns `hardware_concurrency()` threads (capped at `kMaxSearchThreads`, 256), each running a complete independent `IterativeDeepen` search of the root. There is no tree splitting and no work queue — threads cooperate only through the shared lockless transposition table, where one thread's entries prefill another's probes. Each thread has its own `SearchState` (including its own history table), so the only shared mutable state is the transposition tables and `is_cancel_pending`. The thread count can be overridden with the `PAWNSTAR_THREADS` environment variable (e.g. `PAWNSTAR_THREADS=1` for a deterministic single-threaded search — used to regenerate BK reference data). To stop helpers recomputing the same tree in lockstep, the main thread (thread 0) searches every depth while each helper follows a Stockfish-style iteration-skip schedule (`kSkipSize`/`kSkipPhase` tables in `search_root_node.cpp`) that skips selected depths. Only the main thread prints `info`, applies time management and returns the authoritative move; because helpers race ahead through the table, the result (move and exact score) is non-deterministic between runs.
+**Parallel search (Lazy SMP)** — `Game::SearchRootNode` spawns `hardware_concurrency()` threads (capped at `kMaxSearchThreads`, 256), each running a complete independent `SearchState::IterativeDeepen` search of the root. There is no tree splitting and no work queue — threads cooperate only through the shared lockless transposition table, where one thread's entries prefill another's probes. Each thread has its own `SearchState` (including its own history table), so the only shared mutable state is the transposition tables and `is_cancel_pending`. The thread count can be overridden with the `PAWNSTAR_THREADS` environment variable (e.g. `PAWNSTAR_THREADS=1` for a deterministic single-threaded search — used to regenerate BK reference data). To stop helpers recomputing the same tree in lockstep, the main thread (thread 0) searches every depth while each helper follows a Stockfish-style iteration-skip schedule (`kSkipSize`/`kSkipPhase` tables in `search_state.cpp`) that skips selected depths. Only the main thread prints `info`, applies time management and returns the authoritative move; because helpers race ahead through the table, the result (move and exact score) is non-deterministic between runs.
 
 ### Per-thread state
 

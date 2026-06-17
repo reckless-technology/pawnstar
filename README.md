@@ -151,7 +151,7 @@ lockless transposition table rather than splitting the tree between them.
 
 #### Iterative deepening and time management
 
-`SearchRootNode` ([src/search_root_node.cpp](src/search_root_node.cpp)) runs on a dedicated worker
+`Game::SearchRootNode` ([src/game.cpp](src/game.cpp)) runs on a dedicated worker
 thread — started by `Game::StartThinking` — so the UCI `stop` command, which sets an atomic
 cancellation flag polled throughout the tree, can interrupt it at any time. It searches the root move
 list at increasing depths starting from `kStartDepth` (3) up to `kMaxPly` (64), emitting a
@@ -174,7 +174,7 @@ fixed-time clocks bypass the heuristic.
 
 #### Recursive search
 
-`Search` ([src/search_alphabeta.cpp](src/search_alphabeta.cpp)) applies, at each node:
+`SearchState::Search` ([src/search_state.cpp](src/search_state.cpp)) applies, at each node:
 
 - **Transposition table** probe/store with CUT / ALL / PV node types; a TT cutoff or TT move ordering
   hint is taken before any moves are generated.
@@ -194,16 +194,16 @@ fixed-time clocks bypass the heuristic.
   finally losing captures (negative SEE) below the quiet moves. A quiet move that causes a beta cutoff
   is recorded as a killer and rewarded in the per-thread history table.
 
-**Quiescence search** ([src/search_quiescent.cpp](src/search_quiescent.cpp)) extends the leaves with
+**Quiescence search** (`SearchState::SearchQuiescent`, [src/search_state.cpp](src/search_state.cpp)) extends the leaves with
 captures only, using a separate transposition table, so the static evaluation is never called on a
 position with a hanging capture available. It applies **SEE pruning** — a capture that loses material
 by static exchange evaluation and does not give check is skipped rather than searched.
 
 #### Parallel search (Lazy SMP)
 
-Parallelism is provided by **Lazy SMP**: `SearchRootNode` launches `hardware_concurrency()` threads
+Parallelism is provided by **Lazy SMP**: `Game::SearchRootNode` launches `hardware_concurrency()` threads
 (capped at `kMaxSearchThreads`), each running its *own* complete iterative-deepening search of the root
-position via `IterativeDeepen`. There is no tree splitting and no work queue — the threads cooperate
+position via `SearchState::IterativeDeepen`. There is no tree splitting and no work queue — the threads cooperate
 purely through the shared lockless transposition table, where one thread's deeper or earlier results
 prefill the entries another thread will probe. Each thread owns its own `SearchState` (position stack,
 hash history, killers, node count) **and its own history table**, so the only cross-thread sharing is
@@ -214,7 +214,7 @@ environment variable (e.g. `PAWNSTAR_THREADS=1` forces a deterministic single-th
 
 To keep the helper threads from recomputing the same tree in lockstep, the main thread (thread 0)
 searches every depth while each helper follows a Stockfish-style **iteration-skip schedule**
-(`kSkipSize` / `kSkipPhase` tables in `search_root_node.cpp`) that makes it skip selected depths. The
+(`kSkipSize` / `kSkipPhase` tables in `search_state.cpp`) that makes it skip selected depths. The
 threads therefore desynchronise and seed the shared table with a diverse mix of depths. Only the main
 thread prints `info` lines, applies time management and produces the authoritative best move; helpers
 run silently and stop as soon as the shared cancellation flag is set.

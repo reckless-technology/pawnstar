@@ -152,9 +152,8 @@ bool SearchState::IsCancelled() const
 }
 
 // ----------------------------------------------------------------------------
-// Alpha-beta and quiescence search (formerly the free functions in
-// search_alphabeta.cpp / search_quiescent.cpp, now SearchState members). Each
-// keeps a `state` alias so the body reads uniformly through `state`.
+// Alpha-beta and quiescence search. Each keeps a `state` alias so the body reads
+// uniformly through `state`.
 // ----------------------------------------------------------------------------
 
 SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv,
@@ -560,9 +559,8 @@ int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
 }
 
 // ----------------------------------------------------------------------------
-// Iterative deepening — one Lazy SMP thread (formerly the root-node driver in
-// search_root_node.cpp). Game::SearchRootNode (in game.cpp) launches one of
-// these per thread.
+// Iterative deepening — one Lazy SMP thread. Game::SearchRootNode (in game.cpp)
+// launches one of these per thread.
 // ----------------------------------------------------------------------------
 
 Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread_id, int64_t start_ms, int ms_allocated)

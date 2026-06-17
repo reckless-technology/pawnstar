@@ -77,16 +77,16 @@ constexpr void Position::MovePiece(Color color, Piece piece, Square from, Square
     squares_[to]   = piece;
 }
 
-static constexpr Square G1{"G1"}; ///< White kingside castling king destination.
-static constexpr Square C1{"C1"}; ///< White queenside castling king destination.
-static constexpr Square G8{"G8"}; ///< Black kingside castling king destination.
-static constexpr Square C8{"C8"}; ///< Black queenside castling king destination.
-
 /// @brief Make a move and return the new position.
 /// @param move The move to be made.
 /// @return new Position following the move.
 Position Position::MakeMove(const Move &move) const
 {
+    constexpr Square G1{"G1"}; // White kingside castling king destination.
+    constexpr Square C1{"C1"}; // White queenside castling king destination.
+    constexpr Square G8{"G8"}; // Black kingside castling king destination.
+    constexpr Square C8{"C8"}; // Black queenside castling king destination.
+
     const Color  color = color_to_move;
     const Square from  = move.from();
     const Square to    = move.to();

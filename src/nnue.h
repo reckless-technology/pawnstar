@@ -1,7 +1,6 @@
 #pragma once
-/// @file nnue.h Optional NNUE (efficiently-updatable neural network) evaluation.
+/// @file nnue.h NNUE (efficiently-updatable neural network) evaluation — the engine's only evaluator.
 ///
-/// This is an experimental alternative to the handcrafted evaluation in evaluation.cpp.
 /// The network is a "perspective" net with bullet's king-bucketed `ChessBuckets` feature set:
 ///
 ///   768 inputs per (perspective, king bucket)  ->  kHiddenSize feature transformer  (x2 perspectives)
