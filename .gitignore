@@ -1,6 +1,5 @@
 build/
 doc/html/
-src/generated_data.cpp
 
 # fastchess resumable tournament config (written into the cwd during SPRT runs)
 config.json

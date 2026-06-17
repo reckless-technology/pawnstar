@@ -6,8 +6,6 @@ BUILD_DIR           = build
 DOC_DIR             = doc/html
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
 GENERATED_DATA      = src/generated_data.cpp
-GENERATOR_SOURCE    = src/generate_constants.cpp
-GENERATOR_EXE       = $(BUILD_DIR)/gen_constants
 TEST_DIR            = test
 TOOLS_DIR           = tools
 TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net
@@ -77,7 +75,7 @@ ifeq ($(LTO), 1)
 	CXXFLAGS += -flto=thin
 endif
 
-.PHONY: all tests check prep clean gen doc tools
+.PHONY: all tests check prep clean doc tools
 
 all: prep $(PROGRAM_EXE)
 
@@ -104,10 +102,7 @@ clean:
 	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) \
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
 	      $(TOOL_FILTERBOOK_EXE) $(BUILD_DIR)/filter_book.o $(BUILD_DIR)/filter_book.d \
-	      $(OBJECTS) $(EMBED_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS) \
-	      $(GENERATED_DATA) $(GENERATOR_EXE)
-
-gen: prep $(GENERATOR_EXE)
+	      $(OBJECTS) $(EMBED_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS)
 
 # Generate API documentation with doxygen (output configured by the Doxyfile).
 doc:
@@ -160,14 +155,6 @@ $(TOOL_STAMP_EXE): $(BUILD_DIR)/stamp_net.o
 # Link the opening-book filter against all engine objects (it drives the NNUE search).
 $(TOOL_FILTERBOOK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/filter_book.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
-
-# Compile the generator executable.
-$(GENERATOR_EXE): $(GENERATOR_SOURCE) | prep
-	$(CXX) $(CXXFLAGS) -o $(GENERATOR_EXE) $(GENERATOR_SOURCE)
-
-# Invoke the generator executable to create the generated data source file.
-$(GENERATED_DATA): $(GENERATOR_EXE)
-	$(GENERATOR_EXE) > $(GENERATED_DATA)
 
 -include $(DEPS)
 -include $(TEST_DEPS)

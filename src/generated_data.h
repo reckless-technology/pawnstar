@@ -2,25 +2,26 @@
 #include "bitboard.h"
 #include <array>
 #include <cstdint>
-#include <span>
+#include <vector>
 
 using zobrist_t = uint64_t; ///< Zobrist hash value type.
 
-/// @file generated_data.h Declares data which is generated at compile time by the program "generate_constants.cpp" and
-/// contains various precomputed constants that are used by pawnstar to speed up positional hashing, move generation
-/// and attack detection.
+/// @file generated_data.h Declares precomputed lookup tables (attack/ray bitboards, pext sliding-attack
+/// tables, intervening-squares masks and Zobrist hashes) used by pawnstar for hashing, move generation and
+/// attack detection. The tables are defined in generated_data.cpp and computed once at program startup
+/// (dynamic initialisation), so there is no build-time code-generation step.
 
 ///@brief An entry in the pext bitboard move generator array.
 /// Each entry contains information to generate sliding moves for either a bishop or a rook, for one square.
 /// Uses an extra indirection via indices, since indices are 1 byte each and attack sets are 8 bytes each. This saves a
 /// lot of space in the (already very large) rook bitboard tables, since for example for rooks there are 12 bits
 /// in the occupancy mask (4096 indices) but typically only around 100 actual move sets. The pext bitboard sets are
-/// generated at compile time.
+/// computed once at program startup (see generated_data.cpp); each entry owns its attack/index storage.
 struct PextBitboard
 {
-    Bitboard                  occupancy_mask; ///< Occupancy mask (excludes final target square).
-    std::span<const Bitboard> attacks;        ///< Discrete attack vectors (move sets).
-    std::span<const uint8_t>  indices;        ///< Indices into the discrete attack vector array.
+    Bitboard              occupancy_mask; ///< Occupancy mask (excludes final target square).
+    std::vector<Bitboard> attacks;        ///< Discrete attack vectors (move sets).
+    std::vector<uint8_t>  indices;        ///< Indices into the discrete attack vector array.
 };
 
 extern const std::array<Bitboard, 64>     kEastWest;               ///< East|west rays from each square (king's rank, en passant).

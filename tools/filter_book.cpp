@@ -77,7 +77,7 @@ SearchResult Search(Game &game, const std::string &fen, int depth)
     game.book.Free(); // never return a book move - we want the engine's own judgement, not a canned reply
     game.time_control.clock_type = ChessClock::kFixedDepth;
     game.time_control.depth      = depth;
-    Move m                       = SearchRootNode(game);
+    Move m                       = game.SearchRootNode();
     return {m != Move::None(), m.score()};
 }
 

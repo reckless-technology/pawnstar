@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build
 
-Requires `clang++` and GNU `make`. The build has a pre-compilation step that generates `src/generated_data.cpp` (precomputed bitboard lookup tables).
+Requires `clang++` and GNU `make`. There is no code-generation build step; the precomputed bitboard lookup tables in `src/generated_data.cpp` are `const` globals computed once at program startup.
 
 ```bash
 make          # full build → build/pawnstar
@@ -77,7 +77,7 @@ Move types: `kNonCapture`, `kCapture`, `kPawnDoublePush`, `kEpCapture`, `kCastli
 
 ### Attack generation
 
-`Attacks` ([attacks.h](src/attacks.h)) uses BMI2 `_pext_u64` for sliding-piece attacks: for each square the occupancy bits relevant to that slider are extracted with `pext`, used to index a per-square attack table. Tables live in `src/generated_data.cpp` (generated at build time by `src/generate_constants.cpp`; gitignored and regenerated on every `make`).
+`Attacks` ([attacks.h](src/attacks.h)) uses BMI2 `_pext_u64` for sliding-piece attacks: for each square the occupancy bits relevant to that slider are extracted with `pext`, used to index a per-square attack table. Tables live in `src/generated_data.cpp` as `const` globals computed once at program startup (no build-time codegen). The non-PEXT ray-scan fallback was removed — the build always targets BMI2 (`static_assert(__BMI2__)`).
 
 Knight, king, and pawn attack tables are plain 64-entry arrays in `generated_data.cpp`.
 
@@ -161,4 +161,4 @@ SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_excha
 
 ### Generated data
 
-[generate_constants.cpp](src/generate_constants.cpp) is a standalone program (built separately, not part of the engine link) that outputs [src/generated_data.cpp](src/generated_data.cpp). Only modify `generate_constants.cpp` when attack mask logic changes. The output is gitignored and regenerated on every `make`.
+[generated_data.cpp](src/generated_data.cpp) holds the precomputed lookup tables (attack/ray bitboards, pext sliding-attack tables, intervening-squares masks, Zobrist hashes) declared `extern const` in [generated_data.h](src/generated_data.h). They are computed once at program startup (dynamic initialisation of the `const` globals) by the pure helper functions at the top of that file — there is no separate generator program or build step. Edit `generated_data.cpp` when the table logic changes. (Historically these were emitted as literals by a standalone `generate_constants.cpp`, since removed.)

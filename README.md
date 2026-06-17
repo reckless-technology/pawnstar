@@ -35,9 +35,9 @@ make doc       # generate Doxygen HTML into doc/html
 make clean     # remove build artifacts and generated docs
 ```
 
-A pre-compilation step builds and runs `src/generate_constants.cpp`, which emits
-`src/generated_data.cpp` (the precomputed bitboard attack and Zobrist tables). This file is
-gitignored and regenerated on every build.
+There is no code-generation build step: the precomputed bitboard attack and Zobrist tables in
+`src/generated_data.cpp` are ordinary `const` globals computed once at program startup (dynamic
+initialisation), so a plain `make` builds the engine directly.
 
 Debug build with AddressSanitizer + UndefinedBehaviorSanitizer:
 
@@ -140,7 +140,7 @@ allocation happens during move generation or search.
 
 Sliding-piece attacks (bishop, rook, queen) use the BMI2 `_pext_u64` instruction to gather the
 occupancy bits relevant to a square and index a precomputed per-square attack table. Knight, king and
-pawn attacks are plain 64-entry lookup tables. All tables are generated at build time into
+pawn attacks are plain 64-entry lookup tables. All tables are computed once at program startup in
 `src/generated_data.cpp`. `Pins` ([src/pins.h](src/pins.h)) computes absolute pins and the squares
 each pinned piece may still move to, before move generation.
 
@@ -420,9 +420,8 @@ A few deliberate choices shape the codebase:
   fixed-capacity stack containers. The per-search hash history is a `std::vector` reserved once when the
   `SearchState` is constructed, and the game history is a `std::vector` that grows only as real moves are
   played — so the node-by-node search loop itself performs no dynamic allocation.
-- **Everything precomputed that can be.** Attack tables and Zobrist keys are
-  emitted at build time by `generate_constants`, so the engine binary starts instantly and the hot
-  paths are pure lookups.
+- **Everything precomputed that can be.** Attack tables and Zobrist keys are built once at startup
+  (dynamic initialisation of `const` globals in `generated_data.cpp`), so the hot paths are pure lookups.
 - **Lockless sharing.** Under Lazy SMP the transposition tables and the cancellation flag are the only
   cross-thread state — the ordering tables (history, killers, countermove, continuation history) are
   per-thread — and the shared state is accessed
@@ -469,9 +468,8 @@ the published node counts for the standard positions.
    ```bash
    clang-format -i src/<file>            # or your editor's format-on-save
    ```
-   The generated `src/generated_data.cpp` is exempt — it is machine-emitted and gitignored.
-3. Only edit `src/generate_constants.cpp` when the precomputed-table logic actually
-   changes; never edit `src/generated_data.cpp` by hand.
+3. `src/generated_data.cpp` holds the precomputed-table *logic* (the compute functions and the `const`
+   globals they fill at startup); edit it when that logic changes.
 4. Keep new public declarations Doxygen-commented so `make doc` stays complete.
 
 ## License
