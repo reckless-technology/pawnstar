@@ -13,7 +13,8 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 - Parallel iterative-deepening alpha-beta search with principal variation search (PVS).
 - Lazy SMP parallelism: independent per-thread searches sharing one lockless transposition table.
 - Lockless 128-bit transposition table using Hyatt's XOR trick.
-- Null-move pruning, late-move reductions, killer and per-thread history move ordering.
+- Null-move pruning, late-move reductions, and per-thread move ordering (killers, countermove, main +
+  1-ply continuation history).
 - Quiescence search over captures with its own transposition table.
 - **NNUE** evaluation (efficiently-updatable neural network) — a king-bucketed perspective net, the engine's only evaluator. A net is loaded at startup; load a different one at runtime with `setoption name EvalFile`.
 - Optional opening book (`pawnstar.book`).
@@ -193,9 +194,12 @@ fixed-time clocks bypass the heuristic.
   (±18, 578 games)** at 40 moves/minute — a time-control-dependent gain that deeper trees reward.
 - **Search extensions** for promotions and en passant captures.
 - **Move ordering** — the TT move first, then winning/equal captures and promotions by static exchange
-  evaluation, then the two killer moves for the ply, then quiet moves by history-heuristic count, and
-  finally losing captures (negative SEE) below the quiet moves. A quiet move that causes a beta cutoff
-  is recorded as a killer and rewarded in the per-thread history table.
+  evaluation, then the two killer moves for the ply, then the **countermove** (the best quiet refutation
+  to the previous move), then quiet moves scored by the **main history** count plus a **1-ply
+  continuation history** (how often the move was good as a follow-up to the previous move), and finally
+  losing captures (negative SEE) below the quiet moves. A quiet move that causes a beta cutoff is
+  recorded as a killer and as the countermove to the previous move; every good quiet move is rewarded in
+  both the per-thread history and continuation-history tables. All ordering tables are per-thread.
 
 **Quiescence search** (`SearchState::SearchQuiescent`, [src/search_state.cpp](src/search_state.cpp)) extends the leaves with
 captures only, using a separate transposition table, so the static evaluation is never called on a
@@ -209,8 +213,9 @@ Parallelism is provided by **Lazy SMP**: `Game::SearchRootNode` launches `hardwa
 position via `SearchState::IterativeDeepen`. There is no tree splitting and no work queue — the threads cooperate
 purely through the shared lockless transposition table, where one thread's deeper or earlier results
 prefill the entries another thread will probe. Each thread owns its own `SearchState` (position stack,
-hash history, killers, node count) **and its own history table**, so the only cross-thread sharing is
-the transposition tables and the cancellation flag; there is no per-(ply, move) counter contention.
+hash history, killers, node count) **and its own ordering tables** (history, countermove and
+continuation history), so the only cross-thread sharing is the transposition tables and the
+cancellation flag; there is no per-(ply, move) counter contention.
 
 The thread count can be overridden for testing and benchmarking with the `PAWNSTAR_THREADS`
 environment variable (e.g. `PAWNSTAR_THREADS=1` forces a deterministic single-threaded search).
@@ -250,6 +255,10 @@ The table is **lockless** (Hyatt's XOR trick): each cell stores `key = hash ^ da
 cell only if `key ^ data` equals the probe hash, so a torn pair written by two concurrent stores is
 detected and treated as a miss. Concurrent writers race benignly (last writer wins). Aging is O(1):
 `Age()` bumps a generation counter and an entry is stale when its stamped age differs from it.
+
+The probe is a random memory access, so once a child move has been made (its Zobrist hash known) the
+search `Prefetch`es the cell the recursive node will read, hiding the cache-miss latency behind the
+intervening work. This is purely a latency optimization and does not change results.
 
 ### Evaluation
 
@@ -415,7 +424,8 @@ A few deliberate choices shape the codebase:
   emitted at build time by `generate_constants`, so the engine binary starts instantly and the hot
   paths are pure lookups.
 - **Lockless sharing.** Under Lazy SMP the transposition tables and the cancellation flag are the only
-  cross-thread state — the history table and killers are per-thread — and the shared state is accessed
+  cross-thread state — the ordering tables (history, killers, countermove, continuation history) are
+  per-thread — and the shared state is accessed
   with atomics (the TT via Hyatt's XOR trick) rather than locks, so threads never block one another
   mid-search.
 

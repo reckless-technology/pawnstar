@@ -96,8 +96,9 @@ The search functions were consolidated onto the classes that own their state: `G
 - Late-move reduction (LMR): reduces any late move (after the 4th) outside a check sequence at depth > 2, with an extra reduction after the 7th (depth > 3), and a third reduction if that very-late move also has zero history count (SPRT-tested: ~neutral at fast 8+0.08, +11 Elo at 40 moves/min — a time-control-dependent gain). (Each thread searches its tree sequentially — there is no in-tree split.)
 - Killer move heuristic (2 killers per ply): a quiet move that causes a beta cutoff is stored via `SearchState::RecordKiller`.
 - History heuristic (`HistoryTable`) for move ordering — **per-thread** (owned by `SearchState`), so there is no cross-thread contention on its counters.
+- Countermove heuristic + 1-ply continuation history (both **per-thread**, owned by `SearchState`, keyed by the previous move's (piece, to-square)): the countermove is the best quiet refutation to the previous move; the continuation history grades how often a quiet move was good as a follow-up to the previous move. The previous move is threaded into `Search`/`ScoreAndSortMoves` as a `prev_move` parameter (Move::None at the root and after a null move).
 
-**Move ordering** — `SearchState::ScoreAndSortMoves` assigns each move a 23-bit ordering score stored in the `Move` itself, in descending bands: winning/equal captures and promotions (`kWinningCaptureBase` + SEE score), the two killer moves for the ply (just below winning captures), quiet moves (history count, clamped below the killers), and finally losing captures (their negative SEE, sorting below quiet moves). The TT move is searched first, before the list is generated and sorted.
+**Move ordering** — `SearchState::ScoreAndSortMoves` assigns each move a 23-bit ordering score stored in the `Move` itself, in descending bands: winning/equal captures and promotions (`kWinningCaptureBase` + SEE score), the two killer moves for the ply (just below winning captures), the countermove (just below the killers), quiet moves (main history count + 1-ply continuation history, clamped below the countermove), and finally losing captures (their negative SEE, sorting below quiet moves). The TT move is searched first, before the list is generated and sorted.
 
 **Quiescence search** — `SearchState::SearchQuiescent` ([search_state.cpp](src/search_state.cpp)) searches captures only, using its own transposition table. It applies SEE pruning: a capture with negative SEE that does not give check is skipped rather than searched.
 
@@ -109,6 +110,7 @@ The search functions were consolidated onto the classes that own their state: `G
 - A reference to the shared `Game` (TT, clock, cancellation).
 - `history` — the **per-thread** `HistoryTable` (no cross-thread sharing).
 - `killers[kMaxPly][2]` — killer moves.
+- `countermoves_` and `cont_hist_` — the **per-thread** countermove table and 1-ply continuation-history table (keyed by the previous move's (piece, to-square); `cont_hist_` is heap-allocated, ~0.4 MB).
 - `node_count` — nodes searched by this thread.
 - `positions_` (`StackList<Position, kMaxPly + 4>`) — fixed-capacity position stack for the search tree.
 - `accumulator_` (`nnue::Accumulator`) — the NNUE accumulator for the tip position, maintained incrementally across make/undo (only while `game.NnueActive()`, i.e. a net is loaded — false only for tools/tests that build a `Game` without one, e.g. perft/SEE).
@@ -121,6 +123,8 @@ Lazy SMP retired the old YBW machinery: `SearchStatePool` and `ThreadPool` (and 
 Two tables: 64 MB main (`kHashtableMegabytes`) and 8 MB quiescence (`kQHashtableMb`). Each entry is exactly 128 bits: a 64-bit Zobrist `hash` and a 64-bit `move` whose spare bits encode the score, depth, node type (CUT/ALL/PV) and age. `Transposition` exposes `score()`/`depth()`/`node_type()`/`age()` accessors that read those packed bits.
 
 The table is **lockless** (Hyatt's XOR trick). Each cell (`AtomicEntry`) stores two `std::atomic<uint64_t>`: `key = hash ^ data` and `data` (the packed move). A reader accepts a cell only when `key ^ data == probe hash`, so a torn pair written by concurrent stores is detected and read as a miss. Words are accessed with `relaxed` ordering; the XOR check supplies the cross-word consistency that relaxed ordering does not. Writers race benignly (last-writer-wins) — no spinlocks.
+
+`TranspositionTable::Prefetch(hash)` issues a `__builtin_prefetch` for the cell a future probe will read; `SearchSingleMove` calls it right after `PlayMove` so the (random-access) line is resident by the time the recursive node probes the table. Result-neutral; pure latency hiding.
 
 Aging is O(1): the table holds a `generation_` counter that `Age()` increments before each search; an entry is stale when its `age != generation_`, and `RecordTransposition` stamps the current generation when it writes. Replacement policy: prefer replacing stale entries, lower-depth entries, or any entry for PV nodes.
 
