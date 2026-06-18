@@ -140,14 +140,26 @@ class Network
     /// no-op when placements are identical (e.g. a null move). Robust to captures/castling/EP/promotion.
     void Update(Accumulator &acc, const Position &from, const Position &to) const;
 
-    /// @brief Evaluate from a maintained accumulator. @param acc Accumulator matching the position.
+    /// @brief Evaluate from a maintained accumulator using the **int8** output layer — the engine's shipped
+    /// evaluator (~1.86x faster than the exact int16 dot; a measured +31.8 Elo at 8+0.08), accurate to a
+    /// bounded ~26 cp of EvaluateExact. @param acc Accumulator matching the position.
     /// @param side_to_move Selects which perspective feeds the first half of the output layer.
     /// @return Score in centipawns from the side-to-move's perspective.
     int Evaluate(const Accumulator &acc, Color side_to_move) const;
 
-    /// @brief Evaluate a position with a full accumulator refresh (diagnostics / reference path).
+    /// @brief Evaluate a position with a full accumulator refresh, int8 output layer (the engine eval).
     /// @param position Position to evaluate. @return Score in centipawns, side-to-move relative.
     int Evaluate(const Position &position) const;
+
+    /// @brief Exact int16 SCReLU forward pass — the **reference** evaluator that reproduces the trainer's
+    /// eval (test_nnue cross-checks it to bullet within ±2 cp) and that the int8 Evaluate approximates. Not
+    /// used on the search hot path. @param acc Accumulator matching the position. @param side_to_move stm.
+    /// @return Score in centipawns, side-to-move relative.
+    int EvaluateExact(const Accumulator &acc, Color side_to_move) const;
+
+    /// @brief Exact int16 evaluation with a full accumulator refresh (reference / diagnostics).
+    /// @param position Position to evaluate. @return Score in centipawns, side-to-move relative.
+    int EvaluateExact(const Position &position) const;
 
   private:
     /// @brief Rebuild a single perspective from scratch (bias + every piece) using its king bucket.
@@ -178,10 +190,10 @@ class Network
     alignas(64) std::array<int16_t, kHiddenSize> feature_bias_; ///< Feature-transformer biases (always int16).
     /// @brief Output weights: first kHiddenSize weight the side-to-move accumulator, next kHiddenSize the other.
     alignas(64) std::array<int16_t, 2 * kHiddenSize> output_weights_;
-    /// @brief Output weights requantised to int8 for the optional int8 forward pass (PAWNSTAR_INT8 build).
+    /// @brief Output weights requantised to int8 for the shipped int8 forward pass (Network::Evaluate).
     /// w8 = round(output_weight / output_w_scale_) clamped to [-127,127]; the scale keeps the largest output
-    /// weight in int8 range (1 for nets whose |weight| <= 127, e.g. the shipped v8). Always populated by
-    /// Load so the int8 kernel needs no per-eval setup; only read by the int8 Evaluate branch.
+    /// weight in int8 range (1 for nets whose |weight| <= 127, e.g. the shipped v8). Populated by Load so the
+    /// int8 kernel needs no per-eval setup; the int16 reference (EvaluateExact) uses output_weights_ instead.
     alignas(64) std::array<int8_t, 2 * kHiddenSize> output_weights_i8_{};
     int     output_w_scale_ = 1;  ///< Divisor mapping the int16 output weights into int8 range.
     int16_t output_bias_    = 0;  ///< Output bias, in QA*QB units.

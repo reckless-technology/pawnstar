@@ -134,12 +134,15 @@ i.e. int8 is gated on a VNNI target, which the dev/cloud box now provides.
 
 ---
 
-## Phase 2 — RESULTS (int8 output layer, implemented behind `INT8=1`)
+## Phase 2 — RESULTS (int8 output layer — now the **shipped default**)
 
-Implemented the int8 output forward pass in `nnue::Network::Evaluate` (`src/nnue.cpp`), gated by the
-`INT8=1` build flag; the int16 path remains the default/shipped evaluator. Output weights are requantised to
-int8 at load (`output_weights_i8_`); SCReLU activations are requantised to uint8 via `>> kInt8Shift`. The dot
-uses `vpdpbusd` where VNNI is present and AVX2 `pmaddubsw`+`madd` otherwise.
+Implemented the int8 output forward pass as `nnue::Network::Evaluate` (`src/nnue.cpp`) — **the engine's
+default evaluator** as of this work. The exact int16 SCReLU dot is retained as `Network::EvaluateExact`, the
+reference that `test_nnue` cross-checks against bullet (±2 cp) and that the int8 path is checked against
+(≤40 cp). Output weights are requantised to int8 at load (`output_weights_i8_`); SCReLU activations to uint8
+via `>> kInt8Shift`. The dot uses `vpdpbusd` (build `VNNI=1`) where VNNI is present and AVX2
+`pmaddubsw`+`madd` otherwise — bit-identical. (Earlier this lived behind an `INT8=1` flag; it is now
+unconditional, and the Bratko-Kopec accepted-move sets were regenerated for the int8 eval.)
 
 **Shift choice: kInt8Shift = 9 (not 8).** S=8 is more accurate (3 cp mean) but lets a rare `pmaddubsw`
 adjacent-pair saturate int16 on AVX2 — and an adversarial-data probe showed S=8 maddubs diverges from the
@@ -254,24 +257,23 @@ affects a played move, so it does not bias the result.
 
 ## Reproducing
 
+int8 is now the **default** engine eval (no flag); `EvaluateExact` is the int16 reference. The study tool's
+emulation/microbench are self-contained.
+
 ```bash
-# Phase 0/1 study (int16):
+# Phase 0/1 dynamic-range study + per-call kernel timings (int8 Evaluate vs int16 reference internally):
 make build/nnue_quant_study
 build/nnue_quant_study nnue/pawnstar-v8.bin test/nnue_reference.txt
+build/test_nnue nnue/pawnstar-v8.bin test/nnue_reference.txt   # EvaluateExact==trainer; int8 within 40 cp
 
-# Phase 2 int8 output layer (AVX2 = laptop target; add VNNI=1 for vpdpbusd on capable CPUs):
-make clean && make INT8=1 build/nnue_quant_study build/test_nnue
-build/nnue_quant_study nnue/pawnstar-v8.bin test/nnue_reference.txt | grep Evaluate   # ~224 ns vs 416
-build/test_nnue nnue/pawnstar-v8.bin test/nnue_reference.txt                          # max|diff|=26 cp (by design)
-make clean && make   # restore the default int16 engine
+# VNNI vpdpbusd kernel (capable CPUs only; bit-identical to AVX2 pmaddubsw):
+make clean && make VNNI=1
 
-# Phase 3 SPRT (int8 vs int16, same net, time control) — needs fastchess + an openings book:
-make clean && make            && cp build/pawnstar build/pawnstar_int16
-make clean && make INT8=1     && cp build/pawnstar build/pawnstar_int8
-make clean && make            # restore default
-NET="$(pwd)/nnue/pawnstar-v8.bin"
-BASELINE_NET="$NET" TC=8+0.08 BIN_A=build/pawnstar_int8 BIN_B=build/pawnstar_int16 \
-  tools/run_sprt.sh "$NET" <openings.epd> 1200   # fastchess on PATH; both sides load the same net
+# Phase 3 SPRT was int8 (now default) vs an int16-output build. Since int8 is unconditional, an int16-search
+# A/B build is no longer a flag; reproduce by checking out the pre-ship commit for the int16 binary, e.g.:
+#   git stash; git checkout <pre-int8-default-commit>; make && cp build/pawnstar /tmp/p_int16; git checkout -
+#   make && cp build/pawnstar /tmp/p_int8
+#   BASELINE_NET=$NET TC=8+0.08 BIN_A=/tmp/p_int8 BIN_B=/tmp/p_int16 tools/run_sprt.sh $NET <openings.epd> 1200
 ```
 
 Call-ratio counters are not committed (they were temporary DEBUGX increments in `nnue::Network::Update` and

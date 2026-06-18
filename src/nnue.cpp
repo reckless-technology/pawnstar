@@ -117,7 +117,6 @@ inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *colu
 #endif
 #endif
 
-#if defined(PAWNSTAR_INT8) && defined(__AVX2__)
 /// @brief Right shift applied to the SCReLU activation (clamp(x,0,QA)^2, in [0, QA^2=65025]) to fit uint8.
 /// S=9 maps the range onto [0,127], which keeps each `pmaddubsw` adjacent-pair sum (2*127*127 < 2^15) inside
 /// int16 — so the AVX2 (maddubs) and VNNI (vpdpbusd) kernels are saturation-free and bit-identical. The eval
@@ -125,6 +124,7 @@ inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *colu
 /// on AVX2; if a future SPRT wants S=8, pair it with output_w_scale_=2 to stay saturation-free.)
 constexpr int kInt8Shift = 9;
 
+#if defined(__AVX2__)
 /// @brief Pack four int32 vectors (each 8 lanes, values in [0,255]) into 32 uint8 in *natural* order
 /// [a0..7, b0..7, c0..7, d0..7]. packus works within 128-bit lanes, so a final permute restores order.
 inline __m256i PackU8(__m256i a, __m256i b, __m256i c, __m256i d)
@@ -174,7 +174,7 @@ inline int32_t HsumI32(__m256i v)
     s         = _mm_add_epi32(s, _mm_shuffle_epi32(s, _MM_SHUFFLE(2, 3, 0, 1)));
     return _mm_cvtsi128_si32(s);
 }
-#endif // PAWNSTAR_INT8 && __AVX2__
+#endif // __AVX2__
 
 /// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
 /// own* orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map
@@ -456,19 +456,34 @@ void Network::Update(Accumulator &acc, const Position &from, const Position &to)
     }
 }
 
+namespace
+{
+/// @brief Shared dequantisation tail: SCReLU leaves the dot in QA*QA*QB units; reduce one QA, add the bias
+/// (QA*QB units), apply the eval scale, then remove the remaining QA*QB quantisation -> centipawns.
+inline int Dequant(int64_t output, int16_t bias)
+{
+    output /= kQA;
+    output += bias;
+    output *= kScale;
+    output /= (kQA * kQB);
+    return static_cast<int>(output);
+}
+} // namespace
+
 int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
 {
-    // The side-to-move accumulator feeds the first half of the output layer.
+    // The engine's evaluation: the **int8** output layer (the shipped default). Activations are requantised
+    // to uint8 (SCReLU >> kInt8Shift) and the output weights to int8; the dot accumulates in int32 (the
+    // Phase-1 study showed |dot| <= 86M << 2^31). This is ~1.86x faster than the exact int16 dot (a measured
+    // +31.8 Elo at 8+0.08) at a bounded ~26 cp deviation from EvaluateExact. The side-to-move accumulator
+    // feeds the first half of the output layer.
     const bool                              white_to_move = side_to_move == kWhite;
     const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white : acc.black;
     const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? acc.black : acc.white;
 
-    // Forward pass mirroring bullet's `simple` example exactly (SCReLU activation).
     int64_t output = 0;
-#if defined(PAWNSTAR_INT8) && defined(__AVX2__)
-    // int8 output layer: activations requantised to uint8 (SCReLU >> kInt8Shift), output weights to int8.
-    // The dot accumulates in int32 (the Phase-1 study showed |dot| <= 86M << 2^31). dot8 ~= raw_dot /
-    // (output_w_scale_ * 2^kInt8Shift), so multiply that factor back in before the shared dequant chain.
+#if defined(__AVX2__)
+    // dot8 ~= raw_dot / (output_w_scale_ * 2^kInt8Shift), so multiply that factor back in before dequant.
     __m256i        acc32      = _mm256_setzero_si256();
     const int16_t *acts[2]    = {stm_acc.data(), ntm_acc.data()};
     const int8_t  *weights[2] = {output_weights_i8_.data(), output_weights_i8_.data() + kHiddenSize};
@@ -484,11 +499,37 @@ int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
         }
     }
     output = static_cast<int64_t>(HsumI32(acc32)) * output_w_scale_ * (1 << kInt8Shift);
-#elif defined(__AVX2__)
-    // Vectorised SCReLU dot product. Per lane: clamp(x,0,QA)^2 (int32, <=65025) times the weight, taking
-    // the low 32 bits of the product exactly as the scalar int multiply does; products are sign-extended
-    // to 64-bit and summed. Integer addition is associative and exact here (no 64-bit overflow), so the
-    // different summation order is bit-identical to the scalar loop in the #else branch.
+#else
+    // Scalar int8 fallback, bit-identical to the AVX2 path: clamp [0,QA], square, round, >>S to uint8.
+    int64_t dot8 = 0;
+    for (int i = 0; i < kHiddenSize; ++i)
+    {
+        const auto u8 = [&](int16_t x) {
+            const int c = x < 0 ? 0 : (x > kQA ? kQA : x);
+            const int a = (c * c + (1 << (kInt8Shift - 1))) >> kInt8Shift;
+            return a > 255 ? 255 : a;
+        };
+        dot8 += static_cast<int64_t>(u8(stm_acc[i])) * output_weights_i8_[i];
+        dot8 += static_cast<int64_t>(u8(ntm_acc[i])) * output_weights_i8_[kHiddenSize + i];
+    }
+    output = dot8 * output_w_scale_ * (1 << kInt8Shift);
+#endif
+    return Dequant(output, output_bias_);
+}
+
+int Network::EvaluateExact(const Accumulator &acc, Color side_to_move) const
+{
+    // Exact int16 SCReLU forward pass mirroring bullet's `simple` example. This is the **reference**
+    // evaluator: it reproduces the trainer's eval within quantisation rounding (test_nnue, ±2 cp) and is the
+    // baseline the int8 Evaluate above approximates. Not used on the search hot path.
+    const bool                              white_to_move = side_to_move == kWhite;
+    const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white : acc.black;
+    const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? acc.black : acc.white;
+
+    int64_t output = 0;
+#if defined(__AVX2__)
+    // Per lane: clamp(x,0,QA)^2 (int32, <=65025) times the weight (low 32 bits, as the scalar int multiply);
+    // products are sign-extended to 64-bit and summed (exact, no overflow), so it is bit-identical to scalar.
     const __m256i  zero       = _mm256_setzero_si256();
     const __m256i  qa         = _mm256_set1_epi16(static_cast<int16_t>(kQA));
     __m256i        acc64      = _mm256_setzero_si256();
@@ -503,15 +544,12 @@ int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
             const __m256i x  = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(a + i));
             const __m256i c  = _mm256_min_epi16(_mm256_max_epi16(x, zero), qa); // clamp to [0, QA]
             const __m256i wv = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(w + i));
-            // Widen the 16 int16 lanes to int32 (low / high 128-bit halves).
             const __m256i clo = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(c));
             const __m256i chi = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(c, 1));
             const __m256i wlo = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(wv));
             const __m256i whi = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(wv, 1));
-            // (clamp^2) * weight, 32-bit (low bits, matching the scalar int multiply).
             const __m256i plo = _mm256_mullo_epi32(_mm256_mullo_epi32(clo, clo), wlo);
             const __m256i phi = _mm256_mullo_epi32(_mm256_mullo_epi32(chi, chi), whi);
-            // Sign-extend the 32-bit products to 64-bit and accumulate.
             acc64 = _mm256_add_epi64(acc64, _mm256_cvtepi32_epi64(_mm256_castsi256_si128(plo)));
             acc64 = _mm256_add_epi64(acc64, _mm256_cvtepi32_epi64(_mm256_extracti128_si256(plo, 1)));
             acc64 = _mm256_add_epi64(acc64, _mm256_cvtepi32_epi64(_mm256_castsi256_si128(phi)));
@@ -528,22 +566,21 @@ int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
         output += SCReLU(ntm_acc[i]) * output_weights_[kHiddenSize + i];
     }
 #endif
-    // SCReLU leaves the dot product in QA*QA*QB units; reduce one QA, add the bias (QA*QB units), apply the
-    // eval scale, then remove the remaining QA*QB quantisation.
-    output /= kQA;
-    output += output_bias_;
-    output *= kScale;
-    output /= (kQA * kQB);
-    return static_cast<int>(output);
+    return Dequant(output, output_bias_);
 }
 
 int Network::Evaluate(const Position &position) const
 {
-    // Full-refresh evaluation (diagnostics/tests and the incremental path's reference): build a fresh
-    // accumulator then run the shared forward pass, so both paths are guaranteed identical.
     Accumulator acc;
     Refresh(acc, position);
     return Evaluate(acc, position.color_to_move);
+}
+
+int Network::EvaluateExact(const Position &position) const
+{
+    Accumulator acc;
+    Refresh(acc, position);
+    return EvaluateExact(acc, position.color_to_move);
 }
 
 } // namespace nnue

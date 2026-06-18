@@ -48,7 +48,8 @@ and then summing the feature column of every piece in its king bucket's bank. At
 (verified by the cross-check in §6). The bucket map MUST stay byte-identical across `src/nnue.cpp`,
 `tools/bullet/pawnstar.rs` and `tools/bullet/pawnstar_eval.rs`.
 
-**Forward pass** (mirrors bullet's `simple` example exactly; `screlu(x) = clamp(x,0,QA)²`):
+**Forward pass** — the **reference** path (`Network::EvaluateExact`) mirrors bullet's `simple` example
+exactly; `screlu(x) = clamp(x,0,QA)²`:
 
 ```
 out  = Σ screlu(stm[i])·w_stm[i]  +  Σ screlu(ntm[i])·w_ntm[i]   # i64
@@ -57,6 +58,14 @@ out += output_bias        # bias is in QA*QB units
 out *= SCALE
 out /= QA * QB            # -> centipawns, side-to-move relative
 ```
+
+**Shipped output layer is int8** (`Network::Evaluate`, the search hot path): the activations are requantised
+to uint8 (`screlu(x) >> 9` → `[0,127]`) and the output weights to int8, with the dot accumulated in int32 —
+~1.86× faster than the int16 dot (a measured **+31.8 ± 10.3 Elo at 8+0.08**) at a bounded ~26 cp deviation
+from `EvaluateExact`. It runs on the baseline AVX2 build via `pmaddubsw`; the `>>9` keeps every adjacent pair
+inside int16, so the AVX2 and VNNI (`vpdpbusd`, `make VNNI=1`) kernels are saturation-free and bit-identical.
+The int16 *accumulator* is unchanged (the int8 *feature*-weight experiment behind `INT8_FT=1` is not shipped;
+see [int8_quant_study.md](int8_quant_study.md)).
 
 The net is an `nnue::Network` class (the quantised weights plus `Load`/`Refresh`/`Update`/`Evaluate`
 methods), **owned by the `Game`** — there are no nnue globals. Its accumulator is **maintained
@@ -224,7 +233,7 @@ EVAL=~/pawnstar_nnue/bullet/target/release/examples/pawnstar_eval
 # get a FEN list (reuse the checked-in reference FENs; or supply your own, one FEN per line, both colours)
 cut -d'|' -f1 test/nnue_reference.txt > fens.txt
 "$EVAL" net.bin fens.txt > ref.txt
-./build/test_nnue net.bin ref.txt        # expects: max |diff| <= 2 cp (quantisation rounding)
+./build/test_nnue net.bin ref.txt        # EvaluateExact vs ref <=2 cp; int8 Evaluate vs EvaluateExact <=40 cp
 ```
 
 `pawnstar_eval` uses bullet's own feature extraction (`ChessBuckets`) and the same SCReLU inference, so a
@@ -390,7 +399,7 @@ RAW=~/pawnstar_nnue/v7/checkpoints/pawnstar-120/quantised.bin
 cd /path/to/pawnstar
 cut -d'|' -f1 test/nnue_reference.txt > /tmp/fens.txt          # reuse the existing FENs (first field)
 "$EVAL" "$RAW" /tmp/fens.txt > test/nnue_reference.txt          # re-baseline the checked-in reference (RAW net)
-./build/test_nnue nnue/pawnstar-v8.bin test/nnue_reference.txt  # expect max |diff| <= 2 cp (engine == trainer)
+./build/test_nnue nnue/pawnstar-v8.bin test/nnue_reference.txt  # EvaluateExact==trainer <=2 cp; int8 <=40 cp
 ./build/test_nnue_incremental nnue/pawnstar-v8.bin             # incremental accumulator == full refresh
 
 # 7. Regenerate the Bratko-Kopec accepted moves for the new net (the eval changed), then full check.
