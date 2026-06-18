@@ -269,27 +269,32 @@ void Network::Update(Accumulator &acc, const Position &from, const Position &to)
     const int wf = WhiteBucket(from), wt = WhiteBucket(to);
     const int bf = BlackBucket(from), bt = BlackBucket(to);
 
-    // Common case (~98%): neither king changed bucket. Do a single combined pass — one bitboard diff per
-    // piece type, updating both perspectives together — rather than two independent DiffSide passes. A null
-    // move (identical placements) falls through here doing no column work.
+    // Common case (~98%): neither king changed bucket. Find the changed squares directly from the two
+    // colour bitboards (a move touches only 2-4 squares — quiet, capture, en passant, castling and
+    // promotion are all handled uniformly) instead of scanning all 12 piece types. For each square a colour
+    // vacated we subtract the piece that was there (read from `from`); for each it now occupies we add the
+    // piece now there (read from `to`) — so a promotion's pawn->queen and a capture's two pieces fall out
+    // for free. Both perspectives are updated together. A null move (identical placements) does no work.
+    // This is bit-identical to a per-piece-type diff: the same set of feature columns is added/subtracted,
+    // and int16 accumulator add/sub is order-independent. (No square keeps a colour while changing piece
+    // type without moving, so reading the type from `from`/`to` is exact.)
     if (wf == wt && bf == bt)
     {
         for (int color = kWhite; color <= kBlack; ++color)
         {
-            for (int piece = kPawn; piece <= kKing; ++piece)
+            const Bitboard from_bb = from.colors[color];
+            const Bitboard to_bb   = to.colors[color];
+            for (Square s : from_bb & ~to_bb)
             {
-                const Bitboard from_bb = from.pieces[piece] & from.colors[color];
-                const Bitboard to_bb   = to.pieces[piece] & to.colors[color];
-                for (Square s : from_bb & ~to_bb)
-                {
-                    SubColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
-                    SubColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
-                }
-                for (Square s : to_bb & ~from_bb)
-                {
-                    AddColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
-                    AddColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
-                }
+                const int piece = from.PieceAt(s);
+                SubColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
+                SubColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
+            }
+            for (Square s : to_bb & ~from_bb)
+            {
+                const int piece = to.PieceAt(s);
+                AddColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
+                AddColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
             }
         }
         return;
