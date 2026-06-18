@@ -189,10 +189,38 @@ Yes for speed, but with a sharp accuracy catch the output layer didn't have.
   layer was free (`max|w|=127`, `WS=1`, lossless); the FT is not. Doing it well needs a **quantisation-aware
   retrain** in bullet (train feature weights clipped into int8 range, then export `i8`), not a post-hoc ÷4.
 
-**Verdict:** int8 feature weights are a real *second* speed lever (~1.5× on the ~40–50%-of-NNUE `Update`
-path), but they are **retrain-gated and higher-Elo-risk** than the output layer. Sequence it *after* the
-output-layer int8 ships (or is SPRT-cleared): do the output layer first (free, done), then evaluate a
-quantisation-aware int8-FT retrain as Phase 4.
+**Verdict (initial):** int8 feature weights looked like a real *second* speed lever (~1.5× on the
+~40–50%-of-NNUE `Update` path), but **retrain-gated and higher-Elo-risk** than the output layer.
+
+### Prototype measurement (engine, behind `INT8_FT=1`) — the optimism didn't survive contact
+
+Implemented int8 FT storage in the engine (`PAWNSTAR_INT8_FT`): the weight table is int8, `Load`
+requantises the int16 net on the fly (scale = `⌈max|w|/127⌉` = **4** for v8), and the column-add
+reconstructs ~original scale via `*feature_w_scale_`, leaving the accumulator/SCReLU/output untouched.
+Two results, both discouraging for the *post-hoc* path:
+
+| metric | int16 | int8-FT (÷4) | note |
+|---|---|---|---|
+| eval error vs bullet ref (max) | 0 cp | **182 cp** | ÷4 is far too lossy — FT weights are the most strength-critical |
+| `Update` ns/call (cache-resident microbench) | 107.6 | **133.6 (slower)** | reconstruct widen+`mullo` overhead, *not* paid back when columns are hot |
+
+So the two `Update` benchmarks **bracket reality**: the standalone uniform-random bench (whole 1.5 MB table,
+cache-pessimal → memory-bound) showed int8 **1.5× faster**; the engine microbench (one move repeated →
+columns stay L1-resident → ALU-bound) shows it **1.24× slower**. Real search is in between, and the
+study-tool microbenches (single position repeated) systematically *under*-show the memory benefit, so they
+can't settle it. `test_nnue_incremental` still passes (the reconstruct is deterministic).
+
+**Revised verdict:** int8 feature weights are **not** a clear win like the output layer.
+- The **÷4 post-hoc prototype is dead** (182 cp ≫ the output layer's 26; it would shed Elo badly).
+- A **quantisation-aware retrain** (train feature weights clipped to ±127 → scale 1) is *required* — it
+  makes the FT lossless **and** drops the reconstruct `mullo` (just widen+add), the best case for speed.
+- Even then the speedup is **regime-dependent**: it only materialises if real search is memory-bound on the
+  FT column loads. That needs a real-search measurement (confounded by eval), not a per-call microbench.
+
+So before spending GPU time on the retrain, the open question is **"is the FT `Update` memory-bound in real
+search?"** If not, even a lossless int8-FT is neutral-to-slower and isn't worth it. The output-layer int8
+(Phase 2/3, +31.8 Elo) remains the clear, shippable win; int8-FT is speculative. The engine support is
+committed (off by default, `INT8_FT=1`) so a future quantisation-aware net can be measured directly.
 
 ## Phase 3 — RESULTS (SPRT: int8 vs int16 at a time control)
 

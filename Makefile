@@ -93,6 +93,14 @@ endif
 ifeq ($(VNNI), 1)
 	CXXFLAGS += -mavxvnni
 endif
+# Experimental int8 feature-transformer weights (independent of INT8). Stores the FT weight table as int8
+# (half the bytes -> faster, memory-bound accumulator Update) and reconstructs ~original scale on the
+# column-add, so the accumulator / SCReLU / output are unchanged. Load requantises the int16 net on the
+# fly, so this runs on the shipped net (lossy at scale>1, e.g. 4 for v8); a quantisation-aware retrain
+# (weights clipped to int8) makes it lossless (scale 1). Opt-in, SPRT-evaluated.
+ifeq ($(INT8_FT), 1)
+	CXXFLAGS += -D PAWNSTAR_INT8_FT
+endif
 
 .PHONY: all tests check prep clean doc tools
 

@@ -30,12 +30,45 @@ namespace
     return y * y;
 }
 
+// The feature column add/sub maintain the int16 accumulator. Two storage forms share one (acc, column,
+// scale) signature so the call sites are identical in both builds:
+//   * default (int16 weights): `scale` is unused — the column is already full-scale.
+//   * PAWNSTAR_INT8_FT (int8 weights): widen each int8 weight to int16 and multiply by `scale` to
+//     reconstruct ~the original int16 weight, so the accumulator stays in the same units (SCReLU/output
+//     unchanged). Loading half the bytes from the weight table is the win on this memory-bound path.
 #if defined(__AVX2__)
 static_assert(kHiddenSize % 16 == 0, "AVX2 NNUE kernels need kHiddenSize to be a multiple of 16");
 
+#if defined(PAWNSTAR_INT8_FT)
+/// @brief Add an int8 feature column (reconstructed as int16*scale) to the accumulator (AVX2, 16 lanes/step).
+inline void AddColumn(std::array<int16_t, kHiddenSize> &acc, const int8_t *column, int scale)
+{
+    const __m256i s = _mm256_set1_epi16(static_cast<int16_t>(scale));
+    for (int i = 0; i < kHiddenSize; i += 16)
+    {
+        const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(acc.data() + i));
+        const __m256i c = _mm256_mullo_epi16(
+            _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(column + i))), s);
+        _mm256_storeu_si256(reinterpret_cast<__m256i *>(acc.data() + i), _mm256_add_epi16(a, c));
+    }
+}
+
+/// @brief Subtract an int8 feature column (reconstructed as int16*scale) from the accumulator (inverse).
+inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int8_t *column, int scale)
+{
+    const __m256i s = _mm256_set1_epi16(static_cast<int16_t>(scale));
+    for (int i = 0; i < kHiddenSize; i += 16)
+    {
+        const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(acc.data() + i));
+        const __m256i c = _mm256_mullo_epi16(
+            _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(column + i))), s);
+        _mm256_storeu_si256(reinterpret_cast<__m256i *>(acc.data() + i), _mm256_sub_epi16(a, c));
+    }
+}
+#else
 /// @brief Add a feature column to a single-perspective accumulator (AVX2: 16 int16 lanes/step).
 /// The wrapping 16-bit add matches the scalar path exactly, so the result is bit-identical.
-inline void AddColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *column)
+inline void AddColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *column, int /*scale*/)
 {
     for (int i = 0; i < kHiddenSize; i += 16)
     {
@@ -46,7 +79,7 @@ inline void AddColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *colu
 }
 
 /// @brief Subtract a feature column from a single-perspective accumulator (AVX2; inverse of AddColumn).
-inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *column)
+inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *column, int /*scale*/)
 {
     for (int i = 0; i < kHiddenSize; i += 16)
     {
@@ -55,24 +88,33 @@ inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *colu
         _mm256_storeu_si256(reinterpret_cast<__m256i *>(acc.data() + i), _mm256_sub_epi16(a, c));
     }
 }
+#endif
+#else // scalar fallback
+#if defined(PAWNSTAR_INT8_FT)
+inline void AddColumn(std::array<int16_t, kHiddenSize> &acc, const int8_t *column, int scale)
+{
+    for (int i = 0; i < kHiddenSize; ++i)
+        acc[i] = static_cast<int16_t>(acc[i] + column[i] * scale);
+}
+inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int8_t *column, int scale)
+{
+    for (int i = 0; i < kHiddenSize; ++i)
+        acc[i] = static_cast<int16_t>(acc[i] - column[i] * scale);
+}
 #else
 /// @brief Add a feature column to a single-perspective accumulator.
-inline void AddColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *column)
+inline void AddColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *column, int /*scale*/)
 {
     for (int i = 0; i < kHiddenSize; ++i)
-    {
         acc[i] = static_cast<int16_t>(acc[i] + column[i]);
-    }
 }
-
 /// @brief Subtract a feature column from a single-perspective accumulator (the inverse of AddColumn).
-inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *column)
+inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *column, int /*scale*/)
 {
     for (int i = 0; i < kHiddenSize; ++i)
-    {
         acc[i] = static_cast<int16_t>(acc[i] - column[i]);
-    }
 }
+#endif
 #endif
 
 #if defined(PAWNSTAR_INT8) && defined(__AVX2__)
@@ -190,7 +232,7 @@ void Network::RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position
         {
             for (Square s : position.pieces[piece] & friendly)
             {
-                AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
+                AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)], feature_w_scale_);
             }
         }
     }
@@ -207,11 +249,11 @@ void Network::DiffSide(std::array<int16_t, kHiddenSize> &side, const Position &f
             const Bitboard to_bb   = to.pieces[piece] & to.colors[color];
             for (Square s : from_bb & ~to_bb)
             {
-                SubColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
+                SubColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)], feature_w_scale_);
             }
             for (Square s : to_bb & ~from_bb)
             {
-                AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
+                AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)], feature_w_scale_);
             }
         }
     }
@@ -302,7 +344,27 @@ bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, const s
 
     // Copy in bullet's save order: feature_weights, feature_bias, output_weights, output_bias.
     const std::uint8_t *p = data + payload_offset;
+#if defined(PAWNSTAR_INT8_FT)
+    // The net file is always int16; the int8-FT build requantises the feature weights to int8 on load.
+    // The scale keeps the largest-magnitude weight in [-127,127] (4 for the shipped net, since |w|=505);
+    // the column-add reconstructs ~the int16 weight via *feature_w_scale_, so the accumulator is unchanged.
+    {
+        const std::size_t    n = feature_weights_.size();
+        std::vector<int16_t> fw16(n);
+        std::memcpy(fw16.data(), p, n * sizeof(int16_t));
+        int maxw = 0;
+        for (int16_t v : fw16)
+            maxw = std::max(maxw, std::abs(static_cast<int>(v)));
+        feature_w_scale_ = std::max(1, (maxw + 126) / 127);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            const long q        = std::lround(static_cast<double>(fw16[i]) / feature_w_scale_);
+            feature_weights_[i] = static_cast<int8_t>(std::max<long>(-127, std::min<long>(127, q)));
+        }
+    }
+#else
     std::memcpy(feature_weights_.data(), p, feature_weights_.size() * sizeof(int16_t));
+#endif
     p += feature_weights_.size() * sizeof(int16_t);
     std::memcpy(feature_bias_.data(), p, feature_bias_.size() * sizeof(int16_t));
     p += feature_bias_.size() * sizeof(int16_t);
@@ -362,14 +424,14 @@ void Network::Update(Accumulator &acc, const Position &from, const Position &to)
             for (Square s : from_bb & ~to_bb)
             {
                 const int piece = from.PieceAt(s);
-                SubColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
-                SubColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
+                SubColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)], feature_w_scale_);
+                SubColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)], feature_w_scale_);
             }
             for (Square s : to_bb & ~from_bb)
             {
                 const int piece = to.PieceAt(s);
-                AddColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
-                AddColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
+                AddColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)], feature_w_scale_);
+                AddColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)], feature_w_scale_);
             }
         }
         return;
