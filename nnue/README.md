@@ -60,12 +60,15 @@ out /= QA * QB            # -> centipawns, side-to-move relative
 
 The net is an `nnue::Network` class (the quantised weights plus `Load`/`Refresh`/`Update`/`Evaluate`
 methods), **owned by the `Game`** — there are no nnue globals. Its accumulator is **maintained
-incrementally** across make/undo on each thread's `SearchState`: `Network::Update` applies only the
-feature-column deltas for pieces whose placement changed within a king bucket (a parent/child bitboard
-diff — reversible on undo, a no-op for null moves). When a king move **crosses a bucket boundary** that
-whole perspective's bank changes, so `Update` rebuilds just that one perspective from scratch (at most
-one king moves per ply, so at most one perspective refreshes per update); `Network::Refresh` rebuilds
-both at the root.
+incrementally** across make/undo on each thread's `SearchState`: in the common case (no king-bucket
+crossing — always, for the single-bank net) `Network::Update` derives the changed squares directly from
+the parent/child **colour bitboards** — a move touches only 2–4 squares, and captures, en passant,
+castling and promotion all fall out uniformly — and applies just those feature-column deltas to both
+perspectives (no per-piece-type scan; reversible on undo, a no-op for null moves). This is bit-identical to
+a per-piece diff: the same columns are added/subtracted and int16 accumulator add/sub is order-independent.
+When a king move **crosses a bucket boundary** that whole perspective's bank changes, so `Update` rebuilds
+just that one perspective from scratch (at most one king moves per ply, so at most one perspective
+refreshes per update); `Network::Refresh` rebuilds both at the root.
 `Network::Evaluate(position)` (a full refresh) is the reference the incremental path is checked against
 (§6). Both kernels (accumulator update and forward pass) are **AVX2-vectorised** when built with
 `-mavx2`, with scalar fallbacks behind `#if defined(__AVX2__)`; the vectorised path is bit-identical to
@@ -109,8 +112,9 @@ size/header-gates them out.)
 
 A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v8.bin` (cwd-relative) at
 startup. **Embedded fallback:** a byte-identical copy of the shipped net is compiled into the engine
-binary (`src/embedded_net.S` `.incbin`'s `nnue/pawnstar-v8.bin`; linked into the engine only, not the test
-binaries). If the on-disk file can't be loaded — wrong cwd, missing or renamed file, or a stamped net that
+binary (`src/embedded_net.S` `.incbin`'s the net at the Makefile's `EMBED_NET` path — passed in via
+`-DEMBED_NET_PATH`, the single source of truth, so the embedded copy can't drift from the shipped net;
+linked into the engine only, not the test binaries). If the on-disk file can't be loaded — wrong cwd, missing or renamed file, or a stamped net that
 fails architecture validation — the engine loads the embedded copy via `Network::LoadFromMemory` (same
 header detection/validation as `Network::Load`), so it always has a working evaluator; it exits only if
 both the file and the embedded copy fail. To use a *different* net, point the engine at it — at launch:
@@ -394,8 +398,9 @@ cut -d'|' -f1 test/nnue_reference.txt > /tmp/fens.txt          # reuse the exist
 #    (Transcribe each position's got= move into the kCases array in test/bratko_kopec_nnue_test.cpp, then
 #    verify 24/24 at each depth.)
 for d in 8 9 10 11; do ./build/test_bratko_kopec_nnue nnue/pawnstar-v8.bin $d | grep -E 'pos|solved'; done
-make clean && make check          # all suites green; this also re-embeds the new net (src/embedded_net.S
-                                  # .incbin's nnue/pawnstar-v8.bin, a Makefile prerequisite of the engine)
+make clean && make && make check  # `make` rebuilds the engine, re-embedding the new net (embedded_net.S
+                                  # .incbin's the EMBED_NET path); `make check` then runs all suites green
+                                  # (check builds tests+tools, not the engine, so build the engine first)
 
 # 8. Strength-test vs the previous net (BASELINE_NET) at fixed depth and time control.
 BASELINE_NET=/path/to/previous-net.bin tools/run_sprt.sh nnue/pawnstar-v8.bin /path/to/openings.epd 1000 8
