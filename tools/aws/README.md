@@ -59,6 +59,22 @@ quantisation-aware trainer change (`save_format` `quantise::<i8>` for `l0w`, wit
 range) — those source changes land first, then you train here. The int8 *output* layer (Phase 2/3, already
 in the engine behind `INT8=1`) needs no retrain. See [../../nnue/int8_quant_study.md](../../nnue/int8_quant_study.md).
 
+## Troubleshooting
+
+- **`RunInstances ... Unsupported`** — the GPU type isn't offered in that region/AZ (e.g. `g5` in
+  `us-west-1`). The launcher now pre-checks availability and picks a valid AZ/subnet, failing early with
+  alternatives. Use a GPU-rich region or a widely-available type:
+  ```bash
+  REGION=us-west-2 tools/aws/launch_training.sh        # or us-east-1
+  INSTANCE_TYPE=g4dn.xlarge tools/aws/launch_training.sh   # T4, available almost everywhere, cheaper
+  ```
+- **`VcpuLimitExceeded` / 0 vCPU quota for G instances** — new accounts often have a 0 quota for
+  "Running On-Demand G and VT instances". Request an increase in Service Quotas (≥ 4 vCPUs) for that region.
+- **Cleanup after a failed launch** (leftover key pair + security group are free but tidy up anyway):
+  ```bash
+  REGION=<region> ALL=1 tools/aws/teardown.sh          # sweeps tagged SGs + pawnstar-train-* key pairs
+  ```
+
 ## Security notes
 
 - Credentials stay on your machine; the instance gets only your code (scp) and public data.

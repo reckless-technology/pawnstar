@@ -21,7 +21,12 @@ if [ "${ALL:-0}" = 1 ]; then
             --filters "Name=tag:Project,Values=pawnstar-nnue" --query 'SecurityGroups[].GroupId' --output text); do
         aws ec2 delete-security-group --region "$REGION" --group-id "$sg" 2>/dev/null && echo "  deleted $sg" || true
     done
-    echo "done. Note: key pairs are not auto-swept (no tag); delete with aws ec2 delete-key-pair."
+    echo "sweeping pawnstar-train-* key pairs…"
+    for kp in $(aws ec2 describe-key-pairs --region "$REGION" \
+            --filters "Name=key-name,Values=pawnstar-train-*" --query 'KeyPairs[].KeyName' --output text); do
+        aws ec2 delete-key-pair --region "$REGION" --key-name "$kp" && echo "  deleted key pair $kp" || true
+    done
+    echo "done."
     exit 0
 fi
 
