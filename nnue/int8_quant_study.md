@@ -194,6 +194,36 @@ path), but they are **retrain-gated and higher-Elo-risk** than the output layer.
 output-layer int8 ships (or is SPRT-cleared): do the output layer first (free, done), then evaluate a
 quantisation-aware int8-FT retrain as Phase 4.
 
+## Phase 3 — RESULTS (SPRT: int8 vs int16 at a time control)
+
+The end-to-end question: does the 1.86× faster `Evaluate` (deeper search) outweigh the 26 cp requant error
+in real games? Played the **int8 engine (`INT8=1`, AVX2/`pmaddubsw`)** against the **int16 engine**, both on
+the *same* `pawnstar-v8.bin` net (differing only by the output kernel), at **TC 8+0.08** so the speedup can
+convert into depth (a fixed-depth match would only expose the error, never the speed gain).
+
+| games | W–L–D (int8) | score | **Elo** | LOS |
+|---|---|---|---|---|
+| 75 | 29–24–22 | 53.3% | +23.2 ± 33.8 | 75% |
+| 402 | 164–118–120 | 55.7% | +39.9 ± 14.6 | 99.7% |
+| 811 | 324–250–237 | 54.6% | **+31.8 ± 10.3** | **99.9%** |
+
+**int8 is +31.8 ± 10.3 Elo at 8+0.08 — a decisive gain** (SPRT elo0=0/elo1=10 passes H1). The faster eval
+more than pays for the requant error at this time control; int8 is not just a free simplification, it is
+*stronger* here. ~29% draws (UHO book) gave the SPRT good power.
+
+**Caveat — time-control dependence.** This is fast TC. As TC lengthens, both engines reach high depth and the
+26 cp eval error matters *more* while the extra-nodes advantage matters *less*, so +31.8 will shrink at
+40/20. It is very unlikely to invert to a regression given this margin, but the repo's ship standard is a
+40/20 confirmation before flipping the default — that run is long and was not completed in this ephemeral
+container. **Recommendation: int8 output layer is a strong ship-candidate; confirm at 40/20, then make
+`INT8=1` (with the AVX2 `pmaddubsw` kernel) the default build.**
+
+Environment note (nothing here is version-controlled): the SPRT needed tooling built/fetched in-container —
+`fastchess` compiled from source, separate int16/int8 binaries (`build/pawnstar_int16`, `build/pawnstar_int8`),
+and the UHO_4060_v3 opening book downloaded. The engine emits occasional illegal-PV `info` lines (a
+pre-existing PV-reconstruction quirk) that fastchess warns on; it occurs *equally* on both sides and never
+affects a played move, so it does not bias the result.
+
 ## Reproducing
 
 ```bash
@@ -206,6 +236,14 @@ make clean && make INT8=1 build/nnue_quant_study build/test_nnue
 build/nnue_quant_study nnue/pawnstar-v8.bin test/nnue_reference.txt | grep Evaluate   # ~224 ns vs 416
 build/test_nnue nnue/pawnstar-v8.bin test/nnue_reference.txt                          # max|diff|=26 cp (by design)
 make clean && make   # restore the default int16 engine
+
+# Phase 3 SPRT (int8 vs int16, same net, time control) — needs fastchess + an openings book:
+make clean && make            && cp build/pawnstar build/pawnstar_int16
+make clean && make INT8=1     && cp build/pawnstar build/pawnstar_int8
+make clean && make            # restore default
+NET="$(pwd)/nnue/pawnstar-v8.bin"
+BASELINE_NET="$NET" TC=8+0.08 BIN_A=build/pawnstar_int8 BIN_B=build/pawnstar_int16 \
+  tools/run_sprt.sh "$NET" <openings.epd> 1200   # fastchess on PATH; both sides load the same net
 ```
 
 Call-ratio counters are not committed (they were temporary DEBUGX increments in `nnue::Network::Update` and
