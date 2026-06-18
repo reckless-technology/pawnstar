@@ -27,7 +27,7 @@ struct HashEntry
 };
 
 /// @brief A variation (typically principal variation) is a line of play or series of moves.
-using Variation = StackList<Move, kMaxPly>;
+using Variation = std::vector<Move>;
 
 /// @brief Result of searching a single move: its score and whether it gives check.
 struct SingleMoveResult
@@ -200,8 +200,8 @@ class SearchState
     }
 
   private:
-    StackList<Position, kMaxPly + 4> positions_;    ///< Per-thread copy-make position stack.
-    nnue::Accumulator                accumulator_{}; ///< NNUE accumulator for the tip position (incremental).
+    std::vector<Position> positions_;       ///< Per-thread copy-make position stack (reserved in the constructor).
+    nnue::Accumulator     accumulator_{};   ///< NNUE accumulator for the tip position (incremental).
     /// @brief Hash history from game-start through parent of current node (game history + search depth).
     /// A std::vector (reserved up-front in the constructor) so an arbitrarily long game cannot overflow it.
     std::vector<HashEntry> hash_stack_;

@@ -33,6 +33,8 @@ SearchState::SearchState(Game &g) : game(g), cont_hist_(std::make_unique<int16_t
         hash_stack_.push_back({pos[i].Hash(), pos[i].ReversibleMoveCount()});
     }
     // Seed the per-thread position stack with only the current game position.
+    // Reserve the deepest the search can descend so no push_back during search reallocates.
+    positions_.reserve(kMaxPly + 4);
     positions_.push_back(g.CurrentPosition());
     // Seed the NNUE accumulator from the root position (only needed when NNUE is the active evaluator).
     if (game.NnueActive())
