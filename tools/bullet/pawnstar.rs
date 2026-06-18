@@ -13,7 +13,7 @@ headerless format, which src/nnue.cpp loads directly.
 */
 use bullet_lib::{
     game::inputs::{ChessBuckets, get_num_buckets},
-    nn::optimiser::AdamW,
+    nn::optimiser::{AdamW, AdamWParams},
     trainer::{
         save::SavedFormat,
         schedule::{TrainingSchedule, TrainingSteps, lr, wdl},
@@ -76,6 +76,15 @@ fn main() {
             let hidden_layer = stm_hidden.concat(ntm_hidden);
             l1.forward(hidden_layer)
         });
+
+    // Clip l0w (FT weights) so that round(weight * QA) stays in [-127, 127] after quantisation.
+    // This ensures the INT8_FT engine path (PAWNSTAR_INT8_FT=1) can load the net losslessly with
+    // feature_w_scale_=1, dropping the reconstruct multiply and measuring the pure memory-bandwidth gain.
+    // 127/QA ≈ 0.498; the default AdamW bounds are ±1.98 so this is a genuine constraint on l0w only.
+    trainer.optimiser.set_params_for_weight(
+        "l0w",
+        AdamWParams { min_weight: -(127.0 / QA as f32), max_weight: 127.0 / QA as f32, ..Default::default() },
+    );
 
     let schedule = TrainingSchedule {
         net_id: "pawnstar".to_string(),

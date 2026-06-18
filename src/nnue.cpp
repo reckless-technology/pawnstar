@@ -40,29 +40,55 @@ namespace
 static_assert(kHiddenSize % 16 == 0, "AVX2 NNUE kernels need kHiddenSize to be a multiple of 16");
 
 #if defined(PAWNSTAR_INT8_FT)
-/// @brief Add an int8 feature column (reconstructed as int16*scale) to the accumulator (AVX2, 16 lanes/step).
+/// @brief Add an int8 feature column to the accumulator (AVX2, 16 lanes/step).
+/// Scale==1 fast path (lossless QA-aware net): just widen int8→int16 and add; no multiply.
+/// Scale>1 path (lossy post-hoc ÷scale): reconstruct via mullo. Branch is outside the hot loop.
 inline void AddColumn(std::array<int16_t, kHiddenSize> &acc, const int8_t *column, int scale)
 {
-    const __m256i s = _mm256_set1_epi16(static_cast<int16_t>(scale));
-    for (int i = 0; i < kHiddenSize; i += 16)
+    if (scale == 1)
     {
-        const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(acc.data() + i));
-        const __m256i c = _mm256_mullo_epi16(
-            _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(column + i))), s);
-        _mm256_storeu_si256(reinterpret_cast<__m256i *>(acc.data() + i), _mm256_add_epi16(a, c));
+        for (int i = 0; i < kHiddenSize; i += 16)
+        {
+            const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(acc.data() + i));
+            const __m256i c = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(column + i)));
+            _mm256_storeu_si256(reinterpret_cast<__m256i *>(acc.data() + i), _mm256_add_epi16(a, c));
+        }
+    }
+    else
+    {
+        const __m256i s = _mm256_set1_epi16(static_cast<int16_t>(scale));
+        for (int i = 0; i < kHiddenSize; i += 16)
+        {
+            const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(acc.data() + i));
+            const __m256i c = _mm256_mullo_epi16(
+                _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(column + i))), s);
+            _mm256_storeu_si256(reinterpret_cast<__m256i *>(acc.data() + i), _mm256_add_epi16(a, c));
+        }
     }
 }
 
-/// @brief Subtract an int8 feature column (reconstructed as int16*scale) from the accumulator (inverse).
+/// @brief Subtract an int8 feature column from the accumulator (inverse of AddColumn).
 inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int8_t *column, int scale)
 {
-    const __m256i s = _mm256_set1_epi16(static_cast<int16_t>(scale));
-    for (int i = 0; i < kHiddenSize; i += 16)
+    if (scale == 1)
     {
-        const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(acc.data() + i));
-        const __m256i c = _mm256_mullo_epi16(
-            _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(column + i))), s);
-        _mm256_storeu_si256(reinterpret_cast<__m256i *>(acc.data() + i), _mm256_sub_epi16(a, c));
+        for (int i = 0; i < kHiddenSize; i += 16)
+        {
+            const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(acc.data() + i));
+            const __m256i c = _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(column + i)));
+            _mm256_storeu_si256(reinterpret_cast<__m256i *>(acc.data() + i), _mm256_sub_epi16(a, c));
+        }
+    }
+    else
+    {
+        const __m256i s = _mm256_set1_epi16(static_cast<int16_t>(scale));
+        for (int i = 0; i < kHiddenSize; i += 16)
+        {
+            const __m256i a = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(acc.data() + i));
+            const __m256i c = _mm256_mullo_epi16(
+                _mm256_cvtepi8_epi16(_mm_loadu_si128(reinterpret_cast<const __m128i *>(column + i))), s);
+            _mm256_storeu_si256(reinterpret_cast<__m256i *>(acc.data() + i), _mm256_sub_epi16(a, c));
+        }
     }
 }
 #else
@@ -93,13 +119,21 @@ inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *colu
 #if defined(PAWNSTAR_INT8_FT)
 inline void AddColumn(std::array<int16_t, kHiddenSize> &acc, const int8_t *column, int scale)
 {
-    for (int i = 0; i < kHiddenSize; ++i)
-        acc[i] = static_cast<int16_t>(acc[i] + column[i] * scale);
+    if (scale == 1)
+        for (int i = 0; i < kHiddenSize; ++i)
+            acc[i] = static_cast<int16_t>(acc[i] + column[i]);
+    else
+        for (int i = 0; i < kHiddenSize; ++i)
+            acc[i] = static_cast<int16_t>(acc[i] + column[i] * scale);
 }
 inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int8_t *column, int scale)
 {
-    for (int i = 0; i < kHiddenSize; ++i)
-        acc[i] = static_cast<int16_t>(acc[i] - column[i] * scale);
+    if (scale == 1)
+        for (int i = 0; i < kHiddenSize; ++i)
+            acc[i] = static_cast<int16_t>(acc[i] - column[i]);
+    else
+        for (int i = 0; i < kHiddenSize; ++i)
+            acc[i] = static_cast<int16_t>(acc[i] - column[i] * scale);
 }
 #else
 /// @brief Add a feature column to a single-perspective accumulator.
