@@ -1,0 +1,67 @@
+# AWS GPU training for Pawnstar NNUE
+
+Reviewable scripts to run NNUE training on an EC2 GPU instance with **your own** AWS credentials. They run
+*locally* (you never paste secrets into a sandbox), and the instance receives your code via `scp` — so it
+needs **no GitHub token and no AWS keys**.
+
+## Why a GPU box
+
+bullet's CUDA backend needs a driver supporting **CUDA ≥ 12.3 (driver ≥ 545)**. The **Deep Learning Base
+OSS Nvidia Driver AMI (Ubuntu 22.04)** ships that driver + CUDA toolkit preinstalled, so there's nothing to
+build but Rust/bullet. CPU training works too (`BULLET_FEATURES=""`) but is far slower — fine only for a
+tiny-data screen. Disk: the full v8 shuffled file is **~74 GB**, so the default root volume is **200 GB**.
+
+## One-time prerequisites (on your machine)
+
+- AWS CLI v2, configured (`aws configure`) with an IAM identity allowed to manage EC2
+  (`RunInstances`, `Describe*`, `CreateKeyPair`, `*SecurityGroup*`, `TerminateInstances`).
+- `git`, `ssh`, `scp`, `curl`.
+
+## Cost
+
+`g5.xlarge` (1× A10G) ≈ **\$1/hr** on-demand, ~\$0.40/hr spot (`SPOT=1`). A screen run is a couple of hours;
+a full 2.31B-position train is the better part of a day. **~\$5–15 typical.** Always `teardown.sh` when done.
+
+## Quick start
+
+```bash
+# 1) Provision + upload code (prints a plan, asks to confirm). Leaves the box ready, runs nothing heavy.
+tools/aws/launch_training.sh                         # defaults: us-east-1, g5.xlarge, 200 GB
+
+# It prints the ssh command and the staged bootstrap commands. SSH in, then:
+RUN=setup bash ~/pawnstar/tools/aws/bootstrap_train.sh                       # CUDA check, Rust, bullet
+RUN=data  SHARDS="11128 12128 12932 13227" bash ~/pawnstar/tools/aws/bootstrap_train.sh   # download+shuffle
+RUN=train SBS=120 bash ~/pawnstar/tools/aws/bootstrap_train.sh              # -> ~/pawnstar_nnue/out.bin
+
+# 2) Pull the net back and SPRT it locally (see ../run_sprt.sh):
+scp -i tools/aws/<key>.pem ubuntu@<ip>:~/pawnstar_nnue/out.bin ./
+
+# 3) ALWAYS tear down to stop billing:
+REGION=us-east-1 IID=i-... KEY_NAME=<key> SG_ID=sg-... bash tools/aws/teardown.sh
+#   or sweep everything tagged:   REGION=us-east-1 ALL=1 bash tools/aws/teardown.sh
+```
+
+To run the whole thing unattended, pass `RUN=setup,data,train` to `launch_training.sh` (and `SHARDS`/`SBS`).
+
+## Data scope
+
+`SHARDS` lists PlentyChess shard ids from
+<https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat>. Default is **one shard** (~370M
+positions) for a fast screen. The shipped **v8** pool is v6's 818M + shards `11128 12128 12932 13227`
+(~2.31B total) trained at `SBS=120`; see [../../nnue/README.md](../../nnue/README.md) §7 for the exact recipe
+and the v6 base pool. Some shards are corrupt — `bootstrap_train.sh` validates and skips them.
+
+## Phase 4 note (int8 feature weights)
+
+These scripts run the **existing** training pipeline (`tools/train_pipeline.sh` → `tools/bullet/pawnstar.rs`).
+The int8 *feature-weight* experiment additionally needs (a) engine-side int8-FT support and (b) a
+quantisation-aware trainer change (`save_format` `quantise::<i8>` for `l0w`, with weights clipped into int8
+range) — those source changes land first, then you train here. The int8 *output* layer (Phase 2/3, already
+in the engine behind `INT8=1`) needs no retrain. See [../../nnue/int8_quant_study.md](../../nnue/int8_quant_study.md).
+
+## Security notes
+
+- Credentials stay on your machine; the instance gets only your code (scp) and public data.
+- SSH ingress is locked to your current public IP (`/32`) at launch. If your IP changes, re-authorize.
+- The generated `.pem` is written under `tools/aws/` (gitignored) — keep it private; `teardown.sh` deletes
+  the key pair in AWS but not the local file.

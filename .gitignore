@@ -3,3 +3,4 @@ doc/html/
 
 # fastchess resumable tournament config (written into the cwd during SPRT runs)
 config.json
+tools/aws/*.pem
