@@ -154,6 +154,56 @@ SEE (static exchange evaluation, [static_exchange_evaluation.h](src/static_excha
 
 `main` ships one net ([nnue/README.md](nnue/README.md) §7): `nnue/pawnstar-v8.bin`, a **1024-wide, single-bank (no king buckets)** net trained on **~2.31B** public PlentyChess positions — **the engine's only evaluator** (the handcrafted eval was removed). Lineage (all SPRT-measured): self-play labels lost to HCE (label quality was the lever); ~12× more data gave nothing (the 256 net was capacity-limited); doubling width 256→512 added +55 Elo fixed-depth / +71 time-control (**v4**, Chess768); doubling again 512→1024 on 60M gave **~0 fixed-depth and −74 on the clock** (rejected then — 60M saturates 512); **king buckets on 60M were flat (data-starved), but on ~818M gave +47 fixed-depth and +17 on the clock (v6)**, plus two speed fixes (the eval cache and a single-pass `Update`); **scaling that 512×4 arch to ~2.31B gave +29.96 fixed-depth and +20.73 on the clock (v7)**; **then, at that same 2.31B, doubling width to 1024 *without* king buckets (a single bank) beat v7 by +31.9 ± 16.6 Elo at 40/20 — and at half the file size — reversing the old 60M result now that data no longer saturates the wider net (v8, shipped)**. **The recurring lesson: more data is the lever** (v8's 2.31B is still only ~11% of the ~21B available). Incremental accumulator + AVX2 SIMD + the eval cache keep NNUE fast enough to win on the clock, not just at equal depth. Nets of different architecture/width are size-gated and not cross-loadable, so each shipped arch re-ships its net + a matching `test/nnue_reference.txt` (v4/v6/v7 were retired as each successor shipped).
 
+### Continuing NNUE development (experiment playbook + state)
+
+Entry point for further NNUE work, including from a fresh/cloud checkout. The architecture and the full
+train → verify → SPRT → ship recipe live in [nnue/README.md](nnue/README.md) (§6 step-by-step, §7 shipped
+nets + lineage + troubleshooting); this captures the durable *operational* context and experiment state
+that isn't otherwise in the repo.
+
+**Current shipped net:** `nnue/pawnstar-v8.bin` — 1024-wide, single-bank (no king buckets), ~2.31B public
+PlentyChess positions. Engine arch is `kHiddenSize=1024` / `kNumKingBuckets=1` in [nnue.h](src/nnue.h); the
+trainer must match ([tools/bullet/pawnstar.rs](tools/bullet/pawnstar.rs) + `pawnstar_eval.rs`, and the
+all-zero `kKingBucketMap` in [nnue.cpp](src/nnue.cpp)).
+
+**What's been tried (all SPRT-measured — don't repeat):**
+- **Width sweep at 2.31B:** 256→512 = +55 depth / +71 tc (v4); **512→1024 = +31.9 @ 40/20 (v8, shipped)**;
+  **1024→1536 = −17 @ 40/20 (REJECTED)**. So **1024 is the width sweet spot at this data scale** — wider
+  costs more per move than its eval gain returns on the clock. On only 60M, 1024 lost −74 on the clock (v5):
+  width needs data.
+- **King buckets (4):** flat on 60M (data-starved), +47 depth / +17 clock on 818M (v6, shipped then
+  retired). v8 *dropped* buckets — at 2.31B raw width beat bucketing, and v8 is half the file size.
+- **More data is the recurring lever** (v8's 2.31B is only ~11% of the ~21B PlentyChess pool).
+- **Speed** (lets a wider net win on the clock): incremental accumulator (+80), AVX2 (+180), eval cache
+  (~5%; 8→32 MB gave nothing — exhausted), single-pass `Update`, colour-XOR move-driven `Update` (~3% at
+  1024). Aspiration windows: no gain (tried).
+
+**Open levers / candidate next experiments:**
+- **1024 + king buckets on 2.31B** — combine the two winners (v8 = width, no buckets; v6 = buckets, less
+  data). The strongest untested combination.
+- **More data** — add PlentyChess shards beyond the 2.31B pool.
+- **int8 quantisation** — the speed lever that would make >1024 width viable on the clock (~2× kernel
+  throughput); needs a retrain/requantise (clipped-ReLU fits int8; SCReLU's square is harder) and ideally
+  AVX-512/VNNI hardware (the dev box has neither).
+
+**Gotchas (each cost a cycle):**
+- **Not version-controlled:** the training data, the `bullet` checkout, and baseline engine binaries are
+  NOT in the repo — a fresh/cloud env must (re)create them: `tools/setup_bullet.sh` (pinned bullet commit),
+  then download + concat + shuffle the PlentyChess shards per nnue/README §7. GPU needs CUDA ≥ 12.3; set
+  `BULLET_FEATURES=""` to train on CPU.
+- **Cross-arch SPRT:** a new-arch candidate engine's default *and embedded* nets are the old (shipped) arch,
+  so it fatal-exits at startup before fastchess can send `setoption EvalFile`. Give it a net at startup:
+  `CAND_STARTUP_NET=<cand net> BIN_A=<cand engine> BIN_B=<baseline engine> BASELINE_NET=<old net> TC=40/20 tools/run_sprt.sh <cand net> <openings> <rounds>`
+  (run_sprt.sh wraps the candidate when `CAND_STARTUP_NET` is set).
+- **`pawnstar_eval` is NOT header-aware** → run the cross-check against the **raw** (unstamped) net;
+  `test_nnue` / `test_nnue_incremental` accept either. Rebuild `pawnstar_eval` when the arch changes.
+- **Shipping a new net** must: stamp it (`build/stamp_net`), regenerate `test/nnue_reference.txt` (from the
+  raw net) and the Bratko-Kopec accepted moves (`test/bratko_kopec_nnue_test.cpp`, verify 24/24 at depths
+  8–11), point `EMBED_NET` / `main.cpp` at it, retire the old net (size+header gated, not cross-loadable),
+  and update docs — full checklist in nnue/README §7.
+- **`make check` builds tests + tools, not the engine** — run `make` to (re-)embed a new net into
+  `build/pawnstar` before testing the engine binary or running a same-cwd SPRT.
+
 ### Opening book
 
 `OpeningBook` ([opening_book.h](src/opening_book.h)) is loaded from `pawnstar.book` in the working directory at startup (`main.cpp`); the shipped book ([pawnstar.book](pawnstar.book)) is the public-domain [TSCP](https://github.com/terredeciels/TSCP) `book.txt`. The format is plain text, one opening line per row, each move in **coordinate notation** (e.g. `e2e4 e7e5 g1f3`); `ParseLineOfPlay` replays each line from the start position, ignoring tokens that begin with a digit (move numbers) and treating `#` as a to-end-of-line comment. The book is a `std::map<zobrist_t, std::vector<Move>>` storing moves *with repeats*, so `GetMove`'s uniform-random pick is frequency-weighted. `SearchRootNode` returns a book move immediately on a hit, before searching; the `bookmoves` UCI command lists moves and frequencies for the current position. There is no SAN/PGN parser — coordinate notation only.
