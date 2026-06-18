@@ -74,6 +74,12 @@ ifeq ($(LTO), 1)
 	CXXFLAGS += -flto=thin
 endif
 
+# Treat warnings as errors with `make WERROR=1` (e.g. in CI), so a new warning fails the build. Opt-in,
+# not default, since -Werror can break otherwise-fine builds on a newer/different compiler version.
+ifeq ($(WERROR), 1)
+	CXXFLAGS += -Werror
+endif
+
 .PHONY: all tests check prep clean doc tools
 
 all: prep $(PROGRAM_EXE)
@@ -121,9 +127,11 @@ $(BUILD_DIR)/%.o: $(TOOLS_DIR)/%.cpp
 	$(CXX) -c $(CXXFLAGS) -MMD -MP -o $@ $<
 
 # Assemble the embedded net object (.incbin of the shipped net). Rebuilds if the net changes. Plain
-# compile — the C++ flags don't apply to the .S stub. The .incbin path is relative to the make cwd (root).
+# compile — the C++ flags don't apply to the .S stub. The net path is passed from EMBED_NET (single source
+# of truth) into the capital-.S via the preprocessor, so the embedded copy can't drift from the Makefile
+# net. The .incbin path is relative to the make cwd (root).
 $(EMBED_OBJECT): src/embedded_net.S $(EMBED_NET) | prep
-	$(CXX) -c -o $@ src/embedded_net.S
+	$(CXX) -c -DEMBED_NET_PATH='"$(EMBED_NET)"' -o $@ src/embedded_net.S
 
 # Link the main executable (with the embedded-net object).
 $(PROGRAM_EXE): $(OBJECTS) $(EMBED_OBJECT)

@@ -14,6 +14,9 @@
 #   BIN_A, BIN_B   engine binaries for the candidate / baseline (default ./build/pawnstar for both).
 #                  Different net widths need different builds (kHiddenSize is compile-time), so a
 #                  cross-width SPRT points BIN_A and BIN_B at the two separately-built binaries.
+#   CAND_STARTUP_NET  for a cross-arch candidate (BIN_A) whose default/embedded net is incompatible: a net
+#                  to give BIN_A at *startup* (via PAWNSTAR_EVALFILE) so it survives the UCI handshake.
+#                  Without it, such a candidate fatal-exits before the per-engine EvalFile is applied.
 #   ELO0, ELO1     SPRT hypothesis bounds (default 0 / 10).
 set -euo pipefail
 
@@ -36,6 +39,19 @@ export PAWNSTAR_THREADS=1
 # inherits a net path from the environment.
 unset PAWNSTAR_NNUE PAWNSTAR_EVALFILE
 
+# Cross-arch SPRT: when BIN_A is built for a *different* architecture than its default/embedded net, it
+# rejects that net and fatal-exits during the UCI handshake — before fastchess can send setoption EvalFile.
+# Set CAND_STARTUP_NET=<net for BIN_A> to wrap the candidate so it loads a compatible net at *startup* (via
+# PAWNSTAR_EVALFILE); the per-engine EvalFile below still applies normally. The baseline (BIN_B) is assumed
+# to start fine on its own embedded/default net. Unset => behaviour is unchanged.
+CAND_CMD="$BIN_A"
+if [ -n "${CAND_STARTUP_NET:-}" ]; then
+    CAND_CMD="$(mktemp "${TMPDIR:-/tmp}/sprt_cand_wrapper.XXXXXX.sh")"
+    printf '#!/bin/sh\nexec env PAWNSTAR_EVALFILE=%q %q "$@"\n' "$CAND_STARTUP_NET" "$BIN_A" > "$CAND_CMD"
+    chmod +x "$CAND_CMD"
+    trap 'rm -f "$CAND_CMD"' EXIT
+fi
+
 # Per-engine clock spec: a fixed search depth (isolates eval quality) unless TC is set (measures real
 # strength including the speed cost of a heavier net). Built as an array so it expands to one -each token.
 if [ -n "${TC:-}" ]; then
@@ -48,7 +64,7 @@ fi
 # colours reversed; the draw/resign adjudication ends decided games early to save time without biasing the
 # result; -sprt stops as soon as elo0 vs elo1 is decided at the given alpha/beta error rates.
 fastchess \
-    -engine cmd="$BIN_A" name=cand option.EvalFile="$NET" \
+    -engine cmd="$CAND_CMD" name=cand option.EvalFile="$NET" \
     -engine cmd="$BIN_B" name=base option.EvalFile="$BASELINE_NET" \
     -each proto=uci "${tc_args[@]}" \
     -rounds "$ROUNDS" -games 2 -repeat \
