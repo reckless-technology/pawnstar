@@ -15,7 +15,7 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 - Lockless 128-bit transposition table using Hyatt's XOR trick.
 - Null-move pruning, late-move reductions, and per-thread move ordering (killers, countermove, main +
   1-ply continuation history).
-- Quiescence search over captures with its own transposition table.
+- Quiescence search over captures (SEE-pruned; no transposition table of its own).
 - **NNUE** evaluation (efficiently-updatable neural network) — a perspective net (currently 1024-wide, no king buckets), the engine's only evaluator. A net is loaded at startup; load a different one at runtime with `setoption name EvalFile`.
 - Optional opening book (`pawnstar.book`).
 
@@ -200,12 +200,59 @@ fixed-time clocks bypass the heuristic.
   continuation history** (how often the move was good as a follow-up to the previous move), and finally
   losing captures (negative SEE) below the quiet moves. A quiet move that causes a beta cutoff is
   recorded as a killer and as the countermove to the previous move; every good quiet move is rewarded in
-  both the per-thread history and continuation-history tables. All ordering tables are per-thread.
+  both the per-thread history and continuation-history tables. All ordering tables are per-thread — see
+  [Move ordering and history heuristics](#move-ordering-and-history-heuristics) below for the full scheme.
 
 **Quiescence search** (`SearchState::SearchQuiescent`, [src/search_state.cpp](src/search_state.cpp)) extends the leaves with
-captures only, using a separate transposition table, so the static evaluation is never called on a
-position with a hanging capture available. It applies **SEE pruning** — a capture that loses material
-by static exchange evaluation and does not give check is skipped rather than searched.
+captures only, so the static evaluation is never called on a position with a hanging capture available.
+It does not use a transposition table (no probe, no store). It applies **SEE pruning** — a capture that
+loses material by static exchange evaluation and does not give check is skipped rather than searched.
+
+#### Move ordering and history heuristics
+
+Alpha-beta prunes far more when the best move is searched first, so `SearchState::ScoreAndSortMoves`
+([src/search_state.cpp](src/search_state.cpp)) assigns every move a 23-bit sort score (stored in the
+`Move` itself) in strict descending bands. The TT move is searched before the list is even generated;
+the remaining moves sort as:
+
+| Band | Score | Moves |
+| --- | --- | --- |
+| Winning captures | `kWinningCaptureBase` (1 << 20) + SEE | captures / promotions with SEE ≥ 0 |
+| Killers | `kKillerBase` (1 << 19) +1 / +0 | the two killer moves for this ply |
+| Countermove | `kKillerBase − 1` | the best quiet refutation to the previous move |
+| Quiet moves | `min(main history + continuation history, kKillerBase − 2)` | everything else |
+| Losing captures | negative SEE | captures with SEE < 0, below the quiet moves |
+
+The **killer** and **main-history** tables answer *"which quiet moves are good at this ply / in
+general?"*. The **countermove** and **continuation-history** tables refine that by conditioning on the
+**previous move** — the one move the opponent played to reach this node. That move is threaded down the
+tree as `Search`'s `prev_move` parameter (`Move::None()` at the root and after a null move).
+
+Both previous-move tables share a key that abstracts a move down to **`(piece, to-square)`**:
+
+```cpp
+static constexpr int ContKey(Move m) { return m.piece() * 64 + m.to(); }   // 7 × 64 = 448 keys
+```
+
+This is the standard "a piece lands on a square" abstraction — it generalises across positions (a knight
+reaching f5 is the *same* follow-up however it got there), and `Move::None` collapses to a harmless slot 0.
+
+- **Countermove** (`countermoves_`, an `array<Move, 448>`) — a single best refutation per previous move.
+  When a quiet move causes a beta cutoff it is recorded keyed by `ContKey(prev_move)`
+  (`RecordCountermove`). In ordering it is a *boolean* signal — a move that equals the recorded
+  countermove gets the one fixed band just below the killers (`kKillerBase − 1`).
+- **Continuation history** (`cont_hist_`, a 448 × 448 `int16_t` table, ~0.4 MB, indexed
+  `[ContKey(prev) * 448 + ContKey(move)]`) — a *graded* score for every `(prev → move)` pairing. It is a
+  saturating counter (caps at 16384, like the main `HistoryTable`) bumped whenever a quiet move proves
+  good as a follow-up to `prev`: on a beta cutoff, on an alpha-raise, and for the final PV best move
+  (`RecordContHist`). In ordering, an ordinary quiet move's score is **`main_history(ply, move) +
+  cont_hist(prev, move)`**, clamped to `kKillerBase − 2` so a hot quiet can never jump into the
+  countermove or killer bands.
+
+Captures are excluded from both tables (every record site guards on `Move::IsQuiet()`) because captures
+are already ordered by SEE — history signals only matter for quiets, which have no static score to sort
+on. Both tables are **per-thread** (owned by `SearchState`), so there is no cross-thread contention; the
+`cont_hist_` buffer is heap-allocated once in the constructor, so the per-node hot path allocates nothing.
 
 #### Parallel search (Lazy SMP)
 
@@ -241,7 +288,6 @@ The knobs above live in [src/constants.h](src/constants.h):
 | `kStartDepth` | 3 | First (full-width) iterative-deepening depth |
 | `kMaxPly` | 64 | Hard ceiling on search depth / ply |
 | `kHashtableMegabytes` | 64 | Main transposition table size |
-| `kQHashtableMb` | 8 | Quiescence transposition table size |
 | `kScoreInstabilityThreshold` | 50 | Centipawn window for the "score stable" time-management test |
 | `kMaxSearchThreads` | 256 | Upper bound on Lazy SMP search threads |
 

@@ -19,7 +19,6 @@ class Game
 {
   public:
     TranspositionTable transposition_table; ///< The transposition table (shared by all Lazy SMP threads).
-    TranspositionTable quiescent_table;     ///< Special TT for quiescence search (shared by all threads).
     EvalCache          eval_cache;          ///< Lockless NNUE evaluation cache (shared by all threads).
     ChessClock         time_control;        ///< Clock controls for the current game.
     OpeningBook        book;                ///< The opening book.
@@ -27,8 +26,7 @@ class Game
 
     /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
     Game()
-        : transposition_table{kHashtableMegabytes}, quiescent_table{kQHashtableMb}, eval_cache{kEvalCacheMb},
-          is_cancel_pending{false}
+        : transposition_table{kHashtableMegabytes}, eval_cache{kEvalCacheMb}, is_cancel_pending{false}
     {
         NewGame();
     }

@@ -31,7 +31,6 @@ constexpr Color EnemyOf(Color color)
 }
 
 constexpr int kHashtableMegabytes        = 64;        ///< default transposition table size in MB
-constexpr int kQHashtableMb              = 8;         ///< quiescent hash table default size
 constexpr int kEvalCacheMb               = 8;         ///< NNUE evaluation cache size in MB (lockless)
 constexpr int kMaxMovesPerPosition       = 256;       ///< maximum possible number of moves for a chess position
 constexpr int kBeta                      = 11000;     ///< greater than any possible evaluation score
