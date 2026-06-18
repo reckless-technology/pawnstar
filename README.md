@@ -133,8 +133,9 @@ range-based iterator that yields the `Square` of each set bit, enabling `for (Sq
 
 The upper bits (23–63) are scratch ordering space during search and carry the transposition metadata
 once a move is stored in the table. Because all of that lives in the move, a transposition entry is
-just a `{hash, move}` pair. `MoveList` / `StackList` are fixed-capacity stack containers, so no heap
-allocation happens during move generation or search.
+just a `{hash, move}` pair. `MoveList` is a `StackList` — a fixed-capacity, stack-allocated container —
+so move generation does no heap allocation. (The search's principal variation and per-thread position
+stack are `std::vector`s, the position stack reserved once up front; see the design notes.)
 
 ### Attack generation
 
@@ -418,10 +419,13 @@ A few deliberate choices shape the codebase:
   one by value and there is no `UnmakeMove`. This trades a per-ply copy for far simpler code: no
   state to restore, no aliasing between plies, and positions that are trivially safe to hand to other
   threads. The class is kept small (160 bytes) so the copy stays cheap.
-- **No heap allocation on the search hot path.** Move lists and the per-thread search position stack are
-  fixed-capacity stack containers. The per-search hash history is a `std::vector` reserved once when the
-  `SearchState` is constructed, and the game history is a `std::vector` that grows only as real moves are
-  played — so the node-by-node search loop itself performs no dynamic allocation.
+- **Minimal heap allocation on the search hot path.** Move lists are fixed-capacity stack containers
+  (`StackList`), so move generation allocates nothing. The per-thread position stack and the per-search
+  hash history are `std::vector`s reserved once when the `SearchState` is constructed (the position stack
+  to `kMaxPly + 4`, so a `push_back` during search never reallocates and invalidates the live position
+  reference); the principal-variation lists are `std::vector`s bounded by the search depth; and the game
+  history is a `std::vector` that grows only as real moves are played — so the node-by-node search loop
+  performs effectively no dynamic allocation.
 - **Everything precomputed that can be.** Attack tables and Zobrist keys are built once at startup
   (dynamic initialisation of `const` globals in `generated_data.cpp`), so the hot paths are pure lookups.
 - **Lockless sharing.** Under Lazy SMP the transposition tables and the cancellation flag are the only

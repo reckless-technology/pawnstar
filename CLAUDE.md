@@ -76,7 +76,7 @@ The score field (bits 41–63) is shared: during move ordering it holds the sort
 
 Move types: `kNonCapture`, `kCapture`, `kPawnDoublePush`, `kEpCapture`, `kCastling`, and promotion variants `kPromotionKnight/Bishop/Rook/Queen`.
 
-`MoveList` / `StackList` are fixed-capacity stack vectors (no heap allocation during search).
+`MoveList` is a `StackList`: a fixed-capacity, stack-allocated container, so move generation does no heap allocation. (The search's principal-variation lists (`Variation`) and the per-thread position stack are `std::vector`s — the position stack is reserved up front in the `SearchState` constructor; see Per-thread state.)
 
 ### Attack generation
 
@@ -115,7 +115,7 @@ The search functions were consolidated onto the classes that own their state: `G
 - `killers[kMaxPly][2]` — killer moves.
 - `countermoves_` and `cont_hist_` — the **per-thread** countermove table and 1-ply continuation-history table (keyed by the previous move's (piece, to-square); `cont_hist_` is heap-allocated, ~0.4 MB).
 - `node_count` — nodes searched by this thread.
-- `positions_` (`StackList<Position, kMaxPly + 4>`) — fixed-capacity position stack for the search tree.
+- `positions_` (`std::vector<Position>`, reserved to `kMaxPly + 4` in the constructor) — per-thread copy-make position stack for the search tree. Reserved once up front so no `push_back` during search reallocates (which would invalidate the `CurrentPosition()` reference and break incremental NNUE updates).
 - `accumulator_` (`nnue::Accumulator`) — the NNUE accumulator for the tip position, maintained incrementally across make/undo (only while `game.NnueActive()`, i.e. a net is loaded — false only for tools/tests that build a `Game` without one, e.g. perft/SEE).
 - `hash_stack_` (`std::vector<HashEntry>`, reserved in the constructor to game length + `kMaxPly` + 4) — Zobrist hash history for 50-move/repetition detection. One reservation per search, so the per-node hot path still allocates nothing.
 
