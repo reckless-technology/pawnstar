@@ -75,7 +75,36 @@ fi
 VPC_ID="$(aws ec2 describe-subnets --region "$REGION" --subnet-ids "$SUBNET" \
     --query 'Subnets[0].VpcId' --output text)"
 
+echo "[1c/7] checking the G-instance vCPU quota in $REGION"
+# New accounts often have a 0 quota for G/VT instances -> RunInstances fails with VcpuLimitExceeded only
+# AFTER a key pair + SG are created. Catch it up front (best-effort: needs servicequotas:GetServiceQuota).
+QCODE="L-DB2E81BA"; QNAME="Running On-Demand G and VT instances"
+[ "$SPOT" = 1 ] && { QCODE="L-3819A6DF"; QNAME="All G and VT Spot Instance Requests"; }
+QUOTA="$(aws service-quotas get-service-quota --region "$REGION" --service-code ec2 --quota-code "$QCODE" \
+    --query 'Quota.Value' --output text 2>/dev/null || echo unknown)"
+if [ "$QUOTA" != unknown ] && [ "${QUOTA%.*}" -lt 4 ] 2>/dev/null; then
+    echo "error: your '$QNAME' quota in $REGION is $QUOTA vCPUs — too low for $INSTANCE_TYPE (needs >=4)."
+    echo "  request an increase, wait for approval, then retry:"
+    echo "    aws service-quotas request-service-quota-increase --service-code ec2 --quota-code $QCODE --desired-value 8 --region $REGION"
+    echo "    (console: https://$REGION.console.aws.amazon.com/servicequotas/home/services/ec2/quotas/$QCODE )"
+    exit 1
+fi
+[ "$QUOTA" = unknown ] && echo "    (couldn't read quota — needs servicequotas:GetServiceQuota; relying on RunInstances)" \
+    || echo "    quota OK ($QUOTA vCPUs)"
+
 MYIP="$(curl -fsS https://checkip.amazonaws.com 2>/dev/null | tr -d '[:space:]')/32"
+SG_ID=""; IID=""; KEY_CREATED=0   # tracked so cleanup_on_fail can roll back exactly what was created
+cleanup_on_fail() {
+    local code=$?; trap - EXIT
+    [ "$code" = 0 ] && return 0
+    echo; echo "launch failed (exit $code) — rolling back created resources…"
+    if [ -n "$IID" ]; then
+        aws ec2 terminate-instances --region "$REGION" --instance-ids "$IID" >/dev/null 2>&1 && echo "  terminating $IID"
+        aws ec2 wait instance-terminated --region "$REGION" --instance-ids "$IID" 2>/dev/null || true
+    fi
+    [ -n "$SG_ID" ] && aws ec2 delete-security-group --region "$REGION" --group-id "$SG_ID" 2>/dev/null && echo "  deleted SG $SG_ID"
+    [ "$KEY_CREATED" = 1 ] && { aws ec2 delete-key-pair --region "$REGION" --key-name "$KEY_NAME" 2>/dev/null && echo "  deleted key pair $KEY_NAME"; rm -f "$PEM"; }
+}
 SUFFIX="$(date +%s | tail -c 6)"
 KEY_NAME="${KEY_NAME:-pawnstar-train-$SUFFIX}"
 SG_NAME="pawnstar-train-sg-$SUFFIX"
@@ -101,11 +130,14 @@ if [ "${CONFIRM:-0}" != 1 ]; then
     read -r -p "Proceed? [y/N] " ans; [ "$ans" = y ] || { echo "aborted"; exit 1; }
 fi
 
+trap cleanup_on_fail EXIT   # from here on, any failure rolls back the key pair / SG / instance
+
 echo "[2/7] key pair + security group"
 if ! aws ec2 describe-key-pairs --region "$REGION" --key-names "$KEY_NAME" >/dev/null 2>&1; then
     aws ec2 create-key-pair --region "$REGION" --key-name "$KEY_NAME" \
         --query KeyMaterial --output text > "$PEM"
     chmod 600 "$PEM"
+    KEY_CREATED=1
 fi
 SG_ID="$(aws ec2 create-security-group --region "$REGION" --group-name "$SG_NAME" --vpc-id "$VPC_ID" \
     --description "pawnstar training SSH" \
@@ -143,6 +175,7 @@ if [ -n "$RUN" ]; then
     "${SSH[@]}" "RUN='$RUN' bash ~/pawnstar/tools/aws/bootstrap_train.sh"
 fi
 
+trap - EXIT   # success — keep the instance; the user tears it down with teardown.sh
 echo "[7/7] ready"
 cat <<DONE
 
