@@ -134,11 +134,78 @@ i.e. int8 is gated on a VNNI target, which the dev/cloud box now provides.
 
 ---
 
+## Phase 2 — RESULTS (int8 output layer, implemented behind `INT8=1`)
+
+Implemented the int8 output forward pass in `nnue::Network::Evaluate` (`src/nnue.cpp`), gated by the
+`INT8=1` build flag; the int16 path remains the default/shipped evaluator. Output weights are requantised to
+int8 at load (`output_weights_i8_`); SCReLU activations are requantised to uint8 via `>> kInt8Shift`. The dot
+uses `vpdpbusd` where VNNI is present and AVX2 `pmaddubsw`+`madd` otherwise.
+
+**Shift choice: kInt8Shift = 9 (not 8).** S=8 is more accurate (3 cp mean) but lets a rare `pmaddubsw`
+adjacent-pair saturate int16 on AVX2 — and an adversarial-data probe showed S=8 maddubs diverges from the
+exact dot on essentially every eval (worst case large), while **S=9 keeps `u8 ≤ 127`, so each pair
+(`2·127·127 < 2¹⁵`) fits int16 — 0/20000 adversarial trials diverge.** At S=9 the scalar, AVX2-maddubs and
+VNNI-vpdpbusd kernels are therefore **bit-identical**, with no data-dependent saturation. Cost: eval error
+6.2 cp mean / **26 cp max** vs int16 (the inherent SCReLU-square-into-8-bits loss).
+
+**Correctness:** the engine int8 eval reproduces the Phase-1 S=9 emulation exactly — `test_nnue` reports
+`max |diff| = 26 cp` for both the AVX2 and VNNI builds (identical, as designed), and the 189/250 "failures"
+are just the ±2 cp int16 gate flagging the deliberate requant error. `test_nnue_incremental` still **PASS**es
+(the FT/accumulator path is untouched).
+
+**Speed (per-call `Evaluate`, same input, this CPU):**
+
+| Build | `Evaluate` ns/call | vs int16 |
+|---|---|---|
+| int16 (default/shipped) | 416 | 1.0× |
+| **int8 AVX2 / `pmaddubsw`** (laptop target: AVX2+BMI2, no VNNI) | **224** | **1.86×** |
+| int8 AVX-VNNI / `vpdpbusd` (this cloud box) | 204 | 2.04× |
+
+**Key result for the AVX2 ship target:** VNNI buys almost nothing over AVX2 `pmaddubsw` (204 vs 224 ns),
+because the kernel cost is dominated by the *shared* SCReLU square + uint8 pack, not the dot instruction. So
+an **AVX2-only laptop gets ~the full speedup (1.86×) with no VNNI needed.**
+
+Projected NNUE-time reduction (Evaluate is 50–60% of NNUE time, now ×0.54): **≈ 23–28% less NNUE compute.**
+End-to-end nps is *not* a clean way to confirm this — the requant changes the eval, hence the search tree
+(int8 reached depth 14 in 8.2M nodes vs int16's 16.2M on the same positions), so summed nps across divergent
+trees is confounded. The real end-to-end payoff is measured by **Phase 3 SPRT at a time control**, which
+counts games-per-time and so prices in the speedup directly against the 6 cp eval error.
+
+## Can the *feature* (input) weights also go int8? (measured)
+
+Yes for speed, but with a sharp accuracy catch the output layer didn't have.
+
+- **Speed is real.** A column-add microbench over a random-access weight table (mimicking the FT `Update`
+  hot path) measured **int8 feature weights 1.50× faster** (31 vs 46 ns/column): the FT is partly
+  memory-bound, and halving the 1.5 MB weight table's bytes outweighs the int8→int16 widening the add needs.
+  (This **corrects** the Phase-1 "FT int8 = only a cache win, not worth it" note — the cache/memory win is
+  the point, and it's substantial. Caveat: the bench uses uniform-random rows = cache-pessimal; if a search's
+  hot columns are L1-resident the real gain is smaller, so this is an upper-ish bound.)
+- **The accumulator must still be int16.** Live accumulator values reach −4840; only the *weights* go int8,
+  and each int8 column is widened to int16 before being added to the accumulator.
+- **The catch — it's lossy, unlike the output layer.** `feature_weights max|w| = 505`, which does **not** fit
+  int8 (±127). Storing them int8 needs a scale `FS = ⌈505/127⌉ = 4`, i.e. dividing every feature weight by 4
+  and **losing ~2 bits of precision on the most numerous, most strength-critical parameters**. The output
+  layer was free (`max|w|=127`, `WS=1`, lossless); the FT is not. Doing it well needs a **quantisation-aware
+  retrain** in bullet (train feature weights clipped into int8 range, then export `i8`), not a post-hoc ÷4.
+
+**Verdict:** int8 feature weights are a real *second* speed lever (~1.5× on the ~40–50%-of-NNUE `Update`
+path), but they are **retrain-gated and higher-Elo-risk** than the output layer. Sequence it *after* the
+output-layer int8 ships (or is SPRT-cleared): do the output layer first (free, done), then evaluate a
+quantisation-aware int8-FT retrain as Phase 4.
+
 ## Reproducing
 
 ```bash
+# Phase 0/1 study (int16):
 make build/nnue_quant_study
 build/nnue_quant_study nnue/pawnstar-v8.bin test/nnue_reference.txt
+
+# Phase 2 int8 output layer (AVX2 = laptop target; add VNNI=1 for vpdpbusd on capable CPUs):
+make clean && make INT8=1 build/nnue_quant_study build/test_nnue
+build/nnue_quant_study nnue/pawnstar-v8.bin test/nnue_reference.txt | grep Evaluate   # ~224 ns vs 416
+build/test_nnue nnue/pawnstar-v8.bin test/nnue_reference.txt                          # max|diff|=26 cp (by design)
+make clean && make   # restore the default int16 engine
 ```
 
 Call-ratio counters are not committed (they were temporary DEBUGX increments in `nnue::Network::Update` and

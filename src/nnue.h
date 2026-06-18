@@ -168,8 +168,14 @@ class Network
     alignas(64) std::array<int16_t, kHiddenSize> feature_bias_; ///< Feature-transformer biases.
     /// @brief Output weights: first kHiddenSize weight the side-to-move accumulator, next kHiddenSize the other.
     alignas(64) std::array<int16_t, 2 * kHiddenSize> output_weights_;
-    int16_t output_bias_ = 0;     ///< Output bias, in QA*QB units.
-    bool    loaded_      = false; ///< Whether Load() has succeeded.
+    /// @brief Output weights requantised to int8 for the optional int8 forward pass (PAWNSTAR_INT8 build).
+    /// w8 = round(output_weight / output_w_scale_) clamped to [-127,127]; the scale keeps the largest output
+    /// weight in int8 range (1 for nets whose |weight| <= 127, e.g. the shipped v8). Always populated by
+    /// Load so the int8 kernel needs no per-eval setup; only read by the int8 Evaluate branch.
+    alignas(64) std::array<int8_t, 2 * kHiddenSize> output_weights_i8_{};
+    int     output_w_scale_ = 1;  ///< Divisor mapping the int16 output weights into int8 range.
+    int16_t output_bias_    = 0;  ///< Output bias, in QA*QB units.
+    bool    loaded_         = false; ///< Whether Load() has succeeded.
 };
 
 } // namespace nnue

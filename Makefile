@@ -81,6 +81,19 @@ ifeq ($(WERROR), 1)
 	CXXFLAGS += -Werror
 endif
 
+# Optional experimental int8 NNUE output-layer quantisation. INT8=1 swaps the output forward pass to int8
+# (uint8 SCReLU activations x int8 output weights); it runs on the engine's baseline AVX2 target via
+# pmaddubsw and is bit-identical to the VNNI kernel. VNNI=1 additionally enables AVX-VNNI (256-bit
+# vpdpbusd) for an exact, faster dot on CPUs that have it (the FT/accumulator path is unchanged). The
+# int8 path changes eval slightly (SCReLU squared range requantised to 8 bits), so it is opt-in and
+# evaluated by SPRT — the default build is unchanged int16.
+ifeq ($(INT8), 1)
+	CXXFLAGS += -D PAWNSTAR_INT8
+endif
+ifeq ($(VNNI), 1)
+	CXXFLAGS += -mavxvnni
+endif
+
 .PHONY: all tests check prep clean doc tools
 
 all: prep $(PROGRAM_EXE)

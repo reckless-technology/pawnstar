@@ -3,6 +3,8 @@
 #include "constants.h"
 #include "position.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
@@ -72,6 +74,65 @@ inline void SubColumn(std::array<int16_t, kHiddenSize> &acc, const int16_t *colu
     }
 }
 #endif
+
+#if defined(PAWNSTAR_INT8) && defined(__AVX2__)
+/// @brief Right shift applied to the SCReLU activation (clamp(x,0,QA)^2, in [0, QA^2=65025]) to fit uint8.
+/// S=9 maps the range onto [0,127], which keeps each `pmaddubsw` adjacent-pair sum (2*127*127 < 2^15) inside
+/// int16 — so the AVX2 (maddubs) and VNNI (vpdpbusd) kernels are saturation-free and bit-identical. The eval
+/// scale below folds 2^kInt8Shift back out. (S=8 would be more accurate but lets a rare pair saturate int16
+/// on AVX2; if a future SPRT wants S=8, pair it with output_w_scale_=2 to stay saturation-free.)
+constexpr int kInt8Shift = 9;
+
+/// @brief Pack four int32 vectors (each 8 lanes, values in [0,255]) into 32 uint8 in *natural* order
+/// [a0..7, b0..7, c0..7, d0..7]. packus works within 128-bit lanes, so a final permute restores order.
+inline __m256i PackU8(__m256i a, __m256i b, __m256i c, __m256i d)
+{
+    const __m256i ab   = _mm256_packus_epi32(a, b);
+    const __m256i cd   = _mm256_packus_epi32(c, d);
+    const __m256i abcd = _mm256_packus_epi16(ab, cd);
+    return _mm256_permutevar8x32_epi32(abcd, _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7));
+}
+
+/// @brief SCReLU 32 accumulator int16 lanes -> 32 uint8 (natural order): clamp [0,QA], square, round, >>S.
+inline __m256i ScReluU8(const int16_t *a)
+{
+    const __m256i zero = _mm256_setzero_si256();
+    const __m256i qa   = _mm256_set1_epi16(static_cast<int16_t>(kQA));
+    const __m256i round = _mm256_set1_epi32(1 << (kInt8Shift - 1));
+    const __m256i v0 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(a));
+    const __m256i v1 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(a + 16));
+    const __m256i c0 = _mm256_min_epi16(_mm256_max_epi16(v0, zero), qa);
+    const __m256i c1 = _mm256_min_epi16(_mm256_max_epi16(v1, zero), qa);
+    auto sq = [&](__m256i c, bool high) {
+        const __m256i w = high ? _mm256_cvtepi16_epi32(_mm256_extracti128_si256(c, 1))
+                               : _mm256_cvtepi16_epi32(_mm256_castsi256_si128(c));
+        return _mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(w, w), round), kInt8Shift);
+    };
+    return PackU8(sq(c0, false), sq(c0, true), sq(c1, false), sq(c1, true));
+}
+
+/// @brief uint8 x int8 dot, accumulated into an int32 vector. Uses VNNI vpdpbusd where available (exact int32
+/// accumulation); else AVX2 maddubs (uint8*int8 -> int16 pairwise, saturating) + madd widening to int32.
+/// With kInt8Shift=9 the maddubs intermediate never saturates, so both forms give identical results.
+inline __m256i DotU8I8(__m256i acc, __m256i u8, __m256i w8)
+{
+#if defined(__AVXVNNI__) || defined(__AVX512VNNI__)
+    return _mm256_dpbusd_avx_epi32(acc, u8, w8);
+#else
+    const __m256i prod = _mm256_maddubs_epi16(u8, w8);
+    return _mm256_add_epi32(acc, _mm256_madd_epi16(prod, _mm256_set1_epi16(1)));
+#endif
+}
+
+/// @brief Horizontal sum of the 8 int32 lanes.
+inline int32_t HsumI32(__m256i v)
+{
+    __m128i s = _mm_add_epi32(_mm256_castsi256_si128(v), _mm256_extracti128_si256(v, 1));
+    s         = _mm_add_epi32(s, _mm_shuffle_epi32(s, _MM_SHUFFLE(1, 0, 3, 2)));
+    s         = _mm_add_epi32(s, _mm_shuffle_epi32(s, _MM_SHUFFLE(2, 3, 0, 1)));
+    return _mm_cvtsi128_si32(s);
+}
+#endif // PAWNSTAR_INT8 && __AVX2__
 
 /// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
 /// own* orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map
@@ -249,6 +310,20 @@ bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, const s
     p += output_weights_.size() * sizeof(int16_t);
     std::memcpy(&output_bias_, p, sizeof(output_bias_));
 
+    // Requantise the output weights to int8 for the optional int8 forward pass. The scale keeps the
+    // largest-magnitude output weight inside [-127, 127]; for nets whose weights already fit (|w| <= 127,
+    // e.g. the shipped v8) the scale is 1 and the int8 copy is lossless. (Always computed — it is one-time,
+    // ~2 KB, and lets the int8 kernel skip per-eval setup; the int16 path ignores it.)
+    int max_ow = 0;
+    for (int16_t v : output_weights_)
+        max_ow = std::max(max_ow, std::abs(static_cast<int>(v)));
+    output_w_scale_ = std::max(1, (max_ow + 126) / 127);
+    for (std::size_t i = 0; i < output_weights_.size(); ++i)
+    {
+        const long q     = std::lround(static_cast<double>(output_weights_[i]) / output_w_scale_);
+        output_weights_i8_[i] = static_cast<int8_t>(std::max<long>(-127, std::min<long>(127, q)));
+    }
+
     loaded_ = true;
     std::fprintf(stderr, "info string NNUE: loaded net '%s'\n", origin.c_str());
     return true;
@@ -328,7 +403,26 @@ int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
 
     // Forward pass mirroring bullet's `simple` example exactly (SCReLU activation).
     int64_t output = 0;
-#if defined(__AVX2__)
+#if defined(PAWNSTAR_INT8) && defined(__AVX2__)
+    // int8 output layer: activations requantised to uint8 (SCReLU >> kInt8Shift), output weights to int8.
+    // The dot accumulates in int32 (the Phase-1 study showed |dot| <= 86M << 2^31). dot8 ~= raw_dot /
+    // (output_w_scale_ * 2^kInt8Shift), so multiply that factor back in before the shared dequant chain.
+    __m256i        acc32      = _mm256_setzero_si256();
+    const int16_t *acts[2]    = {stm_acc.data(), ntm_acc.data()};
+    const int8_t  *weights[2] = {output_weights_i8_.data(), output_weights_i8_.data() + kHiddenSize};
+    for (int side = 0; side < 2; ++side)
+    {
+        const int16_t *a = acts[side];
+        const int8_t  *w = weights[side];
+        for (int i = 0; i < kHiddenSize; i += 32)
+        {
+            const __m256i u8 = ScReluU8(a + i);
+            const __m256i w8 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(w + i));
+            acc32            = DotU8I8(acc32, u8, w8);
+        }
+    }
+    output = static_cast<int64_t>(HsumI32(acc32)) * output_w_scale_ * (1 << kInt8Shift);
+#elif defined(__AVX2__)
     // Vectorised SCReLU dot product. Per lane: clamp(x,0,QA)^2 (int32, <=65025) times the weight, taking
     // the low 32 bits of the product exactly as the scalar int multiply does; products are sign-extended
     // to 64-bit and summed. Integer addition is associative and exact here (no 64-bit overflow), so the
