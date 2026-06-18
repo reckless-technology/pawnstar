@@ -9,6 +9,7 @@ TEST_DIR            = test
 TOOLS_DIR           = tools
 TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net
 TOOL_FILTERBOOK_EXE = $(BUILD_DIR)/filter_book
+TOOL_QUANT_EXE      = $(BUILD_DIR)/nnue_quant_study
 
 ENGINE_SOURCES      = \
 	debug_hashtable.cpp \
@@ -84,7 +85,7 @@ endif
 
 all: prep $(PROGRAM_EXE)
 
-tools: prep $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE)
+tools: prep $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE) $(TOOL_QUANT_EXE)
 
 tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE)
 
@@ -108,6 +109,7 @@ clean:
 	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) \
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
 	      $(TOOL_FILTERBOOK_EXE) $(BUILD_DIR)/filter_book.o $(BUILD_DIR)/filter_book.d \
+	      $(TOOL_QUANT_EXE) $(BUILD_DIR)/nnue_quant_study.o $(BUILD_DIR)/nnue_quant_study.d \
 	      $(OBJECTS) $(EMBED_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS)
 
 # Generate API documentation with doxygen (output configured by the Doxyfile).
@@ -162,6 +164,10 @@ $(TOOL_STAMP_EXE): $(BUILD_DIR)/stamp_net.o
 
 # Link the opening-book filter against all engine objects (it drives the NNUE search).
 $(TOOL_FILTERBOOK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/filter_book.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+# Link the int8-quantisation study tool (drives NNUE inference; needs the engine objects).
+$(TOOL_QUANT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_quant_study.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 -include $(DEPS)
