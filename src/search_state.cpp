@@ -100,8 +100,12 @@ void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) co
         int sort;
         if (!move.IsQuiet()) // capture or promotion: order by static exchange evaluation
         {
-            const int see = EvaluateStaticExchange(position, move).first;
-            sort          = see >= 0 ? kWinningCaptureBase + see : see; // losing captures sort below quiet moves
+            const auto [see, is_checking] = EvaluateStaticExchange(position, move);
+            if (is_checking)
+            {
+                move.GivesCheck();
+            }
+            sort = see >= 0 ? kWinningCaptureBase + see : see; // losing captures sort below quiet moves
         }
         else if (move == killer0) // first killer: just below winning captures
         {
@@ -289,7 +293,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
 
         case Transposition::NodeType::kAll:
             INCREMENT("table hit all node");
-            if (transposition->score() < alpha)
+            if (transposition->score() <= alpha)
             {
                 INCREMENT("table hit all node cutoffs");
                 return transposition->score();
@@ -343,7 +347,8 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
     {
         INCREMENT("table move");
         best_move = transposition->move;
-        pv.clear(); // child writes its line here only if it is a PV node; clear so a terminal/cutoff child leaves it empty
+        pv.clear(); // child writes its line here only if it is a PV node; clear so a terminal/cutoff child leaves it
+                    // empty
         const int score = state.SearchSingleMove(depth, ply, alpha, beta, transposition->move, pv, 0).score;
         if (state.IsCancelled())
         {
@@ -404,8 +409,8 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
         // are deep into the (history/SEE-sorted) move list, skip the remaining quiet, non-checking moves —
         // they almost never raise alpha, and not searching them spends the saved time on more useful lines.
         // Captures, promotions and checking moves are never pruned.
-        if (beta == alpha + 1 && !in_check_seq && depth <= kLmpMaxDepth && move.IsQuiet() &&
-            !move.IsChecking() && move_index >= kLmpBase + depth * depth)
+        if (beta == alpha + 1 && !in_check_seq && depth <= kLmpMaxDepth && move.IsQuiet() && !move.IsChecking() &&
+            move_index >= kLmpBase + depth * depth)
         {
             INCREMENT("late move prune");
             continue;
