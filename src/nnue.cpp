@@ -321,52 +321,39 @@ bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, const s
 {
     loaded_ = false;
 
-    // Two accepted layouts:
-    //  (1) A Pawnstar-stamped image: a 32-byte NetHeader (magic + architecture) followed by the payload.
-    //      Every architecture field is checked against this engine's constants, so an incompatible net is
-    //      rejected with a clear message instead of being silently misread.
-    //  (2) Raw bullet output (no header): accepted only when its size matches the expected payload exactly
-    //      (within bullet's <64-byte trailing-tensor padding). This exact window — not the old `>=` — is
-    //      what stops a *larger* (e.g. wider) net being silently misread.
-    std::size_t payload_offset = 0;
-    NetHeader   header{};
-    if (size >= sizeof(NetHeader))
+    // Only a Pawnstar-stamped image is accepted: a 32-byte NetHeader (magic + architecture) immediately
+    // followed by the payload. Every architecture field is checked against this engine's constants, so an
+    // incompatible — or an unstamped/raw bullet — net is rejected with a clear message instead of being
+    // silently misread. Stamp a raw bullet net with tools/stamp_net (which embeds the building engine's
+    // constants) before loading it.
+    NetHeader header{};
+    if (size < sizeof(NetHeader) || std::memcmp(data, kNetMagic, sizeof(kNetMagic)) != 0)
     {
-        std::memcpy(&header, data, sizeof(header));
+        std::fprintf(stderr,
+                     "info string NNUE: net '%s' is not a stamped Pawnstar net (missing '%.4s' header) — "
+                     "stamp it with tools/stamp_net\n",
+                     origin.c_str(), kNetMagic);
+        return false;
     }
-    if (std::memcmp(header.magic, kNetMagic, sizeof(kNetMagic)) == 0)
+    std::memcpy(&header, data, sizeof(header));
+
+    // Validate the stamped architecture fields against this build.
+    const NetHeader expected = ExpectedNetHeader();
+    if (header.format_version != expected.format_version || header.input_size != expected.input_size ||
+        header.king_buckets != expected.king_buckets || header.hidden_size != expected.hidden_size ||
+        header.qa != expected.qa || header.qb != expected.qb || header.scale != expected.scale)
     {
-        // Stamped image: validate the architecture fields against this build.
-        const NetHeader expected = ExpectedNetHeader();
-        if (header.format_version != expected.format_version || header.input_size != expected.input_size ||
-            header.king_buckets != expected.king_buckets || header.hidden_size != expected.hidden_size ||
-            header.qa != expected.qa || header.qb != expected.qb || header.scale != expected.scale)
-        {
-            std::fprintf(stderr,
-                         "info string NNUE: net '%s' is incompatible — file is "
-                         "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d, engine expects "
-                         "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d\n",
-                         origin.c_str(), header.format_version, header.input_size, header.king_buckets,
-                         header.hidden_size, header.qa, header.qb, header.scale, expected.format_version,
-                         expected.input_size, expected.king_buckets, expected.hidden_size, expected.qa, expected.qb,
-                         expected.scale);
-            return false;
-        }
-        payload_offset = sizeof(NetHeader);
+        std::fprintf(stderr,
+                     "info string NNUE: net '%s' is incompatible — file is "
+                     "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d, engine expects "
+                     "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d\n",
+                     origin.c_str(), header.format_version, header.input_size, header.king_buckets,
+                     header.hidden_size, header.qa, header.qb, header.scale, expected.format_version,
+                     expected.input_size, expected.king_buckets, expected.hidden_size, expected.qa, expected.qb,
+                     expected.scale);
+        return false;
     }
-    else
-    {
-        // Headerless raw bullet net: require the payload size exactly (bullet pads the trailing tensor up
-        // to a 64-byte boundary, so allow up to 63 bytes of trailing padding, but no more and no less).
-        if (size < kNetFileBytes || size >= kNetFileBytes + 64)
-        {
-            std::fprintf(stderr,
-                         "info string NNUE: net '%s' is %zu bytes, expected %zu (raw, unstamped) — wrong "
-                         "architecture or format\n",
-                         origin.c_str(), size, kNetFileBytes);
-            return false;
-        }
-    }
+    const std::size_t payload_offset = sizeof(NetHeader);
 
     // The packed payload (feature_weights, feature_bias, output_weights, output_bias) is exactly
     // kNetFileBytes; the image may have a header before it and bullet padding after it.

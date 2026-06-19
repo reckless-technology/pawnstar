@@ -100,18 +100,18 @@ Packed payload is `(786432 + 1024 + 2048 + 1) * 2 = 1579010` bytes; bullet pads 
 **Self-describing header.** A shipped net is prepended with a **32-byte `NetHeader`** (`src/nnue.h`):
 a magic (`"PSN1"`), a format version, and the architecture parameters — `kInputSize`, `kNumKingBuckets`,
 `kHiddenSize`, `kQA`, `kQB`, `kScale`. So `nnue/pawnstar-v8.bin` is **1579104 bytes** (32 + 1579072). The
-loader (`Network::Load`) accepts two layouts:
+loader (`Network::Load`) accepts **only a stamped net**:
 
 - **Stamped** (magic present): every architecture field is checked against the engine's compile-time
   constants; any mismatch is rejected with a descriptive message (e.g. `file is …buckets4…hidden512…,
   engine expects …buckets1…hidden1024…`) — so an incompatible net can never be silently misread.
-- **Raw** (no magic, e.g. a freshly-exported bullet `quantised.bin`): accepted only when its size equals
-  the payload exactly, within bullet's `<64`-byte padding (`kNetFileBytes ≤ size < kNetFileBytes+64`).
-  This exact window — not a `>=` floor — is what rejects a *larger* (e.g. wider) raw net rather than
-  misreading it.
+- **Raw** (no magic, e.g. a freshly-exported bullet `quantised.bin`): **rejected** (`not a stamped
+  Pawnstar net (missing 'PSN1' header)`). The old headerless-raw acceptance path was removed; stamp the
+  net before loading it.
 
 Stamp a raw net with `tools/stamp_net` (`make tools`); the header values come from the building engine's
-constants, so it can only stamp a net that matches this build. The forward-pass math and quantisation are
+constants, so it can only stamp a net that matches this build (and it accepts only a *raw*, exact-payload
+net as input — `kNetFileBytes ≤ size < kNetFileBytes+64` — so it can't re-stamp an already-stamped file). The forward-pass math and quantisation are
 kept in lock-step with the trainer ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies
 they agree to within rounding. (The retired nets had different sizes/headers — e.g. the Chess768 512-wide
 v4 a 789506-byte payload, the 512×4 king-bucketed v6/v7 a 3148802-byte payload — so this 1024-wide build
@@ -394,8 +394,9 @@ RAW=~/pawnstar_nnue/v7/checkpoints/pawnstar-120/quantised.bin
 ./build/stamp_net "$RAW" /path/to/pawnstar/nnue/pawnstar-v8.bin
 
 # 6. Verify (§6). GOTCHA: pawnstar_eval is NOT header-aware, so generate the reference from the *RAW*
-#    net; test_nnue / test_nnue_incremental are header-aware and accept either. (Stamping before the
-#    cross-check makes pawnstar_eval misread the 32-byte header -> spurious failures.)
+#    net; but test_nnue / test_nnue_incremental load through the engine, which only accepts a *stamped*
+#    net (the raw path was removed) — so pass them the stamped net (step 5), as below. (Feeding the
+#    stamped net to pawnstar_eval would make it misread the 32-byte header -> spurious failures.)
 cd /path/to/pawnstar
 cut -d'|' -f1 test/nnue_reference.txt > /tmp/fens.txt          # reuse the existing FENs (first field)
 "$EVAL" "$RAW" /tmp/fens.txt > test/nnue_reference.txt          # re-baseline the checked-in reference (RAW net)
@@ -436,13 +437,14 @@ location with `BULLET=…`.
 - **`undefined symbol: cuFuncLoad` when building bullet with `--features cuda`** — the NVIDIA driver is
   too old (it lacks the CUDA ≥ 12.3 driver API). Upgrade the driver to ≥ 545, or train on CPU with
   `BULLET_FEATURES=""`.
-- **`NNUE: file is …, engine expects …`** (stamped net) or **`NNUE: net '…' is N bytes, expected 1579010
-  (raw, unstamped) — wrong architecture or format`** (raw net) — the file doesn't match this build's
-  architecture (wrong `HIDDEN_SIZE`, bucket count, quantisation, or a truncated/corrupt file). Both are
-  hard rejections: a *stamped* net is validated field-by-field against the engine's compile-time constants,
-  and a *raw* net must match the payload size **exactly** (the window `kNetFileBytes ≤ size < kNetFileBytes
-  +64`, §2). So an incompatible net is never silently misread — including a *larger* (e.g. wider) one, the
-  case the old `>=` floor missed. Stamp nets with `tools/stamp_net` so the rejection message is precise.
+- **`NNUE: net '…' is not a stamped Pawnstar net (missing 'PSN1' header)`** — you handed the engine a raw
+  (unstamped) bullet net. The engine only loads **stamped** nets now (the headerless-raw path was removed);
+  stamp it first with `tools/stamp_net <raw> <stamped>`.
+- **`NNUE: net '…' is incompatible — file is …, engine expects …`** — a stamped net whose header arch
+  fields don't match this build (wrong `HIDDEN_SIZE`, bucket count, quantisation). The stamped header is
+  validated field-by-field against the engine's compile-time constants, so an incompatible net is never
+  silently misread — including a *larger* (e.g. wider) one. (`stamp_net` itself only accepts a *raw* net of
+  the exact payload size, so it can't even produce a wrong-arch stamped net for this build.)
 - **Engine "disconnects" mid-match** — the old long-game history overflow is fixed (the game history is
   a dynamic `std::vector` now), so this should be rare; if it recurs it is an actual crash worth a debug
   build. Adjudication (`run_sprt.sh`) is still recommended to keep matches short and decisive.

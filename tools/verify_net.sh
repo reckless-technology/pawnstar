@@ -24,14 +24,20 @@ trap 'rm -rf "$WORK"' EXIT   # clean up the scratch dir however we exit
 # are net-specific, so we can't use the checked-in reference values directly — instead we reuse only its FEN
 # list (field 1 of each "FEN|eval" line), have the trainer re-evaluate them for THIS net, and feed those as
 # the reference to test_nnue, which fails if the engine's inference disagrees by more than 2cp.
+# The engine only loads a *stamped* net (the raw-net path was removed), but pawnstar_eval reads the *raw*
+# bullet net (it is not header-aware). So feed the raw NET to pawnstar_eval, and stamp a scratch copy for
+# the engine-side tests. stamp_net only accepts a raw net, so NET must be the unstamped bullet output.
+STAMPED="$WORK/stamped.bin"
+"$REPO/build/stamp_net" "$NET" "$STAMPED"
+
 echo "[1/2] cross-check: engine NNUE eval vs bullet pawnstar_eval (within +/-2cp)"
 cut -d'|' -f1 "$REPO/test/nnue_reference.txt" > "$WORK/fens.txt"
 "$EVAL" "$NET" "$WORK/fens.txt" > "$WORK/ref.txt"
-"$REPO/build/test_nnue" "$NET" "$WORK/ref.txt"
+"$REPO/build/test_nnue" "$STAMPED" "$WORK/ref.txt"
 
 # [2/2] The search maintains the accumulator incrementally across make/undo; this asserts it stays
 # bit-identical to a from-scratch refresh over random move sequences (catches king-bucket-crossing bugs).
 echo "[2/2] incremental accumulator == full refresh (bit-identical)"
-"$REPO/build/test_nnue_incremental" "$NET"
+"$REPO/build/test_nnue_incremental" "$STAMPED"
 
 echo "verify OK: $NET"

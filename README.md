@@ -350,8 +350,10 @@ incrementally** across make/undo on each thread's `SearchState` — only the fea
 that moved are updated (a king crossing a bucket boundary would rebuild that one perspective's accumulator,
 but with a single bank that never happens). This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
 `int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) from the
-[bullet](https://github.com/jw1912/bullet) trainer, with a small self-describing header so an
-incompatible net is rejected rather than misread (see [nnue/README.md](nnue/README.md)).
+[bullet](https://github.com/jw1912/bullet) trainer, with a small self-describing header that the engine
+**requires**: an unstamped (raw bullet) net or one whose header doesn't match this build's architecture
+is rejected rather than misread. Stamp a freshly trained raw net with `tools/stamp_net` before loading
+(see [nnue/README.md](nnue/README.md)).
 
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
 [nnue/README.md](nnue/README.md). The shipped nets are trained on **public PlentyChess** bulletformat
