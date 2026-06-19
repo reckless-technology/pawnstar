@@ -64,8 +64,8 @@ to uint8 (`screlu(x) >> 9` → `[0,127]`) and the output weights to int8, with t
 ~1.86× faster than the int16 dot (a measured **+31.8 ± 10.3 Elo at 8+0.08**) at a bounded ~26 cp deviation
 from `EvaluateExact`. It runs on the baseline AVX2 build via `pmaddubsw`; the `>>9` keeps every adjacent pair
 inside int16, so the AVX2 and VNNI (`vpdpbusd`, `make VNNI=1`) kernels are saturation-free and bit-identical.
-The int16 *accumulator* is unchanged (the int8 *feature*-weight experiment behind `INT8_FT=1` is not shipped;
-see [int8_quant_study.md](int8_quant_study.md)).
+The int16 *accumulator* and feature transformer are unchanged (the int8 *feature*-weight experiment was
+measured and **removed** after a definitive −8 Elo SPRT; see [int8_quant_study.md](int8_quant_study.md)).
 
 The net is an `nnue::Network` class (the quantised weights plus `Load`/`Refresh`/`Update`/`Evaluate`
 methods), **owned by the `Game`** — there are no nnue globals. Its accumulator is **maintained

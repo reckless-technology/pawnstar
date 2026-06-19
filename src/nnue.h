@@ -176,17 +176,7 @@ class Network
 
     /// @brief Feature-transformer weights, column-major by feature then hidden: index = feature * kHiddenSize + i.
     /// Feature rows are laid out bucket-major: row = bucket * 768 + chess768_index.
-    /// In the PAWNSTAR_INT8_FT build these are stored int8 (half the bytes -> faster, memory-bound Update);
-    /// the column-add reconstructs ~original scale via *feature_w_scale_, so the int16 accumulator, SCReLU
-    /// and output layer are unchanged. Lossy at scale>1 (the shipped net needs scale 4 since |w|=505),
-    /// lossless at scale 1 (a quantisation-aware retrain with weights clipped to int8).
-#if defined(PAWNSTAR_INT8_FT)
-    alignas(64) std::array<int8_t, kFeatureRows * kHiddenSize> feature_weights_;
-    int feature_w_scale_ = 1; ///< Multiplier reconstructing ~int16-scale weights from the int8 table.
-#else
     alignas(64) std::array<int16_t, kFeatureRows * kHiddenSize> feature_weights_;
-    static constexpr int feature_w_scale_ = 1; ///< No FT requant in the int16 build (column already full-scale).
-#endif
     alignas(64) std::array<int16_t, kHiddenSize> feature_bias_; ///< Feature-transformer biases (always int16).
     /// @brief Output weights: first kHiddenSize weight the side-to-move accumulator, next kHiddenSize the other.
     alignas(64) std::array<int16_t, 2 * kHiddenSize> output_weights_;

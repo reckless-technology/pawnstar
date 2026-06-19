@@ -51,13 +51,12 @@ positions) for a fast screen. The shipped **v8** pool is v6's 818M + shards `111
 (~2.31B total) trained at `SBS=120`; see [../../nnue/README.md](../../nnue/README.md) §7 for the exact recipe
 and the v6 base pool. Some shards are corrupt — `bootstrap_train.sh` validates and skips them.
 
-## Phase 4 note (int8 feature weights)
+## int8 feature weights — closed (don't retry)
 
-These scripts run the **existing** training pipeline (`tools/train_pipeline.sh` → `tools/bullet/pawnstar.rs`).
-The int8 *feature-weight* experiment additionally needs (a) engine-side int8-FT support and (b) a
-quantisation-aware trainer change (`save_format` `quantise::<i8>` for `l0w`, with weights clipped into int8
-range) — those source changes land first, then you train here. The int8 *output* layer (Phase 2/3, already
-in the engine behind `INT8=1`) needs no retrain. See [../../nnue/int8_quant_study.md](../../nnue/int8_quant_study.md).
+The int8 *feature-weight* experiment is finished and **rejected** (−8 Elo SPRT with a lossless
+quantisation-aware net); the engine support and trainer clipping were removed. Don't reintroduce it. See
+[../../nnue/int8_quant_study.md](../../nnue/int8_quant_study.md). (The int8 *output* layer is shipped and
+unaffected.)
 
 ## Troubleshooting
 

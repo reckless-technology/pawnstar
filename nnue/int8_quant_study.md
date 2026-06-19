@@ -243,8 +243,10 @@ so an SPRT is a **pure speed test**.
 So even the *best case* (lossless scale=1, no reconstruct multiply) is a **~8 Elo regression**: the FT
 `Update` is **not** memory-bound at 1024×1 in real search, and the int8→int16 widening (`cvtepi8_epi16`)
 in the column-add costs more than halving the weight-table bytes saves. **int8 feature weights are a closed
-door, not an open lever** — the quantisation-aware caveat that kept it alive is now ruled out. (The engine
-`INT8_FT` support + trainer clipping stay in-tree, off by default, as the reproducible record.)
+door, not an open lever** — the quantisation-aware caveat that kept it alive is now ruled out. After this
+result the engine `INT8_FT` support, the `INT8_FT=1` build flag, and the trainer FT-weight clipping were
+**removed** (the feature transformer is unconditionally int16 again); this document is the record. Don't
+reintroduce it.
 
 ## Phase 3 — RESULTS (SPRT: int8 vs int16 at a time control)
 
