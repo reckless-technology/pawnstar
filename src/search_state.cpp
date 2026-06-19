@@ -400,6 +400,17 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             continue;
         }
 
+        // Late move pruning (move-count pruning): at shallow depth in a non-PV node not in check, once we
+        // are deep into the (history/SEE-sorted) move list, skip the remaining quiet, non-checking moves —
+        // they almost never raise alpha, and not searching them spends the saved time on more useful lines.
+        // Captures, promotions and checking moves are never pruned.
+        if (beta == alpha + 1 && !in_check_seq && depth <= kLmpMaxDepth && move.IsQuiet() &&
+            !move.IsChecking() && move_index >= kLmpBase + depth * depth)
+        {
+            INCREMENT("late move prune");
+            continue;
+        }
+
         // Late move reduction: reduce late moves outside a check sequence at null-window nodes.
         int lmr_depth = depth;
         if (beta == alpha + 1 && move_index > 3 && !in_check_seq && depth > 2)

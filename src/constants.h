@@ -46,5 +46,7 @@ constexpr int kScoreInstabilityThreshold = 50;        ///< window of score varia
 constexpr int kStartDepth                = 3;         ///< depth to do full width search
 constexpr int kRfpMaxDepth               = 7;         ///< reverse-futility pruning: max depth to apply it
 constexpr int kRfpMargin                 = 80;        ///< reverse-futility pruning: centipawn margin per ply
+constexpr int kLmpMaxDepth               = 8;         ///< late-move (move-count) pruning: max depth to apply it
+constexpr int kLmpBase                   = 3;         ///< late-move pruning: quiet skipped once move index >= kLmpBase + depth*depth
 constexpr int kMegabyte                  = 1 << 20;
 constexpr int kMaxSearchThreads          = 256;       ///< upper bound on Lazy SMP search threads
