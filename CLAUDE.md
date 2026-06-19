@@ -177,8 +177,9 @@ all-zero `kKingBucketMap` in [nnue.cpp](src/nnue.cpp)).
 - **More data is the recurring lever** (v8's 2.31B is only ~11% of the ~21B PlentyChess pool).
 - **Speed** (lets a wider net win on the clock): incremental accumulator (+80), AVX2 (+180), eval cache
   (~5%; 8→32 MB gave nothing — exhausted), single-pass `Update`, colour-XOR move-driven `Update` (~3% at
-  1024), **int8 output layer (+31.8 ± 10.3 at 8+0.08, shipped)** — 1.86× faster output dot. Aspiration
-  windows: no gain (tried).
+  1024), **int8 output layer (+31.8 ± 10.3 at 8+0.08, shipped)** — 1.86× faster output dot. **int8 *feature*
+  weights (lossless scale=1 retrain): −8 Elo, rejected** (FT `Update` not memory-bound at 1024×1). Aspiration
+  windows: no gain (tried). **Quiescence TT removal + SEE sorted early-exit: +38.65 ± 13.8 at 8+0.08, shipped.**
 
 **Open levers / candidate next experiments:**
 - **1024 + king buckets on 2.31B** — combine the two winners (v8 = width, no buckets; v6 = buckets, less
@@ -186,10 +187,12 @@ all-zero `kKingBucketMap` in [nnue.cpp](src/nnue.cpp)).
 - **More data** — add PlentyChess shards beyond the 2.31B pool.
 - **int8 *output* layer — DONE, shipped** (+31.8 Elo at 8+0.08; runs on plain AVX2 via `pmaddubsw`, no
   VNNI needed; `VNNI=1` enables the bit-identical `vpdpbusd` kernel). See [nnue/int8_quant_study.md](nnue/int8_quant_study.md).
-- **int8 *feature* weights** — implemented behind `INT8_FT=1` but **not a clear win**: the post-hoc ÷4
-  requant is too lossy (182 cp) and the speed is regime-dependent (faster only when the FT `Update` is
-  memory-bound). Needs a quantisation-aware retrain (weights clipped to int8 → lossless, scale 1) *and* a
-  real-search confirmation it's memory-bound before it's worth GPU time. (See the study doc.)
+- **int8 *feature* weights — DONE, REJECTED (−8 Elo), closed door.** Implemented behind `INT8_FT=1`. The
+  quantisation-aware retrain (FT weights clipped to ±127/QA → `scale=1`, lossless, no reconstruct `mullo`)
+  was trained and SPRT'd as a pure speed test (`INT8_FT` vs standard, bit-identical evals, same net, TC
+  8+0.08): **H0 accepted, −8.04 ± 6.85 Elo over 5314 games**. The FT `Update` isn't memory-bound at 1024×1,
+  so halving the weight bytes doesn't pay for the int8→int16 widening — even the best case loses. *Don't
+  retry.* Engine support + trainer clipping stay in-tree (off by default) as the record. (See the study doc.)
 - **More data / king buckets on 1024** remain the eval-quality levers; int8 was the speed lever and the
   output half is now banked.
 

@@ -225,6 +225,27 @@ search?"** If not, even a lossless int8-FT is neutral-to-slower and isn't worth 
 (Phase 2/3, +31.8 Elo) remains the clear, shippable win; int8-FT is speculative. The engine support is
 committed (off by default, `INT8_FT=1`) so a future quantisation-aware net can be measured directly.
 
+### Quantisation-aware retrain — DONE, definitive **REJECT** (−8 Elo)
+
+Closed the open question. Trained a quantisation-aware net (bullet `set_params_for_weight("l0w",
+AdamWParams{ min_weight: -127/QA, max_weight: 127/QA })`, 1024-wide single-bank, ~750M PlentyChess), which
+clips the exported FT weights to **`max|w| = 127` → `scale = 1`** — verified on the net (0 weights > 127).
+At scale 1 the int8-FT column-add is just widen+add (no `mullo`; the engine has a hoisted `scale==1` fast
+path), and the `INT8_FT` and standard engines evaluate **bit-identically** (confirmed on test positions),
+so an SPRT is a **pure speed test**.
+
+| test | result |
+|---|---|
+| eval error vs bullet ref (int16 path) | **0 cp** (lossless — the ÷4's 182 cp is gone) |
+| `INT8_FT` vs standard eval (same net) | **bit-identical** |
+| **SPRT, TC 8+0.08, same net, bounds [0, 5]** | **H0 accepted, LLR −2.96 — Elo −8.04 ± 6.85 over 5314 games** |
+
+So even the *best case* (lossless scale=1, no reconstruct multiply) is a **~8 Elo regression**: the FT
+`Update` is **not** memory-bound at 1024×1 in real search, and the int8→int16 widening (`cvtepi8_epi16`)
+in the column-add costs more than halving the weight-table bytes saves. **int8 feature weights are a closed
+door, not an open lever** — the quantisation-aware caveat that kept it alive is now ruled out. (The engine
+`INT8_FT` support + trainer clipping stay in-tree, off by default, as the reproducible record.)
+
 ## Phase 3 — RESULTS (SPRT: int8 vs int16 at a time control)
 
 The end-to-end question: does the 1.86× faster `Evaluate` (deeper search) outweigh the 26 cp requant error

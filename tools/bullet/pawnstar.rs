@@ -53,6 +53,7 @@ fn main() {
     let out_dir = std::env::var("PAWNSTAR_OUT").unwrap_or_else(|_| "checkpoints".to_string());
     let bps: usize = env_or("PAWNSTAR_BPS", 1000);
     let end_sb: usize = env_or("PAWNSTAR_SBS", 30);
+    let save_rate: usize = env_or("PAWNSTAR_SAVE_RATE", 10);
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
@@ -97,7 +98,7 @@ fn main() {
         },
         wdl_scheduler: wdl::ConstantWDL { value: 0.5 },
         lr_scheduler: lr::StepLR { start: 0.001, gamma: 0.3, step: end_sb / 3 },
-        save_rate: 10,
+        save_rate,
     };
 
     let settings =
