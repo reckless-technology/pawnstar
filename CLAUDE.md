@@ -216,6 +216,19 @@ all-zero `kKingBucketMap` in [nnue.cpp](src/nnue.cpp)).
   and update docs — full checklist in nnue/README §7.
 - **`make check` builds tests + tools, not the engine** — run `make` to (re-)embed a new net into
   `build/pawnstar` before testing the engine binary or running a same-cwd SPRT.
+- **Trainer edits don't take effect until re-synced + rebuilt (cost a full ~3h cycle once).** The repo's
+  `tools/bullet/pawnstar.rs` is *copied* into the bullet checkout (`~/pawnstar_nnue/bullet/examples/pawnstar.rs`)
+  by `tools/setup_bullet.sh`; training compiles **that copy**. Editing the repo file alone changes nothing.
+  After editing, `cp tools/bullet/pawnstar.rs <bullet>/examples/` (or re-run `setup_bullet.sh`), rebuild
+  (`cargo build --release --features cuda --example pawnstar`), and confirm the example binary is newer than
+  the source. A 750M run was wasted once because a clipped trainer was edited but never synced — the stale
+  unclipped binary trained.
+- **Spot-check a quantisation-aware retrain at SB1 before sinking full GPU time.** Set `PAWNSTAR_SAVE_RATE=1`
+  (env, added to the trainer) to checkpoint every superbatch, then inspect the first `quantised.bin` (~5 min):
+  e.g. for FT-weight clipping, `max|FT weight|` must be ≤127 (`scale=1`) — read it straight from the raw net
+  with numpy (`np.fromfile(...,dtype=np.int16)[:768*1024]`). The *unclipped* run saturates to `max=505`
+  almost immediately, so SB1 is already a conclusive discriminator. Abort in minutes if the clipping/quant
+  didn't take, instead of discovering it after the full run.
 
 ### Opening book
 
