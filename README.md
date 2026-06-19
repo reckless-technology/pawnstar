@@ -205,8 +205,11 @@ fixed-time clocks bypass the heuristic.
 
 **Quiescence search** (`SearchState::SearchQuiescent`, [src/search_state.cpp](src/search_state.cpp)) extends the leaves with
 captures only, so the static evaluation is never called on a position with a hanging capture available.
-It does not use a transposition table (no probe, no store). It applies **SEE pruning** — a capture that
-loses material by static exchange evaluation and does not give check is skipped rather than searched.
+It does not use a transposition table (no probe, no store). It applies **SEE pruning** — the captures are
+SEE-sorted, so the loop reads each move's precomputed ordering score and **exits on the first losing
+capture** (`move.score() < 0`); every remaining move loses material too, so none are searched (and no
+SEE is recomputed in the loop). Dropping the quiescence transposition table and switching to this sorted
+early-exit was SPRT-tested **+38.65 ± 13.78 Elo at 8+0.08** (1318 games, LLR-accepted against `[-5, 0]`).
 
 #### Move ordering and history heuristics
 
