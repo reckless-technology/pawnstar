@@ -2,7 +2,7 @@
 
 Pawnstar is a [UCI](https://en.wikipedia.org/wiki/Universal_Chess_Interface) chess engine written in
 C++20. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
-a lockless transposition table, and a perspective NNUE evaluation (the engine's sole evaluator).
+a lockless transposition table, and a perspective NNUE evaluation.
 
 Legal move generation runs at roughly 600 million moves per second on a modern laptop.
 
@@ -15,14 +15,14 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 - Lockless 128-bit transposition table using Hyatt's XOR trick.
 - Null-move pruning, late-move reductions, and per-thread move ordering (killers, countermove, main +
   1-ply continuation history).
-- Quiescence search over captures (SEE-pruned; no transposition table of its own).
-- **NNUE** evaluation (efficiently-updatable neural network) — a perspective net (currently 1024-wide, no king buckets), the engine's only evaluator. A net is loaded at startup; load a different one at runtime with `setoption name EvalFile`.
+- Quiescence search over captures and promotions (SEE-pruned).
+- **NNUE** evaluation (efficiently-updatable neural network) — a perspective net (currently 1024-wide, no king buckets). A net is loaded at startup; load a different one at runtime with `setoption name EvalFile`.
 - Optional opening book (`pawnstar.book`).
 
 ## Requirements
 
 - `clang++` with C++20 support.
-- A CPU with the BMI2 and AVX2 instruction sets (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`.
+- A CPU with the BMI2 and AVX2 instruction sets (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`. BMI2 is required for the `pext` instruction (sliding move generation) and AVX2 is required for the NNUE evaluation SIMD calculation.
 - GNU `make`.
 - `doxygen` (and optionally Graphviz `dot`) only if you want to build the API docs.
 
@@ -31,13 +31,10 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 ```bash
 make           # build/pawnstar
 make check     # build and run all test suites
+make tests     # build the test executables without running them
 make doc       # generate Doxygen HTML into doc/html
 make clean     # remove build artifacts and generated docs
 ```
-
-There is no code-generation build step: the precomputed bitboard attack and Zobrist tables in
-`src/generated_data.cpp` are ordinary `const` globals computed once at program startup (dynamic
-initialisation), so a plain `make` builds the engine directly.
 
 Debug build with AddressSanitizer + UndefinedBehaviorSanitizer:
 
@@ -106,8 +103,8 @@ array for O(1) lookup, the incrementally-maintained Zobrist hash, castling right
 square, the half-move clock, and a `checkers` bitboard. `MakeMove` and `MakeNullMove` return a brand
 new `Position` by value (copy-make); there is no unmake.
 
-`pieces` is a `std::array<Bitboard, 7>` indexed by piece type, but **`pieces[0]` (the `kNone` slot)
-holds the occupied-squares set** — the union of all pieces of both colours — rather than a piece
+`pieces` is a `std::array<Bitboard, 7>` indexed by piece type, but `pieces[0]` (the `kNone` slot)
+holds the occupied-squares set — the union of all pieces of both colours — rather than a piece
 bitboard; the six real piece types occupy indices 1–6. This lets occupancy queries and the `pext`-based
 attack lookups read it directly without recomputing a union.
 
@@ -142,7 +139,9 @@ stack are `std::vector`s, the position stack reserved once up front; see the des
 Sliding-piece attacks (bishop, rook, queen) use the BMI2 `_pext_u64` instruction to gather the
 occupancy bits relevant to a square and index a precomputed per-square attack table. Knight, king and
 pawn attacks are plain 64-entry lookup tables. All tables are computed once at program startup in
-`src/generated_data.cpp`. `Pins` ([src/pins.h](src/pins.h)) computes absolute pins and the squares
+`src/generated_data.cpp`.
+
+`Pins` ([src/pins.h](src/pins.h)) computes absolute pins and the squares
 each pinned piece may still move to, before move generation.
 
 ### Search
@@ -193,7 +192,7 @@ fixed-time clocks bypass the heuristic.
   least-promising quiets are pruned hardest). A reduced search that beats alpha is re-searched at full
   depth. The third-ply reduction was SPRT-tested: roughly neutral at fast 8+0.08, but **+11 Elo
   (±18, 578 games)** at 40 moves/minute — a time-control-dependent gain that deeper trees reward.
-- **Search extensions** for promotions and en passant captures.
+- **Search extensions** for checks, promotions and en passant captures.
 - **Move ordering** — the TT move first, then winning/equal captures and promotions by static exchange
   evaluation, then the two killer moves for the ply, then the **countermove** (the best quiet refutation
   to the previous move), then quiet moves scored by the **main history** count plus a **1-ply
@@ -296,14 +295,16 @@ The knobs above live in [src/constants.h](src/constants.h):
 
 ### Transposition table
 
-Two tables are used: 64 MB for the main search and 8 MB for quiescence. Each entry is exactly 128
-bits — a 64-bit Zobrist hash and a 64-bit move whose spare bits carry the score, depth, node type and
-age.
+A 64 MB TT is used for the main search. Each entry is exactly 128 bits — a 64-bit Zobrist hash and a 64-bit move whose spare bits carry the score, depth, node type and age.
 
 The table is **lockless** (Hyatt's XOR trick): each cell stores `key = hash ^ data` alongside `data`
-(the packed move), as two `std::atomic<uint64_t>` accessed with relaxed ordering. A reader accepts a
+(the packed move), as two `std::atomic<uint64_t>` accessed with relaxed ordering.
+
+A reader accepts a
 cell only if `key ^ data` equals the probe hash, so a torn pair written by two concurrent stores is
-detected and treated as a miss. Concurrent writers race benignly (last writer wins). Aging is O(1):
+detected and treated as a miss.
+
+Concurrent writers race benignly (last writer wins). Aging is O(1):
 `Age()` bumps a generation counter and an entry is stale when its stamped age differs from it.
 
 The probe is a random memory access, so once a child move has been made (its Zobrist hash known) the
