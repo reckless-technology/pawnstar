@@ -337,7 +337,8 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
     if (transposition && transposition->move != Move::None())
     {
         INCREMENT("table move");
-        best_move       = transposition->move;
+        best_move = transposition->move;
+        pv.clear(); // child writes its line here only if it is a PV node; clear so a terminal/cutoff child leaves it empty
         const int score = state.SearchSingleMove(depth, ply, alpha, beta, transposition->move, pv, 0).score;
         if (state.IsCancelled())
         {
@@ -363,6 +364,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             INCREMENT("table move raised alpha");
             alpha            = score;
             has_raised_alpha = true;
+            CopyVariation(parent_pv, pv, transposition->move); // capture the PV now, while pv holds THIS move's line
             state.history.RecordGoodMove(ply, transposition->move);
             state.RecordContHist(prev_move, transposition->move);
         }
@@ -411,6 +413,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             }
         }
 
+        pv.clear(); // see TT-move note: clear so a non-PV-node child leaves no stale tail in pv
         int score = state.SearchSingleMove(lmr_depth, ply, alpha, beta, move, pv, move_index).score;
         if (score > alpha && lmr_depth < depth)
         {
@@ -445,6 +448,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
                 INCREMENT("pv changed");
                 alpha            = score;
                 has_raised_alpha = true;
+                CopyVariation(parent_pv, pv, move); // capture the PV now, while pv holds THIS move's line
                 state.history.RecordGoodMove(ply, move);
                 state.RecordContHist(prev_move, move);
             }
@@ -460,7 +464,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             Transposition{state.CurrentPosition().Hash(), best_move, alpha, depth, Transposition::NodeType::kPv});
         state.history.RecordGoodMove(ply, best_move);
         state.RecordContHist(prev_move, best_move);
-        CopyVariation(parent_pv, pv, best_move);
+        // parent_pv was already set, with the correct line, at the alpha-raise above.
     }
     else
     {
@@ -582,7 +586,8 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
         for (auto &move : move_list)
         {
             const int move_index = (int)(&move - move_list.begin());
-            const int score      = state.SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score;
+            child_pv.clear(); // clear per move so a terminal/non-PV-node child leaves no stale tail
+            const int score = state.SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score;
             move.AssignScore(score);
             if (state.IsCancelled())
             {
