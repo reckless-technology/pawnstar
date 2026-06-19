@@ -25,8 +25,7 @@ class Game
     std::atomic<bool>  is_cancel_pending;   ///< Shared stop flag: set on timeout, UCI stop, or search completion.
 
     /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
-    Game()
-        : transposition_table{kHashtableMegabytes}, eval_cache{kEvalCacheMb}, is_cancel_pending{false}
+    Game() : transposition_table{kHashtableMegabytes}, eval_cache{kEvalCacheMb}, is_cancel_pending{false}
     {
         NewGame();
     }
@@ -58,6 +57,7 @@ class Game
     {
         return nnue_network_;
     }
+
     /// @brief The NNUE network (const overload).
     /// @return Const reference to the network.
     const nnue::Network &NnueNetwork() const
@@ -77,20 +77,28 @@ class Game
 
     /// @brief Start a new game from the given position (see definition for details).
     void NewGame(std::string_view fen_string);
+
     /// @brief Start a new game from the standard initial position.
     void NewGame();
+
     /// @brief Play a move given in algebraic notation (see definition for details).
     Move PlayMove(std::string_view move_string);
+
     /// @brief Play a move (see definition for details).
     void PlayMove(Move move);
+
     /// @brief Play a null (pass) move.
     void MakeNullMove();
+
     /// @brief Undo the most recent move.
     void UndoMove();
+
     /// @brief Start searching for a move on the worker thread.
     void StartThinking();
+
     /// @brief Signal the search to stop and join the worker thread.
     void StopThinking();
+
     /// @brief Search the current position and return the best move (see definition in search_root_node.cpp).
     /// Returns a book move immediately on a book hit; otherwise runs the Lazy SMP iterative-deepening search.
     /// @return The best move, or Move::None if there are no legal moves.
