@@ -216,47 +216,36 @@ SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int alpha, in
     return {score, is_checking};
 }
 
-/// @brief Result of a null-move pruning attempt: the null-move score and the static evaluation.
-struct NullMoveResult
-{
-    int score;      ///< Score after null move (or alpha if null move not tried).
-    int eval_score; ///< Static evaluation (or kAlpha if not computed).
-};
-
-/// @brief Try null move pruning.
-/// @return Null move score plus evaluation score (or kAlpha if evaluation was not called).
-static inline NullMoveResult AttemptNullMove(SearchState &state, int depth, int ply, int alpha, int beta)
+/// @brief Try null move pruning, reusing the caller's precomputed static eval.
+/// The caller has already established this is a non-PV node that is not in check.
+/// @param eval_score The node's static evaluation (already computed by the caller).
+/// @return The null-move score, or alpha if null move was not tried / did not cut.
+static inline int AttemptNullMove(SearchState &state, int depth, int ply, int alpha, int beta, int eval_score)
 {
     const Position &position = state.CurrentPosition();
     const Color     color    = position.color_to_move;
     // Only try null move pruning if all conditions are met.
     const Bitboard friendly = position.colors[color];
-    if (!position.is_null_move && // previous move was not a null move
-        !position.IsInCheck() &&  // we are not in check
-        beta == alpha + 1 &&      // this is not a PV node
-        friendly.PopCount() > 3)  // we have at least 4 friendly pieces
+    if (!position.is_null_move &&  // previous move was not a null move
+        friendly.PopCount() > 3 && // we have at least 4 friendly pieces
+        eval_score >= beta)        // and we are already failing high statically
     {
-        const int eval_score = EvaluatePosition(state);
-        if (eval_score >= beta)
+        INCREMENT("null move");
+        Variation dummy{};
+        state.MakeNullMove();
+        int score = -state.Search(depth - 4, ply + 1, -beta, -alpha, dummy, Move::None());
+        state.UndoMove();
+        if (state.IsCancelled())
         {
-            INCREMENT("null move");
-            Variation dummy{};
-            state.MakeNullMove();
-            int score = -state.Search(depth - 4, ply + 1, -beta, -alpha, dummy, Move::None());
-            state.UndoMove();
-            if (state.IsCancelled())
-            {
-                return {kSearchCancelledScore, eval_score};
-            }
-            if (score >= beta)
-            {
-                return {beta, eval_score};
-            }
-            INCREMENT("null move fails");
-            return {alpha, eval_score};
+            return kSearchCancelledScore;
         }
+        if (score >= beta)
+        {
+            return beta;
+        }
+        INCREMENT("null move fails");
     }
-    return {alpha, kAlpha};
+    return alpha;
 }
 
 int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move)
@@ -318,15 +307,31 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
     {
         return state.SearchQuiescent(depth, ply, alpha, beta);
     }
-    // Try null move pruning.
-    auto [null_move_score, eval_score] = AttemptNullMove(state, depth, ply, alpha, beta);
-    if (state.IsCancelled())
+    // Static-eval-based pruning at non-PV nodes that are not in check. The static eval is computed once
+    // here and reused by reverse-futility pruning and null-move pruning.
+    const bool is_pv = beta > alpha + 1;
+    if (!is_pv && !state.CurrentPosition().IsInCheck())
     {
-        return kSearchCancelledScore;
-    }
-    if (null_move_score >= beta)
-    {
-        return null_move_score;
+        const int eval_score = EvaluatePosition(state);
+        // Reverse futility pruning (a.k.a. static null move): at shallow depth, if we are far enough above
+        // beta that even conceding kRfpMargin per ply still leaves us at/above beta, assume a quiet move
+        // holds the advantage and cut. Disabled in the mate zone so it cannot mask a forced mate.
+        if (depth <= kRfpMaxDepth && std::abs(beta) < -kCheckmatedScore - kMaxPly &&
+            eval_score - kRfpMargin * depth >= beta)
+        {
+            INCREMENT("reverse futility prune");
+            return eval_score;
+        }
+        // Null move pruning, reusing the static eval.
+        const int null_move_score = AttemptNullMove(state, depth, ply, alpha, beta, eval_score);
+        if (state.IsCancelled())
+        {
+            return kSearchCancelledScore;
+        }
+        if (null_move_score >= beta)
+        {
+            return null_move_score;
+        }
     }
 
     // Try the transposition table move first.

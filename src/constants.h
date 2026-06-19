@@ -44,5 +44,7 @@ constexpr int kRankFlip                  = 0x38;      ///< used as an XOR mask t
 constexpr int kSearchCancelledScore      = -12345678; ///< illegal value returned when search is cancelled
 constexpr int kScoreInstabilityThreshold = 50;        ///< window of score variability
 constexpr int kStartDepth                = 3;         ///< depth to do full width search
+constexpr int kRfpMaxDepth               = 7;         ///< reverse-futility pruning: max depth to apply it
+constexpr int kRfpMargin                 = 80;        ///< reverse-futility pruning: centipawn margin per ply
 constexpr int kMegabyte                  = 1 << 20;
 constexpr int kMaxSearchThreads          = 256;       ///< upper bound on Lazy SMP search threads
