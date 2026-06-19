@@ -4,32 +4,15 @@
         {
             "name": "Launch pawnstar",
             "type": "cppdbg",
-            "miDebuggerPath": "/usr/bin/gdb",
             "request": "launch",
-            "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/build",
             "program": "${workspaceFolder}/build/pawnstar",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set hex output",
-                    "text": "set output-radix 16",
-                    "ignoreFailures": false
-                }
-            ]
-        },
-        {
-            "name": "Launch generate constants",
-            "type": "cppdbg",
-            "miDebuggerPath": "/usr/bin/gdb",
-            "request": "launch",
-            "stopAtEntry": true,
             "cwd": "${workspaceFolder}",
-            "program": "${workspaceFolder}/build/gen_constants",
+            "args": [],
+            "stopAtEntry": false,
+            "console": "integratedTerminal",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "preLaunchTask": "build pawnstar",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
