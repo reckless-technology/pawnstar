@@ -306,6 +306,16 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             break;
         }
     }
+    // Internal iterative reduction: with no usable transposition-table move our move ordering is weak (the TT
+    // move is searched first; lacking it the first move searched is only a guess). Rather than spend the full
+    // depth with poor ordering, reduce by one ply — the shallower search still fills the TT with a best move,
+    // so the cost is recouped by better ordering when this node is revisited. Applied only at sufficient depth,
+    // where the per-node saving outweighs the lost ply (qsearch is unaffected: depth stays >= kIirMinDepth-1).
+    if (depth >= kIirMinDepth && (!transposition || transposition->move == Move::None()))
+    {
+        INCREMENT("internal iterative reduction");
+        --depth;
+    }
     // Can we go directly to the quiescence search?
     if (depth <= 0 && !state.CurrentPosition().IsInCheck())
     {
