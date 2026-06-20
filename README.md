@@ -13,8 +13,8 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 - Parallel iterative-deepening alpha-beta search with principal variation search (PVS).
 - Lazy SMP parallelism: independent per-thread searches sharing one lockless transposition table.
 - Lockless 128-bit transposition table using Hyatt's XOR trick.
-- Null-move pruning, late-move reductions, and per-thread move ordering (killers, countermove, main +
-  1-ply continuation history).
+- Reverse futility pruning, null-move pruning, late-move pruning + reductions, and per-thread move
+  ordering (killers, countermove, main + 1-ply continuation history).
 - Quiescence search over captures and promotions (SEE-pruned).
 - **NNUE** evaluation (efficiently-updatable neural network) — a perspective net (currently 1024-wide with 4 king buckets). A net is loaded at startup; load a different one at runtime with `setoption name EvalFile`.
 - Optional opening book (`pawnstar.book`).
@@ -182,6 +182,11 @@ fixed-time clocks bypass the heuristic.
 - **Principal variation search (PVS)** — the first move is searched with the full window; later moves
   get a null-window (`[alpha, alpha+1]`) scout search and are only re-searched with the full window if
   the scout beats alpha.
+- **Reverse futility pruning (RFP)** — at a non-PV node not in check, at shallow depth (≤ 7) and outside
+  the mate zone, if `static_eval − 80·depth ≥ beta` the node is cut immediately (returning `static_eval`)
+  without searching any move — when we are that far above beta a quiet move will hold it. The static eval
+  is computed once and shared with null-move pruning. SPRT-tested **+114.8 ± 22.5 Elo at 8+0.08** — the
+  largest single search gain; pawnstar had previously lacked the static-eval pruning suite.
 - **Null-move pruning** — when not in check and the previous move was not itself a null move, a null
   move is searched at reduced depth (`depth − 4`, i.e. R = 3); a resulting score `≥ beta` prunes the
   node. (Reducing less — `depth − 3` — was SPRT-tested at 8+0.08 and lost ≈16 Elo over 1000 games
@@ -192,6 +197,10 @@ fixed-time clocks bypass the heuristic.
   least-promising quiets are pruned hardest). A reduced search that beats alpha is re-searched at full
   depth. The third-ply reduction was SPRT-tested: roughly neutral at fast 8+0.08, but **+11 Elo
   (±18, 578 games)** at 40 moves/minute — a time-control-dependent gain that deeper trees reward.
+- **Late-move (move-count) pruning (LMP)** — at a non-PV node not in check at shallow depth (≤ 8), once
+  past the `3 + depth²`-th move the remaining **quiet, non-checking** moves are skipped entirely (captures,
+  promotions and checks are never pruned). Where LMR *reduces* late quiets, LMP *drops* them. SPRT-tested
+  **+18.6 ± 9.0 Elo at 8+0.08** on top of RFP.
 - **Search extensions** for checks, promotions and en passant captures.
 - **Move ordering** — the TT move first, then winning/equal captures and promotions by static exchange
   evaluation, then the two killer moves for the ply, then the **countermove** (the best quiet refutation
