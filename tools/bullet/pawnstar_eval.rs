@@ -18,19 +18,20 @@ const QB: i32 = 64;
 const SCALE: i32 = 400;
 
 // King-square -> weight-bank map. MUST be byte-identical to kKingBucketMap in src/nnue.cpp and to
-// KING_BUCKETS in pawnstar.rs. All-zero = a single bank (no king buckets); NUM_BUCKETS below must match.
+// KING_BUCKETS in pawnstar.rs. The shipped v9 net uses 4 king buckets by king file-pair (file/2:
+// a/b->0, c/d->1, e/f->2, g/h->3); NUM_BUCKETS below must match (4).
 #[rustfmt::skip]
 const KING_BUCKETS: [usize; 64] = [
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 1, 1, 2, 2, 3, 3,
+    0, 0, 1, 1, 2, 2, 3, 3,
+    0, 0, 1, 1, 2, 2, 3, 3,
+    0, 0, 1, 1, 2, 2, 3, 3,
+    0, 0, 1, 1, 2, 2, 3, 3,
+    0, 0, 1, 1, 2, 2, 3, 3,
+    0, 0, 1, 1, 2, 2, 3, 3,
+    0, 0, 1, 1, 2, 2, 3, 3,
 ];
-const NUM_BUCKETS: usize = 1;
+const NUM_BUCKETS: usize = 4;
 
 fn screlu(x: i16) -> i32 {
     let y = i32::from(x).clamp(0, QA);
