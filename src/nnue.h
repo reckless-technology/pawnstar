@@ -12,8 +12,8 @@
 /// stays positive at scale). The bucket mechanism generalises over kNumKingBuckets: each perspective
 /// selects one of kNumKingBuckets banks by *its own* king's square (in that perspective's orientation), the
 /// feature row being `bucket * 768 + chess768_index`, matching bullet's `ChessBuckets::new(kKingBucketMap)`
-/// (the same 64-entry map; see nnue.cpp). A king move that crosses a bucket boundary refreshes that whole
-/// perspective's bank rather than diffing it (with a single bank, boundary crossings never occur).
+/// (the same 64-entry map; see nnue.cpp). A king move that crosses a file-pair bucket boundary refreshes
+/// that whole perspective's bank rather than diffing it.
 ///
 /// A net is owned by the Game (one instance, read-only after Network::Load) and shared by all Lazy SMP
 /// threads, which call only its const methods. The accumulator is maintained incrementally across
@@ -62,7 +62,7 @@ constexpr std::uint16_t kNetFormatVersion = 1; ///< Header format version (bump 
 
 /// @brief Self-describing 32-byte header prepended to a shipped net so an incompatible file is rejected
 /// rather than silently misread. The architecture fields must equal the engine's compile-time constants;
-/// the loader checks every one. Raw (headerless) bullet output is still accepted via an exact size check.
+/// the loader checks every one. Raw (headerless) bullet output is rejected — stamp it with tools/stamp_net.
 #pragma pack(push, 1)
 
 struct NetHeader
