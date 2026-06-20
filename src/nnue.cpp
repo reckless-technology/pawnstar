@@ -137,14 +137,14 @@ inline int32_t HsumI32(__m256i v)
 /// i.e. plain Chess768. The map is retained so a future bucketed net only needs to change these values
 /// (and kNumKingBuckets) to match.
 constexpr std::array<int, 64> kKingBucketMap = {
-    0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, //
-    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
 };
 
 /// @brief Feature row for a piece in one perspective's bucket bank.

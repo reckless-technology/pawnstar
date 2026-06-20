@@ -6,9 +6,10 @@
 ///   768 inputs per (perspective, king bucket)  ->  kHiddenSize feature transformer  (x2 perspectives)
 ///   SCReLU activation, concat[own | opponent] = 2*kHiddenSize  ->  1 output (centipawns, stm relative)
 ///
-/// The shipped net is **1024-wide with kNumKingBuckets = 1** — a single weight bank, i.e. plain Chess768
-/// with no king buckets (at the 2.31B-position data scale this beat the 512-wide 4-bucket v7 by ~+32 Elo
-/// at 40/20). The bucket mechanism is retained and generalises over kNumKingBuckets: each perspective
+/// The shipped net is **1024-wide with kNumKingBuckets = 4** — four king-square weight banks selected by
+/// king file-pair (`kKingBucketMap`, below). On ~2.25B positions this beat the single-bank 1024 net (v8)
+/// by **+11.4 ± 6.75 Elo at 8+0.08** (the bucket advantage shrinks with data — it was +29 at 750M — but
+/// stays positive at scale). The bucket mechanism generalises over kNumKingBuckets: each perspective
 /// selects one of kNumKingBuckets banks by *its own* king's square (in that perspective's orientation), the
 /// feature row being `bucket * 768 + chess768_index`, matching bullet's `ChessBuckets::new(kKingBucketMap)`
 /// (the same 64-entry map; see nnue.cpp). A king move that crosses a bucket boundary refreshes that whole
@@ -42,7 +43,7 @@ namespace nnue
 {
 
 constexpr int kInputSize      = 768; ///< Features per perspective per bucket: 2 colors * 6 types * 64 squares.
-constexpr int kNumKingBuckets = 1;   ///< King-square weight banks (1 = single bank, i.e. no king buckets).
+constexpr int kNumKingBuckets = 4;   ///< King-square weight banks (1 = single bank, i.e. no king buckets).
 constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
 constexpr int kHiddenSize     = 1024; ///< Feature-transformer / accumulator width per perspective.
 
