@@ -107,12 +107,15 @@ void handle_uci(Game &game, std::span<std::string>)
               << "\n";
     std::cout << "option name Ponder type check default false\n";
     std::cout << "option name EvalFile type string default <empty>\n";
+    std::cout << "option name Clear Hash type button\n";
+    std::cout << "option name Move Overhead type spin default " << game.move_overhead.count() << " min 0 max 5000\n";
     std::cout << "uciok\n";
 }
 
 /// @brief Handle the "setoption" command: "setoption name <Name> value <Value>".
 /// Recognises EvalFile (load a different NNUE net file; NNUE is the only evaluator), Hash (transposition
-/// table size in MB, 1..4096) and Threads (Lazy SMP search threads, 1..kMaxSearchThreads).
+/// table size in MB, 1..4096), Threads (Lazy SMP search threads, 1..kMaxSearchThreads), Clear Hash (a
+/// button that empties the transposition table) and Move Overhead (ms reserved from each deadline, 0..5000).
 /// @param args Command arguments.
 void handle_setoption(Game &game, std::span<std::string> args)
 {
@@ -152,6 +155,14 @@ void handle_setoption(Game &game, std::span<std::string> args)
     {
         game.thread_count = std::clamp(std::atoi(value.c_str()), 1, kMaxSearchThreads);
     }
+    else if (name == "Clear Hash") // a button: no value, just empty the transposition table
+    {
+        game.transposition_table.Clear();
+    }
+    else if (name == "Move Overhead")
+    {
+        game.move_overhead = ChessClock::Duration{std::clamp(std::atoi(value.c_str()), 0, 5000)};
+    }
 }
 
 /// @brief Handle the "ucinewgame" command: stop searching and reset to a new game.
@@ -165,8 +176,9 @@ void handle_ucinewgame(Game &game, std::span<std::string>)
 /// @brief Handle the "go" command: parse time controls and start searching.
 /// Parsed as a small state machine alternating between a keyword and its integer argument, rather than
 /// scanning with `args[++i]` look-ahead (which also read out of bounds when a value keyword ended the
-/// input). Recognised keywords: the flag `infinite`, and the value-taking `wtime`/`btime`/`movetime`/
-/// `depth`/`movestogo`; any other token (e.g. `winc`, `searchmoves` and its moves) is ignored.
+/// input). Recognised keywords: the flags `infinite`/`ponder`, and the value-taking `wtime`/`btime`/
+/// `winc`/`binc`/`movetime`/`depth`/`movestogo`; any other token (e.g. `nodes`, `searchmoves` and its
+/// moves) is ignored.
 /// @param game Game to act on.
 /// @param args Command arguments (time controls, depth, etc.).
 void handle_go(Game &game, std::span<std::string> args)
@@ -181,7 +193,8 @@ void handle_go(Game &game, std::span<std::string> args)
     State            state = State::kAwaitKeyword;
     std::string_view pending; // the value-taking keyword whose argument is expected next
 
-    game.is_pondering.store(false, std::memory_order_relaxed); // set true below if this is a `go ponder`
+    game.is_pondering.store(false, std::memory_order_relaxed);  // set true below if this is a `go ponder`
+    game.time_control.increment = ChessClock::Duration::zero(); // cleared up front; set below if winc/binc present
 
     for (std::size_t i = 1; i < args.size(); ++i)
     {
@@ -196,13 +209,13 @@ void handle_go(Game &game, std::span<std::string> args)
             {
                 game.time_control.clock_type = ChessClock::kInfinite; // no time limit; remaining_time is unused
             }
-            else if (token == "wtime" || token == "btime" || token == "movetime" || token == "depth" ||
-                     token == "movestogo")
+            else if (token == "wtime" || token == "btime" || token == "winc" || token == "binc" ||
+                     token == "movetime" || token == "depth" || token == "movestogo")
             {
                 pending = token; // a value-taking keyword: its argument is the next token
                 state   = State::kAwaitValue;
             }
-            // else: ignore unrecognised tokens (winc/binc/nodes, searchmoves and its move list, …)
+            // else: ignore unrecognised tokens (nodes, searchmoves and its move list, …)
         }
         else // kAwaitValue: token is the integer argument for `pending`
         {
@@ -212,6 +225,11 @@ void handle_go(Game &game, std::span<std::string> args)
             {
                 game.time_control.clock_type     = ChessClock::kStandard;
                 game.time_control.remaining_time = ChessClock::Duration{value};
+            }
+            else if ((pending == "winc" && game.CurrentPosition().color_to_move == kWhite) ||
+                     (pending == "binc" && game.CurrentPosition().color_to_move == kBlack))
+            {
+                game.time_control.increment = ChessClock::Duration{value};
             }
             else if (pending == "movetime")
             {
@@ -366,7 +384,7 @@ constexpr std::array handlers =
     Handler { COMMAND(ponderhit),      "Pondered move was played; convert ponder search to a timed search"},
     Handler { COMMAND(position),       "Set the position and series of moves"},
     Handler { COMMAND(quit),           "Exit the program"},
-    Handler { COMMAND(setoption),      "Set a UCI option (EvalFile)"},
+    Handler { COMMAND(setoption),      "Set a UCI option (EvalFile/Hash/Threads/Clear Hash/Move Overhead)"},
     Handler { COMMAND(stop),           "Stop searching and return best move found"},
     Handler { COMMAND(uci),            "Enter UCI protocol"},
     Handler { COMMAND(ucinewgame),     "UCI mode start new game"}

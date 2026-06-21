@@ -66,11 +66,17 @@ class TranspositionTable
     TranspositionTable(std::size_t megabytes);
     /// @brief Reallocate the table to approximately @p megabytes (clamped to >= 1 MB), clearing every entry
     /// and resetting the generation. Backs the UCI `Hash` option. Not safe to call during a search.
-    void                         Resize(std::size_t megabytes);
+    void Resize(std::size_t megabytes);
+    /// @brief Zero every entry and reset the generation, keeping the table size. Backs the UCI `Clear Hash`
+    /// button. Not safe to call during a search.
+    void                         Clear();
     std::optional<Transposition> FindTransposition(zobrist_t hash) const;
     void                         RecordTransposition(const Transposition &transposition);
     void                         Age();
     std::pair<std::size_t, int>  UsageStats() const;
+    /// @brief Approximate fill level for the UCI `info hashfull` field, in per mille (0..1000). Samples the
+    /// first min(size, 1000) cells rather than scanning the whole table, so it is cheap to call per info line.
+    int HashfullPermille() const;
 
     /// @brief Prefetch the cell a future FindTransposition(@p hash) will read, hiding the cache-miss
     /// latency of the random table access. Result-neutral. @param hash Zobrist hash to be probed soon.

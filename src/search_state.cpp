@@ -626,9 +626,30 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
                         pv_string.push_back(' ');
                     }
                     pv_string.pop_back();
-                    std::cout << std::format("info depth {:2} score cp {:5} time {:5} nodes {:8} pv {}\n", depth, alpha,
-                                             game.time_control.ElapsedSinceSearchStart().count(), node_count,
-                                             pv_string);
+                    // Report a forced mate as `score mate <moves>` (positive = we mate, negative = we get
+                    // mated) rather than a huge `cp` value; otherwise the centipawn score. Mate scores are
+                    // +/-(kMateValue - plies_to_mate), so plies_to_mate = kMateValue - |score| and the move
+                    // count rounds up (+1)/2.
+                    constexpr int kMateValue = -kCheckmatedScore; // 10000
+                    std::string   score_string;
+                    if (alpha >= kWinThreshold)
+                    {
+                        score_string = std::format("mate {}", (kMateValue - alpha + 1) / 2);
+                    }
+                    else if (alpha <= kLoseThreshold)
+                    {
+                        score_string = std::format("mate {}", -((kMateValue + alpha + 1) / 2));
+                    }
+                    else
+                    {
+                        score_string = std::format("cp {}", alpha);
+                    }
+                    const long long elapsed_ms = game.time_control.ElapsedSinceSearchStart().count();
+                    const long long nps =
+                        static_cast<long long>(node_count) * 1000 / std::max<long long>(1, elapsed_ms);
+                    std::cout << std::format("info depth {:2} score {} time {:5} nodes {:8} nps {} hashfull {} pv {}\n",
+                                             depth, score_string, elapsed_ms, node_count, nps,
+                                             game.transposition_table.HashfullPermille(), pv_string);
                 }
             }
         }

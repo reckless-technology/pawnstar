@@ -166,9 +166,10 @@ Move Game::SearchRootNode()
         return move_list[0];
     }
     // Plan time usage for this search.
-    using Duration           = ChessClock::Duration;
-    Duration allocated_time  = Duration::zero(); // soft budget (drives between-iteration stopping)
-    Duration max_search_time = Duration::zero(); // hard budget (deadline); zero means no hard stop
+    using Duration                 = ChessClock::Duration;
+    const Duration increment       = game.time_control.increment; // per-move increment (winc/binc), zero if none
+    Duration       allocated_time  = Duration::zero();            // soft budget (drives between-iteration stopping)
+    Duration       max_search_time = Duration::zero();            // hard budget (deadline); zero means no hard stop
     switch (game.time_control.clock_type)
     {
     case ChessClock::kStandard:
@@ -176,7 +177,10 @@ Move Game::SearchRootNode()
         const int moves_to_go = game.time_control.moves_to_go != 0
                                     ? game.time_control.moves_to_go
                                     : std::max(40 - game.CurrentPosition().MoveCount(), 5);
-        allocated_time        = game.time_control.remaining_time / moves_to_go;
+        // Soft budget: an even slice of the remaining time, plus half the per-move increment. The increment is
+        // banked back each move, so spending part of it does not erode the base clock — but in increment time
+        // controls ignoring it (the old behaviour) systematically under-uses time every move.
+        allocated_time = game.time_control.remaining_time / moves_to_go + increment / 2;
         // Hard budget: up to 2x the soft budget, but never spend into the last second of our clock, and always
         // allow at least 100 ms.
         max_search_time =
@@ -190,6 +194,12 @@ Move Game::SearchRootNode()
         break;
     case ChessClock::kInfinite:
         break; // no time limit; only `stop` ends it
+    }
+    // Reserve the configured move overhead (GUI/network lag) from the hard deadline so we don't forfeit on
+    // time. Only when there is a hard deadline (fixed-depth / infinite searches leave it zero = no stop).
+    if (max_search_time > Duration::zero())
+    {
+        max_search_time = std::max(Duration{1}, max_search_time - game.move_overhead);
     }
 
     // Arm the clock. A ponder search has no hard deadline until `ponderhit` (budget-from-ponderhit); the

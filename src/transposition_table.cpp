@@ -28,6 +28,18 @@ void TranspositionTable::Resize(std::size_t megabytes)
     generation_ = 0;
 }
 
+/// @brief Zero every entry and reset the generation, keeping the current table size (UCI `Clear Hash`).
+/// Not safe to call during a search.
+void TranspositionTable::Clear()
+{
+    for (std::size_t i = 0; i < size_; ++i)
+    {
+        table_[i].key.store(0, std::memory_order_relaxed);
+        table_[i].data.store(0, std::memory_order_relaxed);
+    }
+    generation_ = 0;
+}
+
 /// @brief Find an entry in the TT if one exists for this position.
 /// @param hash Zobrist hash of position.
 /// @return The matching transposition if found.
@@ -78,6 +90,27 @@ std::pair<std::size_t, int> TranspositionTable::UsageStats() const
         }
     }
     return {count, (int)((count * 100) / size_)};
+}
+
+/// @brief Approximate fill level for UCI `info hashfull`, in per mille. Samples the first min(size, 1000)
+/// cells (positions hash uniformly, so the prefix is a representative sample) rather than scanning the whole
+/// table, so it is cheap enough to call on every info line.
+int TranspositionTable::HashfullPermille() const
+{
+    const std::size_t sample = size_ < 1000 ? size_ : 1000;
+    if (sample == 0)
+    {
+        return 0;
+    }
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < sample; ++i)
+    {
+        if (table_[i].data.load(std::memory_order_relaxed) != 0)
+        {
+            ++count;
+        }
+    }
+    return static_cast<int>((count * 1000) / sample);
 }
 
 /// @brief Advance the table generation so that all existing entries become stale (replaceable).

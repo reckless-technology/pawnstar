@@ -85,7 +85,9 @@ plain position but diverge on a draw or once the fifty-move clock is high.
 Pawnstar advertises these `setoption` options in its `uci` response:
 
 - **`Hash`** (spin, default 64, 1–4096 MB) — transposition-table size; resized at runtime (`setoption name Hash value <MB>`).
+- **`Clear Hash`** (button) — empties the transposition table without resizing it.
 - **`Threads`** (spin, default = `PAWNSTAR_THREADS` or all cores, 1–256) — number of Lazy SMP search threads.
+- **`Move Overhead`** (spin, default 10, 0–5000 ms) — time reserved from each move's deadline to cover GUI/network lag, so Pawnstar doesn't forfeit on time.
 - **`EvalFile`** (string) — path to an NNUE net to load at runtime (see below).
 - **`Ponder`** (check) — advertised so GUIs know Pawnstar can ponder. **Its value is declarative only** — the
   GUI's checkbox controls whether the GUI itself uses pondering; Pawnstar ignores the `setoption … Ponder`
@@ -178,8 +180,9 @@ lockless transposition table rather than splitting the tree between them.
 `Game::SearchRootNode` ([src/game.cpp](src/game.cpp)) runs on a dedicated worker
 thread — started by `Game::StartThinking` — so the UCI `stop` command, which sets an atomic
 cancellation flag polled throughout the tree, can interrupt it at any time. It searches the root move
-list at increasing depths starting from `kStartDepth` (3) up to `kMaxPly` (64), emitting a
-`info depth … score cp … pv …` line each time the best move improves. After every iteration the root
+list at increasing depths starting from `kStartDepth` (3) up to `kMaxPly` (64), emitting an
+`info depth … score … time … nodes … nps … hashfull … pv …` line each time the best move improves
+(`score mate <±moves>` once a forced mate is found, otherwise `score cp <centipawns>`). After every iteration the root
 moves are re-sorted by their scores from the previous iteration, so the prior best move is tried first
 next time. The root searches a full `[kAlpha, kBeta]` window (no aspiration windows); alpha is raised
 in place as root moves beat it.
@@ -195,6 +198,11 @@ the stability of the result across iterations:
 
 This avoids burning the whole clock on positions whose answer is already settled. Fixed-depth and
 fixed-time clocks bypass the heuristic.
+
+Time budgeting is **increment-aware**: the per-move soft budget is `remaining_time / moves_to_go +
+increment / 2`, so in increment time controls (e.g. `wtime`/`winc`) the guaranteed per-move increment is
+actually spent rather than left on the clock. The configured `Move Overhead` is then subtracted from the
+hard deadline to leave headroom for GUI/network lag.
 
 `ChessClock` ([src/chess_clock.h](src/chess_clock.h)) is implemented with `std::chrono` on the monotonic
 `steady_clock`: the soft/hard budgets are `std::chrono::milliseconds` durations and the hard stop is an
