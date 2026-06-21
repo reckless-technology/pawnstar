@@ -399,7 +399,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
         const int move_index = (int)(&move - move_list.begin());
         if (transposition && move == transposition->move)
         {
-            continue;
+            continue; // we already searched that one.
         }
 
         // Late move pruning (move-count pruning): at shallow depth in a non-PV node not in check, once we
