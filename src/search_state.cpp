@@ -577,7 +577,7 @@ int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
 // launches one of these per thread.
 // ----------------------------------------------------------------------------
 
-Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread_id, int64_t start_ms, int ms_allocated)
+Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread_id)
 {
     SearchState &state   = *this;
     const bool   is_main = thread_id == 0; // thread 0 is the authoritative main thread
@@ -632,6 +632,9 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
                 {
                     // Show thinking output.
                     CopyVariation(principal_variation, child_pv, best_move);
+                    // Publish the predicted reply (PV[1]) as it improves, so `bestmove <m> ponder <reply>` has
+                    // it on every exit path — including a hard-timeout/stop cancellation, which returns early.
+                    game.ponder_move = principal_variation.size() >= 2 ? principal_variation[1] : Move::None();
                     std::string pv_string;
                     for (const auto &m : principal_variation)
                     {
@@ -640,8 +643,8 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
                     }
                     pv_string.pop_back();
                     std::cout << std::format("info depth {:2} score cp {:5} time {:5} nodes {:8} pv {}\n", depth, alpha,
-                                             game.time_control.ElapsedMilliseconds() - start_ms, state.node_count,
-                                             pv_string);
+                                             game.time_control.ElapsedMilliseconds() - game.time_control.search_start_ms,
+                                             state.node_count, pv_string);
                 }
             }
         }
@@ -649,9 +652,13 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
         {
             break;
         }
-        if (is_main && game.time_control.clock_type == ChessClock::kStandard)
+        // Soft time management: never stop while pondering (no real clock is running yet); once `ponderhit`
+        // clears is_pondering it has reset search_start_ms, so elapsed is measured from the ponderhit moment.
+        if (is_main && game.time_control.clock_type == ChessClock::kStandard &&
+            !game.is_pondering.load(std::memory_order_relaxed))
         {
-            const int64_t elapsed_ms = game.time_control.ElapsedMilliseconds() - start_ms;
+            const int     ms_allocated = game.time_control.ms_allocated;
+            const int64_t elapsed_ms   = game.time_control.ElapsedMilliseconds() - game.time_control.search_start_ms;
             const bool    is_best_move_consistent =
                 std::ranges::all_of(best_moves, [best_move](const Move &m) { return m == best_move; });
             const bool is_score_stable = std::ranges::all_of(best_moves, [best_move](const Move &m) {

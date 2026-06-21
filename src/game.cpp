@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <format>
@@ -78,16 +79,31 @@ Move Game::PlayMove(std::string_view move_str)
 void Game::SearchThreadEntry()
 {
     Move move = SearchRootNode();
+    // UCI forbids sending `bestmove` while pondering: if the ponder search ended on its own (reached max
+    // depth or a forced mate) before the GUI resolved it, wait here until `ponderhit` clears is_pondering or
+    // `stop` sets is_cancel_pending. For a normal (non-ponder) search is_pondering is false, so this is a no-op.
+    while (is_pondering.load(std::memory_order_relaxed) && !is_cancel_pending.load(std::memory_order_relaxed))
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     if (move != Move::None())
     {
         PlayMove(move);
-        std::cout << std::format("bestmove {}\n", move.ToString());
+        if (ponder_move != Move::None())
+        {
+            std::cout << std::format("bestmove {} ponder {}\n", move.ToString(), ponder_move.ToString());
+        }
+        else
+        {
+            std::cout << std::format("bestmove {}\n", move.ToString());
+        }
     }
 }
 
 /// @brief If currently thinking, stop immediately.
 void Game::StopThinking()
 {
+    is_pondering.store(false, std::memory_order_relaxed); // a stop ends any ponder; worker must not block waiting
     is_cancel_pending.store(true, std::memory_order_relaxed);
     if (worker_thread_.joinable())
     {
@@ -126,6 +142,7 @@ int Game::ComputeDefaultThreads()
 Move Game::SearchRootNode()
 {
     Game &game = *this; // local alias so the search body reads uniformly through `game`
+    game.ponder_move = Move::None(); // set by the main thread's IterativeDeepen if the PV has a reply move
     // If there is a book move for this position, do not bother with search.
     Move book_move = game.book.GetMove(game.CurrentPosition().Hash());
     if (book_move != Move::None())
@@ -161,6 +178,7 @@ Move Game::SearchRootNode()
         ms_timeout = std::max(100, std::min(ms_allocated * 2, game.time_control.ms_remaining - 1000));
         game.time_control.hard_stop_ms = game.time_control.ElapsedMilliseconds() + ms_timeout;
         break;
+        // (ponder: hard_stop_ms is cleared below so the search never times out until ponderhit.)
 
     case ChessClock::kFixedDepth:
         ms_timeout                     = 0;
@@ -179,7 +197,15 @@ Move Game::SearchRootNode()
         break;
     }
 
-    const int64_t start_ms = game.time_control.ElapsedMilliseconds();
+    // Publish the per-move time budget to the clock so a `ponderhit` can retarget the running search to a real
+    // deadline (budget-from-ponderhit). While pondering, clear the hard stop so the search runs until resolved.
+    game.time_control.ms_allocated    = ms_allocated;
+    game.time_control.ms_timeout      = ms_timeout;
+    game.time_control.search_start_ms = game.time_control.ElapsedMilliseconds();
+    if (game.is_pondering)
+    {
+        game.time_control.hard_stop_ms = 0;
+    }
     game.is_cancel_pending.store(false, std::memory_order_relaxed);
     DebugXClear();
     game.transposition_table.Age();
@@ -207,13 +233,13 @@ Move Game::SearchRootNode()
     for (int i = 1; i < n_threads; ++i)
     {
         // Each helper gets a distinct thread id, which selects its iteration-skip schedule (see IterativeDeepen).
-        helpers.emplace_back([&game, &move_list, best_move, i, start_ms, ms_allocated] {
+        helpers.emplace_back([&game, &move_list, best_move, i] {
             SearchState helper_state{game};
-            helper_state.IterativeDeepen(move_list, best_move, /*thread_id=*/i, start_ms, ms_allocated);
+            helper_state.IterativeDeepen(move_list, best_move, /*thread_id=*/i);
         });
     }
 
-    best_move = state.IterativeDeepen(move_list, best_move, /*thread_id=*/0, start_ms, ms_allocated);
+    best_move = state.IterativeDeepen(move_list, best_move, /*thread_id=*/0);
 
     game.is_cancel_pending.store(true, std::memory_order_relaxed); // signal helpers to stop
     for (auto &helper : helpers)

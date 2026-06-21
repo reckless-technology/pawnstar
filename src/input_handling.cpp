@@ -105,6 +105,7 @@ void handle_uci(Game &game, std::span<std::string>)
     std::cout << "option name Hash type spin default " << kHashtableMegabytes << " min 1 max 4096\n";
     std::cout << "option name Threads type spin default " << game.thread_count << " min 1 max " << kMaxSearchThreads
               << "\n";
+    std::cout << "option name Ponder type check default false\n";
     std::cout << "option name EvalFile type string default <empty>\n";
     std::cout << "uciok\n";
 }
@@ -180,12 +181,18 @@ void handle_go(Game &game, std::span<std::string> args)
     State            state = State::kAwaitKeyword;
     std::string_view pending; // the value-taking keyword whose argument is expected next
 
+    game.is_pondering.store(false, std::memory_order_relaxed); // set true below if this is a `go ponder`
+
     for (std::size_t i = 1; i < args.size(); ++i)
     {
         const std::string &token = args[i];
         if (state == State::kAwaitKeyword)
         {
-            if (token == "infinite") // a flag, no argument
+            if (token == "ponder") // flag: search on the opponent's time until ponderhit / stop
+            {
+                game.is_pondering.store(true, std::memory_order_relaxed);
+            }
+            else if (token == "infinite") // a flag, no argument
             {
                 game.time_control.clock_type   = ChessClock::kInfinite;
                 game.time_control.ms_remaining = 0;
@@ -233,6 +240,21 @@ void handle_go(Game &game, std::span<std::string> args)
 void handle_stop(Game &game, std::span<std::string>)
 {
     game.StopThinking();
+}
+
+/// @brief Handle the "ponderhit" command: the predicted move was played, so convert the running ponder
+/// search into a normally-timed search, keeping all work done so far (warm TT, current iteration depth).
+/// Budget starts now (budget-from-ponderhit): set the soft-time origin and hard deadline from this moment,
+/// then clear is_pondering last so the search never sees the new flag with a stale start time.
+/// @param game Game to act on.
+void handle_ponderhit(Game &game, std::span<std::string>)
+{
+    game.time_control.search_start_ms = game.time_control.ElapsedMilliseconds();
+    if (game.time_control.ms_timeout > 0)
+    {
+        game.time_control.hard_stop_ms = game.time_control.ElapsedMilliseconds() + game.time_control.ms_timeout;
+    }
+    game.is_pondering.store(false, std::memory_order_relaxed);
 }
 
 /// @brief Handle the "quit" command: stop searching and exit the program.
@@ -345,6 +367,7 @@ constexpr std::array handlers =
     Handler { COMMAND(help),           "Display a summary of commands"},
     Handler { COMMAND(isready),        "Respond with readyok"},
     Handler { COMMAND(nnue),           "Display the raw NNUE evaluation of the current position"},
+    Handler { COMMAND(ponderhit),      "Pondered move was played; convert ponder search to a timed search"},
     Handler { COMMAND(position),       "Set the position and series of moves"},
     Handler { COMMAND(quit),           "Exit the program"},
     Handler { COMMAND(setoption),      "Set a UCI option (EvalFile)"},

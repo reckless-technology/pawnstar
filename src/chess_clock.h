@@ -19,7 +19,7 @@ class ChessClock
     /// @brief Default constructor; standard clock with five minutes remaining, started now.
     ChessClock()
         : clock_type{kStandard}, hard_stop_ms{0}, ms_remaining{5 * 60 * 1000}, num_moves_remaining{0}, depth{10},
-          start_time_{std::chrono::system_clock::now()}
+          search_start_ms{0}, ms_allocated{0}, ms_timeout{0}, start_time_{std::chrono::system_clock::now()}
     {
     }
 
@@ -28,6 +28,12 @@ class ChessClock
     int       ms_remaining;        ///< Number of ms remaining in this clock period.
     int       num_moves_remaining; ///< Number of moves remaining in this clock period.
     int       depth;               ///< Search depth (when CLOCK_FIXED_DEPTH is used).
+    // The following three are set per search by SearchRootNode and read live by the running search, so that
+    // `ponderhit` can retarget a ponder search to a real budget mid-flight (budget-from-ponderhit). Plain
+    // int64/int (aligned, naturally atomic on the x86-64 target); written by the UCI thread, read by workers.
+    int64_t   search_start_ms;     ///< Elapsed-ms timestamp the soft-time budget is measured from (reset on ponderhit).
+    int       ms_allocated;        ///< Soft time budget for this move (ms).
+    int       ms_timeout;          ///< Hard-stop budget for this move (ms); used to set hard_stop_ms on ponderhit.
 
     /// @brief Elapsed time since the clock was constructed.
     /// @return Microseconds elapsed.

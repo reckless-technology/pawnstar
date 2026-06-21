@@ -125,9 +125,10 @@ class SearchState
     /// @param move_list This thread's copy of the root move list (re-sorted per iteration).
     /// @param best_move Best move from the shallow ordering pass (seed).
     /// @param thread_id Thread index (0 = authoritative main thread); drives the iteration-skip schedule.
-    /// @param start_ms Search start time (elapsed ms). @param ms_allocated Soft time budget (standard clock).
+    /// Time management reads the soft budget / start timestamp live from `game.time_control` (so `ponderhit`
+    /// can retarget a running ponder search), and the main thread publishes the ponder move to `game`.
     /// @return The best move found by this thread.
-    Move IterativeDeepen(MoveList move_list, Move best_move, int thread_id, int64_t start_ms, int ms_allocated);
+    Move IterativeDeepen(MoveList move_list, Move best_move, int thread_id);
 
     /// @brief Whether the current position is a draw by threefold repetition.
     /// @return true if drawn by repetition.
