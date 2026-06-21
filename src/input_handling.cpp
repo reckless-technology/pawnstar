@@ -117,7 +117,7 @@ void handle_uci(Game &game, std::span<std::string>)
 void handle_setoption(Game &game, std::span<std::string> args)
 {
     // Parse the UCI "name <words...> value <words...>" grammar.
-    std::string name, value;
+    std::string  name, value;
     std::string *target = nullptr;
     for (std::size_t i = 1; i < args.size(); ++i)
     {
@@ -194,8 +194,7 @@ void handle_go(Game &game, std::span<std::string> args)
             }
             else if (token == "infinite") // a flag, no argument
             {
-                game.time_control.clock_type   = ChessClock::kInfinite;
-                game.time_control.ms_remaining = 0;
+                game.time_control.clock_type = ChessClock::kInfinite; // no time limit; remaining_time is unused
             }
             else if (token == "wtime" || token == "btime" || token == "movetime" || token == "depth" ||
                      token == "movestogo")
@@ -211,13 +210,13 @@ void handle_go(Game &game, std::span<std::string> args)
             if ((pending == "wtime" && game.CurrentPosition().color_to_move == kWhite) ||
                 (pending == "btime" && game.CurrentPosition().color_to_move == kBlack))
             {
-                game.time_control.clock_type   = ChessClock::kStandard;
-                game.time_control.ms_remaining = value;
+                game.time_control.clock_type     = ChessClock::kStandard;
+                game.time_control.remaining_time = ChessClock::Duration{value};
             }
             else if (pending == "movetime")
             {
-                game.time_control.clock_type   = ChessClock::kFixedTime;
-                game.time_control.ms_remaining = value;
+                game.time_control.clock_type     = ChessClock::kFixedTime;
+                game.time_control.remaining_time = ChessClock::Duration{value};
             }
             else if (pending == "depth")
             {
@@ -226,7 +225,7 @@ void handle_go(Game &game, std::span<std::string> args)
             }
             else if (pending == "movestogo")
             {
-                game.time_control.num_moves_remaining = value;
+                game.time_control.moves_to_go = value;
             }
             // (wtime/btime for the side *not* to move falls through here and is intentionally ignored.)
             state = State::kAwaitKeyword;
@@ -244,16 +243,13 @@ void handle_stop(Game &game, std::span<std::string>)
 
 /// @brief Handle the "ponderhit" command: the predicted move was played, so convert the running ponder
 /// search into a normally-timed search, keeping all work done so far (warm TT, current iteration depth).
-/// Budget starts now (budget-from-ponderhit): set the soft-time origin and hard deadline from this moment,
-/// then clear is_pondering last so the search never sees the new flag with a stale start time.
+/// `OnPonderhit` starts the budget from this moment (budget-from-ponderhit) by resetting the soft-time
+/// origin and arming the hard deadline; is_pondering is cleared last so the search never sees the new flag
+/// with a stale start time.
 /// @param game Game to act on.
 void handle_ponderhit(Game &game, std::span<std::string>)
 {
-    game.time_control.search_start_ms = game.time_control.ElapsedMilliseconds();
-    if (game.time_control.ms_timeout > 0)
-    {
-        game.time_control.hard_stop_ms = game.time_control.ElapsedMilliseconds() + game.time_control.ms_timeout;
-    }
+    game.time_control.OnPonderhit();
     game.is_pondering.store(false, std::memory_order_relaxed);
 }
 

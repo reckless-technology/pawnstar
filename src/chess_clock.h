@@ -1,54 +1,118 @@
 #pragma once
-/// @file chess_clock.h Chess clock.
+/// @file chess_clock.h Chess clock and per-search time management.
+///
+/// Times are `std::chrono` values on a monotonic (steady) clock: budgets and the remaining clock are
+/// `Duration`s, and the hard stop is an absolute `TimePoint` deadline. Soft-time management compares the time
+/// elapsed since the search started against the allocated budget; the hard deadline is the wall-clock instant
+/// at which the search must stop no matter what.
+#include <atomic>
 #include <chrono>
-#include <cstdint>
 
-/// @brief Clock and time controls.
+/// @brief Clock and time controls for the current game / search.
 class ChessClock
 {
   public:
-    /// @brief Time control chess clock types.
+    using Clock     = std::chrono::steady_clock; ///< Monotonic clock — correct for elapsed time and deadlines.
+    using TimePoint = Clock::time_point;         ///< An absolute instant on the steady clock.
+    using Duration  = std::chrono::milliseconds; ///< Budgets / remaining time (UCI granularity is the ms).
+
+    /// @brief Time control types.
     enum ClockType
     {
-        kStandard,   ///< N moves to be made in a specified time.
-        kFixedDepth, ///< Search to depth D on every move.
-        kFixedTime,  ///< Search for N milliseconds on every move.
-        kInfinite,   ///< Keep searching until told to stop.
+        kStandard,   ///< N moves in a given time (or sudden death): time is managed per move.
+        kFixedDepth, ///< Search to a fixed depth every move.
+        kFixedTime,  ///< Search for a fixed amount of time every move.
+        kInfinite,   ///< Search until told to stop.
     };
 
-    /// @brief Default constructor; standard clock with five minutes remaining, started now.
-    ChessClock()
-        : clock_type{kStandard}, hard_stop_ms{0}, ms_remaining{5 * 60 * 1000}, num_moves_remaining{0}, depth{10},
-          search_start_ms{0}, ms_allocated{0}, ms_timeout{0}, start_time_{std::chrono::system_clock::now()}
+    ChessClock() = default;
+
+    ClockType clock_type{kStandard};                   ///< The current time-control type.
+    Duration  remaining_time{std::chrono::minutes{5}}; ///< Time left on our clock this period (UCI wtime/btime).
+    int       moves_to_go{0}; ///< Moves until the next time control (0 = unknown / sudden death).
+    int       depth{10};      ///< Target depth when clock_type == kFixedDepth.
+
+    /// @brief Reset to default time control (called when starting a new game). Provided instead of assigning a
+    /// fresh ChessClock because the atomic members below make the class non-assignable.
+    void Reset()
     {
+        clock_type       = kStandard;
+        remaining_time   = std::chrono::minutes{5};
+        moves_to_go      = 0;
+        depth            = 10;
+        allocated_time_  = Duration::zero();
+        max_search_time_ = Duration::zero();
+        search_start_time_.store(Clock::now(), std::memory_order_relaxed);
+        hard_deadline_.store(kNoDeadline, std::memory_order_relaxed);
     }
 
-    ClockType clock_type;          ///< The current clock type.
-    int64_t   hard_stop_ms;        ///< Wall clock time to hard stop searching and move
-    int       ms_remaining;        ///< Number of ms remaining in this clock period.
-    int       num_moves_remaining; ///< Number of moves remaining in this clock period.
-    int       depth;               ///< Search depth (when CLOCK_FIXED_DEPTH is used).
-    // The following three are set per search by SearchRootNode and read live by the running search, so that
-    // `ponderhit` can retarget a ponder search to a real budget mid-flight (budget-from-ponderhit). Plain
-    // int64/int (aligned, naturally atomic on the x86-64 target); written by the UCI thread, read by workers.
-    int64_t   search_start_ms;     ///< Elapsed-ms timestamp the soft-time budget is measured from (reset on ponderhit).
-    int       ms_allocated;        ///< Soft time budget for this move (ms).
-    int       ms_timeout;          ///< Hard-stop budget for this move (ms); used to set hard_stop_ms on ponderhit.
-
-    /// @brief Elapsed time since the clock was constructed.
-    /// @return Microseconds elapsed.
-    int64_t ElapsedMicroseconds()
+    /// @brief Begin timing a search: record the start instant and the soft/hard budgets, and arm the hard
+    /// deadline. A non-positive @p maximum means no hard deadline (fixed-depth / infinite).
+    /// @param allocated Soft time budget for the move. @param maximum Hard time budget (deadline = now + this).
+    void StartSearch(Duration allocated, Duration maximum)
     {
-        return duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now() - start_time_).count();
+        allocated_time_  = allocated;
+        max_search_time_ = maximum;
+        search_start_time_.store(Clock::now(), std::memory_order_relaxed);
+        ArmHardDeadline(maximum);
     }
 
-    /// @brief Elapsed time since the clock was constructed.
-    /// @return Milliseconds elapsed.
-    int64_t ElapsedMilliseconds()
+    /// @brief Begin a ponder search: timed like StartSearch but with NO hard deadline — the search runs until
+    /// `ponderhit` or `stop`. The budgets are remembered so OnPonderhit can start the real clock.
+    /// @param allocated Soft budget to use once pondering converts to a real search.
+    /// @param maximum Hard budget to use once pondering converts (the deadline OnPonderhit will arm).
+    void StartPonderSearch(Duration allocated, Duration maximum)
     {
-        return ElapsedMicroseconds() / 1000;
+        allocated_time_  = allocated;
+        max_search_time_ = maximum;
+        search_start_time_.store(Clock::now(), std::memory_order_relaxed);
+        hard_deadline_.store(kNoDeadline, std::memory_order_relaxed);
+    }
+
+    /// @brief The opponent played the pondered move: start the real clock now (budget-from-ponderhit), keeping
+    /// the work already done. Resets the soft-time origin and arms the hard deadline from this instant.
+    void OnPonderhit()
+    {
+        search_start_time_.store(Clock::now(), std::memory_order_relaxed);
+        ArmHardDeadline(max_search_time_);
+    }
+
+    /// @brief Time elapsed since the most recent search start (or ponderhit).
+    /// @return Elapsed duration (milliseconds granularity).
+    Duration ElapsedSinceSearchStart() const
+    {
+        return std::chrono::duration_cast<Duration>(Clock::now() - search_start_time_.load(std::memory_order_relaxed));
+    }
+
+    /// @brief The soft time budget allocated for this move.
+    Duration AllocatedTime() const
+    {
+        return allocated_time_;
+    }
+
+    /// @brief Whether the hard deadline has passed. Always false when there is no hard deadline.
+    /// @return true if the search must stop now.
+    bool HasReachedHardDeadline() const
+    {
+        return Clock::now() >= hard_deadline_.load(std::memory_order_relaxed);
     }
 
   private:
-    std::chrono::system_clock::time_point start_time_; ///< When the clock was started.
+    /// @brief Sentinel hard deadline meaning "no hard stop" — `HasReachedHardDeadline` never returns true.
+    static constexpr TimePoint kNoDeadline = TimePoint::max();
+
+    /// @brief Arm the hard deadline at now + @p maximum, or clear it (no hard stop) if @p maximum <= 0.
+    void ArmHardDeadline(Duration maximum)
+    {
+        hard_deadline_.store(maximum > Duration::zero() ? Clock::now() + maximum : kNoDeadline,
+                             std::memory_order_relaxed);
+    }
+
+    // search_start_time_ and hard_deadline_ are mutated mid-search by `ponderhit` (UCI thread) and read every
+    // node by the search worker threads, so they are atomic. The budgets are set before the workers start and
+    // not changed mid-search, so they are plain.
+    std::atomic<TimePoint> search_start_time_{Clock::now()};
+    std::atomic<TimePoint> hard_deadline_{kNoDeadline};
+    Duration               allocated_time_{Duration::zero()};
+    Duration               max_search_time_{Duration::zero()};
 };

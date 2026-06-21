@@ -24,7 +24,7 @@ using std::string_view;
 /// @param fen_string Initial position.
 void Game::NewGame(std::string_view fen_string)
 {
-    time_control = ChessClock{};
+    time_control.Reset();
     is_cancel_pending.store(false, std::memory_order_relaxed);
     eval_cache.Clear(); // evals are net-specific; start each game with a clean cache
     positions_.clear();
@@ -143,7 +143,7 @@ int Game::ComputeDefaultThreads()
 /// @return The best move, or Move::None if there are no legal moves.
 Move Game::SearchRootNode()
 {
-    Game &game = *this; // local alias so the search body reads uniformly through `game`
+    Game &game       = *this;        // local alias so the search body reads uniformly through `game`
     game.ponder_move = Move::None(); // set by the main thread's IterativeDeepen if the PV has a reply move
     // Clear the stop flag (set true by StartThinking's StopThinking) up front — BEFORE the book / single-move
     // early returns. Otherwise a leftover cancel makes SearchThreadEntry's ponder-wait exit immediately and
@@ -166,51 +166,41 @@ Move Game::SearchRootNode()
         return move_list[0];
     }
     // Plan time usage for this search.
-    int ms_timeout   = 0; // Hard stop: cancel search when this time expires.
-    int ms_allocated = 0; // Soft allocated time for the move.
+    using Duration           = ChessClock::Duration;
+    Duration allocated_time  = Duration::zero(); // soft budget (drives between-iteration stopping)
+    Duration max_search_time = Duration::zero(); // hard budget (deadline); zero means no hard stop
     switch (game.time_control.clock_type)
     {
     case ChessClock::kStandard:
-    default:
-        if (game.time_control.num_moves_remaining != 0)
-        {
-            ms_allocated = game.time_control.ms_remaining / game.time_control.num_moves_remaining;
-        }
-        else
-        {
-            const int num_moves_to_go_estimate = std::max(40 - game.CurrentPosition().MoveCount(), 5);
-            ms_allocated                       = game.time_control.ms_remaining / num_moves_to_go_estimate;
-        }
-        ms_timeout = std::max(100, std::min(ms_allocated * 2, game.time_control.ms_remaining - 1000));
-        game.time_control.hard_stop_ms = game.time_control.ElapsedMilliseconds() + ms_timeout;
-        break;
-        // (ponder: hard_stop_ms is cleared below so the search never times out until ponderhit.)
-
-    case ChessClock::kFixedDepth:
-        ms_timeout                     = 0;
-        ms_allocated                   = 0;
-        game.time_control.hard_stop_ms = 0;
-        break;
-
-    case ChessClock::kFixedTime:
-        ms_timeout                     = game.time_control.ms_remaining;
-        game.time_control.hard_stop_ms = game.time_control.ElapsedMilliseconds() + ms_timeout;
-        ms_allocated                   = 0;
-        break;
-
-    case ChessClock::kInfinite:
-        game.time_control.hard_stop_ms = 0;
+    default: {
+        const int moves_to_go = game.time_control.moves_to_go != 0
+                                    ? game.time_control.moves_to_go
+                                    : std::max(40 - game.CurrentPosition().MoveCount(), 5);
+        allocated_time        = game.time_control.remaining_time / moves_to_go;
+        // Hard budget: up to 2x the soft budget, but never spend into the last second of our clock, and always
+        // allow at least 100 ms.
+        max_search_time =
+            std::max(Duration{100}, std::min(allocated_time * 2, game.time_control.remaining_time - Duration{1000}));
         break;
     }
+    case ChessClock::kFixedDepth:
+        break; // no time limit; the depth loop bounds the search
+    case ChessClock::kFixedTime:
+        max_search_time = game.time_control.remaining_time; // movetime: a hard budget, no soft management
+        break;
+    case ChessClock::kInfinite:
+        break; // no time limit; only `stop` ends it
+    }
 
-    // Publish the per-move time budget to the clock so a `ponderhit` can retarget the running search to a real
-    // deadline (budget-from-ponderhit). While pondering, clear the hard stop so the search runs until resolved.
-    game.time_control.ms_allocated    = ms_allocated;
-    game.time_control.ms_timeout      = ms_timeout;
-    game.time_control.search_start_ms = game.time_control.ElapsedMilliseconds();
+    // Arm the clock. A ponder search has no hard deadline until `ponderhit` (budget-from-ponderhit); the
+    // budgets are recorded so the conversion can start the real clock from that moment.
     if (game.is_pondering)
     {
-        game.time_control.hard_stop_ms = 0;
+        game.time_control.StartPonderSearch(allocated_time, max_search_time);
+    }
+    else
+    {
+        game.time_control.StartSearch(allocated_time, max_search_time);
     }
     DebugXClear();
     game.transposition_table.Age();
