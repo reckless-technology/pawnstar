@@ -39,6 +39,7 @@ TEST_BK_NNUE_EXE    = $(BUILD_DIR)/test_bratko_kopec_nnue
 TEST_NNUE_EXE       = $(BUILD_DIR)/test_nnue
 TEST_NNUE_INC_EXE   = $(BUILD_DIR)/test_nnue_incremental
 TEST_BOOK_EXE       = $(BUILD_DIR)/test_opening_book
+TEST_CLOCK_EXE      = $(BUILD_DIR)/test_chess_clock
 # Shipped net + checked-in trainer reference, used by `make check` to exercise NNUE inference and the
 # incremental accumulator. Resolved with wildcard so the checks degrade to a no-op (still green) if absent.
 NNUE_NET            = $(wildcard nnue/pawnstar-v10.bin)
@@ -48,7 +49,8 @@ TEST_OBJECTS        = $(BUILD_DIR)/perft_test.o \
                       $(BUILD_DIR)/bratko_kopec_nnue_test.o \
                       $(BUILD_DIR)/nnue_test.o \
                       $(BUILD_DIR)/nnue_incremental_test.o \
-                      $(BUILD_DIR)/opening_book_test.o
+                      $(BUILD_DIR)/opening_book_test.o \
+                      $(BUILD_DIR)/chess_clock_test.o
 TEST_DEPS           = $(TEST_OBJECTS:.o=.d)
 
 # Diagnostic counters (DEBUGX) are compiled in by default; build with RELEASE=1 to omit them.
@@ -95,7 +97,7 @@ all: prep $(PROGRAM_EXE)
 
 tools: prep $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE) $(TOOL_QUANT_EXE)
 
-tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE)
+tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) $(TEST_CLOCK_EXE)
 
 # Run every suite in one shell, chained with && so the first failure aborts (and the summary below is
 # skipped). On full success report the wall-clock time spent running the tests (not the build). Depends on
@@ -108,13 +110,14 @@ check: tests tools
 	$(TEST_NNUE_INC_EXE) $(NNUE_NET) && \
 	$(TEST_SEE_EXE) && \
 	$(TEST_BOOK_EXE) && \
+	$(TEST_CLOCK_EXE) && \
 	echo "all tests passed in $$(( $$(date +%s%3N) - start )) ms"
 
 prep:
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) \
+	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) $(TEST_CLOCK_EXE) \
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
 	      $(TOOL_FILTERBOOK_EXE) $(BUILD_DIR)/filter_book.o $(BUILD_DIR)/filter_book.d \
 	      $(TOOL_QUANT_EXE) $(BUILD_DIR)/nnue_quant_study.o $(BUILD_DIR)/nnue_quant_study.d \
@@ -164,6 +167,10 @@ $(TEST_NNUE_INC_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_incremental_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(TEST_BOOK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/opening_book_test.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+# ChessClock is header-only, so the clock test links against its own object alone (no engine objects).
+$(TEST_CLOCK_EXE): $(BUILD_DIR)/chess_clock_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 # Link the net-stamping tool (header-only use of nnue.h constants; no engine objects needed).
