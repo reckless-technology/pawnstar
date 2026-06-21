@@ -71,6 +71,7 @@ nnue        print the raw NNUE network output for the current position
 getboard    print the FEN of the current position
 bookmoves   list opening-book moves for the current position
 dbg         dump internal diagnostic counters
+bench       search a fixed position set to a fixed depth; print "<nodes> nodes <nps> nps"
 help        list all commands
 ```
 
@@ -88,6 +89,7 @@ Pawnstar advertises these `setoption` options in its `uci` response:
 - **`Clear Hash`** (button) — empties the transposition table without resizing it.
 - **`Threads`** (spin, default = `PAWNSTAR_THREADS` or all cores, 1–256) — number of Lazy SMP search threads.
 - **`Move Overhead`** (spin, default 30, 0–5000 ms) — time reserved from each move's deadline to cover GUI/network lag, so Pawnstar doesn't forfeit on time.
+- **`OwnBook`** (check, default true) — whether to play from the built-in opening book; set false to let the GUI's book drive the opening.
 - **`EvalFile`** (string) — path to an NNUE net to load at runtime (see below).
 - **`Ponder`** (check) — advertised so GUIs know Pawnstar can ponder. **Its value is declarative only** — the
   GUI's checkbox controls whether the GUI itself uses pondering; Pawnstar ignores the `setoption … Ponder`

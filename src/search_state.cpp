@@ -244,11 +244,14 @@ int SearchState::AttemptNullMove(int depth, int ply, int alpha, int beta, int ev
 int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move)
 {
     INCREMENT("alpha beta calls");
-    // Poll the hard deadline often (every 2048 nodes): between polls the search cannot stop, so a coarse
-    // interval lets a node-heavy batch overrun the deadline — at fast TCs with an increment actually spent,
-    // a ~64k-node interval overran by 6-10 ms and forfeited games. 2048 nodes keeps the overrun sub-ms; the
-    // clock read is negligible at this cadence.
-    if ((++node_count & 0x7FF) == 0 && game.time_control.HasReachedHardDeadline())
+    // Poll the hard deadline (and the `go nodes` limit) often — every 2048 nodes: between polls the search
+    // cannot stop, so a coarse interval lets a node-heavy batch overrun the deadline (a ~64k-node interval
+    // overran by 6-10 ms and forfeited games once the increment was actually spent). 2048 nodes keeps the
+    // overrun sub-ms; the clock read is negligible at this cadence. The node limit (max_nodes, 0 = none) is
+    // checked per-thread, so it is exact at Threads=1 (the reproducible-testing case) and approximate above.
+    if ((++node_count & 0x7FF) == 0 &&
+        (game.time_control.HasReachedHardDeadline() ||
+         (game.time_control.max_nodes != 0 && node_count >= game.time_control.max_nodes)))
     {
         game.is_cancel_pending.store(true, std::memory_order_relaxed);
         return kSearchCancelledScore;
@@ -597,7 +600,6 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
         SortMoves<true>(move_list); // Sort based on scores from the previous iteration.
         Variation child_pv{};
         int       alpha = kAlpha;
-        node_count      = 0;
         if (is_main)
         {
             best_moves.push_back(best_move);

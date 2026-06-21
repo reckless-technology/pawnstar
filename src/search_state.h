@@ -55,10 +55,10 @@ constexpr void CopyVariation(Variation &dst, const Variation &src, const Move &b
 class SearchState
 {
   public:
-    Game                                    &game;         ///< Shared state: TT, clock, cancellation flag.
-    HistoryTable                             history{};    ///< Per-thread history heuristic counts (no sharing).
-    std::array<std::array<Move, 2>, kMaxPly> killers{};    ///< Killer moves indexed by ply.
-    int                                      node_count{}; ///< Nodes searched by this thread.
+    Game                                    &game;      ///< Shared state: TT, clock, cancellation flag.
+    HistoryTable                             history{}; ///< Per-thread history heuristic counts (no sharing).
+    std::array<std::array<Move, 2>, kMaxPly> killers{}; ///< Killer moves indexed by ply.
+    uint64_t node_count{}; ///< Cumulative nodes this thread searched this search (nps + `go nodes`).
 
     /// @brief Construct a search state from the current game.
     /// Builds the full hash history from the game's position stack and seeds the per-thread

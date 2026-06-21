@@ -2,6 +2,7 @@
 
 #include <array>
 #include <atomic>
+#include <cstdint>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -30,7 +31,9 @@ class Game
     std::atomic<bool> is_pondering{
         false}; ///< True while a `go ponder` search runs (until `ponderhit` / `stop`); suppresses time stops.
     Move ponder_move{
-        Move::None()}; ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
+        Move::None()};           ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
+    bool     use_own_book{true}; ///< Whether to consult the built-in opening book (UCI `OwnBook`).
+    uint64_t last_search_node_count{0}; ///< Node count of the most recent search's main thread (for `bench`).
 
     /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
     Game()

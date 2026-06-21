@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <format>
@@ -109,13 +111,15 @@ void handle_uci(Game &game, std::span<std::string>)
     std::cout << "option name EvalFile type string default <empty>\n";
     std::cout << "option name Clear Hash type button\n";
     std::cout << "option name Move Overhead type spin default " << game.move_overhead.count() << " min 0 max 5000\n";
+    std::cout << "option name OwnBook type check default " << (game.use_own_book ? "true" : "false") << "\n";
     std::cout << "uciok\n";
 }
 
 /// @brief Handle the "setoption" command: "setoption name <Name> value <Value>".
 /// Recognises EvalFile (load a different NNUE net file; NNUE is the only evaluator), Hash (transposition
 /// table size in MB, 1..4096), Threads (Lazy SMP search threads, 1..kMaxSearchThreads), Clear Hash (a
-/// button that empties the transposition table) and Move Overhead (ms reserved from each deadline, 0..5000).
+/// button that empties the transposition table), Move Overhead (ms reserved from each deadline, 0..5000) and
+/// OwnBook (whether to consult the built-in opening book).
 /// @param args Command arguments.
 void handle_setoption(Game &game, std::span<std::string> args)
 {
@@ -163,6 +167,10 @@ void handle_setoption(Game &game, std::span<std::string> args)
     {
         game.move_overhead = ChessClock::Duration{std::clamp(std::atoi(value.c_str()), 0, 5000)};
     }
+    else if (name == "OwnBook")
+    {
+        game.use_own_book = (value == "true");
+    }
 }
 
 /// @brief Handle the "ucinewgame" command: stop searching and reset to a new game.
@@ -171,6 +179,64 @@ void handle_ucinewgame(Game &game, std::span<std::string>)
 {
     game.StopThinking();
     game.NewGame();
+}
+
+/// @brief Fixed, known-legal position set for `bench` (the Bratko-Kopec middlegame/endgame positions). Each
+/// is searched to a fixed depth; the total node count is a determinism signature and the nps a speed check.
+static const char *const kBenchFens[] = {
+    "1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - - 0 1",
+    "3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - - 0 1",
+    "2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - - 0 1",
+    "rnbqkb1r/p3pppp/1p6/2ppP3/3N4/2P5/PPP1QPPP/R1B1KB1R w KQkq - 0 1",
+    "r1b2rk1/2q1b1pp/p2ppn2/1p6/3QP3/1BN1B3/PPP3PP/R4RK1 w - - 0 1",
+    "2r3k1/pppR1pp1/4p3/4P1P1/5P2/1P4K1/P1P5/8 w - - 0 1",
+    "1nk1r1r1/pp2n1pp/4p3/q2pPp1N/b1pP1P2/B1P2R2/2P1B1PP/R2Q2K1 w - - 0 1",
+    "4b3/p3kp2/6p1/3pP2p/2pP1P2/4K1P1/P3N2P/8 w - - 0 1",
+    "2kr1bnr/pbpq4/2n1pp2/3p3p/3P1P1B/2N2N1Q/PPP3PP/2KR1B1R w - - 0 1",
+    "3rr1k1/pp3pp1/1qn2np1/8/3p4/PP1R1P2/2P1NQPP/R1B3K1 b - - 0 1",
+    "2r1nrk1/p2q1ppp/bp1p4/n1pPp3/P1P1P3/2PBB1N1/4QPPP/R4RK1 w - - 0 1",
+    "r3r1k1/ppqb1ppp/8/4p1NQ/8/2P5/PP3PPP/R3R1K1 b - - 0 1",
+    "r2q1rk1/4bppp/p2p4/2pP4/3pP3/3Q4/PP1B1PPP/R3R1K1 w - - 0 1",
+    "rnb2r1k/pp2p2p/2pp2p1/q2P1p2/8/1Pb2NP1/PB2PPBP/R2Q1RK1 w - - 0 1",
+    "2r3k1/1p2q1pp/2b1pr2/p1pp4/6Q1/1P1PP1R1/P1PN2PP/5RK1 w - - 0 1",
+    "r1bqkb1r/4npp1/p1p4p/1p1pP1B1/8/1B6/PPPN1PPP/R2Q1RK1 w kq - 0 1",
+};
+
+/// @brief Default `bench` search depth (overridden by `bench <depth>`).
+static constexpr int kBenchDepth = 13;
+
+/// @brief Handle the "bench" command: search each position in kBenchFens to a fixed depth (kBenchDepth, or
+/// `bench <depth>`) and print `<nodes> nodes <nps> nps`. The node total is a determinism signature (a search
+/// change meant to be neutral that alters it shows up immediately) and the nps a quick speed-regression check.
+/// Forces a single thread and disables the opening book for reproducibility (restored afterwards); the hash is
+/// cleared up front. Leaves the board at the last bench position (run it standalone).
+void handle_bench(Game &game, std::span<std::string> args)
+{
+    const int  depth          = args.size() > 1 ? std::atoi(args[1].c_str()) : kBenchDepth;
+    const int  saved_threads  = game.thread_count;
+    const bool saved_own_book = game.use_own_book;
+    game.thread_count         = 1;     // deterministic, single-threaded
+    game.use_own_book         = false; // never short-circuit on a book move
+    game.transposition_table.Clear();
+    game.eval_cache.Clear();
+
+    uint64_t   total_nodes = 0;
+    const auto start       = ChessClock::Clock::now();
+    for (const char *fen : kBenchFens)
+    {
+        game.NewGame(fen);
+        game.time_control.clock_type = ChessClock::kFixedDepth; // NewGame reset the clock; set fixed depth after
+        game.time_control.depth      = depth;
+        game.SearchRootNode();
+        total_nodes += game.last_search_node_count;
+    }
+    const long long elapsed_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(ChessClock::Clock::now() - start).count();
+    const long long nps = static_cast<long long>(total_nodes) * 1000 / std::max<long long>(1, elapsed_ms);
+
+    game.thread_count = saved_threads;
+    game.use_own_book = saved_own_book;
+    std::cout << std::format("{} nodes {} nps\n", total_nodes, nps);
 }
 
 /// @brief Handle the "go" command: parse time controls and start searching.
@@ -195,6 +261,7 @@ void handle_go(Game &game, std::span<std::string> args)
 
     game.is_pondering.store(false, std::memory_order_relaxed);  // set true below if this is a `go ponder`
     game.time_control.increment = ChessClock::Duration::zero(); // cleared up front; set below if winc/binc present
+    game.time_control.max_nodes = 0;                            // cleared up front; set below if `nodes` present
 
     for (std::size_t i = 1; i < args.size(); ++i)
     {
@@ -210,7 +277,7 @@ void handle_go(Game &game, std::span<std::string> args)
                 game.time_control.clock_type = ChessClock::kInfinite; // no time limit; remaining_time is unused
             }
             else if (token == "wtime" || token == "btime" || token == "winc" || token == "binc" ||
-                     token == "movetime" || token == "depth" || token == "movestogo")
+                     token == "movetime" || token == "depth" || token == "movestogo" || token == "nodes")
             {
                 pending = token; // a value-taking keyword: its argument is the next token
                 state   = State::kAwaitValue;
@@ -244,6 +311,13 @@ void handle_go(Game &game, std::span<std::string> args)
             else if (pending == "movestogo")
             {
                 game.time_control.moves_to_go = value;
+            }
+            else if (pending == "nodes")
+            {
+                // Node-limited search: run with no clock (kInfinite) and stop at the node budget (Search polls
+                // max_nodes). Useful for reproducible, machine-speed-independent testing.
+                game.time_control.clock_type = ChessClock::kInfinite;
+                game.time_control.max_nodes  = static_cast<uint64_t>(value);
             }
             // (wtime/btime for the side *not* to move falls through here and is intentionally ignored.)
             state = State::kAwaitKeyword;
@@ -371,6 +445,7 @@ void handle_help(Game &, std::span<std::string>);
 /// @brief Table of all supported input commands and their handlers.
 constexpr std::array handlers =
 {
+    Handler { COMMAND(bench),          "Search a fixed position set to fixed depth; print nodes + nps"},
     Handler { COMMAND(bookmoves),      "Display available book moves for current position"},
     Handler { COMMAND(dbg),            "Display diagnostic counts"},
     Handler { COMMAND(dbgclear),       "Reset diagnostic counts"},
@@ -384,7 +459,7 @@ constexpr std::array handlers =
     Handler { COMMAND(ponderhit),      "Pondered move was played; convert ponder search to a timed search"},
     Handler { COMMAND(position),       "Set the position and series of moves"},
     Handler { COMMAND(quit),           "Exit the program"},
-    Handler { COMMAND(setoption),      "Set a UCI option (EvalFile/Hash/Threads/Clear Hash/Move Overhead)"},
+    Handler { COMMAND(setoption),      "Set a UCI option (EvalFile/Hash/Threads/Clear Hash/Move Overhead/OwnBook)"},
     Handler { COMMAND(stop),           "Stop searching and return best move found"},
     Handler { COMMAND(uci),            "Enter UCI protocol"},
     Handler { COMMAND(ucinewgame),     "UCI mode start new game"}

@@ -7,6 +7,7 @@
 /// at which the search must stop no matter what.
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 
 /// @brief Clock and time controls for the current game / search.
 class ChessClock
@@ -32,8 +33,9 @@ class ChessClock
     Duration  increment{
         Duration::zero()}; ///< Per-move increment, side to move (UCI winc/binc). Parsed but not currently used by time
                             ///< planning — see SearchRootNode (folding it into the budget SPRT'd neutral/negative).
-    int moves_to_go{0};     ///< Moves until the next time control (0 = unknown / sudden death).
-    int depth{10};          ///< Target depth when clock_type == kFixedDepth.
+    int      moves_to_go{0}; ///< Moves until the next time control (0 = unknown / sudden death).
+    int      depth{10};      ///< Target depth when clock_type == kFixedDepth.
+    uint64_t max_nodes{0};   ///< Node limit for `go nodes` (0 = no limit); checked per-thread in Search.
 
     /// @brief Reset to default time control (called when starting a new game). Provided instead of assigning a
     /// fresh ChessClock because the atomic members below make the class non-assignable.
@@ -44,6 +46,7 @@ class ChessClock
         increment        = Duration::zero();
         moves_to_go      = 0;
         depth            = 10;
+        max_nodes        = 0;
         allocated_time_  = Duration::zero();
         max_search_time_ = Duration::zero();
         search_start_time_.store(Clock::now(), std::memory_order_relaxed);

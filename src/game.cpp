@@ -149,11 +149,15 @@ Move Game::SearchRootNode()
     // early returns. Otherwise a leftover cancel makes SearchThreadEntry's ponder-wait exit immediately and
     // emit a premature `bestmove` when `go ponder` lands on a book/forced position (which returns without search).
     game.is_cancel_pending.store(false, std::memory_order_relaxed);
-    // If there is a book move for this position, do not bother with search.
-    Move book_move = game.book.GetMove(game.CurrentPosition().Hash());
-    if (book_move != Move::None())
+    game.last_search_node_count = 0; // set below once a real search runs (stays 0 for book/forced returns)
+    // If there is a book move for this position, do not bother with search (unless OwnBook is disabled).
+    if (game.use_own_book)
     {
-        return book_move;
+        Move book_move = game.book.GetMove(game.CurrentPosition().Hash());
+        if (book_move != Move::None())
+        {
+            return book_move;
+        }
     }
     MoveList move_list = game.CurrentPosition().GenerateLegalMoves();
     // If there is only 1 legal move available, there is no point wasting time searching it, just play it.
@@ -245,7 +249,8 @@ Move Game::SearchRootNode()
         });
     }
 
-    best_move = state.IterativeDeepen(move_list, best_move, /*thread_id=*/0);
+    best_move                   = state.IterativeDeepen(move_list, best_move, /*thread_id=*/0);
+    game.last_search_node_count = state.node_count; // main-thread node total (used by `bench`)
 
     game.is_cancel_pending.store(true, std::memory_order_relaxed); // signal helpers to stop
     for (auto &helper : helpers)
