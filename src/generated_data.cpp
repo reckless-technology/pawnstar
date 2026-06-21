@@ -43,7 +43,6 @@ constexpr uint8_t  RankOf(uint8_t sq)         { return sq >> 3;                 
 constexpr uint64_t SqBB(uint8_t sq)           { return 1ull << sq;                   } ///< Square index -> single-square Bitboard.
 constexpr uint64_t SqBB(int x, int y)         { return 1ull << (x + 8 * y);          } ///< (file, rank) -> single-square Bitboard.
 constexpr bool     IsInBoard(int x, int y)    { return x == (x & 7) && y == (y & 7); } ///< Is (file, rank) on the board?
-
 constexpr uint64_t ShiftNorth(uint64_t b)     { return b << 8;                       } ///< Shift a Bitboard one square north.
 constexpr uint64_t ShiftNortheast(uint64_t b) { return (b & ~kFileH) << 9;           } ///< Shift a Bitboard one square northeast.
 constexpr uint64_t ShiftEast(uint64_t b)      { return (b & ~kFileH) << 1;           } ///< Shift a Bitboard one square east.
@@ -299,23 +298,21 @@ std::array<zobrist_t, 64> MakeEnPassantHashes()
 } // namespace
 
 // ── The precomputed tables, computed once at program startup (dynamic initialisation). ──────────────
-const std::array<Bitboard, 64> kEastWest =
-    MakeBitboards([](uint8_t sq) { return RayFrom(sq, kEast) | RayFrom(sq, kWest); });
-const std::array<Bitboard, 64> kPawnAttacksWhite =
-    MakeBitboards([](uint8_t sq) { return ShiftNorthwest(SqBB(sq)) | ShiftNortheast(SqBB(sq)); });
-const std::array<Bitboard, 64> kPawnAttacksBlack =
-    MakeBitboards([](uint8_t sq) { return ShiftSouthwest(SqBB(sq)) | ShiftSoutheast(SqBB(sq)); });
-const std::array<Bitboard, 64> kKnightAttacks = MakeBitboards(KnightAttacks);
-const std::array<Bitboard, 64> kBishopAttacks = MakeBitboards(BishopAttacksOnEmptyBoard);
-const std::array<Bitboard, 64> kRookAttacks   = MakeBitboards(RookAttacksOnEmptyBoard);
-const std::array<Bitboard, 64> kKingAttacks   = MakeBitboards(KingAttacks);
+// clang-format off
+const std::array<Bitboard, 64>     kEastWest            =    MakeBitboards([](uint8_t sq) { return RayFrom(sq, kEast) | RayFrom(sq, kWest); });
+const std::array<Bitboard, 64>     kPawnAttacksWhite    =    MakeBitboards([](uint8_t sq) { return ShiftNorthwest(SqBB(sq)) | ShiftNortheast(SqBB(sq)); });
+const std::array<Bitboard, 64>     kPawnAttacksBlack    =    MakeBitboards([](uint8_t sq) { return ShiftSouthwest(SqBB(sq)) | ShiftSoutheast(SqBB(sq)); });
+const std::array<Bitboard, 64>     kKnightAttacks       = MakeBitboards(KnightAttacks);
+const std::array<Bitboard, 64>     kBishopAttacks       = MakeBitboards(BishopAttacksOnEmptyBoard);
+const std::array<Bitboard, 64>     kRookAttacks         = MakeBitboards(RookAttacksOnEmptyBoard);
+const std::array<Bitboard, 64>     kKingAttacks         = MakeBitboards(KingAttacks);
+const std::array<PextBitboard, 64> kBishopPexts         = MakePexts(BishopOccupancyMask, BishopAttacks);
+const std::array<PextBitboard, 64> kRookPexts           = MakePexts(RookOccupancyMask, RookAttacks);
 
-const std::array<PextBitboard, 64> kBishopPexts = MakePexts(BishopOccupancyMask, BishopAttacks);
-const std::array<PextBitboard, 64> kRookPexts   = MakePexts(RookOccupancyMask, RookAttacks);
-
-const MultiDimArray<Bitboard, 64, 64>::type kInterveningSquares = MakeInterveningSquares();
-
-// Defined in this exact order so the shared g_zobrist_prng is drawn in the historical sequence.
-const MultiDimArray<zobrist_t, 2, 6, 64>::type kPieceSquareHashes    = MakePieceSquareHashes();
-const std::array<zobrist_t, 16>                kCastlingRightsHashes = MakeCastlingRightsHashes();
-const std::array<zobrist_t, 64>                kEnPassantHashes      = MakeEnPassantHashes();
+const MultiDimArray<Bitboard, 64, 64>::type    kInterveningSquares      = MakeInterveningSquares();
+// The zobrist tables below MUST stay in this order: they share the global g_zobrist_prng, so reordering them
+// changes every drawn key (and breaks book / TT / repetition compatibility).
+const MultiDimArray<zobrist_t, 2, 6, 64>::type kPieceSquareHashes       = MakePieceSquareHashes();
+const std::array<zobrist_t, 16>                kCastlingRightsHashes    = MakeCastlingRightsHashes();
+const std::array<zobrist_t, 64>                kEnPassantHashes         = MakeEnPassantHashes();
+// clang-format on
