@@ -29,9 +29,11 @@ class ChessClock
 
     ClockType clock_type{kStandard};                   ///< The current time-control type.
     Duration  remaining_time{std::chrono::minutes{5}}; ///< Time left on our clock this period (UCI wtime/btime).
-    Duration  increment{Duration::zero()};             ///< Per-move increment for the side to move (UCI winc/binc).
-    int       moves_to_go{0}; ///< Moves until the next time control (0 = unknown / sudden death).
-    int       depth{10};      ///< Target depth when clock_type == kFixedDepth.
+    Duration  increment{
+        Duration::zero()}; ///< Per-move increment, side to move (UCI winc/binc). Parsed but not currently used by time
+                            ///< planning — see SearchRootNode (folding it into the budget SPRT'd neutral/negative).
+    int moves_to_go{0};     ///< Moves until the next time control (0 = unknown / sudden death).
+    int depth{10};          ///< Target depth when clock_type == kFixedDepth.
 
     /// @brief Reset to default time control (called when starting a new game). Provided instead of assigning a
     /// fresh ChessClock because the atomic members below make the class non-assignable.

@@ -199,10 +199,10 @@ the stability of the result across iterations:
 This avoids burning the whole clock on positions whose answer is already settled. Fixed-depth and
 fixed-time clocks bypass the heuristic.
 
-Time budgeting is **increment-aware**: the per-move soft budget is `remaining_time / moves_to_go +
-increment / 2`, so in increment time controls (e.g. `wtime`/`winc`) the guaranteed per-move increment is
-actually spent rather than left on the clock. The configured `Move Overhead` is then subtracted from the
-hard deadline to leave headroom for GUI/network lag.
+The per-move soft budget is `remaining_time / moves_to_go`, and the configured `Move Overhead` is
+subtracted from the hard deadline to leave headroom for GUI/network lag. (Folding the per-move increment
+into the soft budget was SPRT-tested at 8+0.08 and 10+0.1 and proved neutral-to-slightly-negative in
+equal-clock self-play, so `winc`/`binc` are parsed but not currently used in budgeting.)
 
 `ChessClock` ([src/chess_clock.h](src/chess_clock.h)) is implemented with `std::chrono` on the monotonic
 `steady_clock`: the soft/hard budgets are `std::chrono::milliseconds` durations and the hard stop is an
