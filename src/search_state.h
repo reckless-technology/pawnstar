@@ -201,6 +201,11 @@ class SearchState
     }
 
   private:
+    /// @brief Try null-move pruning at the current node (the caller has established it is a non-PV node not in
+    /// check). Reuses the caller's precomputed static eval.
+    /// @return The null-move score, or @p alpha if null move was not tried / did not cut.
+    int AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
+
     std::vector<Position> positions_;     ///< Per-thread copy-make position stack (reserved in the constructor).
     nnue::Accumulator     accumulator_{}; ///< NNUE accumulator for the tip position (incremental).
 

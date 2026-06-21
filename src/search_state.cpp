@@ -155,15 +155,13 @@ bool SearchState::IsCancelled() const
 }
 
 // ----------------------------------------------------------------------------
-// Alpha-beta and quiescence search. Each keeps a `state` alias so the body reads
-// uniformly through `state`.
+// Alpha-beta and quiescence search (SearchState members).
 // ----------------------------------------------------------------------------
 
 SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv,
                                                int move_index)
 {
-    SearchState    &state        = *this;
-    const Position &position     = state.CurrentPosition();
+    const Position &position     = CurrentPosition();
     const bool      was_in_check = position.IsInCheck(); // check extensions are added in main Search()
 
     int child_depth = depth - 1;
@@ -185,29 +183,29 @@ SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int alpha, in
     default:
         break;
     }
-    state.PlayMove(move);
+    PlayMove(move);
     // Prefetch the child's TT cell now; the recursive Search probes it after its own prologue, by which
     // time the (random-access, cache-missing) line should be resident. Result-neutral speed win.
-    state.game.transposition_table.Prefetch(state.CurrentPosition().Hash());
-    const bool is_checking = state.CurrentPosition().IsInCheck();
+    game.transposition_table.Prefetch(CurrentPosition().Hash());
+    const bool is_checking = CurrentPosition().IsInCheck();
     int        score;
     if (beta > alpha + 1 && move_index > 0 && !was_in_check && !is_checking)
     {
         // Try principal variation search.
         INCREMENT("pvs attempts");
-        score = -state.Search(child_depth, ply + 1, -alpha - 1, -alpha, pv, move);
+        score = -Search(child_depth, ply + 1, -alpha - 1, -alpha, pv, move);
         if (score > alpha)
         {
             INCREMENT("pvs fails");
             INCREMENT_IF(ply == 0, "pvs fails root ply");
-            score = -state.Search(child_depth, ply + 1, -beta, -alpha, pv, move);
+            score = -Search(child_depth, ply + 1, -beta, -alpha, pv, move);
         }
     }
     else
     {
-        score = -state.Search(child_depth, ply + 1, -beta, -alpha, pv, move);
+        score = -Search(child_depth, ply + 1, -beta, -alpha, pv, move);
     }
-    state.UndoMove();
+    UndoMove();
     return {score, is_checking};
 }
 
@@ -215,9 +213,9 @@ SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int alpha, in
 /// The caller has already established this is a non-PV node that is not in check.
 /// @param eval_score The node's static evaluation (already computed by the caller).
 /// @return The null-move score, or alpha if null move was not tried / did not cut.
-static inline int AttemptNullMove(SearchState &state, int depth, int ply, int alpha, int beta, int eval_score)
+int SearchState::AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score)
 {
-    const Position &position = state.CurrentPosition();
+    const Position &position = CurrentPosition();
     const Color     color    = position.color_to_move;
     // Only try null move pruning if all conditions are met.
     const Bitboard friendly = position.colors[color];
@@ -227,10 +225,10 @@ static inline int AttemptNullMove(SearchState &state, int depth, int ply, int al
     {
         INCREMENT("null move");
         Variation dummy{};
-        state.MakeNullMove();
-        int score = -state.Search(depth - 4, ply + 1, -beta, -alpha, dummy, Move::None());
-        state.UndoMove();
-        if (state.IsCancelled())
+        MakeNullMove();
+        int score = -Search(depth - 4, ply + 1, -beta, -alpha, dummy, Move::None());
+        UndoMove();
+        if (IsCancelled())
         {
             return kSearchCancelledScore;
         }
@@ -257,7 +255,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
     }
     if (CurrentPosition().IsInCheck())
     {
-        INCREMENT("checks");
+        INCREMENT("extensions check");
         ++depth;
     }
     if (ply == kMaxPly)
@@ -291,7 +289,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
 
         case Transposition::NodeType::kPv:
             INCREMENT("table hit pv node");
-            ++depth;
+            ++depth; // extend depth if we think we are on the PV
             break;
         }
     }
@@ -326,7 +324,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             return eval_score;
         }
         // Null move pruning, reusing the static eval.
-        const int null_move_score = AttemptNullMove(*this, depth, ply, alpha, beta, eval_score);
+        const int null_move_score = AttemptNullMove(depth, ply, alpha, beta, eval_score);
         if (IsCancelled())
         {
             return kSearchCancelledScore;
@@ -498,21 +496,20 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
 
 int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
 {
-    SearchState &state = *this;
     INCREMENT("quiescent calls");
     if (ply == kMaxPly)
     {
         INCREMENT("quiescent max ply");
-        return EvaluatePosition(state);
+        return EvaluatePosition(*this);
     }
-    if (state.CurrentPosition().IsInCheck())
+    if (CurrentPosition().IsInCheck())
     {
         // We can't handle checks in quiescence.
         INCREMENT("quiescent checks");
         Variation dummy{};
-        return state.Search(depth, ply, alpha, beta, dummy, Move::None());
+        return Search(depth, ply, alpha, beta, dummy, Move::None());
     }
-    int score = EvaluatePosition(state);
+    int score = EvaluatePosition(*this);
     if (score >= beta)
     {
         INCREMENT("quiescent eval beta cutoffs");
@@ -524,8 +521,8 @@ int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
         alpha = score;
     }
     int      best_score = score;
-    MoveList move_list{state.CurrentPosition().GenerateLegalCaptures()};
-    state.ScoreAndSortMoves(move_list, ply, Move::None());
+    MoveList move_list{CurrentPosition().GenerateLegalCaptures()};
+    ScoreAndSortMoves(move_list, ply, Move::None());
     for (Move &move : move_list)
     {
         // SEE pruning: skip captures that lose material.
@@ -534,17 +531,17 @@ int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
             INCREMENT("quiescent negative see");
             return best_score; // All moves after this are -ve SEE and may be skipped.
         }
-        state.PlayMove(move);
-        score = -state.SearchQuiescent(depth - 1, ply + 1, -beta, -alpha);
-        state.UndoMove();
-        if (state.IsCancelled())
+        PlayMove(move);
+        score = -SearchQuiescent(depth - 1, ply + 1, -beta, -alpha);
+        UndoMove();
+        if (IsCancelled())
         {
             return kSearchCancelledScore;
         }
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            state.history.RecordGoodMove(ply, move);
+            history.RecordGoodMove(ply, move);
             return score;
         }
         if (score > best_score)
@@ -554,7 +551,7 @@ int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent pv changed");
-                state.history.RecordGoodMove(ply, move);
+                history.RecordGoodMove(ply, move);
             }
         }
     }
@@ -568,8 +565,7 @@ int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
 
 Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread_id)
 {
-    SearchState &state   = *this;
-    const bool   is_main = thread_id == 0; // thread 0 is the authoritative main thread
+    const bool is_main = thread_id == 0; // thread 0 is the authoritative main thread
     // Per-thread iteration-skip schedule (Stockfish-style): helper threads skip certain iteration depths so
     // their searches desynchronize from the main thread and from each other, prefilling the shared TT with
     // diverse entries instead of recomputing the same tree in lockstep. The main thread (thread_id 0) never skips.
@@ -577,7 +573,6 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
     static constexpr std::array<int, 20> kSkipPhase{0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7};
     constexpr int                        kSkipEntries = (int)kSkipSize.size();
 
-    Game             &game = state.game;
     Variation         principal_variation{};
     std::vector<Move> best_moves; // Best move found at each search depth (main thread, for stability checks).
 
@@ -597,8 +592,8 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
         }
         SortMoves<true>(move_list); // Sort based on scores from the previous iteration.
         Variation child_pv{};
-        int       alpha  = kAlpha;
-        state.node_count = 0;
+        int       alpha = kAlpha;
+        node_count      = 0;
         if (is_main)
         {
             best_moves.push_back(best_move);
@@ -607,9 +602,9 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
         {
             const int move_index = (int)(&move - move_list.begin());
             child_pv.clear(); // clear per move so a terminal/non-PV-node child leaves no stale tail
-            const int score = state.SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score;
+            const int score = SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score;
             move.AssignScore(score);
-            if (state.IsCancelled())
+            if (IsCancelled())
             {
                 return best_move;
             }
@@ -632,7 +627,7 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
                     }
                     pv_string.pop_back();
                     std::cout << std::format("info depth {:2} score cp {:5} time {:5} nodes {:8} pv {}\n", depth, alpha,
-                                             game.time_control.ElapsedSinceSearchStart().count(), state.node_count,
+                                             game.time_control.ElapsedSinceSearchStart().count(), node_count,
                                              pv_string);
                 }
             }
