@@ -31,6 +31,11 @@ class OpeningBook
     /// @brief Load the opening book from a file (see definition for details).
     bool Initialize(std::string_view filename);
 
+    /// @brief Load the opening book from an in-memory buffer (the embedded fallback; see definition).
+    /// @param data Pointer to the book text. @param size Number of bytes (the text is not null-terminated).
+    /// @return true on success.
+    bool InitializeFromMemory(const char *data, std::size_t size);
+
     /// @brief Print the book moves available from a position (see definition for details).
     void DisplayAvailableMoves(const Position &position);
 

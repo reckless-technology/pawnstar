@@ -455,7 +455,10 @@ for the full lineage and exact recreation steps.
 `OpeningBook` ([src/opening_book.h](src/opening_book.h)) lets the engine play known opening lines
 instantly instead of searching. At startup the engine loads `pawnstar.book` from the working directory;
 the shipped book ([pawnstar.book](pawnstar.book)) is derived from the public-domain
-[TSCP](https://github.com/terredeciels/TSCP) `book.txt`.
+[TSCP](https://github.com/terredeciels/TSCP) `book.txt`. As with the NNUE net, if the file can't be loaded
+(wrong cwd, missing/renamed file) the engine falls back to a copy of the book embedded in the binary, so a
+relocated executable still has its book; the book is optional, so failing both is only a warning. The
+built-in book can be disabled with the `OwnBook` UCI option.
 
 The file is plain text, one opening line per row, with each move in **coordinate notation**
 (from-square then to-square, e.g. `e2e4 e7e5 g1f3`). Tokens that begin with a digit are treated as

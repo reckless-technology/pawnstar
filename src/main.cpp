@@ -59,6 +59,11 @@ std::string LocateResource(const std::string &relpath)
 extern "C" const unsigned char pawnstar_embedded_net[];
 extern "C" const unsigned char pawnstar_embedded_net_end[];
 
+// The shipped opening book embedded into the binary (see src/embedded_book.S), used as a fallback when the
+// on-disk pawnstar.book cannot be loaded. Linked into the engine executable only (not the test binaries).
+extern "C" const char pawnstar_embedded_book[];
+extern "C" const char pawnstar_embedded_book_end[];
+
 /// @brief Program entry point. Prints the banner, loads the book, then runs the UCI input loop.
 /// @return Process exit code.
 int main()
@@ -83,9 +88,20 @@ int main()
                  "Compiled: " __DATE__ " " __TIME__ "\n";
 
     Game game{};
+    // Load the opening book from the working directory; if the file can't be loaded (wrong cwd, missing/
+    // renamed file), fall back to the copy embedded in the binary (src/embedded_book.S) so the engine always
+    // has a book. The book is optional, so a failure of both is only a warning, not fatal.
     if (!game.book.Initialize(LocateResource("pawnstar.book")))
     {
-        std::cout << "info string Unable to open book file.\n";
+        const std::size_t embedded_size = static_cast<std::size_t>(pawnstar_embedded_book_end - pawnstar_embedded_book);
+        if (game.book.InitializeFromMemory(pawnstar_embedded_book, embedded_size))
+        {
+            std::cout << "info string book file load failed; using the embedded book (" << embedded_size << " bytes)\n";
+        }
+        else
+        {
+            std::cout << "info string Unable to open book file (and the embedded fallback failed).\n";
+        }
     }
     // NNUE is the only evaluator, so a net is required. Load the shipped net from the working directory
     // (like the opening book); PAWNSTAR_EVALFILE=<path> overrides the path, and UCI `setoption name

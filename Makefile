@@ -32,6 +32,10 @@ DEPS                = $(OBJECTS:.o=.d)
 # the engine executable only — the test binaries load nets explicitly and don't need it.
 EMBED_NET           = nnue/pawnstar-v10.bin
 EMBED_OBJECT        = $(BUILD_DIR)/embedded_net.o
+# The shipped opening book embedded into the engine binary (.incbin) as a runtime-load fallback, mirroring
+# the embedded net. Linked into the engine executable only.
+EMBED_BOOK          = pawnstar.book
+EMBED_BOOK_OBJECT   = $(BUILD_DIR)/embedded_book.o
 
 TEST_PERFT_EXE      = $(BUILD_DIR)/test_perft
 TEST_SEE_EXE        = $(BUILD_DIR)/test_see
@@ -121,7 +125,7 @@ clean:
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
 	      $(TOOL_FILTERBOOK_EXE) $(BUILD_DIR)/filter_book.o $(BUILD_DIR)/filter_book.d \
 	      $(TOOL_QUANT_EXE) $(BUILD_DIR)/nnue_quant_study.o $(BUILD_DIR)/nnue_quant_study.d \
-	      $(OBJECTS) $(EMBED_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS)
+	      $(OBJECTS) $(EMBED_OBJECT) $(EMBED_BOOK_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS)
 
 # Generate API documentation with doxygen (output configured by the Doxyfile).
 doc:
@@ -146,9 +150,15 @@ $(BUILD_DIR)/%.o: $(TOOLS_DIR)/%.cpp
 $(EMBED_OBJECT): src/embedded_net.S $(EMBED_NET) | prep
 	$(CXX) -c -DEMBED_NET_PATH='"$(EMBED_NET)"' -o $@ src/embedded_net.S
 
-# Link the main executable (with the embedded-net object).
-$(PROGRAM_EXE): $(OBJECTS) $(EMBED_OBJECT)
-	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS) $(EMBED_OBJECT)
+# Assemble the embedded opening-book object (.incbin of the shipped book). Rebuilds if the book changes.
+# The book path is passed from EMBED_BOOK (single source of truth) into the capital-.S via the preprocessor,
+# so the embedded copy can't drift from the Makefile book. The .incbin path is relative to the make cwd (root).
+$(EMBED_BOOK_OBJECT): src/embedded_book.S $(EMBED_BOOK) | prep
+	$(CXX) -c -DEMBED_BOOK_PATH='"$(EMBED_BOOK)"' -o $@ src/embedded_book.S
+
+# Link the main executable (with the embedded-net and embedded-book objects).
+$(PROGRAM_EXE): $(OBJECTS) $(EMBED_OBJECT) $(EMBED_BOOK_OBJECT)
+	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS) $(EMBED_OBJECT) $(EMBED_BOOK_OBJECT)
 
 # Link test executables against all engine objects (no main.o).
 $(TEST_PERFT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/perft_test.o

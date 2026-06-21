@@ -37,6 +37,16 @@ bool OpeningBook::Initialize(std::string_view filename)
     return is_ok;
 }
 
+/// @brief Parse the opening book from an in-memory buffer (the copy embedded in the binary, used when the
+/// on-disk book cannot be loaded). The buffer is the raw book text and is not null-terminated.
+/// @param data Pointer to the book text. @param size Number of bytes.
+/// @return true on success.
+bool OpeningBook::InitializeFromMemory(const char *data, std::size_t size)
+{
+    std::istringstream ss{std::string(data, size)};
+    return InitializeFromStream(ss);
+}
+
 /// @brief Pseudo randomly select from available book moves
 /// @param hash the position hash
 /// @return Move selected from book, or Move::None if no move found
