@@ -87,7 +87,7 @@ Pawnstar advertises these `setoption` options in its `uci` response:
 - **`Hash`** (spin, default 64, 1–4096 MB) — transposition-table size; resized at runtime (`setoption name Hash value <MB>`).
 - **`Clear Hash`** (button) — empties the transposition table without resizing it.
 - **`Threads`** (spin, default = `PAWNSTAR_THREADS` or all cores, 1–256) — number of Lazy SMP search threads.
-- **`Move Overhead`** (spin, default 10, 0–5000 ms) — time reserved from each move's deadline to cover GUI/network lag, so Pawnstar doesn't forfeit on time.
+- **`Move Overhead`** (spin, default 30, 0–5000 ms) — time reserved from each move's deadline to cover GUI/network lag, so Pawnstar doesn't forfeit on time.
 - **`EvalFile`** (string) — path to an NNUE net to load at runtime (see below).
 - **`Ponder`** (check) — advertised so GUIs know Pawnstar can ponder. **Its value is declarative only** — the
   GUI's checkbox controls whether the GUI itself uses pondering; Pawnstar ignores the `setoption … Ponder`
@@ -206,7 +206,7 @@ hard deadline to leave headroom for GUI/network lag.
 
 `ChessClock` ([src/chess_clock.h](src/chess_clock.h)) is implemented with `std::chrono` on the monotonic
 `steady_clock`: the soft/hard budgets are `std::chrono::milliseconds` durations and the hard stop is an
-absolute `time_point` deadline, polled (every ~64k nodes) via `HasReachedHardDeadline`. On `ponderhit` the
+absolute `time_point` deadline, polled (every ~2k nodes) via `HasReachedHardDeadline`. On `ponderhit` the
 clock restarts the budget from that instant (the deadline and search-start instant are `std::atomic` so the
 UCI thread can retarget the running search). It is covered by the `test_chess_clock` unit suite.
 

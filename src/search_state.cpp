@@ -244,7 +244,11 @@ int SearchState::AttemptNullMove(int depth, int ply, int alpha, int beta, int ev
 int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move)
 {
     INCREMENT("alpha beta calls");
-    if ((++node_count & 0xFFFF) == 0 && game.time_control.HasReachedHardDeadline())
+    // Poll the hard deadline often (every 2048 nodes): between polls the search cannot stop, so a coarse
+    // interval lets a node-heavy batch overrun the deadline — at fast TCs with an increment actually spent,
+    // a ~64k-node interval overran by 6-10 ms and forfeited games. 2048 nodes keeps the overrun sub-ms; the
+    // clock read is negligible at this cadence.
+    if ((++node_count & 0x7FF) == 0 && game.time_control.HasReachedHardDeadline())
     {
         game.is_cancel_pending.store(true, std::memory_order_relaxed);
         return kSearchCancelledScore;

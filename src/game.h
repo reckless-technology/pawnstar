@@ -25,7 +25,7 @@ class Game
     std::atomic<bool>  is_cancel_pending;   ///< Shared stop flag: set on timeout, UCI stop, or search completion.
     int thread_count; ///< Lazy SMP search threads; default from PAWNSTAR_THREADS / hardware, set by UCI `Threads`.
     ChessClock::Duration move_overhead{
-        ChessClock::Duration{10}}; ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
+        ChessClock::Duration{30}}; ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
                                    ///< Persists across games.
     std::atomic<bool> is_pondering{
         false}; ///< True while a `go ponder` search runs (until `ponderhit` / `stop`); suppresses time stops.
