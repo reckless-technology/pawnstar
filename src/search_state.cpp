@@ -21,7 +21,7 @@
 /// hash_stack_ is populated with all ancestor positions (positions 0..N-1 where N is
 /// the current position), so that IsDrawByRepetition can walk backwards through the full
 /// game history.
-SearchState::SearchState(Game &g) : game(g), cont_hist_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
+SearchState::SearchState(Game &g) : game(g), continuation_history_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
 {
     const std::vector<Position> &pos = g.Positions();
     // Reserve the whole game history plus the deepest the search can descend, so no push_back during the
@@ -36,36 +36,27 @@ SearchState::SearchState(Game &g) : game(g), cont_hist_(std::make_unique<int16_t
     // Reserve the deepest the search can descend so no push_back during search reallocates.
     positions_.reserve(kMaxPly + 4);
     positions_.push_back(g.CurrentPosition());
-    // Seed the NNUE accumulator from the root position (only needed when NNUE is the active evaluator).
-    if (game.NnueActive())
-    {
-        game.NnueNetwork().Refresh(accumulator_, positions_.back());
-    }
+    // Seed the NNUE accumulator from the root position.
+    game.NnueNetwork().Refresh(accumulator_, positions_.back());
 }
 
 /// @brief Push the current position's hash then make the move on a copy of the position.
-/// When NNUE is active, advance the accumulator from the parent to the child by feature deltas.
+/// Advance the NNUE accumulator from the parent to the child by feature deltas.
 void SearchState::PlayMove(Move move)
 {
     const Position &cur = CurrentPosition();
     hash_stack_.push_back({cur.Hash(), cur.ReversibleMoveCount()});
     Position next = cur.MakeMove(move);
-    if (game.NnueActive())
-    {
-        game.NnueNetwork().Update(accumulator_, cur, next);
-    }
+    game.NnueNetwork().Update(accumulator_, cur, next);
     positions_.push_back(next);
 }
 
 /// @brief Pop the position and hash stacks to undo the last move.
-/// When NNUE is active, reverse the accumulator from the child back to the parent (Update is reversible).
+/// Reverse the NNUE accumulator from the child back to the parent (Update is reversible).
 void SearchState::UndoMove()
 {
-    if (game.NnueActive())
-    {
-        const std::size_t n = positions_.size();
-        game.NnueNetwork().Update(accumulator_, positions_[n - 1], positions_[n - 2]);
-    }
+    const std::size_t n = positions_.size();
+    game.NnueNetwork().Update(accumulator_, positions_[n - 1], positions_[n - 2]);
     positions_.pop_back();
     hash_stack_.pop_back();
 }
@@ -121,7 +112,7 @@ void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) co
         }
         else // quiet move: main history + 1-ply continuation history, clamped below the countermove
         {
-            const uint32_t h = history.GetCount(ply, move) + (uint32_t)ContHistScore(prev_move, move);
+            const uint32_t h = history.GetCount(ply, move) + (uint32_t)ContinuationHistScore(prev_move, move);
             sort             = (int)std::min<uint32_t>(h, (uint32_t)kMaxQuiet);
         }
         move.AssignScore(sort);
@@ -310,8 +301,8 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
     // move is searched first; lacking it the first move searched is only a guess). Rather than spend the full
     // depth with poor ordering, reduce by one ply — the shallower search still fills the TT with a best move,
     // so the cost is recouped by better ordering when this node is revisited. Applied only at sufficient depth,
-    // where the per-node saving outweighs the lost ply (qsearch is unaffected: depth stays >= kIirMinDepth-1).
-    if (depth >= kIirMinDepth && (!transposition || transposition->move == Move::None()))
+    // where the per-node saving outweighs the lost ply (qsearch unaffected: depth stays >= the min depth - 1).
+    if (depth >= kInternalIterativeReductionMinDepth && (!transposition || transposition->move == Move::None()))
     {
         INCREMENT("internal iterative reduction");
         --depth;
@@ -370,7 +361,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             state.game.transposition_table.RecordTransposition(Transposition{
                 state.CurrentPosition().Hash(), transposition->move, score, depth, Transposition::NodeType::kCut});
             state.history.RecordGoodMove(ply, transposition->move);
-            state.RecordContHist(prev_move, transposition->move);
+            state.RecordContinuationHistory(prev_move, transposition->move);
             if (transposition->move.IsQuiet())
             {
                 state.RecordKiller(ply, transposition->move);
@@ -386,7 +377,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             has_raised_alpha = true;
             CopyVariation(parent_pv, pv, transposition->move); // capture the PV now, while pv holds THIS move's line
             state.history.RecordGoodMove(ply, transposition->move);
-            state.RecordContHist(prev_move, transposition->move);
+            state.RecordContinuationHistory(prev_move, transposition->move);
         }
     }
 
@@ -461,7 +452,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             state.game.transposition_table.RecordTransposition(
                 Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
             state.history.RecordGoodMove(ply, move);
-            state.RecordContHist(prev_move, move);
+            state.RecordContinuationHistory(prev_move, move);
             if (move.IsQuiet())
             {
                 state.RecordKiller(ply, move);
@@ -481,7 +472,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
                 has_raised_alpha = true;
                 CopyVariation(parent_pv, pv, move); // capture the PV now, while pv holds THIS move's line
                 state.history.RecordGoodMove(ply, move);
-                state.RecordContHist(prev_move, move);
+                state.RecordContinuationHistory(prev_move, move);
             }
         }
     }
@@ -494,7 +485,7 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
         state.game.transposition_table.RecordTransposition(
             Transposition{state.CurrentPosition().Hash(), best_move, alpha, depth, Transposition::NodeType::kPv});
         state.history.RecordGoodMove(ply, best_move);
-        state.RecordContHist(prev_move, best_move);
+        state.RecordContinuationHistory(prev_move, best_move);
         // parent_pv was already set, with the correct line, at the alpha-raise above.
     }
     else
@@ -643,7 +634,8 @@ Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread
                     }
                     pv_string.pop_back();
                     std::cout << std::format("info depth {:2} score cp {:5} time {:5} nodes {:8} pv {}\n", depth, alpha,
-                                             game.time_control.ElapsedMilliseconds() - game.time_control.search_start_ms,
+                                             game.time_control.ElapsedMilliseconds() -
+                                                 game.time_control.search_start_ms,
                                              state.node_count, pv_string);
                 }
             }

@@ -13,10 +13,11 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 - Parallel iterative-deepening alpha-beta search with principal variation search (PVS).
 - Lazy SMP parallelism: independent per-thread searches sharing one lockless transposition table.
 - Lockless 128-bit transposition table using Hyatt's XOR trick.
-- Reverse futility pruning, null-move pruning, late-move pruning + reductions, and per-thread move
-  ordering (killers, countermove, main + 1-ply continuation history).
+- Internal iterative reduction, reverse futility pruning, null-move pruning, late-move pruning + reductions,
+  and per-thread move ordering (killers, countermove, main + 1-ply continuation history).
 - Quiescence search over captures and promotions (SEE-pruned).
 - **NNUE** evaluation (efficiently-updatable neural network) — a perspective net (currently 1024-wide with 4 king buckets). A net is loaded at startup; load a different one at runtime with `setoption name EvalFile`.
+- Configurable `Hash` and `Threads` UCI options, and **pondering** (think on the opponent's clock).
 - Optional opening book (`pawnstar.book`).
 
 ## Requirements
@@ -65,13 +66,35 @@ Run as a UCI engine (connect via Arena, Cute Chess, or any UCI-compatible GUI):
 In addition to the standard UCI commands, a few engine-specific commands are available at the prompt:
 
 ```
-eval        print the NNUE static evaluation of the current position
-nnue        print the raw NNUE evaluation of the current position
+eval        print the full evaluation the search uses for the current position
+nnue        print the raw NNUE network output for the current position
 getboard    print the FEN of the current position
 bookmoves   list opening-book moves for the current position
 dbg         dump internal diagnostic counters
 help        list all commands
 ```
+
+`eval` and `nnue` are **not** duplicates. `eval` is the value the search actually uses: the draw
+short-circuit (0 for a material/fifty-move/repetition draw), then the NNUE forward pass (memoised in the
+eval cache), then fifty-move scaling (`ScaleByRule50`, which fades the score toward 0 as the fifty-move
+clock climbs past 20 plies). `nnue` is the **bare** network output with none of that wrapping. They agree in a
+plain position but diverge on a draw or once the fifty-move clock is high.
+
+### UCI options
+
+Pawnstar advertises these `setoption` options in its `uci` response:
+
+- **`Hash`** (spin, default 64, 1–4096 MB) — transposition-table size; resized at runtime (`setoption name Hash value <MB>`).
+- **`Threads`** (spin, default = `PAWNSTAR_THREADS` or all cores, 1–256) — number of Lazy SMP search threads.
+- **`EvalFile`** (string) — path to an NNUE net to load at runtime (see below).
+- **`Ponder`** (check) — advertised so GUIs know Pawnstar can ponder. **Its value is declarative only** — the
+  GUI's checkbox controls whether the GUI itself uses pondering; Pawnstar ignores the `setoption … Ponder`
+  value (per the UCI spec it only signals that pondering is *allowed*, e.g. to adjust time management, which
+  Pawnstar doesn't do). Pondering is driven entirely by the `go ponder` command: when the GUI sends it,
+  Pawnstar thinks on the opponent's clock and reports `bestmove <move> ponder <reply>`; on a ponder *hit*
+  (`ponderhit`) it keeps the work already done (warm TT, current depth) and converts to a normally-timed
+  search; on a *miss* the GUI sends `stop` and Pawnstar returns its move, then searches the real position
+  afresh.
 
 ### The NNUE net
 
@@ -182,6 +205,10 @@ fixed-time clocks bypass the heuristic.
 - **Principal variation search (PVS)** — the first move is searched with the full window; later moves
   get a null-window (`[alpha, alpha+1]`) scout search and are only re-searched with the full window if
   the scout beats alpha.
+- **Internal iterative reduction (IIR)** — at a node with no usable transposition-table move and depth ≥ 4,
+  the search depth is reduced by one ply: without a TT move the move ordering is only a guess, so spending the
+  full depth is wasteful; the shallower search still fills the TT with a best move, recouped by better ordering
+  when the node is revisited. SPRT-tested **+31.8 ± 16.2 Elo at 8+0.08** (898 games) — a large, clean win.
 - **Reverse futility pruning (RFP)** — at a non-PV node not in check, at shallow depth (≤ 7) and outside
   the mate zone, if `static_eval − 80·depth ≥ beta` the node is cut immediately (returning `static_eval`)
   without searching any move — when we are that far above beta a quiet move will hold it. The static eval
@@ -252,23 +279,23 @@ reaching f5 is the *same* follow-up however it got there), and `Move::None` coll
   When a quiet move causes a beta cutoff it is recorded keyed by `ContKey(prev_move)`
   (`RecordCountermove`). In ordering it is a *boolean* signal — a move that equals the recorded
   countermove gets the one fixed band just below the killers (`kKillerBase − 1`).
-- **Continuation history** (`cont_hist_`, a 448 × 448 `int16_t` table, ~0.4 MB, indexed
+- **Continuation history** (`continuation_history_`, a 448 × 448 `int16_t` table, ~0.4 MB, indexed
   `[ContKey(prev) * 448 + ContKey(move)]`) — a *graded* score for every `(prev → move)` pairing. It is a
   saturating counter (caps at 16384, like the main `HistoryTable`) bumped whenever a quiet move proves
   good as a follow-up to `prev`: on a beta cutoff, on an alpha-raise, and for the final PV best move
-  (`RecordContHist`). In ordering, an ordinary quiet move's score is **`main_history(ply, move) +
-  cont_hist(prev, move)`**, clamped to `kKillerBase − 2` so a hot quiet can never jump into the
+  (`RecordContinuationHistory`). In ordering, an ordinary quiet move's score is **`main_history(ply, move) +
+  continuation_history(prev, move)`**, clamped to `kKillerBase − 2` so a hot quiet can never jump into the
   countermove or killer bands.
 
 Captures are excluded from both tables (every record site guards on `Move::IsQuiet()`) because captures
 are already ordered by SEE — history signals only matter for quiets, which have no static score to sort
 on. Both tables are **per-thread** (owned by `SearchState`), so there is no cross-thread contention; the
-`cont_hist_` buffer is heap-allocated once in the constructor, so the per-node hot path allocates nothing.
+`continuation_history_` buffer is heap-allocated once in the constructor, so the per-node hot path allocates nothing.
 
 #### Parallel search (Lazy SMP)
 
-Parallelism is provided by **Lazy SMP**: `Game::SearchRootNode` launches `hardware_concurrency()` threads
-(capped at `kMaxSearchThreads`), each running its *own* complete iterative-deepening search of the root
+Parallelism is provided by **Lazy SMP**: `Game::SearchRootNode` launches `Game::thread_count` threads
+(clamped to `kMaxSearchThreads`), each running its *own* complete iterative-deepening search of the root
 position via `SearchState::IterativeDeepen`. There is no tree splitting and no work queue — the threads cooperate
 purely through the shared lockless transposition table, where one thread's deeper or earlier results
 prefill the entries another thread will probe. Each thread owns its own `SearchState` (position stack,
@@ -276,8 +303,10 @@ hash history, killers, node count) **and its own ordering tables** (history, cou
 continuation history), so the only cross-thread sharing is the transposition tables and the
 cancellation flag; there is no per-(ply, move) counter contention.
 
-The thread count can be overridden for testing and benchmarking with the `PAWNSTAR_THREADS`
-environment variable (e.g. `PAWNSTAR_THREADS=1` forces a deterministic single-threaded search).
+The thread count is set by the UCI **`Threads`** option (stored in `Game::thread_count`); its default is
+computed once at construction from the `PAWNSTAR_THREADS` environment variable if set (>0), else
+`hardware_concurrency()`, clamped to `[1, kMaxSearchThreads]` (e.g. `PAWNSTAR_THREADS=1` forces a
+deterministic single-threaded search, used to regenerate Bratko-Kopec reference data).
 
 To keep the helper threads from recomputing the same tree in lockstep, the main thread (thread 0)
 searches every depth while each helper follows a Stockfish-style **iteration-skip schedule**

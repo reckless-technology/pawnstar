@@ -74,16 +74,6 @@ class Game
         return nnue_network_;
     }
 
-    /// @brief Whether NNUE evaluation is usable: a net is loaded. NNUE is the engine's only evaluator, so
-    /// a loaded net is required to search (main.cpp loads one at startup and exits if it cannot). This gate
-    /// stays meaningful for tooling/tests that construct a Game without loading a net (e.g. perft/SEE),
-    /// where the accumulator is simply not maintained.
-    /// @return true if the search should evaluate with the network.
-    bool NnueActive() const
-    {
-        return nnue_network_.IsLoaded();
-    }
-
     /// @brief Start a new game from the given position (see definition for details).
     void NewGame(std::string_view fen_string);
 

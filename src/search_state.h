@@ -81,7 +81,6 @@ class SearchState
     }
 
     /// @brief The NNUE accumulator for the current position, maintained incrementally across make/undo.
-    /// Only valid (kept in sync) while game.NnueActive(); ignored otherwise.
     /// @return Const reference to the current accumulator.
     const nnue::Accumulator &CurrentAccumulator() const
     {
@@ -163,12 +162,13 @@ class SearchState
     {
         return m.piece() * 64 + m.to();
     }
+
     static constexpr int kContKeys = 7 * 64; ///< Distinct (piece, to) keys: pieces 0..6 × 64 squares.
 
     /// @brief Continuation-history score for playing @p move after @p prev (0 if prev/move not quiet-tracked).
-    int ContHistScore(Move prev, Move move) const
+    int ContinuationHistScore(Move prev, Move move) const
     {
-        return cont_hist_[ContKey(prev) * kContKeys + ContKey(move)];
+        return continuation_history_[ContKey(prev) * kContKeys + ContKey(move)];
     }
 
     /// @brief Whether @p move is the recorded countermove (best quiet refutation) to @p prev.
@@ -179,11 +179,11 @@ class SearchState
 
     /// @brief Reward a quiet @p move that was good (raised alpha or cut) as a follow-up to @p prev.
     /// Captures are ignored (they are ordered by SEE, not history). Saturating count, like HistoryTable.
-    void RecordContHist(Move prev, Move move)
+    void RecordContinuationHistory(Move prev, Move move)
     {
         if (move.IsQuiet())
         {
-            int16_t &c = cont_hist_[ContKey(prev) * kContKeys + ContKey(move)];
+            int16_t &c = continuation_history_[ContKey(prev) * kContKeys + ContKey(move)];
             if (c < 16384)
             {
                 ++c;
@@ -201,14 +201,17 @@ class SearchState
     }
 
   private:
-    std::vector<Position> positions_;       ///< Per-thread copy-make position stack (reserved in the constructor).
-    nnue::Accumulator     accumulator_{};   ///< NNUE accumulator for the tip position (incremental).
+    std::vector<Position> positions_;     ///< Per-thread copy-make position stack (reserved in the constructor).
+    nnue::Accumulator     accumulator_{}; ///< NNUE accumulator for the tip position (incremental).
+
     /// @brief Hash history from game-start through parent of current node (game history + search depth).
     /// A std::vector (reserved up-front in the constructor) so an arbitrarily long game cannot overflow it.
     std::vector<HashEntry> hash_stack_;
+
     /// @brief Best quiet refutation to each previous move (countermove heuristic), indexed by ContKey(prev).
     std::array<Move, kContKeys> countermoves_{};
+
     /// @brief 1-ply continuation history: how often a quiet move was good after a given previous move.
     /// Heap-allocated (per-thread, ~0.4 MB) and indexed [ContKey(prev) * kContKeys + ContKey(move)].
-    std::unique_ptr<int16_t[]> cont_hist_;
+    std::unique_ptr<int16_t[]> continuation_history_;
 };

@@ -70,16 +70,16 @@ int main(int argc, char **argv)
         std::cout << "test_nnue_incremental: no net provided, skipping (pass).\n";
         return 0;
     }
-    // Load the net into a Game and select NNUE, so SearchState maintains the accumulator via game.NnueActive().
+    // Load the net into a Game; SearchState then maintains the accumulator incrementally.
     Game game;
     if (!game.NnueNetwork().Load(argv[1]))
     {
         std::cout << "test_nnue_incremental: failed to load net '" << argv[1] << "'\n";
         return 1;
     }
-    if (!game.NnueActive())
+    if (!game.NnueNetwork().IsLoaded())
     {
-        std::cout << "test_nnue_incremental: NNUE not active after load\n";
+        std::cout << "test_nnue_incremental: net not loaded after load\n";
         return 1;
     }
 

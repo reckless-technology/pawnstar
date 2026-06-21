@@ -56,7 +56,7 @@ void handle_freebook(Game &game, std::span<std::string>)
 /// @param game Game to act on.
 void handle_eval(Game &game, std::span<std::string>)
 {
-    if (!game.NnueActive())
+    if (!game.NnueNetwork().IsLoaded())
     {
         std::cout << "info string no NNUE net loaded (use setoption name EvalFile value <path>)\n";
         return;

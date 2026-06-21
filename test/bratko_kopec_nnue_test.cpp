@@ -119,9 +119,9 @@ int main(int argc, char *argv[])
         std::cerr << "test_bratko_kopec_nnue: failed to load net '" << net_path << "'\n";
         return 1;
     }
-    if (!game.NnueActive())
+    if (!game.NnueNetwork().IsLoaded())
     {
-        std::cerr << "test_bratko_kopec_nnue: NNUE not active after load\n";
+        std::cerr << "test_bratko_kopec_nnue: net not loaded after load\n";
         return 1;
     }
 

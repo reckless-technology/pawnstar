@@ -101,9 +101,11 @@ void Game::SearchThreadEntry()
 }
 
 /// @brief If currently thinking, stop immediately.
+/// Note: this does NOT clear is_pondering — handle_go sets it just before calling StartThinking (which calls
+/// StopThinking), so clearing it here would clobber the flag for the search about to start. The ponder-wait
+/// in SearchThreadEntry exits on is_cancel_pending (set below), so a `stop` during a ponder still works.
 void Game::StopThinking()
 {
-    is_pondering.store(false, std::memory_order_relaxed); // a stop ends any ponder; worker must not block waiting
     is_cancel_pending.store(true, std::memory_order_relaxed);
     if (worker_thread_.joinable())
     {
@@ -143,6 +145,10 @@ Move Game::SearchRootNode()
 {
     Game &game = *this; // local alias so the search body reads uniformly through `game`
     game.ponder_move = Move::None(); // set by the main thread's IterativeDeepen if the PV has a reply move
+    // Clear the stop flag (set true by StartThinking's StopThinking) up front — BEFORE the book / single-move
+    // early returns. Otherwise a leftover cancel makes SearchThreadEntry's ponder-wait exit immediately and
+    // emit a premature `bestmove` when `go ponder` lands on a book/forced position (which returns without search).
+    game.is_cancel_pending.store(false, std::memory_order_relaxed);
     // If there is a book move for this position, do not bother with search.
     Move book_move = game.book.GetMove(game.CurrentPosition().Hash());
     if (book_move != Move::None())
@@ -206,7 +212,6 @@ Move Game::SearchRootNode()
     {
         game.time_control.hard_stop_ms = 0;
     }
-    game.is_cancel_pending.store(false, std::memory_order_relaxed);
     DebugXClear();
     game.transposition_table.Age();
 
