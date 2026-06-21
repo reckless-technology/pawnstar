@@ -196,6 +196,12 @@ the stability of the result across iterations:
 This avoids burning the whole clock on positions whose answer is already settled. Fixed-depth and
 fixed-time clocks bypass the heuristic.
 
+`ChessClock` ([src/chess_clock.h](src/chess_clock.h)) is implemented with `std::chrono` on the monotonic
+`steady_clock`: the soft/hard budgets are `std::chrono::milliseconds` durations and the hard stop is an
+absolute `time_point` deadline, polled (every ~64k nodes) via `HasReachedHardDeadline`. On `ponderhit` the
+clock restarts the budget from that instant (the deadline and search-start instant are `std::atomic` so the
+UCI thread can retarget the running search). It is covered by the `test_chess_clock` unit suite.
+
 #### Recursive search
 
 `SearchState::Search` ([src/search_state.cpp](src/search_state.cpp)) applies, at each node:
