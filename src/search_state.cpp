@@ -164,7 +164,7 @@ SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int alpha, in
 {
     SearchState    &state        = *this;
     const Position &position     = state.CurrentPosition();
-    const bool      was_in_check = position.IsInCheck();
+    const bool      was_in_check = position.IsInCheck(); // check extensions are added in main Search()
 
     int child_depth = depth - 1;
     switch (move.type())
@@ -245,18 +245,17 @@ static inline int AttemptNullMove(SearchState &state, int depth, int ply, int al
 
 int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move)
 {
-    SearchState &state = *this;
     INCREMENT("alpha beta calls");
-    if ((++state.node_count & 0xFFFF) == 0 && state.game.time_control.HasReachedHardDeadline())
+    if ((++node_count & 0xFFFF) == 0 && game.time_control.HasReachedHardDeadline())
     {
-        state.game.is_cancel_pending.store(true, std::memory_order_relaxed);
+        game.is_cancel_pending.store(true, std::memory_order_relaxed);
         return kSearchCancelledScore;
     }
-    if (state.CurrentPosition().IsDrawByMaterial() || state.IsDrawByFiftyMoves() || state.IsDrawByRepetition())
+    if (CurrentPosition().IsDrawByMaterial() || IsDrawByFiftyMoves() || IsDrawByRepetition())
     {
         return kDrawScore;
     }
-    if (state.CurrentPosition().IsInCheck())
+    if (CurrentPosition().IsInCheck())
     {
         INCREMENT("checks");
         ++depth;
@@ -264,10 +263,10 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
     if (ply == kMaxPly)
     {
         INCREMENT("max ply reached");
-        return EvaluatePosition(state);
+        return EvaluatePosition(*this);
     }
     // Determine if there is an entry in the transposition table for this position.
-    const auto transposition = state.game.transposition_table.FindTransposition(state.CurrentPosition().Hash());
+    const auto transposition = game.transposition_table.FindTransposition(CurrentPosition().Hash());
     if (transposition && transposition->depth() >= depth)
     {
         switch (transposition->node_type())
@@ -307,16 +306,16 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
         --depth;
     }
     // Can we go directly to the quiescence search?
-    if (depth <= 0 && !state.CurrentPosition().IsInCheck())
+    if (depth <= 0 && !CurrentPosition().IsInCheck())
     {
-        return state.SearchQuiescent(depth, ply, alpha, beta);
+        return SearchQuiescent(depth, ply, alpha, beta);
     }
     // Static-eval-based pruning at non-PV nodes that are not in check. The static eval is computed once
     // here and reused by reverse-futility pruning and null-move pruning.
     const bool is_pv = beta > alpha + 1;
-    if (!is_pv && !state.CurrentPosition().IsInCheck())
+    if (!is_pv && !CurrentPosition().IsInCheck())
     {
-        const int eval_score = EvaluatePosition(state);
+        const int eval_score = EvaluatePosition(*this);
         // Reverse futility pruning (a.k.a. static null move): at shallow depth, if we are far enough above
         // beta that even conceding kRfpMargin per ply still leaves us at/above beta, assume a quiet move
         // holds the advantage and cut. Disabled in the mate zone so it cannot mask a forced mate.
@@ -327,8 +326,8 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             return eval_score;
         }
         // Null move pruning, reusing the static eval.
-        const int null_move_score = AttemptNullMove(state, depth, ply, alpha, beta, eval_score);
-        if (state.IsCancelled())
+        const int null_move_score = AttemptNullMove(*this, depth, ply, alpha, beta, eval_score);
+        if (IsCancelled())
         {
             return kSearchCancelledScore;
         }
@@ -349,22 +348,22 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
         best_move = transposition->move;
         pv.clear(); // child writes its line here only if it is a PV node; clear so a terminal/cutoff child leaves it
                     // empty
-        const int score = state.SearchSingleMove(depth, ply, alpha, beta, transposition->move, pv, 0).score;
-        if (state.IsCancelled())
+        const int score = SearchSingleMove(depth, ply, alpha, beta, transposition->move, pv, 0).score;
+        if (IsCancelled())
         {
             return kSearchCancelledScore;
         }
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            state.game.transposition_table.RecordTransposition(Transposition{
-                state.CurrentPosition().Hash(), transposition->move, score, depth, Transposition::NodeType::kCut});
-            state.history.RecordGoodMove(ply, transposition->move);
-            state.RecordContinuationHistory(prev_move, transposition->move);
+            game.transposition_table.RecordTransposition(Transposition{CurrentPosition().Hash(), transposition->move,
+                                                                       score, depth, Transposition::NodeType::kCut});
+            history.RecordGoodMove(ply, transposition->move);
+            RecordContinuationHistory(prev_move, transposition->move);
             if (transposition->move.IsQuiet())
             {
-                state.RecordKiller(ply, transposition->move);
-                state.RecordCountermove(prev_move, transposition->move);
+                RecordKiller(ply, transposition->move);
+                RecordCountermove(prev_move, transposition->move);
             }
             return score;
         }
@@ -375,15 +374,15 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
             alpha            = score;
             has_raised_alpha = true;
             CopyVariation(parent_pv, pv, transposition->move); // capture the PV now, while pv holds THIS move's line
-            state.history.RecordGoodMove(ply, transposition->move);
-            state.RecordContinuationHistory(prev_move, transposition->move);
+            history.RecordGoodMove(ply, transposition->move);
+            RecordContinuationHistory(prev_move, transposition->move);
         }
     }
 
-    MoveList move_list{state.CurrentPosition().GenerateLegalMoves()};
+    MoveList move_list{CurrentPosition().GenerateLegalMoves()};
     if (move_list.size() == 0)
     {
-        if (state.CurrentPosition().IsInCheck())
+        if (CurrentPosition().IsInCheck())
         {
             INCREMENT("checkmates");
             return kCheckmatedScore + ply;
@@ -391,11 +390,11 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
         INCREMENT("stalemates");
         return kDrawScore;
     }
-    state.ScoreAndSortMoves(move_list, ply, prev_move);
+    ScoreAndSortMoves(move_list, ply, prev_move);
 
     // Search the moves one at a time. Parallelism comes from Lazy SMP (independent whole-tree
     // searches sharing the transposition table), not from splitting this node.
-    const bool in_check_seq = state.CurrentPosition().IsInCheck();
+    const bool in_check_seq = CurrentPosition().IsInCheck();
 
     for (const Move &move : move_list)
     {
@@ -435,27 +434,27 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
         }
 
         pv.clear(); // see TT-move note: clear so a non-PV-node child leaves no stale tail in pv
-        int score = state.SearchSingleMove(lmr_depth, ply, alpha, beta, move, pv, move_index).score;
+        int score = SearchSingleMove(lmr_depth, ply, alpha, beta, move, pv, move_index).score;
         if (score > alpha && lmr_depth < depth)
         {
             INCREMENT("late move reduction fails");
-            score = state.SearchSingleMove(depth, ply, alpha, beta, move, pv, move_index).score;
+            score = SearchSingleMove(depth, ply, alpha, beta, move, pv, move_index).score;
         }
-        if (state.IsCancelled())
+        if (IsCancelled())
         {
             return kSearchCancelledScore;
         }
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            state.game.transposition_table.RecordTransposition(
-                Transposition{state.CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
-            state.history.RecordGoodMove(ply, move);
-            state.RecordContinuationHistory(prev_move, move);
+            game.transposition_table.RecordTransposition(
+                Transposition{CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
+            history.RecordGoodMove(ply, move);
+            RecordContinuationHistory(prev_move, move);
             if (move.IsQuiet())
             {
-                state.RecordKiller(ply, move);
-                state.RecordCountermove(prev_move, move);
+                RecordKiller(ply, move);
+                RecordCountermove(prev_move, move);
             }
             return score;
         }
@@ -470,8 +469,8 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
                 alpha            = score;
                 has_raised_alpha = true;
                 CopyVariation(parent_pv, pv, move); // capture the PV now, while pv holds THIS move's line
-                state.history.RecordGoodMove(ply, move);
-                state.RecordContinuationHistory(prev_move, move);
+                history.RecordGoodMove(ply, move);
+                RecordContinuationHistory(prev_move, move);
             }
         }
     }
@@ -481,18 +480,18 @@ int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &pare
     {
         // Raised alpha without a cutoff: PV node.
         INCREMENT("pv nodes");
-        state.game.transposition_table.RecordTransposition(
-            Transposition{state.CurrentPosition().Hash(), best_move, alpha, depth, Transposition::NodeType::kPv});
-        state.history.RecordGoodMove(ply, best_move);
-        state.RecordContinuationHistory(prev_move, best_move);
+        game.transposition_table.RecordTransposition(
+            Transposition{CurrentPosition().Hash(), best_move, alpha, depth, Transposition::NodeType::kPv});
+        history.RecordGoodMove(ply, best_move);
+        RecordContinuationHistory(prev_move, best_move);
         // parent_pv was already set, with the correct line, at the alpha-raise above.
     }
     else
     {
         // Searched all moves without raising alpha: all-node.
         INCREMENT("all nodes");
-        state.game.transposition_table.RecordTransposition(
-            Transposition{state.CurrentPosition().Hash(), best_move, best_score, depth, Transposition::NodeType::kAll});
+        game.transposition_table.RecordTransposition(
+            Transposition{CurrentPosition().Hash(), best_move, best_score, depth, Transposition::NodeType::kAll});
     }
     return best_score;
 }
