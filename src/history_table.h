@@ -4,29 +4,29 @@
 #include "constants.h"
 #include "move.h"
 
-#include <atomic>
 #include <cstdint>
 #include <memory>
 
-/// @brief Thread-safe history table tracking which moves raised alpha or caused a beta cutoff.
-/// Moves are indexed per ply by from/to square. Counts are stored as atomics so that parallel
-/// workers can increment them concurrently without data races.
+/// @brief History table tracking which moves raised alpha or caused a beta cutoff.
+/// Moves are indexed per ply by from/to square. The table is per-thread (owned by SearchState) under
+/// Lazy SMP — each search thread has its own — so the counts are plain (non-atomic): there is no
+/// cross-thread access to synchronise.
 class HistoryTable
 {
   public:
     static constexpr int kTableSize = kMaxPly * 4096; ///< Total number of (ply, move) entries.
 
     /// @brief Construct the table, allocating and zeroing the count array.
-    HistoryTable() : counts_{new std::atomic<uint32_t>[kTableSize] {}}
+    HistoryTable() : counts_{new uint32_t[kTableSize]{}}
     {
     }
 
-    /// @brief Reset all counts to zero (call before each root search, single-threaded).
+    /// @brief Reset all counts to zero (call before each root search).
     void Reset()
     {
         for (int i = 0; i < kTableSize; ++i)
         {
-            counts_[i].store(0, std::memory_order_relaxed);
+            counts_[i] = 0;
         }
     }
 
@@ -37,10 +37,9 @@ class HistoryTable
         uint32_t max_val = 0;
         for (int i = 0; i < kTableSize; ++i)
         {
-            uint32_t v = counts_[i].load(std::memory_order_relaxed);
-            if (v > max_val)
+            if (counts_[i] > max_val)
             {
-                max_val = v;
+                max_val = counts_[i];
             }
         }
         return max_val;
@@ -51,7 +50,7 @@ class HistoryTable
     /// @param move Move to record.
     void RecordGoodMove(int ply, const Move &move)
     {
-        counts_[ply * 4096 + move.from_to()].fetch_add(1, std::memory_order_relaxed);
+        counts_[ply * 4096 + move.from_to()] += 1;
     }
 
     /// @brief Retrieve the history count for a move at a given ply.
@@ -60,9 +59,9 @@ class HistoryTable
     /// @return The recorded history count for this (ply, move).
     uint32_t GetCount(int ply, const Move &move) const
     {
-        return counts_[ply * 4096 + move.from_to()].load(std::memory_order_relaxed);
+        return counts_[ply * 4096 + move.from_to()];
     }
 
   private:
-    std::unique_ptr<std::atomic<uint32_t>[]> counts_; ///< Heap-allocated atomic count array.
+    std::unique_ptr<uint32_t[]> counts_; ///< Heap-allocated count array.
 };
