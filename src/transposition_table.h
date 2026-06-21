@@ -64,6 +64,9 @@ class TranspositionTable
 {
   public:
     TranspositionTable(std::size_t megabytes);
+    /// @brief Reallocate the table to approximately @p megabytes (clamped to >= 1 MB), clearing every entry
+    /// and resetting the generation. Backs the UCI `Hash` option. Not safe to call during a search.
+    void                         Resize(std::size_t megabytes);
     std::optional<Transposition> FindTransposition(zobrist_t hash) const;
     void                         RecordTransposition(const Transposition &transposition);
     void                         Age();

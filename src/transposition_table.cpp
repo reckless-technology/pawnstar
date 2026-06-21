@@ -12,8 +12,20 @@
 /// @param megabytes Approx max size of the table in megabytes.
 TranspositionTable::TranspositionTable(std::size_t megabytes)
 {
-    size_  = (megabytes * kMegabyte) / sizeof(AtomicEntry);
-    table_ = std::make_unique<AtomicEntry[]>(size_); // value-initialises every word to 0.
+    Resize(megabytes);
+}
+
+/// @brief Reallocate the table to approximately @p megabytes (clamped to >= 1 MB), clearing it and resetting
+/// the generation. Backs the UCI `Hash` option; not safe to call during a search.
+void TranspositionTable::Resize(std::size_t megabytes)
+{
+    if (megabytes < 1)
+    {
+        megabytes = 1;
+    }
+    size_       = (megabytes * kMegabyte) / sizeof(AtomicEntry);
+    table_      = std::make_unique<AtomicEntry[]>(size_); // value-initialises every word to 0.
+    generation_ = 0;
 }
 
 /// @brief Find an entry in the TT if one exists for this position.

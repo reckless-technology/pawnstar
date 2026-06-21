@@ -23,12 +23,19 @@ class Game
     ChessClock         time_control;        ///< Clock controls for the current game.
     OpeningBook        book;                ///< The opening book.
     std::atomic<bool>  is_cancel_pending;   ///< Shared stop flag: set on timeout, UCI stop, or search completion.
+    int                thread_count;        ///< Lazy SMP search threads; default from PAWNSTAR_THREADS / hardware, set by UCI `Threads`.
 
     /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
-    Game() : transposition_table{kHashtableMegabytes}, eval_cache{kEvalCacheMb}, is_cancel_pending{false}
+    Game()
+        : transposition_table{kHashtableMegabytes}, eval_cache{kEvalCacheMb}, is_cancel_pending{false},
+          thread_count{ComputeDefaultThreads()}
     {
         NewGame();
     }
+
+    /// @brief Default Lazy SMP thread count: PAWNSTAR_THREADS if set (>0), else hardware_concurrency,
+    /// clamped to [1, kMaxSearchThreads]. Read once at construction; the UCI `Threads` option overrides it.
+    static int ComputeDefaultThreads();
 
     /// @brief Current position.
     /// @return Reference to the current position.

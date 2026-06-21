@@ -102,9 +102,26 @@ void Game::StartThinking()
     worker_thread_ = std::thread([this] { this->SearchThreadEntry(); });
 }
 
+/// @brief Default Lazy SMP thread count: PAWNSTAR_THREADS if set (>0), else hardware_concurrency, clamped to
+/// [1, kMaxSearchThreads]. Read once at construction; the UCI `Threads` option overrides Game::thread_count.
+int Game::ComputeDefaultThreads()
+{
+    const unsigned hw = std::thread::hardware_concurrency();
+    int            n  = std::clamp<int>(hw == 0 ? 1 : (int)hw, 1, kMaxSearchThreads);
+    if (const char *env = std::getenv("PAWNSTAR_THREADS"))
+    {
+        const int requested = std::atoi(env);
+        if (requested > 0)
+        {
+            n = std::clamp(requested, 1, kMaxSearchThreads);
+        }
+    }
+    return n;
+}
+
 /// @brief Search the current position and return the best move.
 /// Returns a book move immediately on a book hit; otherwise runs the Lazy SMP iterative-deepening search:
-/// one authoritative main thread plus hardware_concurrency()-1 helpers, all sharing the transposition table.
+/// one authoritative main thread plus (Game::thread_count - 1) helpers, all sharing the transposition table.
 /// @return The best move, or Move::None if there are no legal moves.
 Move Game::SearchRootNode()
 {
@@ -182,16 +199,9 @@ Move Game::SearchRootNode()
     // Lazy SMP: each thread runs an independent iterative-deepening search of the same root, sharing the
     // (lockless) transposition table and (atomic) history table. The main thread is authoritative; helper
     // threads deepen the shared TT to accelerate it. Each thread has its own SearchState and move-list copy.
-    unsigned hw        = std::thread::hardware_concurrency();
-    int      n_threads = std::clamp<int>(hw == 0 ? 1 : (int)hw, 1, kMaxSearchThreads);
-    if (const char *env = std::getenv("PAWNSTAR_THREADS"))
-    {
-        const int requested = std::atoi(env);
-        if (requested > 0)
-        {
-            n_threads = std::clamp(requested, 1, kMaxSearchThreads);
-        }
-    }
+    // Thread count is configured via the UCI `Threads` option (or the PAWNSTAR_THREADS default at startup),
+    // stored in game.thread_count; re-clamped here defensively.
+    const int                n_threads = std::clamp(game.thread_count, 1, kMaxSearchThreads);
     std::vector<std::thread> helpers;
     helpers.reserve(n_threads - 1);
     for (int i = 1; i < n_threads; ++i)

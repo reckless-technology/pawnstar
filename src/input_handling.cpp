@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <format>
 #include <iostream>
@@ -96,16 +98,20 @@ void handle_getboard(Game &game, std::span<std::string>)
 }
 
 /// @brief Handle the "uci" command: identify the engine and acknowledge UCI mode.
-void handle_uci(Game &, std::span<std::string>)
+void handle_uci(Game &game, std::span<std::string>)
 {
     std::cout << "id name Pawnstar\n";
     std::cout << "id author Jonny Reckless\n";
+    std::cout << "option name Hash type spin default " << kHashtableMegabytes << " min 1 max 4096\n";
+    std::cout << "option name Threads type spin default " << game.thread_count << " min 1 max " << kMaxSearchThreads
+              << "\n";
     std::cout << "option name EvalFile type string default <empty>\n";
     std::cout << "uciok\n";
 }
 
 /// @brief Handle the "setoption" command: "setoption name <Name> value <Value>".
-/// Recognises EvalFile (load a different NNUE net file). NNUE is the only evaluator.
+/// Recognises EvalFile (load a different NNUE net file; NNUE is the only evaluator), Hash (transposition
+/// table size in MB, 1..4096) and Threads (Lazy SMP search threads, 1..kMaxSearchThreads).
 /// @param args Command arguments.
 void handle_setoption(Game &game, std::span<std::string> args)
 {
@@ -135,6 +141,15 @@ void handle_setoption(Game &game, std::span<std::string> args)
     {
         game.NnueNetwork().Load(value);
         game.eval_cache.Clear(); // cached evals belong to the previous net
+    }
+    else if (name == "Hash")
+    {
+        const int mb = std::clamp(std::atoi(value.c_str()), 1, 4096);
+        game.transposition_table.Resize(static_cast<std::size_t>(mb));
+    }
+    else if (name == "Threads")
+    {
+        game.thread_count = std::clamp(std::atoi(value.c_str()), 1, kMaxSearchThreads);
     }
 }
 
