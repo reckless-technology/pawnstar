@@ -83,10 +83,10 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    // Several independent random search trees from the start position (the net persists across NewGame()).
+    // Several independent random search trees from the start position (the net persists across SetPosition()).
     for (uint64_t seed = 1; seed <= 12; ++seed)
     {
-        game.NewGame();
+        game.SetPosition();
         SearchState     state{game};
         std::mt19937_64 rng(seed);
         Walk(state, rng, /*depth=*/10, /*branch=*/2);

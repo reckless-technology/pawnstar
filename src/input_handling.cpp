@@ -174,11 +174,18 @@ void handle_setoption(Game &game, std::span<std::string> args)
 }
 
 /// @brief Handle the "ucinewgame" command: stop searching and reset to a new game.
+/// Clears all shared, game-spanning state so the new game starts clean: the transposition table and the
+/// NNUE eval cache. (`SetPosition` itself only resets per-position state and clears the eval cache — it is also
+/// called per move by `position`, so it must NOT clear the TT, whose whole value is persisting across moves.
+/// The per-thread history / killer / countermove / continuation tables live on `SearchState` and are rebuilt
+/// fresh on every search, so they never carry across games and need no reset here.)
 /// @param game Game to act on.
 void handle_ucinewgame(Game &game, std::span<std::string>)
 {
     game.StopThinking();
-    game.NewGame();
+    game.transposition_table.Clear();
+    game.eval_cache.Clear();
+    game.SetPosition();
 }
 
 /// @brief Fixed, known-legal position set for `bench` (the Bratko-Kopec middlegame/endgame positions). Each
@@ -224,8 +231,8 @@ void handle_bench(Game &game, std::span<std::string> args)
     const auto start       = ChessClock::Clock::now();
     for (const char *fen : kBenchFens)
     {
-        game.NewGame(fen);
-        game.time_control.clock_type = ChessClock::kFixedDepth; // NewGame reset the clock; set fixed depth after
+        game.SetPosition(fen);
+        game.time_control.clock_type = ChessClock::kFixedDepth; // SetPosition reset the clock; set fixed depth after
         game.time_control.depth      = depth;
         game.SearchRootNode();
         total_nodes += game.last_search_node_count;
@@ -386,7 +393,7 @@ void handle_position(Game &game, std::span<std::string> args)
         case State::kAwaitSource:
             if (token == "startpos")
             {
-                game.NewGame();
+                game.SetPosition();
                 state = State::kPlayMoves;
             }
             else if (token == "fen")
@@ -402,7 +409,7 @@ void handle_position(Game &game, std::span<std::string> args)
         case State::kCollectFen:
             if (token == "moves")
             {
-                game.NewGame(fen); // FEN ended early (fewer than six fields is tolerated)
+                game.SetPosition(fen); // FEN ended early (fewer than six fields is tolerated)
                 state = State::kPlayMoves;
             }
             else
@@ -414,7 +421,7 @@ void handle_position(Game &game, std::span<std::string> args)
                 fen += token;
                 if (++fen_fields == 6) // a complete FEN; anything after must be the move list
                 {
-                    game.NewGame(fen);
+                    game.SetPosition(fen);
                     state = State::kPlayMoves;
                 }
             }
@@ -431,7 +438,7 @@ void handle_position(Game &game, std::span<std::string> args)
     // A FEN that ran to the end of input without a `moves` keyword or a sixth field is still applied.
     if (state == State::kCollectFen && !fen.empty())
     {
-        game.NewGame(fen);
+        game.SetPosition(fen);
     }
 }
 

@@ -20,9 +20,10 @@ using std::string_view;
 #include "search_state.h"
 #include "transposition_table.h"
 
-/// @brief Construct a game from a FEN (Forsyth Edwards) position string.
+/// @brief Set the board to a position from a FEN (Forsyth Edwards) string, resetting per-game transient
+/// state (move stack, clock, eval cache, cancel flag). Called for a new game and by every `position` command.
 /// @param fen_string Initial position.
-void Game::NewGame(std::string_view fen_string)
+void Game::SetPosition(std::string_view fen_string)
 {
     time_control.Reset();
     is_cancel_pending.store(false, std::memory_order_relaxed);
@@ -32,10 +33,10 @@ void Game::NewGame(std::string_view fen_string)
     positions_.push_back(Position::FromString(fen_string));
 }
 
-/// @brief Start a new game from the standard initial position.
-void Game::NewGame()
+/// @brief Set the board to the standard initial position (overload of SetPosition).
+void Game::SetPosition()
 {
-    NewGame("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    SetPosition("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
 }
 
 /// @brief Play a move and update state. Move must be legal for the current position.

@@ -73,7 +73,7 @@ struct SearchResult
 /// @return {found, score}. found is false only if the position has no legal move (mate/stalemate at the root).
 SearchResult Search(Game &game, const std::string &fen, int depth)
 {
-    game.NewGame(fen);
+    game.SetPosition(fen);
     game.book.Free(); // never return a book move - we want the engine's own judgement, not a canned reply
     game.time_control.clock_type = ChessClock::kFixedDepth;
     game.time_control.depth      = depth;

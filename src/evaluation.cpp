@@ -48,7 +48,7 @@ int EvaluatePosition(const SearchState &state)
     const Position &position = state.CurrentPosition();
     // Memoise the (net-specific) NNUE eval by Zobrist hash: a cache hit skips the forward pass. The
     // accumulator is maintained incrementally by SearchState make/undo; the cache only saves the
-    // dot-product. The cache is cleared whenever the net changes (NewGame / EvalFile load).
+    // dot-product. The cache is cleared whenever the net changes (SetPosition / EvalFile load).
     //
     // The cached value is the RAW, clock-independent NNUE eval: the Zobrist hash excludes the fifty-move
     // clock, so the same position can be probed at different clock values. The fifty-move scaling is

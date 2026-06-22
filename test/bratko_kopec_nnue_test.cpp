@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
     {
         const bk::BkCase &tc = bk::kCases[i];
 
-        game.NewGame(tc.fen);
+        game.SetPosition(tc.fen);
         game.book.Free();
         game.time_control.clock_type = ChessClock::kFixedDepth;
         game.time_control.depth      = depth;

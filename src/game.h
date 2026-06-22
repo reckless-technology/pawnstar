@@ -38,7 +38,7 @@ class Game
         : transposition_table{kHashtableMegabytes}, eval_cache{kEvalCacheMb}, is_cancel_pending{false},
           thread_count{ComputeDefaultThreads()}
     {
-        NewGame();
+        SetPosition();
     }
 
     /// @brief Default Lazy SMP thread count: PAWNSTAR_THREADS if set (>0), else hardware_concurrency,
@@ -80,11 +80,11 @@ class Game
         return nnue_network_;
     }
 
-    /// @brief Start a new game from the given position (see definition for details).
-    void NewGame(std::string_view fen_string);
+    /// @brief Set the board to the given position, resetting per-game transient state (see definition).
+    void SetPosition(std::string_view fen_string);
 
-    /// @brief Start a new game from the standard initial position.
-    void NewGame();
+    /// @brief Set the board to the standard initial position (overload of SetPosition).
+    void SetPosition();
 
     /// @brief Play a move given in algebraic notation (see definition for details).
     Move PlayMove(std::string_view move_string);
