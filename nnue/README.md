@@ -2,12 +2,12 @@
 
 Pawnstar evaluates **exclusively** with an **NNUE** (Efficiently Updatable Neural Network) — it is the
 engine's only evaluator (the former hand-crafted evaluation, "HCE", was removed). At startup the engine
-loads the shipped net `nnue/pawnstar-v10.bin` (relative to the working directory) and evaluates with it;
+loads the shipped net `nnue/pawnstar-v11.bin` (relative to the working directory) and evaluates with it;
 if that file can't be loaded the engine falls back to a copy of the net embedded in the binary (§3), and
 errors out only if both fail. This document is the complete reference for how the net works, how to load a
 net, and how to generate data, train, validate and strength-test a net.
 
-The shipped net (`pawnstar-v10.bin`) is a **1024-wide, 4-king-bucket (file-pair)** `ChessBuckets` net
+The shipped net (`pawnstar-v11.bin`) is a **1024-wide, 4-king-bucket (file-pair)** `ChessBuckets` net
 (i.e. plain Chess768 at width 1024). §1, §2 and §6 describe that architecture; §7 has the lineage
 (including the retired Chess768 256/512 nets and the retired 512-wide 4-king-bucket v6/v7).
 
@@ -96,11 +96,11 @@ The **payload** is bullet's native quantised weights — tightly packed, little-
 
 Packed payload is `(3145728 + 1024 + 2048 + 1) * 2 = 6297602` bytes; bullet pads the trailing 1-element
 `output_bias` tensor up to a 64-byte boundary, so its raw output is **6297664 bytes** (for the shipped
-4-bucket v10; a single-bank net would be 1579072).
+4-bucket v11; a single-bank net would be 1579072).
 
 **Self-describing header.** A shipped net is prepended with a **32-byte `NetHeader`** (`src/nnue.h`):
 a magic (`"PSN1"`), a format version, and the architecture parameters — `kInputSize`, `kNumKingBuckets`,
-`kHiddenSize`, `kQA`, `kQB`, `kScale`. So `nnue/pawnstar-v10.bin` is **6297696 bytes** (32 + 6297664). The
+`kHiddenSize`, `kQA`, `kQB`, `kScale`. So `nnue/pawnstar-v11.bin` is **6297696 bytes** (32 + 6297664). The
 loader (`Network::Load`) accepts **only a stamped net**:
 
 - **Stamped** (magic present): every architecture field is checked against the engine's compile-time
@@ -120,7 +120,7 @@ size/header-gates them out.)
 
 ## 3. Using a net in the engine
 
-A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v10.bin` (cwd-relative) at
+A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v11.bin` (cwd-relative) at
 startup. **Embedded fallback:** a byte-identical copy of the shipped net is compiled into the engine
 binary (`src/embedded_net.S` `.incbin`'s the net at the Makefile's `EMBED_NET` path — passed in via
 `-DEMBED_NET_PATH`, the single source of truth, so the embedded copy can't drift from the shipped net;
@@ -242,17 +242,17 @@ match confirms our feature indexing, king bucketing, perspective/orientation, SC
 are all correct. It must be built at the same width and feature set as the engine, or the cross-check
 fails by design.
 
-The repo checks in `test/nnue_reference.txt` — 250 reference evals for the shipped `pawnstar-v10.bin` —
-and `make check` runs `test_nnue nnue/pawnstar-v10.bin test/nnue_reference.txt` automatically (current
+The repo checks in `test/nnue_reference.txt` — 250 reference evals for the shipped `pawnstar-v11.bin` —
+and `make check` runs `test_nnue nnue/pawnstar-v11.bin test/nnue_reference.txt` automatically (current
 engine: max |diff| 0 cp). The reference's first field is the FEN, so regenerate it after shipping a *new*
-net with: `cut -d'|' -f1 test/nnue_reference.txt > fens.txt && "$EVAL" nnue/pawnstar-v10.bin fens.txt >
+net with: `cut -d'|' -f1 test/nnue_reference.txt > fens.txt && "$EVAL" nnue/pawnstar-v11.bin fens.txt >
 test/nnue_reference.txt`. With no arguments `test_nnue` is a no-op, so `make check` stays green if the
 net/reference are absent.
 
 A second test, `test_nnue_incremental <net.bin>`, plays random move sequences through a `SearchState`
 and asserts the incrementally-maintained accumulator evaluates **bit-identically** to a full refresh at
 every node (and again after every undo, to catch reverse-update bugs). With no argument it is a no-op,
-so `make check` stays green; run it with a net (e.g. `./build/test_nnue_incremental nnue/pawnstar-v10.bin`)
+so `make check` stays green; run it with a net (e.g. `./build/test_nnue_incremental nnue/pawnstar-v11.bin`)
 after any change to the accumulator, feature indexing, or make/undo.
 
 `verify_net.sh <net.bin>` bundles both checks into one gate: it regenerates the reference evals for
@@ -289,7 +289,7 @@ the mean. It anchors only as well as those opponents and the chosen TC, so treat
 
 ## 7. Shipped nets
 
-The repo ships one reference net, **[pawnstar-v10.bin](pawnstar-v10.bin)** (1024-wide, 4 king buckets,
+The repo ships one reference net, **[pawnstar-v11.bin](pawnstar-v11.bin)** (1024-wide, 4 king buckets,
 file-pair; stamped file **6,297,696 bytes ≈ 6.3 MB**) — loaded at startup as the engine's only evaluator
 (resolved relative to the working directory). To use a different net at runtime:
 
@@ -297,14 +297,14 @@ file-pair; stamped file **6,297,696 bytes ≈ 6.3 MB**) — loaded at startup as
 setoption name EvalFile value /path/to/other-net.bin
 ```
 
-**`pawnstar-v10.bin`** is trained on **~3.82B** positions of **public PlentyChess** data (bulletformat,
+**`pawnstar-v11.bin`** is trained on **~6.05B** positions of **public PlentyChess** data (bulletformat,
 strong-engine labels) with a 1024-wide transformer and **4 king buckets selected by king file-pair**
-(`kKingBucketMap`, §1). It is the **same architecture** as the previous shipped net **v9** — the only
-change is **more data**, scaling the pool from v9's ~2.31B to ~3.82B (four more PlentyChess shards). It
-beats v9 by **+16.3 ± 10.8 Elo at 8+0.08** (LLR 2.95, H1 accepted; 1944 games, 52.3%). More data is again
-the single biggest lever, and v10's 3.82B is still only ~18% of the ~21B PlentyChess pool. (The v8→v9 gain
-was king buckets at fixed 1024 width, +11.4 Elo; file-pair bucketing is preferable to quadrant/rank-based —
-king safety is file-dependent and back-rank kings exercise all four file banks.) See the lineage below.
+(`kKingBucketMap`, §1). It is the **same architecture** as the previous shipped net **v10** — the only
+change is **more data**, scaling the pool from v10's ~3.82B to ~6.05B (six more PlentyChess shards). It
+beats v10 by **+9.28 ± 6.58 Elo at 8+0.08** (LOS 99.7%, LLR 2.48; 6102 games, 51.3%). More data is again
+the single biggest lever, and v11's 6.05B is still only ~29% of the ~21B PlentyChess pool. The gain is
+diminishing as the base grows (v9→v10 was +16.3 Elo for +1.5B; v10→v11 +9.3 for +2.2B) but stays clearly
+positive. See the lineage below.
 
 **Lineage — what moved the needle (all SPRT-measured):**
 
@@ -320,7 +320,8 @@ king safety is file-dependent and back-rank kings exercise all four file banks.)
 | v7 (512 + 4 king buckets) | **~2.31B** (v6's 818M + 4 more big shards), same arch, SBS 40→120 (~3 epochs) | **+29.96 ± 14.05 fixed-depth, +20.73 ± 12.73 on the clock** over v6 — *still more data*; same arch/speed, so the eval-quality gain carries straight to the clock (later retired) |
 | **v8 (1024, no king buckets)** | **double the width, drop king buckets**, same 2.31B as v7 | **+31.9 ± 16.6 Elo at 40/20** over v7 (LLR 2.95, H1; 972 games) — at the full data scale width beats buckets, **at half the file size** (fewer feature rows, wider hidden). Reverses v5's 60M result now that data no longer saturates 1024. (later retired) |
 | v9 (1024 + 4 king buckets, file-pair) | add king buckets to the v8 arch, same ~2.31B scale/schedule | **+11.4 ± 6.75 Elo at 8+0.08** over v8 (LLR 2.96, H1; 5520 games). Holding width fixed, buckets win at scale — the gain shrinks with data (+29 at 750M → +11 at 2.31B) but stays positive; the v8 'width beats buckets' call was width-vs-buckets confounded. **File-pair bucketing beats quadrant/rank-based** (king safety is file-dependent; back-rank kings use all 4 file banks). 4× the FT rows (1.58→6.3 MB). (later retired) |
-| **v10 (1024 + 4 king buckets, file-pair)** | **more data**: scale the pool 2.31B→3.82B (four more PlentyChess shards: `13247`, `13399`, `13364`, `13381`), same v9 arch, SBS 120→190 (~3 epochs) | **+16.3 ± 10.8 Elo at 8+0.08** over v9 (LLR 2.95, H1; 1944 games, 52.3%). More data again the single biggest lever; v10's 3.82B is still only ~18% of the ~21B pool. **shipped** |
+| v10 (1024 + 4 king buckets, file-pair) | **more data**: scale the pool 2.31B→3.82B (four more PlentyChess shards: `13247`, `13399`, `13364`, `13381`), same v9 arch, SBS 120→190 (~3 epochs) | **+16.3 ± 10.8 Elo at 8+0.08** over v9 (LLR 2.95, H1; 1944 games, 52.3%). More data again the single biggest lever. (later retired) |
+| **v11 (1024 + 4 king buckets, file-pair)** | **more data**: scale the pool 3.82B→6.05B (six more PlentyChess shards: `11756`, `12450`, `12862`, `13128`, `13148`, `13419`), same v10 arch, SBS 190→300 (~3 epochs) | **+9.28 ± 6.58 Elo at 8+0.08** over v10 (LOS 99.7%, LLR 2.48; 6102 games, 51.3%). More data again the single biggest lever — the per-step gain is shrinking (+16 for +1.5B → +9 for +2.2B) but stays clearly positive; v11's 6.05B is still only ~29% of the ~21B pool. **shipped** |
 
 PlentyChess data: <https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat> (public,
 already bulletformat — `bullet-utils validate` a shard first (some are corrupt, e.g. `11496.data`),
@@ -328,18 +329,18 @@ already bulletformat — `bullet-utils validate` a shard first (some are corrupt
 
 The eval is also fast on the clock: the **incremental accumulator** (~+80 Elo equal-time vs full
 refresh), **AVX2 SIMD kernels** (~+180 Elo equal-time vs scalar), and the **eval cache** mean NNUE wins on
-time as well as depth. v10's 4-bucket table is 4× the feature rows of a single-bank net (6.3 MB vs 1.58 MB)
-and slightly heavier per eval, but every shipping SPRT (v8→v9→v10) was at a time control, so that cost is
-already priced in. **The repeated lesson: more data is the lever** (v10's 3.82B is still only ~18% of the
+time as well as depth. v11's 4-bucket table is 4× the feature rows of a single-bank net (6.3 MB vs 1.58 MB)
+and slightly heavier per eval, but every shipping SPRT (v8→v9→v10→v11) was at a time control, so that cost is
+already priced in. **The repeated lesson: more data is the lever** (v11's 6.05B is still only ~29% of the
 ~21B PlentyChess pool).
 Next levers: yet more data; a finer or mirrored bucket map (file+rank, or mirrored to halve the input
 space); or a wider transformer still.
 
-### Recreating `pawnstar-v10.bin` (step by step)
+### Recreating `pawnstar-v11.bin` (step by step)
 
-`pawnstar-v10.bin` is a **1024-wide net with 4 king buckets (file-pair)** trained on **~3.82 billion**
-PlentyChess positions — ten big shards: v9's six (`11008`, `11128`, `13349`, `12128`, `12932`, `13227`)
-plus four added for v10 (`13247`, `13399`, `13364`, `13381`) (~370–379M positions each, 32-byte
+`pawnstar-v11.bin` is a **1024-wide net with 4 king buckets (file-pair)** trained on **~6.05 billion**
+PlentyChess positions — sixteen big shards: v10's ten (`11008`, `11128`, `13349`, `12128`, `12932`, `13227`, `13247`, `13399`, `13364`, `13381`)
+plus six added for v11 (`11756`, `12450`, `12862`, `13128`, `13148`, `13419`) (~370–379M positions each, 32-byte
 `bullet::ChessBoard` records, already bulletformat so the text→`convert` step is skipped). GPU training is
 nondeterministic, so this reproduces a *functionally equivalent* net, not a byte-identical one.
 
@@ -372,10 +373,10 @@ export CUDA_PATH=/usr/local/cuda-13.3 PATH="$CUDA_PATH/bin:$PATH" LD_LIBRARY_PAT
 ( cd "$BULLET/crates/bullet_lib" && cargo build --release --features cuda --example pawnstar --example pawnstar_eval )
 UTILS="$BULLET/target/release/bullet-utils"
 EVAL="$BULLET/target/release/examples/pawnstar_eval"
-mkdir -p ~/pawnstar_nnue/v10 && cd ~/pawnstar_nnue/v10
-SHARDS="11008 11128 13349 12128 12932 13227 13247 13399 13364 13381"   # v9's six + v10's four
+mkdir -p ~/pawnstar_nnue/v11 && cd ~/pawnstar_nnue/v11
+SHARDS="11008 11128 13349 12128 12932 13227 13247 13399 13364 13381 11756 12450 12862 13128 13148 13419"   # v10's ten + v11's six
 
-# 1. Download the ten big PlentyChess shards (~11–12 GB / ~370M positions each, ~120 GB total).
+# 1. Download the sixteen big PlentyChess shards (~11–12 GB each, ~190 GB total).
 BASE=https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat/resolve/main
 for sh in $SHARDS; do curl -L --fail -C - -o "$sh.data" "$BASE/$sh.data"; done
 
@@ -383,20 +384,20 @@ for sh in $SHARDS; do curl -L --fail -C - -o "$sh.data" "$BASE/$sh.data"; done
 #    so ALWAYS validate before training; drop and replace any that fail.
 for sh in $SHARDS; do "$UTILS" validate --input "$sh.data"; done
 
-# 3. Concatenate the ten shards (flat 32-byte records) and re-shuffle (concatenated shards are correlated).
+# 3. Concatenate the sixteen shards (flat 32-byte records) and re-shuffle (concatenated shards are correlated).
 #    --mem-used-mb: size to free RAM (16384 if you have it; 8192 on a 16 GB box).
 cat $(for sh in $SHARDS; do printf '%s.data ' "$sh"; done) > all.data
 "$UTILS" shuffle --input all.data --output shuffled.data --mem-used-mb 16384
-echo "pool: $(( $(stat -c%s shuffled.data) / 32 )) positions"   # ~3.82e9
+echo "pool: $(( $(stat -c%s shuffled.data) / 32 )) positions"   # ~6.05e9
 rm -f all.data                                                   # reclaim disk
 
-# 4. Train the 1024-wide, 4-king-bucket arch. BPS=3688 and SBS=190 => ~11.5B samples seen (~3 epochs of
-#    the 3.82B pool). LR schedule auto-scales (StepLR step = SBS/3). ~50 min on an RTX 4070 (~2.4M pos/s);
-#    ~9.3 h on a GTX 1050 Ti (~0.33M pos/s). PAWNSTAR_SAVE_RATE=1 checkpoints every superbatch so you can
+# 4. Train the 1024-wide, 4-king-bucket arch. BPS=3688 and SBS=300 => ~18.1B samples seen (~3 epochs of
+#    the 6.05B pool). LR schedule auto-scales (StepLR step = SBS/3). ~50 min on an RTX 4070 (~2.4M pos/s);
+#    ~14.7 h on a GTX 1050 Ti (~0.34M pos/s). PAWNSTAR_SAVE_RATE=1 checkpoints every superbatch so you can
 #    spot-check the FIRST one (below).
 ( cd "$BULLET/crates/bullet_lib" && \
-  PAWNSTAR_DATA=~/pawnstar_nnue/v10/shuffled.data PAWNSTAR_BPS=3688 PAWNSTAR_SBS=190 \
-  PAWNSTAR_SAVE_RATE=1 PAWNSTAR_OUT=~/pawnstar_nnue/v10/checkpoints \
+  PAWNSTAR_DATA=~/pawnstar_nnue/v11/shuffled.data PAWNSTAR_BPS=3688 PAWNSTAR_SBS=300 \
+  PAWNSTAR_SAVE_RATE=1 PAWNSTAR_OUT=~/pawnstar_nnue/v11/checkpoints \
   cargo run --release --features cuda --example pawnstar )   # drop --features cuda to train on CPU
 
 # 4b. SPOT-CHECK at SB1 (~30 s in): confirm the net is genuinely 4-bank before sinking the full run.
@@ -404,8 +405,8 @@ rm -f all.data                                                   # reclaim disk
 python3 -c "import os;s=os.path.getsize('checkpoints/pawnstar-1/quantised.bin');print(s, '4-bank' if s>5_000_000 else 'WRONG (single-bank)')"
 
 # 5. Stamp the final RAW net into the shipped path (stamp_net embeds this build's arch header, §2).
-RAW=~/pawnstar_nnue/v10/checkpoints/pawnstar-190/quantised.bin
-./build/stamp_net "$RAW" /path/to/pawnstar/nnue/pawnstar-v10.bin   # writes a 6,297,696-byte stamped file
+RAW=~/pawnstar_nnue/v11/checkpoints/pawnstar-300/quantised.bin
+./build/stamp_net "$RAW" /path/to/pawnstar/nnue/pawnstar-v11.bin   # writes a 6,297,696-byte stamped file
 
 # 6. Verify. GOTCHA: pawnstar_eval is NOT header-aware -> feed it the RAW net; test_nnue /
 #    test_nnue_incremental load through the engine, which only accepts a STAMPED net (the raw path was
@@ -419,17 +420,17 @@ cut -d'|' -f1 test/nnue_reference.txt > /tmp/fens.txt            # reuse the che
 # 7. Regenerate the Bratko-Kopec accepted moves (the eval changed), then a full check. The search is
 #    single-threaded/deterministic per depth; the accepted set is the union of the engine's best moves over
 #    depths 8-11. Capture them straight from the harness's own output (`got=<move>` per position):
-for d in 8 9 10 11; do ./build/test_bratko_kopec_nnue nnue/pawnstar-v10.bin $d 2>&1 \
+for d in 8 9 10 11; do ./build/test_bratko_kopec_nnue nnue/pawnstar-v11.bin $d 2>&1 \
     | grep -oE "pos[0-9]+ got=[a-h][0-9][a-h][0-9][nbrq]?"; done   # union per pos -> kCases in
                                                                    # test/bratko_kopec_nnue_test.cpp
 make clean && make && make check    # rebuild the engine (re-embeds the new net via embedded_net.S .incbin),
                                     # then run all suites; BK must be 24/24 at depths 8-11
 
-# 8. Strength-test vs the previous net (BASELINE_NET). v10 and v9 are the SAME arch (both 1024 + 4-bucket),
+# 8. Strength-test vs the previous net (BASELINE_NET). v11 and v10 are the SAME arch (both 1024 + 4-bucket),
 #    so this is a plain same-binary net-vs-net SPRT — no CAND_STARTUP_NET wrapper needed (that's only for a
-#    cross-arch candidate whose default/embedded net is incompatible). v10 won +16.3 ± 10.8 Elo (H1).
-BASELINE_NET=/path/to/pawnstar-v9.bin TC=8+0.08 \
-  tools/run_sprt.sh nnue/pawnstar-v10.bin /path/to/openings.epd 20000
+#    cross-arch candidate whose default/embedded net is incompatible). v11 won +9.28 ± 6.58 Elo (H1).
+BASELINE_NET=/path/to/pawnstar-v10.bin TC=8+0.08 \
+  tools/run_sprt.sh nnue/pawnstar-v11.bin /path/to/openings.epd 20000
 ```
 
 To train a **stronger** net, add yet more clean PlentyChess shards at steps 1–3 (the dataset has ~168

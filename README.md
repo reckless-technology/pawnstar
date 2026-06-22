@@ -103,7 +103,7 @@ Pawnstar advertises these `setoption` options in its `uci` response:
 ### The NNUE net
 
 NNUE is Pawnstar's **only** evaluator, so a net is required. At startup the engine loads the shipped net
-`nnue/pawnstar-v10.bin` (resolved relative to the working directory, like `pawnstar.book`). If that file
+`nnue/pawnstar-v11.bin` (resolved relative to the working directory, like `pawnstar.book`). If that file
 can't be loaded (wrong cwd, missing/renamed file), the engine **falls back to a copy of the net embedded
 in the binary** at build time, so it always has a working evaluator; it only errors out if both the file
 and the embedded copy fail. To use a different net:
@@ -428,8 +428,8 @@ supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""` to train on CPU. NN
 game play (SPRT — now always net-vs-net, since the hand-crafted baseline was removed), not by the
 Bratko-Kopec suite.
 
-**Shipped net.** [nnue/pawnstar-v10.bin](nnue/pawnstar-v10.bin) is a **1024-wide net with 4 king buckets
-(file-pair)** trained on **~3.82B** positions of **public PlentyChess** data. Lineage, all SPRT-measured
+**Shipped net.** [nnue/pawnstar-v11.bin](nnue/pawnstar-v11.bin) is a **1024-wide net with 4 king buckets
+(file-pair)** trained on **~6.05B** positions of **public PlentyChess** data. Lineage, all SPRT-measured
 (against the since-removed hand-crafted eval, "HCE", in the early steps): Pawnstar self-play *lost* to the
 HCE (label quality, not quantity, was the lever); scaling that data ~12× gave nothing (capacity-limited);
 **doubling the width 256→512 added +55 Elo (fixed depth) / +71 (time control)** — that is v4; doubling
@@ -445,9 +445,11 @@ holding the width at 1024 and the data at ~2.31B, **adding 4 king buckets (file-
 2.31B) but stays positive, and the earlier "width beats buckets" call was really width-vs-buckets
 confounded (it compared 512+buckets v7 to 1024-no-buckets v8). Then, holding that v9 arch fixed,
 **scaling the data ~2.31B→~3.82B (four more PlentyChess shards) beat v9 by +16.3 ± 10.8 Elo at 8+0.08 — the
-v10 net (shipped)**. Each shipped net retires its predecessor
-(v4 at v6, v6 at v7, v7 at v8, v8 at v9, v9 at v10). The recurring lesson: **more data is the lever** (v10's 3.82B is
-still only ~18% of the ~21B available). See [nnue/README.md §7](nnue/README.md)
+v10 net**; then, holding that same arch, **scaling ~3.82B→~6.05B (six more shards) beat v10 by +9.28 ± 6.58
+Elo at 8+0.08 (LOS 99.7%) — the v11 net (shipped)**. Each shipped net retires its predecessor
+(v4 at v6, v6 at v7, v7 at v8, v8 at v9, v9 at v10, v10 at v11). The recurring lesson: **more data is the lever**
+— though the per-step gain is shrinking (+16 for +1.5B → +9 for +2.2B) — and v11's 6.05B is
+still only ~29% of the ~21B available. See [nnue/README.md §7](nnue/README.md)
 for the full lineage and exact recreation steps.
 
 ### Opening book
@@ -488,7 +490,7 @@ builds and runs seven standalone test executables:
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
 
-`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v10.bin`: `test_nnue` against the
+`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v11.bin`: `test_nnue` against the
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
 asserts the incremental accumulator matches a full refresh at every node, and `test_bratko_kopec_nnue`
 which searches the 24 BK positions with the net (single-threaded, deterministic) and **must solve all 24**
@@ -500,7 +502,7 @@ and the BK accepted moves (the net-specific union over depths 8–11) — see [n
 
 The Bratko-Kopec suite is the **move-based** `test_bratko_kopec_nnue` (the classic metric — did the engine
 find a good move). It takes an optional depth argument, e.g.
-`./build/test_bratko_kopec_nnue nnue/pawnstar-v10.bin 10`, and searches single-threaded for a reproducible
+`./build/test_bratko_kopec_nnue nnue/pawnstar-v11.bin 10`, and searches single-threaded for a reproducible
 result; the accepted moves are recorded over depths 8–11, so it solves 24/24 at each of those depths.
 There is no score-based Bratko-Kopec test: NNUE scores are non-deterministic under Lazy SMP
 and on a different scale. The earlier score-based `test_bratko_kopec` and the `test_pawn_structure` suite
@@ -554,7 +556,7 @@ Pawnstar has no official CCRL rating. The figures currently tracked are:
 
 - **Move generation** — roughly 700 million legal moves per second on a modern laptop core.
 - **Bratko-Kopec** — `test_bratko_kopec_nnue` solves 24/24 at each depth 8–11 with the shipped net (depth 8 runs in `make check`).
-- **Strength (rough).** `nnue/pawnstar-v10.bin` measures roughly ~2900+ Elo (CCRL-ballpark, anchored
+- **Strength (rough).** `nnue/pawnstar-v11.bin` measures roughly ~2900+ Elo (CCRL-ballpark, anchored
   against reference engines at a fast time control; v8 is +31.9 ± 16.6 over v7 at 40/20, and v7 measured
   ~2900) — far above the since-removed hand-crafted eval (~2350). At equal *time*, the incremental accumulator is
   worth ~+80 Elo over a full refresh and the AVX2 SIMD kernels a further ~+180 Elo over the scalar
