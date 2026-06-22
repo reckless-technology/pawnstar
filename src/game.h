@@ -19,21 +19,19 @@
 class Game
 {
   public:
-    TranspositionTable transposition_table; ///< The transposition table (shared by all Lazy SMP threads).
-    EvalCache          eval_cache;          ///< Lockless NNUE evaluation cache (shared by all threads).
-    ChessClock         time_control;        ///< Clock controls for the current game.
-    OpeningBook        book;                ///< The opening book.
-    std::atomic<bool>  is_cancel_pending;   ///< Shared stop flag: set on timeout, UCI stop, or search completion.
-    int thread_count; ///< Lazy SMP search threads; default from PAWNSTAR_THREADS / hardware, set by UCI `Threads`.
-    ChessClock::Duration move_overhead{
-        ChessClock::Duration{30}}; ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
-                                   ///< Persists across games.
-    std::atomic<bool> is_pondering{
-        false}; ///< True while a `go ponder` search runs (until `ponderhit` / `stop`); suppresses time stops.
-    Move ponder_move{
-        Move::None()};           ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
-    bool     use_own_book{true}; ///< Whether to consult the built-in opening book (UCI `OwnBook`).
-    uint64_t last_search_node_count{0}; ///< Node count of the most recent search's main thread (for `bench`).
+    // clang-format off
+    TranspositionTable      transposition_table;        ///< The transposition table (shared by all Lazy SMP threads).
+    EvalCache               eval_cache;                 ///< Lockless NNUE evaluation cache (shared by all threads).
+    ChessClock              time_control;               ///< Clock controls for the current game.
+    OpeningBook             book;                       ///< The opening book.
+    std::atomic<bool>       is_cancel_pending;          ///< Shared stop flag: set on timeout, UCI stop, or search completion.
+    int                     thread_count;               ///< Lazy SMP search threads; default from PAWNSTAR_THREADS / hardware, set by UCI `Threads`.
+    ChessClock::Duration    move_overhead{ChessClock::Duration{30}}; ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
+    std::atomic<bool>       is_pondering{false};        ///< True while a `go ponder` search runs (until `ponderhit` / `stop`); suppresses time stops.
+    Move                    ponder_move{Move::None()};  ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
+    bool                    use_own_book{true};         ///< Whether to consult the built-in opening book (UCI `OwnBook`).
+    uint64_t                last_search_node_count{0};  ///< Node count of the most recent search's main thread (for `bench`).
+    // clang-format on
 
     /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
     Game()
