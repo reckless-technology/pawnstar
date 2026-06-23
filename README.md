@@ -406,9 +406,13 @@ incrementally** across make/undo on each thread's `SearchState` — only the fea
 that moved are updated (a king crossing a file-pair bucket boundary rebuilds that one perspective's
 accumulator). This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
 `int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) from the
-[bullet](https://github.com/jw1912/bullet) trainer, with a small self-describing header that the engine
-**requires**: an unstamped (raw bullet) net or one whose header doesn't match this build's architecture
-is rejected rather than misread. Stamp a freshly trained raw net with `tools/stamp_net` before loading
+[bullet](https://github.com/jw1912/bullet) trainer. The feature transformer and accumulator stay `int16`,
+but the shipped forward pass runs the **output layer in `int8`** (uint8 SCReLU activations × int8 output
+weights, accumulated in int32) — ~1.86× faster than the exact `int16` dot for a measured **+31.8 Elo at
+8+0.08** at a bounded ~26 cp deviation; the exact `int16` path survives as `Network::EvaluateExact`, the
+reference the `int8` path is cross-checked against. The net carries a small self-describing header that the
+engine **requires**: an unstamped (raw bullet) net or one whose header doesn't match this build's
+architecture is rejected rather than misread. Stamp a freshly trained raw net with `tools/stamp_net` before loading
 (see [nnue/README.md](nnue/README.md)).
 
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
@@ -491,6 +495,8 @@ builds and runs seven standalone test executables:
 | `build/test_bratko_kopec_nnue` | 24 Bratko-Kopec positions searched with the NNUE net; reports moves solved |
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
+| `build/test_opening_book` | Opening-book parse/lookup regression |
+| `build/test_chess_clock` | `ChessClock` `std::chrono` timing logic (deadline / elapsed / ponderhit / reset) |
 
 `make check` runs the NNUE tests against the shipped `nnue/pawnstar-v11.bin`: `test_nnue` against the
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
@@ -524,8 +530,8 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 |---|---|
 | `src/` | Engine source and headers |
 | `test/` | Standalone test programs |
-| `tools/` | NNUE data generation, bullet trainer sources, and training/SPRT scripts |
-| `nnue/` | NNUE training pipeline documentation |
+| `tools/` | Bullet trainer sources, training/verify/SPRT scripts, and helper tools (`stamp_net`, `filter_book`, `nnue_quant_study`) |
+| `nnue/` | The shipped NNUE net (`pawnstar-v11.bin`) plus training-pipeline documentation |
 | `Doxyfile` | Doxygen configuration |
 | `LICENSE` | GNU General Public License v3 |
 
@@ -556,7 +562,7 @@ A few deliberate choices shape the codebase:
 
 Pawnstar has no official CCRL rating. The figures currently tracked are:
 
-- **Move generation** — roughly 700 million legal moves per second on a modern laptop core.
+- **Move generation** — roughly 600 million legal moves per second on a modern laptop core.
 - **Bratko-Kopec** — `test_bratko_kopec_nnue` solves 24/24 at each depth 8–11 with the shipped net (depth 8 runs in `make check`).
 - **Strength (rough).** `nnue/pawnstar-v11.bin` measures roughly ~2900+ Elo (CCRL-ballpark, anchored
   against reference engines at a fast time control; v8 is +31.9 ± 16.6 over v7 at 40/20, and v7 measured

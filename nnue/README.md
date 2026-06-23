@@ -209,12 +209,13 @@ from the first argument:
 4. copies `<work_dir>/checkpoints/pawnstar-<end_superbatch>/quantised.bin` → `out_net.bin`, where
    `<work_dir>` is the data directory (text mode) or the `.data` file's directory (bulletformat mode).
 
-Trainer hyperparameters ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)): `HIDDEN_SIZE=512`,
+Trainer hyperparameters ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)): `HIDDEN_SIZE=1024`,
 AdamW, `batch_size=16384`, loss `sigmoid(out)` squared-error against
 `target = wdl·result + (1-wdl)·sigmoid(score/SCALE)` with `ConstantWDL=0.5`, `StepLR{start=0.001,
 gamma=0.3, step=SBS/3}`, `eval_scale=400`. Overridable via env: `PAWNSTAR_DATA`, `PAWNSTAR_BPS`,
 `PAWNSTAR_SBS`, `PAWNSTAR_OUT`. GPU training reports the device (e.g. `Training on NVIDIA GeForce GTX
-1050 Ti (sm_61)`) and runs at ~1.7M positions/sec for this net.
+1050 Ti (sm_61)`) and runs at ~0.34M positions/sec on that card for this 1024-wide net (~2.4M on an RTX
+4070; see §7).
 
 ### Openings
 
