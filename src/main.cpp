@@ -1,6 +1,7 @@
 #include "constants.h"
 #include "debug_hashtable.h"
 #include "game.h"
+#include "input_handling.h"
 #include "nnue.h"
 #include "opening_book.h"
 #include "position.h"
@@ -15,9 +16,6 @@
 #include <string>
 #include <string_view>
 #include <unistd.h>
-
-/// @brief Process a single line of UCI input (defined in input_handling.cpp).
-void ProcessInput(Game &game, std::string_view line);
 
 namespace
 {

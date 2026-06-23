@@ -1,7 +1,7 @@
 PROGRAM             = pawnstar
 CXX                 = clang++
 CPPFLAGS            = -I src
-CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++20 -mbmi2 -mavx2
+CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++23 -mbmi2 -mavx2
 BUILD_DIR           = build
 DOC_DIR             = doc/html
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
@@ -11,22 +11,11 @@ TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net
 TOOL_FILTERBOOK_EXE = $(BUILD_DIR)/filter_book
 TOOL_QUANT_EXE      = $(BUILD_DIR)/nnue_quant_study
 
-ENGINE_SOURCES      = \
-	debug_hashtable.cpp \
-	evaluation.cpp \
-	game.cpp \
-	input_handling.cpp \
-	nnue.cpp \
-	opening_book.cpp \
-	position.cpp \
-	search_state.cpp \
-	static_exchange_evaluation.cpp \
-	transposition_table.cpp \
-	generated_data.cpp
-
-SOURCES             = $(ENGINE_SOURCES) main.cpp
-ENGINE_OBJECTS      = $(addprefix $(BUILD_DIR)/, $(ENGINE_SOURCES:.cpp=.o))
-OBJECTS             = $(ENGINE_OBJECTS) $(BUILD_DIR)/main.o
+# Header-only engine: every engine class/function lives in src/*.h as `inline` definitions, so there are
+# no per-class engine .cpp files or object files to link. The only compiled engine translation unit is
+# main.cpp (the UCI entry point); each test and tool compiles as a single TU that pulls the engine in
+# through its headers. Full cross-"file" inlining now happens within each TU at -O3, with no LTO needed.
+OBJECTS             = $(BUILD_DIR)/main.o
 DEPS                = $(OBJECTS:.o=.d)
 # The shipped NNUE net embedded into the engine binary (.incbin) as a runtime-load fallback. Linked into
 # the engine executable only — the test binaries load nets explicitly and don't need it.
@@ -66,19 +55,6 @@ ifeq ($(DEBUG), 1)
 	CXXFLAGS += -g -Og -D DEBUG -fsanitize=undefined -fsanitize=address
 else
 	CXXFLAGS += -g -O3 -D NDEBUG
-endif
-
-# Link-time optimization (ThinLTO), on by default for release builds. LTO lets the optimizer inline and
-# specialize across translation units, which plain per-TU -O3 cannot do — it matters most for the small
-# hot-path methods that callers reach across .cpp boundaries. CXXFLAGS feeds both the compile and link
-# steps, so adding the flag here enables LTO end to end. Disable with `make LTO=0`; forced off for the
-# sanitizer DEBUG build, where LTO interferes with instrumentation and slows the build for no benefit.
-LTO ?= 1
-ifeq ($(DEBUG), 1)
-	LTO := 0
-endif
-ifeq ($(LTO), 1)
-	CXXFLAGS += -flto=thin
 endif
 
 # Treat warnings as errors with `make WERROR=1` (e.g. in CI), so a new warning fails the build. Opt-in,
@@ -160,39 +136,37 @@ $(EMBED_BOOK_OBJECT): src/embedded_book.S $(EMBED_BOOK) | prep
 $(PROGRAM_EXE): $(OBJECTS) $(EMBED_OBJECT) $(EMBED_BOOK_OBJECT)
 	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS) $(EMBED_OBJECT) $(EMBED_BOOK_OBJECT)
 
-# Link test executables against all engine objects (no main.o).
-$(TEST_PERFT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/perft_test.o
+# Header-only engine: each test executable is a single TU (its *_test.o) that pulls the engine in through
+# headers, so it links on its own — there are no engine objects to link against any more (and no main.o).
+$(TEST_PERFT_EXE): $(BUILD_DIR)/perft_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TEST_SEE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/see_test.o
+$(TEST_SEE_EXE): $(BUILD_DIR)/see_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TEST_BK_NNUE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/bratko_kopec_nnue_test.o
+$(TEST_BK_NNUE_EXE): $(BUILD_DIR)/bratko_kopec_nnue_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TEST_NNUE_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_test.o
+$(TEST_NNUE_EXE): $(BUILD_DIR)/nnue_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TEST_NNUE_INC_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_incremental_test.o
+$(TEST_NNUE_INC_EXE): $(BUILD_DIR)/nnue_incremental_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-$(TEST_BOOK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/opening_book_test.o
+$(TEST_BOOK_EXE): $(BUILD_DIR)/opening_book_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-# ChessClock is header-only, so the clock test links against its own object alone (no engine objects).
 $(TEST_CLOCK_EXE): $(BUILD_DIR)/chess_clock_test.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-# Link the net-stamping tool (header-only use of nnue.h constants; no engine objects needed).
+# Each tool is likewise a single TU pulling the engine in through headers; it links on its own.
 $(TOOL_STAMP_EXE): $(BUILD_DIR)/stamp_net.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-# Link the opening-book filter against all engine objects (it drives the NNUE search).
-$(TOOL_FILTERBOOK_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/filter_book.o
+$(TOOL_FILTERBOOK_EXE): $(BUILD_DIR)/filter_book.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
-# Link the int8-quantisation study tool (drives NNUE inference; needs the engine objects).
-$(TOOL_QUANT_EXE): $(ENGINE_OBJECTS) $(BUILD_DIR)/nnue_quant_study.o
+$(TOOL_QUANT_EXE): $(BUILD_DIR)/nnue_quant_study.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 -include $(DEPS)

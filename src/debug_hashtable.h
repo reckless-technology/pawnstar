@@ -1,4 +1,4 @@
-/// @file debug_hashtable.h Debugging counts dictionary.
+/// @file debug_hashtable.h Debugging counts dictionary (header-only).
 
 #pragma once
 #include <cstdint>
@@ -6,6 +6,10 @@
 #include <unordered_map>
 
 #if DEBUGX
+#include <format>
+#include <iostream>
+#include <map>
+#include <mutex>
 
 /// @brief FNV-1a 64 hash. Simple, fast, and constexpr.
 struct string_hasher
@@ -27,19 +31,47 @@ struct string_hasher
 
 /// @brief Maps a literal string to a count value.
 using DebugTable = std::unordered_map<std::string_view, int64_t, string_hasher>;
-extern DebugTable debug_dictionary; ///< Global dictionary of named diagnostic counters.
+
+/// @brief Global dictionary of named diagnostic counters.
+inline DebugTable debug_dictionary;
 
 /// @brief Find-or-create the counter slot for a name and return a stable pointer to it.
 /// std::unordered_map nodes are stable across insert/rehash and DebugXClear zeroes values rather than
 /// erasing nodes, so the returned pointer is valid for the program's lifetime. Each INCREMENT call site
 /// caches this pointer in a function-local static, so after the first hit a counter update is a single
 /// pointer increment — no string hashing and no map lookup on the hot path.
-int64_t *DebugSlot(std::string_view name);
+/// Creation is serialised so concurrent first-time creations from worker threads don't race on the map.
+inline int64_t *DebugSlot(std::string_view name)
+{
+    static std::mutex           slot_mutex;
+    std::lock_guard<std::mutex> lock(slot_mutex);
+    return &debug_dictionary[name];
+}
 
-/// @brief Reset all diagnostic counters to zero.
-void DebugXClear();
-/// @brief Print all diagnostic counters in alphabetical order.
-void DebugXWrite();
+/// @brief Reset all diagnostic counters to zero. Entries are kept (not erased) so the slot pointers
+/// cached at each INCREMENT call site remain valid.
+inline void DebugXClear()
+{
+    for (auto &entry : debug_dictionary)
+    {
+        entry.second = 0;
+    }
+}
+
+/// @brief Print the non-zero debug counters in alphabetic order.
+inline void DebugXWrite()
+{
+    std::map<std::string_view, int64_t> sorted_entries(debug_dictionary.begin(), debug_dictionary.end());
+    std::cout << "********************* DEBUGX *********************\n";
+    for (const auto &[title, count] : sorted_entries)
+    {
+        if (count != 0)
+        {
+            std::cout << std::format("{:<40}{:10}\n", title, count);
+        }
+    }
+    std::cout << "**************************************************\n";
+}
 
 /// @brief Increment the named counter (slot pointer cached per call site).
 #define INCREMENT(x)                              \

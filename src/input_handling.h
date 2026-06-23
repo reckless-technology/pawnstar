@@ -1,3 +1,6 @@
+#pragma once
+/// @file input_handling.h UCI command parsing + dispatch (header-only).
+
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -42,21 +45,21 @@ struct Handler
 
 /// @brief Handle the "bookmoves" command: display book moves for the current position.
 /// @param game Game to act on.
-void handle_bookmoves(Game &game, std::span<std::string>)
+inline void handle_bookmoves(Game &game, std::span<std::string>)
 {
     game.book.DisplayAvailableMoves(game.CurrentPosition());
 }
 
 /// @brief Handle the "freebook" command: release the opening book from memory.
 /// @param game Game to act on.
-void handle_freebook(Game &game, std::span<std::string>)
+inline void handle_freebook(Game &game, std::span<std::string>)
 {
     game.book.Free();
 }
 
 /// @brief Handle the "eval" command: print the static evaluation of the current position.
 /// @param game Game to act on.
-void handle_eval(Game &game, std::span<std::string>)
+inline void handle_eval(Game &game, std::span<std::string>)
 {
     if (!game.NnueNetwork().IsLoaded())
     {
@@ -69,7 +72,7 @@ void handle_eval(Game &game, std::span<std::string>)
 
 /// @brief Handle the "nnue" command: print the raw NNUE evaluation of the current position (diagnostic).
 /// @param game Game to act on.
-void handle_nnue(Game &game, std::span<std::string>)
+inline void handle_nnue(Game &game, std::span<std::string>)
 {
     if (!game.NnueNetwork().IsLoaded())
     {
@@ -80,27 +83,27 @@ void handle_nnue(Game &game, std::span<std::string>)
 }
 
 /// @brief Handle the "dbg" command: print diagnostic counters.
-void handle_dbg(Game &, std::span<std::string>)
+inline void handle_dbg(Game &, std::span<std::string>)
 {
     DebugXWrite();
 }
 
 /// @brief Handle the "dbgclear" command: reset diagnostic counters.
-void handle_dbgclear(Game &, std::span<std::string>)
+inline void handle_dbgclear(Game &, std::span<std::string>)
 {
     DebugXClear();
 }
 
 /// @brief Handle the "getboard" command: print the FEN of the current position.
 /// @param game Game to act on.
-void handle_getboard(Game &game, std::span<std::string>)
+inline void handle_getboard(Game &game, std::span<std::string>)
 {
     auto fen = game.CurrentPosition().ToString();
     std::cout << std::format("{}\n", fen);
 }
 
 /// @brief Handle the "uci" command: identify the engine and acknowledge UCI mode.
-void handle_uci(Game &game, std::span<std::string>)
+inline void handle_uci(Game &game, std::span<std::string>)
 {
     std::cout << "id name Pawnstar\n";
     std::cout << "id author Jonny Reckless\n";
@@ -121,7 +124,7 @@ void handle_uci(Game &game, std::span<std::string>)
 /// button that empties the transposition table), Move Overhead (ms reserved from each deadline, 0..5000) and
 /// OwnBook (whether to consult the built-in opening book).
 /// @param args Command arguments.
-void handle_setoption(Game &game, std::span<std::string> args)
+inline void handle_setoption(Game &game, std::span<std::string> args)
 {
     // Parse the UCI "name <words...> value <words...>" grammar.
     std::string  name, value;
@@ -180,7 +183,7 @@ void handle_setoption(Game &game, std::span<std::string> args)
 /// The per-thread history / killer / countermove / continuation tables live on `SearchState` and are rebuilt
 /// fresh on every search, so they never carry across games and need no reset here.)
 /// @param game Game to act on.
-void handle_ucinewgame(Game &game, std::span<std::string>)
+inline void handle_ucinewgame(Game &game, std::span<std::string>)
 {
     game.StopThinking();
     game.transposition_table.Clear();
@@ -217,7 +220,7 @@ static constexpr int kBenchDepth = 13;
 /// change meant to be neutral that alters it shows up immediately) and the nps a quick speed-regression check.
 /// Forces a single thread and disables the opening book for reproducibility (restored afterwards); the hash is
 /// cleared up front. Leaves the board at the last bench position (run it standalone).
-void handle_bench(Game &game, std::span<std::string> args)
+inline void handle_bench(Game &game, std::span<std::string> args)
 {
     const int  depth          = args.size() > 1 ? std::atoi(args[1].c_str()) : kBenchDepth;
     const int  saved_threads  = game.thread_count;
@@ -254,7 +257,7 @@ void handle_bench(Game &game, std::span<std::string> args)
 /// moves) is ignored.
 /// @param game Game to act on.
 /// @param args Command arguments (time controls, depth, etc.).
-void handle_go(Game &game, std::span<std::string> args)
+inline void handle_go(Game &game, std::span<std::string> args)
 {
     /// @brief Parser state: whether the next token is a keyword or the pending keyword's integer value.
     enum class State
@@ -335,7 +338,7 @@ void handle_go(Game &game, std::span<std::string> args)
 
 /// @brief Handle the "stop" command: stop searching and report the best move found.
 /// @param game Game to act on.
-void handle_stop(Game &game, std::span<std::string>)
+inline void handle_stop(Game &game, std::span<std::string>)
 {
     game.StopThinking();
 }
@@ -346,7 +349,7 @@ void handle_stop(Game &game, std::span<std::string>)
 /// origin and arming the hard deadline; is_pondering is cleared last so the search never sees the new flag
 /// with a stale start time.
 /// @param game Game to act on.
-void handle_ponderhit(Game &game, std::span<std::string>)
+inline void handle_ponderhit(Game &game, std::span<std::string>)
 {
     game.time_control.OnPonderhit();
     game.is_pondering.store(false, std::memory_order_relaxed);
@@ -354,14 +357,14 @@ void handle_ponderhit(Game &game, std::span<std::string>)
 
 /// @brief Handle the "quit" command: stop searching and exit the program.
 /// @param game Game to act on.
-void handle_quit(Game &game, std::span<std::string>)
+inline void handle_quit(Game &game, std::span<std::string>)
 {
     game.StopThinking();
     exit(0);
 }
 
 /// @brief Handle the "isready" command: respond with readyok.
-void handle_isready(Game &, std::span<std::string>)
+inline void handle_isready(Game &, std::span<std::string>)
 {
     std::cout << "readyok\n";
 }
@@ -371,7 +374,7 @@ void handle_isready(Game &, std::span<std::string>)
 /// machine over the tokens, rather than scanning with look-ahead and index mutation.
 /// @param game Game to act on.
 /// @param args Command arguments (startpos / fen and the move list).
-void handle_position(Game &game, std::span<std::string> args)
+inline void handle_position(Game &game, std::span<std::string> args)
 {
     /// @brief Parser state: what the next token is expected to be.
     enum class State
@@ -443,14 +446,14 @@ void handle_position(Game &game, std::span<std::string> args)
 }
 
 /// @brief Handle the "help" command: list all available commands.
-void handle_help(Game &, std::span<std::string>);
+inline void handle_help(Game &, std::span<std::string>);
 
 /// @brief Expand to a handler function pointer and its command name string.
 #define COMMAND(name) handle_##name, #name
 
 // clang-format off
 /// @brief Table of all supported input commands and their handlers.
-constexpr std::array handlers =
+inline constexpr std::array handlers =
 {
     Handler { COMMAND(bench),          "Search a fixed position set to fixed depth; print nodes + nps"},
     Handler { COMMAND(bookmoves),      "Display available book moves for current position"},
@@ -474,7 +477,7 @@ constexpr std::array handlers =
 // clang-format on
 
 /// @brief Handle the "help" command: list all available commands.
-void handle_help(Game &, std::span<std::string>)
+inline void handle_help(Game &, std::span<std::string>)
 {
     std::cout << "Available commands:\n";
     for (auto &i : handlers)
@@ -486,7 +489,7 @@ void handle_help(Game &, std::span<std::string>)
 /// @brief Tokenize a line of input and dispatch it to the matching command handler.
 /// @param game Game to act on.
 /// @param line Input line.
-void ProcessInput(Game &game, std::string_view line)
+inline void ProcessInput(Game &game, std::string_view line)
 {
     std::stringstream ss;
     ss << line;
