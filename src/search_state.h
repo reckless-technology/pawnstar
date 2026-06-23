@@ -189,6 +189,19 @@ inline void SearchState::RecordCountermove(Move prev, Move move)
 inline SearchState::SearchState(Game &g)
     : game_(g), continuation_history_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
 {
+    // Initialise the killer and countermove tables to "no move". Their `{}` member initialiser only
+    // aggregate-constructs each Move through Move's deliberately-uninitialised default constructor (kept
+    // cheap so per-node MoveLists need not zero 256 moves), so it does NOT clear val_; the never-recorded
+    // slots would otherwise hold garbage that ScoreAndSortMoves reads in its killer / countermove `==`
+    // comparisons. That stray read perturbed move ordering and was the long-standing uninitialised-stack
+    // read that made bench node counts differ across compiler optimisation levels (benign: legal moves and
+    // evals were unaffected, only ordering). Move::None() is Move{0} — a value no legal move equals.
+    for (auto &ply_killers : killers_)
+    {
+        ply_killers.fill(Move::None());
+    }
+    countermoves_.fill(Move::None());
+
     const std::vector<Position> &pos = g.positions_;
     // Reserve the whole game history plus the deepest the search can descend, so no push_back during the
     // search reallocates (and an arbitrarily long game cannot overflow a fixed buffer).
