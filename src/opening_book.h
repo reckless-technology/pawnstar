@@ -1,10 +1,17 @@
 #pragma once
 /// @file opening_book.h Opening book storage and move selection.
+#include <cctype>
+#include <chrono>
 #include <cstdint>
+#include <format>
+#include <fstream>
+#include <iostream>
 #include <map>
 #include <random>
 #include <sstream>
+#include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "generated_data.h"
@@ -55,21 +62,10 @@ class OpeningBook
     std::mt19937                           prng_;         ///< PRNG used to randomly select among book moves.
 };
 
-// ---- Definitions (moved from opening_book.cpp for header-only build) ----
+// ---- Out-of-class definitions (header-only build) ----
 #include "debug_hashtable.h"
 #include "position.h"
 #include "transposition_table.h"
-#include <cctype>
-#include <chrono>
-#include <format>
-#include <fstream>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
-using std::string;
 
 /// @brief Constructor. Seeds the PRNG.
 inline OpeningBook::OpeningBook()
@@ -79,7 +75,7 @@ inline OpeningBook::OpeningBook()
 
 inline bool OpeningBook::Initialize(std::string_view filename)
 {
-    std::ifstream file{string(filename)};
+    std::ifstream file{std::string(filename)};
     if (!file)
     {
         return false;
@@ -166,7 +162,7 @@ inline bool OpeningBook::ParseLineOfPlay(std::string_view line)
     ss << line;
     while (ss)
     {
-        string move_string;
+        std::string move_string;
         ss >> move_string;
         if (move_string.length() == 0 || isdigit(move_string[0]))
         {
@@ -208,7 +204,7 @@ inline bool OpeningBook::InitializeFromStream(std::istream &ss)
 {
     while (ss)
     {
-        string line_of_play;
+        std::string line_of_play;
         std::getline(ss, line_of_play);
         if (!ParseLineOfPlay(line_of_play))
         {

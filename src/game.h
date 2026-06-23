@@ -84,7 +84,7 @@ inline const Position &Game::CurrentPosition() const
     return positions_.back();
 }
 
-// ---- Definitions moved from game.cpp (header-only). SearchRootNode/SearchThreadEntry's search half
+// ---- Out-of-class definitions (header-only build). SearchRootNode/SearchThreadEntry's search half
 //      needs SearchState, so SearchRootNode lives in the search_state.h hub; the rest are inline here. ----
 
 /// @brief Set the board to a position from a FEN (Forsyth Edwards) string, resetting per-game transient

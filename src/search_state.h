@@ -177,7 +177,7 @@ inline void SearchState::RecordCountermove(Move prev, Move move)
     }
 }
 
-// ================= Definitions moved here for the header-only build =================
+// ================= Out-of-class definitions (header-only build) =================
 // search_state.h is the hub where Game and SearchState are both complete, so the cyclic
 // definitions (SearchState methods, Game::SearchRootNode, EvaluatePosition) live here inline.
 
@@ -785,6 +785,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
 
     Variation         principal_variation{};
     std::vector<Move> best_moves; // Best move found at each search depth (main thread, for stability checks).
+    best_moves.reserve(kMaxPly);  // one entry appended per iteration; reserve to avoid reallocation.
 
     for (int depth = kStartDepth + 1; depth != kMaxPly; ++depth)
     {
@@ -898,7 +899,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
     return best_move;
 }
 
-// ---- Game::SearchRootNode (moved from game.cpp; needs SearchState complete) ----
+// ---- Game::SearchRootNode (defined here; needs SearchState complete) ----
 
 /// @brief Search the current position and return the best move.
 /// Returns a book move immediately on a book hit; otherwise runs the Lazy SMP iterative-deepening search:
@@ -1023,7 +1024,7 @@ inline Move Game::SearchRootNode()
     return best_move;
 }
 
-// ---- EvaluatePosition (moved from evaluation.cpp; needs SearchState + Game complete) ----
+// ---- EvaluatePosition (defined here; needs SearchState + Game complete) ----
 
 /// @brief Plies the fifty-move clock may reach before the static eval is discounted. Below this the eval
 /// is untouched, so normal play (where the clock is reset often by pawn moves/captures) is unaffected.

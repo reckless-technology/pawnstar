@@ -1,7 +1,11 @@
 #pragma once
 #include "bitboard.h"
+#include <algorithm>
 #include <array>
 #include <cstdint>
+#include <immintrin.h>
+#include <random>
+#include <set>
 #include <vector>
 
 using zobrist_t = uint64_t; ///< Zobrist hash value type.
@@ -45,14 +49,7 @@ template <class T, size_t I> struct MultiDimArray<T, I>
     using type = std::array<T, I>; ///< One-dimensional array type.
 };
 
-// ---- Definitions moved from generated_data.cpp (header-only) ----
-#include <algorithm>
-#include <array>
-#include <immintrin.h>
-#include <random>
-#include <set>
-#include <vector>
-
+// ---- Out-of-class definitions (header-only build) ----
 namespace gendata_detail
 {
 /// @brief Compass-rose directions (north = forward for white), indices into kShiftFunctions.

@@ -4,6 +4,7 @@
 #include <array>
 #include <format>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -406,19 +407,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     return moves;
 }
 
-// ---- Definitions (moved from position.cpp for header-only build) ----
-#include <algorithm>
-#include <cstring>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <vector>
-using std::istringstream;
-using std::ostringstream;
-using std::string;
-using std::string_view;
-using std::vector;
+// ---- Out-of-class definitions (header-only build) ----
 #include "debug_hashtable.h"
 #include "transposition_table.h"
 
@@ -577,8 +566,10 @@ constexpr Position Position::MakeMove(const Move &move) const
 /// @param fen_string Forsyth Edwards string.
 inline Position Position::FromString(std::string_view fen_string)
 {
-    Position position{};
-    // std::memset((void *)&position, 0, sizeof(position));
+    using std::istringstream;
+    using std::string;
+    using std::string_view;
+    Position              position{};
     constexpr string_view white_piece_names{"PNBRQK"};
     constexpr string_view black_piece_names{"pnbrqk"};
     istringstream         ss{string{fen_string}};
@@ -665,6 +656,7 @@ inline Position Position::FromString(std::string_view fen_string)
 /// @return The FEN representation of the position.
 inline std::string Position::ToString() const
 {
+    using std::ostringstream;
     ostringstream ss;
     // Pieces on the board
     const Bitboard occupied_squares = OccupiedSquares();

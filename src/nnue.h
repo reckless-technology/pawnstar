@@ -32,26 +32,22 @@
 /// the trainer's eval (verified by test_nnue).
 
 #include "constants.h"
-
-#include <array>
-#include <cstdint>
-#include <string>
-
-class Position;
-
-#include "constants.h"
 #include "position.h"
+
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <string>
 #include <utility>
 #include <vector>
 #if defined(__AVX2__)
 #include <immintrin.h>
 #endif
+
 namespace nnue
 {
 
@@ -199,7 +195,7 @@ class Network
     bool loaded_ = false; ///< Whether Load() has succeeded.
 };
 
-// ---- Definitions moved from nnue.cpp (header-only) ----
+// ---- Out-of-class definitions (header-only build) ----
 
 /// @brief Squared clipped ReLU: clamp to [0, kQA] then square (mirrors bullet's `simple` activation).
 /// @param x Accumulator value (already in QA units). @return Activated value in QA*QA units.
@@ -286,7 +282,7 @@ inline __m256i ScReluU8(const int16_t *a)
     const __m256i c1    = _mm256_min_epi16(_mm256_max_epi16(v1, zero), qa);
     auto          sq    = [&](__m256i c, bool high) {
         const __m256i w = high ? _mm256_cvtepi16_epi32(_mm256_extracti128_si256(c, 1))
-                               : _mm256_cvtepi16_epi32(_mm256_castsi256_si128(c));
+                                           : _mm256_cvtepi16_epi32(_mm256_castsi256_si128(c));
         return _mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(w, w), round), kInt8Shift);
     };
     return PackU8(sq(c0, false), sq(c0, true), sq(c1, false), sq(c1, true));
