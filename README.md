@@ -573,14 +573,15 @@ the published node counts for the standard positions.
   AVX2, so the engine needs an Intel Haswell / AMD Zen 1 (or newer) CPU and is built with `-mbmi2 -mavx2`.
   On early AMD Zen parts `pext` is microcoded and comparatively slow. (The NNUE kernels keep scalar
   fallbacks behind `#if defined(__AVX2__)`, but the default build enables AVX2.)
-- **Thread count** defaults to `hardware_concurrency()` and is not exposed as a UCI option, though it
-  can be overridden with the `PAWNSTAR_THREADS` environment variable.
-- **No pondering** (thinking on the opponent's time) and **no syzygy/tablebase** support.
-- **NNUE is the only evaluator.** The engine loads the shipped net at startup and **exits** if it cannot
-  (there is no hand-crafted fallback). The accumulator is maintained incrementally across make/undo (with
-  a refresh of one perspective when its king crosses a file-pair bucket boundary) and the kernels are
-  AVX2-vectorised, so it is fast on the clock; the shipped net is a 1024-wide, 4-king-bucket (file-pair)
-  `ChessBuckets` net (v9).
+- **Thread count** is set by the `Threads` UCI option (Lazy SMP, 1–256); its default comes from the
+  `PAWNSTAR_THREADS` environment variable if set, otherwise `hardware_concurrency()`.
+- **No syzygy/tablebase** support.
+- **NNUE is the only evaluator.** The engine loads the shipped net at startup, falls back to a copy
+  embedded in the binary if the file can't be loaded, and **exits** only if both fail (there is no
+  hand-crafted fallback). The accumulator is maintained incrementally across make/undo (with a refresh of
+  one perspective when its king crosses a file-pair bucket boundary) and the kernels are AVX2-vectorised,
+  so it is fast on the clock; the shipped net is a 1024-wide, 4-king-bucket (file-pair) `ChessBuckets` net
+  (v11).
 
 ## Contributing
 
