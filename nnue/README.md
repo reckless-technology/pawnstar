@@ -11,8 +11,9 @@ The shipped net (`pawnstar-v11.bin`) is a **1024-wide, 4-king-bucket (file-pair)
 (i.e. plain Chess768 at width 1024). §1, §2 and §6 describe that architecture; §7 has the lineage
 (including the retired Chess768 256/512 nets and the retired 512-wide 4-king-bucket v6/v7).
 
-In-engine code: [src/nnue.h](../src/nnue.h), [src/nnue.cpp](../src/nnue.cpp). The net is called from
-[src/evaluation.cpp](../src/evaluation.cpp) (`EvaluatePosition`). Tooling: [tools/](../tools).
+In-engine code: [src/nnue.h](../src/nnue.h) (header-only). The net is called from `EvaluatePosition`
+(declared in [src/evaluation.h](../src/evaluation.h), defined in the [src/search_state.h](../src/search_state.h)
+hub). Tooling: [tools/](../tools).
 
 ---
 
@@ -45,7 +46,7 @@ Two accumulators are built (white-perspective and black-perspective), each seede
 and then summing the feature column of every piece in its king bucket's bank. At evaluation the
 **side-to-move** accumulator is fed to the first 1024 output weights and the opponent's to the second
 1024. This is mathematically identical to bullet's `ChessBuckets::map_features` with the same bucket map
-(verified by the cross-check in §6). The bucket map MUST stay byte-identical across `src/nnue.cpp`,
+(verified by the cross-check in §6). The bucket map MUST stay byte-identical across `src/nnue.h`,
 `tools/bullet/pawnstar.rs` and `tools/bullet/pawnstar_eval.rs`.
 
 **Forward pass** — the **reference** path (`Network::EvaluateExact`) mirrors bullet's `simple` example
@@ -346,7 +347,7 @@ nondeterministic, so this reproduces a *functionally equivalent* net, not a byte
 
 **The defining requirement: the architecture (especially the king-bucket map) must match everywhere.**
 `kHiddenSize=1024`, `kNumKingBuckets=4`, and the **file-pair `kKingBucketMap`** in
-[src/nnue.h](../src/nnue.h)/[src/nnue.cpp](../src/nnue.cpp) must be byte-identical to `HIDDEN_SIZE` and the
+[src/nnue.h](../src/nnue.h) must be byte-identical to `HIDDEN_SIZE` and the
 `KING_BUCKETS` array in [tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs) and
 [tools/bullet/pawnstar_eval.rs](../tools/bullet/pawnstar_eval.rs) (and `NUM_BUCKETS=4` in `pawnstar_eval.rs`).
 The repo is already on this arch, so the checked-in files match; the map is:
@@ -436,7 +437,7 @@ BASELINE_NET=/path/to/pawnstar-v10.bin TC=8+0.08 \
 To train a **stronger** net, add yet more clean PlentyChess shards at steps 1–3 (the dataset has ~168
 shards ≈ 21B positions; `validate` each first) and scale `SBS` to keep ~3 epochs. To change the
 **architecture** — width (`kHiddenSize`), bucket count (`kNumKingBuckets`) or the `kKingBucketMap` —
-change it identically in `nnue.h`/`nnue.cpp`, `pawnstar.rs` and `pawnstar_eval.rs` (and `NUM_BUCKETS` in
+change it identically in `nnue.h`, `pawnstar.rs` and `pawnstar_eval.rs` (and `NUM_BUCKETS` in
 `pawnstar_eval.rs`), re-sync + rebuild the bullet examples, rebuild the engine, and retrain. A different
 architecture yields a different file size, so an engine built for one cannot load a net of another (§2).
 

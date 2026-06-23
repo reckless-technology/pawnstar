@@ -1,8 +1,10 @@
 # Pawnstar
 
 Pawnstar is a [UCI](https://en.wikipedia.org/wiki/Universal_Chess_Interface) chess engine written in
-C++20. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
-a lockless transposition table, and a perspective NNUE evaluation.
+C++23. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
+a lockless transposition table, and a perspective NNUE evaluation. The engine is **header-only** — every
+class lives entirely in its `src/*.h` header as `inline` definitions, so only `main.cpp` is compiled and
+linked (each test/tool is a single self-contained translation unit), and the build needs no LTO.
 
 Legal move generation runs at roughly 600 million moves per second on a modern laptop.
 
@@ -22,7 +24,7 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 
 ## Requirements
 
-- `clang++` with C++20 support.
+- `clang++` with C++23 support.
 - A CPU with the BMI2 and AVX2 instruction sets (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`. BMI2 is required for the `pext` instruction (sliding move generation) and AVX2 is required for the NNUE evaluation SIMD calculation.
 - GNU `make`.
 - `doxygen` (and optionally Graphviz `dot`) only if you want to build the API docs.
@@ -166,7 +168,7 @@ stack are `std::vector`s, the position stack reserved once up front; see the des
 Sliding-piece attacks (bishop, rook, queen) use the BMI2 `_pext_u64` instruction to gather the
 occupancy bits relevant to a square and index a precomputed per-square attack table. Knight, king and
 pawn attacks are plain 64-entry lookup tables. All tables are computed once at program startup in
-`src/generated_data.cpp`.
+`src/generated_data.h`.
 
 `Pins` ([src/pins.h](src/pins.h)) computes absolute pins and the squares
 each pinned piece may still move to, before move generation.
@@ -179,7 +181,7 @@ lockless transposition table rather than splitting the tree between them.
 
 #### Iterative deepening and time management
 
-`Game::SearchRootNode` ([src/game.cpp](src/game.cpp)) runs on a dedicated worker
+`Game::SearchRootNode` (defined in the [src/search_state.h](src/search_state.h) hub) runs on a dedicated worker
 thread — started by `Game::StartThinking` — so the UCI `stop` command, which sets an atomic
 cancellation flag polled throughout the tree, can interrupt it at any time. It searches the root move
 list at increasing depths starting from `kStartDepth` (3) up to `kMaxPly` (64), emitting an
@@ -214,7 +216,7 @@ UCI thread can retarget the running search). It is covered by the `test_chess_cl
 
 #### Recursive search
 
-`SearchState::Search` ([src/search_state.cpp](src/search_state.cpp)) applies, at each node:
+`SearchState::Search` ([src/search_state.h](src/search_state.h)) applies, at each node:
 
 - **Transposition table** probe/store with CUT / ALL / PV node types; a TT cutoff or TT move ordering
   hint is taken before any moves are generated.
@@ -254,7 +256,7 @@ UCI thread can retarget the running search). It is covered by the `test_chess_cl
   both the per-thread history and continuation-history tables. All ordering tables are per-thread — see
   [Move ordering and history heuristics](#move-ordering-and-history-heuristics) below for the full scheme.
 
-**Quiescence search** (`SearchState::SearchQuiescent`, [src/search_state.cpp](src/search_state.cpp)) extends the leaves with
+**Quiescence search** (`SearchState::SearchQuiescent`, [src/search_state.h](src/search_state.h)) extends the leaves with
 captures only, so the static evaluation is never called on a position with a hanging capture available.
 It does not use a transposition table (no probe, no store). It applies **SEE pruning** — the captures are
 SEE-sorted, so the loop reads each move's precomputed ordering score and **exits on the first losing
@@ -265,7 +267,7 @@ early-exit was SPRT-tested **+38.65 ± 13.78 Elo at 8+0.08** (1318 games, LLR-ac
 #### Move ordering and history heuristics
 
 Alpha-beta prunes far more when the best move is searched first, so `SearchState::ScoreAndSortMoves`
-([src/search_state.cpp](src/search_state.cpp)) assigns every move a 23-bit sort score (stored in the
+([src/search_state.h](src/search_state.h)) assigns every move a 23-bit sort score (stored in the
 `Move` itself) in strict descending bands. The TT move is searched before the list is even generated;
 the remaining moves sort as:
 
@@ -326,7 +328,7 @@ deterministic single-threaded search, used to regenerate Bratko-Kopec reference 
 
 To keep the helper threads from recomputing the same tree in lockstep, the main thread (thread 0)
 searches every depth while each helper follows a Stockfish-style **iteration-skip schedule**
-(`kSkipSize` / `kSkipPhase` tables in `search_state.cpp`) that makes it skip selected depths. The
+(`kSkipSize` / `kSkipPhase` tables in `search_state.h`) that makes it skip selected depths. The
 threads therefore desynchronise and seed the shared table with a diverse mix of depths. Only the main
 thread prints `info` lines, applies time management and produces the authoritative best move; helpers
 run silently and stop as soon as the shared cancellation flag is set.
@@ -367,7 +369,7 @@ intervening work. This is purely a latency optimization and does not change resu
 
 ### Evaluation
 
-`EvaluatePosition` ([src/evaluation.cpp](src/evaluation.cpp)) is **NNUE-only**: after a draw
+`EvaluatePosition` (declared in [src/evaluation.h](src/evaluation.h), defined in the [src/search_state.h](src/search_state.h) hub) is **NNUE-only**: after a draw
 short-circuit it returns the network's score for the incrementally-maintained accumulator (memoised by
 Zobrist hash in an eval cache). See [NNUE evaluation](#nnue-evaluation) below. Earlier versions also had a
 tapered hand-crafted evaluation (material, piece-square tables, pawn structure, king safety, mobility);
@@ -385,7 +387,7 @@ trained to score positions. It is the engine's only evaluator: the shipped net i
 a copy embedded in the binary as a fallback if the file can't be loaded), and a different net can be
 loaded at runtime (see [The NNUE net](#the-nnue-net) above).
 
-**How it works.** The network ([src/nnue.cpp](src/nnue.cpp), [src/nnue.h](src/nnue.h)) is a
+**How it works.** The network ([src/nnue.h](src/nnue.h)) is a
 "perspective" net using bullet's `ChessBuckets` feature set:
 
 ```
@@ -543,7 +545,7 @@ A few deliberate choices shape the codebase:
   history is a `std::vector` that grows only as real moves are played — so the node-by-node search loop
   performs effectively no dynamic allocation.
 - **Everything precomputed that can be.** Attack tables and Zobrist keys are built once at startup
-  (dynamic initialisation of `const` globals in `generated_data.cpp`), so the hot paths are pure lookups.
+  (dynamic initialisation of `inline const` globals in `generated_data.h`), so the hot paths are pure lookups.
 - **Lockless sharing.** Under Lazy SMP the transposition tables and the cancellation flag are the only
   cross-thread state — the ordering tables (history, killers, countermove, continuation history) are
   per-thread — and the shared state is accessed
@@ -591,8 +593,8 @@ the published node counts for the standard positions.
    ```bash
    clang-format -i src/<file>            # or your editor's format-on-save
    ```
-3. `src/generated_data.cpp` holds the precomputed-table *logic* (the compute functions and the `const`
-   globals they fill at startup); edit it when that logic changes.
+3. `src/generated_data.h` holds the precomputed-table *logic* (the compute functions, in a `gendata_detail`
+   namespace, and the `inline const` globals they fill at startup); edit it when that logic changes.
 4. Keep new public declarations Doxygen-commented so `make doc` stays complete.
 
 ## License
