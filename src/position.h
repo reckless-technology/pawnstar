@@ -20,8 +20,7 @@ class Position
 {
   public:
     // State variables
-    std::array<Bitboard, 7> pieces_;                ///< Per-piece-type bitboards indexed by Piece;
-                                                    ///< index 0 (kNone) holds the occupied-squares bitboard.
+    std::array<Bitboard, 7> pieces_;                ///< Bitboards indexed by Piece (index 0 = occupied squares)
     std::array<Bitboard, 2> colors_;                ///< Per-color bitboards indexed by Color.
     std::array<Piece, 64>   squares_;               ///< Squares array for fast piece lookup.
     Bitboard                checkers_;              ///< Set of squares which attack the king.
@@ -31,8 +30,8 @@ class Position
     uint8_t                 reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
     uint8_t                 full_move_count_;       ///< Number of full moves (zero indexed).
     CastlingRights          castling_rights_;       ///< Castling rights flags.
-    bool                    is_null_move_;          ///< @brief Whether the last move was a null (pass) move.
-    Color                   color_to_move_;         ///< @brief Side to move.
+    bool                    is_null_move_;          ///< Whether the last move was a null (pass) move.
+    Color                   color_to_move_;         ///< Side to move.
 
     // Interface
     constexpr Position()                                = default;

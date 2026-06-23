@@ -11,17 +11,15 @@
 #include "stack_list.h"
 
 /// @brief Transposition-table node type, packed into a move's spare bits.
-/// kCut: beta cutoff (lower bound). kAll: no move exceeded alpha (upper bound). kPv: exact score.
 enum class NodeType : uint8_t
 {
-    kCut,
-    kAll,
-    kPv,
+    kCut, ///< Beta cutoff.
+    kAll, ///< No move exceeded alpha.
+    kPv,  ///< Principal variation (rare).
 };
 
 /// @brief Class for representing a chess move.
 /// A move is 64 bits in size.
-///
 /// Bits are as follows:
 /// Bits | Meaning
 /// -----|--------
