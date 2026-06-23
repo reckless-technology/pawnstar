@@ -15,13 +15,14 @@ struct SeeBoard
 {
     std::array<Bitboard, 7> pieces_; ///< Per-piece-type bitboards indexed by Piece (index 0 / kNone unused).
     std::array<Bitboard, 2> colors_; ///< Per-color bitboards indexed by Color.
-
-    /// @brief Construct the working board from a position.
-    /// @param p Position to copy piece bitboards from.
-    constexpr SeeBoard(const Position &p) : pieces_(p.pieces_), colors_(p.colors_)
-    {
-    }
+    constexpr SeeBoard(const Position &p);
 };
+
+/// @brief Construct the working board from a position.
+/// @param p Position to copy piece bitboards from.
+constexpr SeeBoard::SeeBoard(const Position &p) : pieces_(p.pieces_), colors_(p.colors_)
+{
+}
 
 /// @brief Determine the swap off value for a capture on a square.
 /// @param bb set of bitboards of piece locations on the board

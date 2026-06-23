@@ -15,49 +15,55 @@
 struct Transposition
 {
     using NodeType = ::NodeType; ///< Alpha-beta node type (kCut / kAll / kPv), defined in move.h.
-
-    zobrist_t hash_; ///< Zobrist hash of this position.
-    Move      move_; ///< Best move, with score/depth/node-type/age packed into its spare bits.
-
-    constexpr Transposition() : hash_(0), move_(Move::None())
-    {
-    }
-
-    /// @brief Construct from a move that already has its TT metadata packed in (used when reconstructing
-    /// an entry read back from the table).
-    constexpr Transposition(zobrist_t hash, Move move) : hash_(hash), move_(move)
-    {
-    }
-
-    constexpr Transposition(zobrist_t hash, const Move &move, int score, int depth, NodeType type)
-        : hash_(hash), move_(move.WithTTData(score, depth, type))
-    {
-    }
-
-    /// @brief Score computed from this position (lower/upper bound or exact, per node_type()).
-    constexpr int score() const
-    {
-        return move_.score();
-    }
-
-    /// @brief Depth to which this position was searched.
-    constexpr int depth() const
-    {
-        return move_.TTDepth();
-    }
-
-    /// @brief Node type of the stored result.
-    constexpr NodeType node_type() const
-    {
-        return move_.TTNodeType();
-    }
-
-    /// @brief Table generation when stored; stale when != the table's current generation.
-    constexpr uint8_t age() const
-    {
-        return move_.TTAge();
-    }
+    zobrist_t hash_;             ///< Zobrist hash of this position.
+    Move      move_;             ///< Best move, with score/depth/node-type/age packed into its spare bits.
+    constexpr Transposition();
+    constexpr Transposition(zobrist_t hash, Move move);
+    constexpr Transposition(zobrist_t hash, const Move &move, int score, int depth, NodeType type);
+    constexpr int      score() const;
+    constexpr int      depth() const;
+    constexpr NodeType node_type() const;
+    constexpr uint8_t  age() const;
 };
+
+constexpr Transposition::Transposition() : hash_(0), move_(Move::None())
+{
+}
+
+/// @brief Construct from a move that already has its TT metadata packed in (used when reconstructing
+/// an entry read back from the table).
+constexpr Transposition::Transposition(zobrist_t hash, Move move) : hash_(hash), move_(move)
+{
+}
+
+constexpr Transposition::Transposition(zobrist_t hash, const Move &move, int score, int depth, NodeType type)
+    : hash_(hash), move_(move.WithTTData(score, depth, type))
+{
+}
+
+/// @brief Score computed from this position (lower/upper bound or exact, per node_type()).
+constexpr int Transposition::score() const
+{
+    return move_.score();
+}
+
+/// @brief Depth to which this position was searched.
+constexpr int Transposition::depth() const
+{
+    return move_.TTDepth();
+}
+
+/// @brief Node type of the stored result.
+constexpr Transposition::NodeType Transposition::node_type() const
+{
+    return move_.TTNodeType();
+}
+
+/// @brief Table generation when stored; stale when != the table's current generation.
+constexpr uint8_t Transposition::age() const
+{
+    return move_.TTAge();
+}
 
 static_assert(sizeof(Transposition) == 16);
 
@@ -82,14 +88,8 @@ class TranspositionTable
     std::pair<std::size_t, int>  UsageStats() const;
     /// @brief Approximate fill level for the UCI `info hashfull` field, in per mille (0..1000). Samples the
     /// first min(size, 1000) cells rather than scanning the whole table, so it is cheap to call per info line.
-    int HashfullPermille() const;
-
-    /// @brief Prefetch the cell a future FindTransposition(@p hash) will read, hiding the cache-miss
-    /// latency of the random table access. Result-neutral. @param hash Zobrist hash to be probed soon.
-    void Prefetch(zobrist_t hash) const
-    {
-        __builtin_prefetch(&table_[hash % size_], 0 /*read*/, 1 /*low temporal locality*/);
-    }
+    int  HashfullPermille() const;
+    void Prefetch(zobrist_t hash) const;
 
   private:
     /// @brief One lockless table cell. Stores @c key = hash ^ data alongside @c data (the packed move
@@ -107,6 +107,13 @@ class TranspositionTable
     std::size_t                    size_       = 0; ///< Number of cells in table_.
     uint8_t                        generation_ = 0; ///< Current generation; bumped by Age().
 };
+
+/// @brief Prefetch the cell a future FindTransposition(@p hash) will read, hiding the cache-miss
+/// latency of the random table access. Result-neutral. @param hash Zobrist hash to be probed soon.
+inline void TranspositionTable::Prefetch(zobrist_t hash) const
+{
+    __builtin_prefetch(&table_[hash % size_], 0 /*read*/, 1 /*low temporal locality*/);
+}
 
 /// @brief Create the transposition table.
 /// @param megabytes Approx max size of the table in megabytes.

@@ -39,30 +39,13 @@ class Game
     // clang-format on
 
     /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
-    Game()
-        : transposition_table_{kHashtableMegabytes}, eval_cache_{kEvalCacheMb}, is_cancel_pending_{false},
-          thread_count_{ComputeDefaultThreads()}
-    {
-        SetPosition();
-    }
+    Game();
 
     /// @brief Default Lazy SMP thread count: PAWNSTAR_THREADS if set (>0), else hardware_concurrency,
     /// clamped to [1, kMaxSearchThreads]. Read once at construction; the UCI `Threads` option overrides it.
-    static int ComputeDefaultThreads();
-
-    /// @brief Current position.
-    /// @return Reference to the current position.
-    Position &CurrentPosition()
-    {
-        return positions_.back();
-    }
-
-    /// @brief Current position (const overload).
-    /// @return Const reference to the current position.
-    const Position &CurrentPosition() const
-    {
-        return positions_.back();
-    }
+    static int      ComputeDefaultThreads();
+    Position       &CurrentPosition();
+    const Position &CurrentPosition() const;
 
     /// @brief Set the board to the given position, resetting per-game transient state (see definition).
     void SetPosition(std::string_view fen_string);
@@ -101,6 +84,30 @@ class Game
     std::vector<Position> positions_;    ///< Game position history (grows with the game; no fixed cap).
     nnue::Network         nnue_network_; ///< NNUE network instance (loaded via EvalFile; read-only in search).
 };
+
+inline // clang-format on
+
+    /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
+    Game::Game()
+    : transposition_table_{kHashtableMegabytes}, eval_cache_{kEvalCacheMb}, is_cancel_pending_{false},
+      thread_count_{ComputeDefaultThreads()}
+{
+    SetPosition();
+}
+
+/// @brief Current position.
+/// @return Reference to the current position.
+inline Position &Game::CurrentPosition()
+{
+    return positions_.back();
+}
+
+/// @brief Current position (const overload).
+/// @return Const reference to the current position.
+inline const Position &Game::CurrentPosition() const
+{
+    return positions_.back();
+}
 
 // ---- Definitions moved from game.cpp (header-only). SearchRootNode/SearchThreadEntry's search half
 //      needs SearchState, so SearchRootNode lives in the search_state.h hub; the rest are inline here. ----

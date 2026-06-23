@@ -25,51 +25,56 @@
 class EvalCache
 {
   public:
-    /// @brief Construct a cache of about @p megabytes MB (entry count rounded down to a power of two).
-    /// @param megabytes Target size in megabytes.
-    explicit EvalCache(int megabytes)
-    {
-        const std::size_t want = (static_cast<std::size_t>(megabytes) * 1024 * 1024) / sizeof(std::atomic<uint64_t>);
-        std::size_t       pow2 = 1;
-        while (pow2 * 2 <= want)
-        {
-            pow2 *= 2;
-        }
-        mask_  = pow2 - 1;
-        table_ = std::vector<std::atomic<uint64_t>>(pow2); // value-initialised (all zero)
-    }
-
-    /// @brief Probe the cache for a position. @param hash Position Zobrist hash.
-    /// @param[out] score Cached evaluation (centipawns, side-to-move relative) on a hit. @return true on hit.
-    bool Probe(zobrist_t hash, int &score) const
-    {
-        const uint64_t entry = table_[hash & mask_].load(std::memory_order_relaxed);
-        if ((entry >> 16) != (hash >> 16))
-        {
-            return false;
-        }
-        score = static_cast<int16_t>(static_cast<uint16_t>(entry));
-        return true;
-    }
-
-    /// @brief Store an evaluation for a position. @param hash Position Zobrist hash. @param score Eval in cp.
-    void Store(zobrist_t hash, int score)
-    {
-        const uint64_t entry =
-            (hash & 0xFFFFFFFFFFFF0000ULL) | static_cast<uint64_t>(static_cast<uint16_t>(static_cast<int16_t>(score)));
-        table_[hash & mask_].store(entry, std::memory_order_relaxed);
-    }
-
-    /// @brief Reset every entry. Call when the active network changes (and at the start of a game).
-    void Clear()
-    {
-        for (auto &entry : table_)
-        {
-            entry.store(0, std::memory_order_relaxed);
-        }
-    }
+    explicit EvalCache(int megabytes);
+    bool Probe(zobrist_t hash, int &score) const;
+    void Store(zobrist_t hash, int score);
+    void Clear();
 
   private:
-    std::vector<std::atomic<uint64_t>> table_;   ///< Power-of-two table; each entry packs key|score.
+    std::vector<std::atomic<uint64_t>> table_;    ///< Power-of-two table; each entry packs key|score.
     std::size_t                        mask_ = 0; ///< Index mask (table size - 1).
 };
+
+/// @brief Construct a cache of about @p megabytes MB (entry count rounded down to a power of two).
+/// @param megabytes Target size in megabytes.
+inline EvalCache::EvalCache(int megabytes)
+{
+    const std::size_t want = (static_cast<std::size_t>(megabytes) * 1024 * 1024) / sizeof(std::atomic<uint64_t>);
+    std::size_t       pow2 = 1;
+    while (pow2 * 2 <= want)
+    {
+        pow2 *= 2;
+    }
+    mask_  = pow2 - 1;
+    table_ = std::vector<std::atomic<uint64_t>>(pow2); // value-initialised (all zero)
+}
+
+/// @brief Probe the cache for a position. @param hash Position Zobrist hash.
+/// @param[out] score Cached evaluation (centipawns, side-to-move relative) on a hit. @return true on hit.
+inline bool EvalCache::Probe(zobrist_t hash, int &score) const
+{
+    const uint64_t entry = table_[hash & mask_].load(std::memory_order_relaxed);
+    if ((entry >> 16) != (hash >> 16))
+    {
+        return false;
+    }
+    score = static_cast<int16_t>(static_cast<uint16_t>(entry));
+    return true;
+}
+
+/// @brief Store an evaluation for a position. @param hash Position Zobrist hash. @param score Eval in cp.
+inline void EvalCache::Store(zobrist_t hash, int score)
+{
+    const uint64_t entry =
+        (hash & 0xFFFFFFFFFFFF0000ULL) | static_cast<uint64_t>(static_cast<uint16_t>(static_cast<int16_t>(score)));
+    table_[hash & mask_].store(entry, std::memory_order_relaxed);
+}
+
+/// @brief Reset every entry. Call when the active network changes (and at the start of a game).
+inline void EvalCache::Clear()
+{
+    for (auto &entry : table_)
+    {
+        entry.store(0, std::memory_order_relaxed);
+    }
+}

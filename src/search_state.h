@@ -77,20 +77,8 @@ class SearchState
     /// position stack with the current position only.
     /// @param game Game to search.
     explicit SearchState(Game &game);
-
-    /// @brief Current position at the tip of the search tree.
-    /// @return Reference to the current position.
-    Position &CurrentPosition()
-    {
-        return positions_.back();
-    }
-
-    /// @brief Current position at the tip of the search tree (const overload).
-    /// @return Const reference to the current position.
-    const Position &CurrentPosition() const
-    {
-        return positions_.back();
-    }
+    Position       &CurrentPosition();
+    const Position &CurrentPosition() const;
 
     /// @brief Make a move, pushing the resulting position onto the stack and recording its hash.
     /// @param move Move to play.
@@ -145,72 +133,20 @@ class SearchState
     /// @brief Returns true if this thread should abort because the global stop flag is set
     /// (time limit fired, UCI stop, or another Lazy SMP thread completed the search).
     /// @return true if the search should be abandoned.
-    bool IsCancelled() const;
-
-    /// @brief Record a quiet move that caused a beta cutoff as a killer move for this ply.
-    /// Shifts the previous first killer into the second slot; ignores duplicates.
-    /// @param ply Current search ply.
-    /// @param move Quiet move that caused the cutoff.
-    void RecordKiller(int ply, Move move)
-    {
-        if (!(killers_[ply][0] == move))
-        {
-            INCREMENT("killer moves");
-            killers_[ply][1] = killers_[ply][0];
-            killers_[ply][0] = move;
-        }
-    }
-
-    /// @brief Table key for a move in the countermove / continuation-history tables: (piece, to-square).
-    /// Move::None (piece 0, to 0) maps to 0, a harmless dedicated slot.
-    static constexpr int ContKey(Move m)
-    {
-        return m.piece() * 64 + m.to();
-    }
-
+    bool                 IsCancelled() const;
+    void                 RecordKiller(int ply, Move move);
+    static constexpr int ContKey(Move m);
     static constexpr int kContKeys = 7 * 64; ///< Distinct (piece, to) keys: pieces 0..6 × 64 squares.
-
-    /// @brief Continuation-history score for playing @p move after @p prev (0 if prev/move not quiet-tracked).
-    int ContinuationHistScore(Move prev, Move move) const
-    {
-        return continuation_history_[ContKey(prev) * kContKeys + ContKey(move)];
-    }
-
-    /// @brief Whether @p move is the recorded countermove (best quiet refutation) to @p prev.
-    bool IsCountermove(Move prev, Move move) const
-    {
-        return countermoves_[ContKey(prev)] == move;
-    }
-
-    /// @brief Reward a quiet @p move that was good (raised alpha or cut) as a follow-up to @p prev.
-    /// Captures are ignored (they are ordered by SEE, not history). Saturating count, like HistoryTable.
-    void RecordContinuationHistory(Move prev, Move move)
-    {
-        if (move.IsQuiet())
-        {
-            int16_t &c = continuation_history_[ContKey(prev) * kContKeys + ContKey(move)];
-            if (c < 16384)
-            {
-                ++c;
-            }
-        }
-    }
-
-    /// @brief Record a quiet @p move that caused a beta cutoff as the countermove to @p prev.
-    void RecordCountermove(Move prev, Move move)
-    {
-        if (move.IsQuiet())
-        {
-            countermoves_[ContKey(prev)] = move;
-        }
-    }
+    int                  ContinuationHistScore(Move prev, Move move) const;
+    bool                 IsCountermove(Move prev, Move move) const;
+    void                 RecordContinuationHistory(Move prev, Move move);
+    void                 RecordCountermove(Move prev, Move move);
 
   private:
     /// @brief Try null-move pruning at the current node (the caller has established it is a non-PV node not in
     /// check). Reuses the caller's precomputed static eval.
     /// @return The null-move score, or @p alpha if null move was not tried / did not cut.
-    int AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
-
+    int                   AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
     std::vector<Position> positions_; ///< Per-thread copy-make position stack (reserved in the constructor).
 
   public:
@@ -228,6 +164,76 @@ class SearchState
     /// Heap-allocated (per-thread, ~0.4 MB) and indexed [ContKey(prev) * kContKeys + ContKey(move)].
     std::unique_ptr<int16_t[]> continuation_history_;
 };
+
+/// @brief Current position at the tip of the search tree.
+/// @return Reference to the current position.
+inline Position &SearchState::CurrentPosition()
+{
+    return positions_.back();
+}
+
+/// @brief Current position at the tip of the search tree (const overload).
+/// @return Const reference to the current position.
+inline const Position &SearchState::CurrentPosition() const
+{
+    return positions_.back();
+}
+
+/// @brief Record a quiet move that caused a beta cutoff as a killer move for this ply.
+/// Shifts the previous first killer into the second slot; ignores duplicates.
+/// @param ply Current search ply.
+/// @param move Quiet move that caused the cutoff.
+inline void SearchState::RecordKiller(int ply, Move move)
+{
+    if (!(killers_[ply][0] == move))
+    {
+        INCREMENT("killer moves");
+        killers_[ply][1] = killers_[ply][0];
+        killers_[ply][0] = move;
+    }
+}
+
+/// @brief Table key for a move in the countermove / continuation-history tables: (piece, to-square).
+/// Move::None (piece 0, to 0) maps to 0, a harmless dedicated slot.
+constexpr int SearchState::ContKey(Move m)
+{
+    return m.piece() * 64 + m.to();
+}
+
+/// @brief Continuation-history score for playing @p move after @p prev (0 if prev/move not quiet-tracked).
+inline int SearchState::ContinuationHistScore(Move prev, Move move) const
+{
+    return continuation_history_[ContKey(prev) * kContKeys + ContKey(move)];
+}
+
+/// @brief Whether @p move is the recorded countermove (best quiet refutation) to @p prev.
+inline bool SearchState::IsCountermove(Move prev, Move move) const
+{
+    return countermoves_[ContKey(prev)] == move;
+}
+
+/// @brief Reward a quiet @p move that was good (raised alpha or cut) as a follow-up to @p prev.
+/// Captures are ignored (they are ordered by SEE, not history). Saturating count, like HistoryTable.
+inline void SearchState::RecordContinuationHistory(Move prev, Move move)
+{
+    if (move.IsQuiet())
+    {
+        int16_t &c = continuation_history_[ContKey(prev) * kContKeys + ContKey(move)];
+        if (c < 16384)
+        {
+            ++c;
+        }
+    }
+}
+
+/// @brief Record a quiet @p move that caused a beta cutoff as the countermove to @p prev.
+inline void SearchState::RecordCountermove(Move prev, Move move)
+{
+    if (move.IsQuiet())
+    {
+        countermoves_[ContKey(prev)] = move;
+    }
+}
 
 // ================= Definitions moved here for the header-only build =================
 // search_state.h is the hub where Game and SearchState are both complete, so the cyclic

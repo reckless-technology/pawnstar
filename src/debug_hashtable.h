@@ -14,20 +14,22 @@
 /// @brief FNV-1a 64 hash. Simple, fast, and constexpr.
 struct string_hasher
 {
-    /// @brief Hash a string view.
-    /// @param str String to hash.
-    /// @return 64-bit FNV-1a hash.
-    constexpr std::size_t operator()(std::string_view str) const
-    {
-        std::size_t result = 14695981039346656037ull;
-        for (auto c : str)
-        {
-            result ^= c;
-            result *= 1099511628211ull;
-        }
-        return result;
-    }
+    constexpr std::size_t operator()(std::string_view str) const;
 };
+
+/// @brief Hash a string view.
+/// @param str String to hash.
+/// @return 64-bit FNV-1a hash.
+constexpr std::size_t string_hasher::operator()(std::string_view str) const
+{
+    std::size_t result = 14695981039346656037ull;
+    for (auto c : str)
+    {
+        result ^= c;
+        result *= 1099511628211ull;
+    }
+    return result;
+}
 
 /// @brief Maps a literal string to a count value.
 using DebugTable = std::unordered_map<std::string_view, int64_t, string_hasher>;

@@ -34,14 +34,15 @@ struct Handler
     HandlerFn        function_;    ///< Function to be called
     std::string_view name_;        ///< Command name
     std::string_view description_; ///< Command description
-
-    /// @brief Construct a command handler entry.
-    /// @param fn Handler function. @param name Command name. @param desc Human-readable description.
-    constexpr Handler(HandlerFn fn, std::string_view name, std::string_view desc)
-        : function_(fn), name_(name), description_(desc)
-    {
-    }
+    constexpr Handler(HandlerFn fn, std::string_view name, std::string_view desc);
 };
+
+/// @brief Construct a command handler entry.
+/// @param fn Handler function. @param name Command name. @param desc Human-readable description.
+constexpr Handler::Handler(HandlerFn fn, std::string_view name, std::string_view desc)
+    : function_(fn), name_(name), description_(desc)
+{
+}
 
 /// @brief Handle the "bookmoves" command: display book moves for the current position.
 /// @param game Game to act on.

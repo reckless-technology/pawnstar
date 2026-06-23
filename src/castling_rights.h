@@ -13,120 +13,16 @@
 class CastlingRights
 {
   public:
-    /// @brief Default constructor; no castling rights.
-    constexpr CastlingRights() : value_{0}
-    {
-    }
-
-    /// @brief Construct from a raw 4-bit flag value.
-    /// @param rights Bitwise OR of the Flags enumerators.
-    constexpr CastlingRights(uint8_t rights) : value_{rights}
-    {
-    }
-
-    /// @brief Whether white may still castle kingside.
-    /// @return true if the white kingside right is set.
-    constexpr bool MayWhiteCastleKingside() const
-    {
-        return !!(value_ & kWhiteKingside);
-    }
-
-    /// @brief Whether white may still castle queenside.
-    /// @return true if the white queenside right is set.
-    constexpr bool MayWhiteCastleQueenside() const
-    {
-        return !!(value_ & kWhiteQueenside);
-    }
-
-    /// @brief Whether black may still castle kingside.
-    /// @return true if the black kingside right is set.
-    constexpr bool MayBlackCastleKingside() const
-    {
-        return !!(value_ & kBlackKingside);
-    }
-
-    /// @brief Whether black may still castle queenside.
-    /// @return true if the black queenside right is set.
-    constexpr bool MayBlackCastleQueenside() const
-    {
-        return !!(value_ & kBlackQueenside);
-    }
-
-    /// @brief Zobrist hash associated with these castling rights.
-    constexpr zobrist_t Hash() const
-    {
-        return kCastlingRightsHashes[value_];
-    }
-
-    /// @brief Return the castling rights that result after making a move.
-    /// @param move Move being made (its from/to squares may revoke rights).
-    /// @return Reference to this updated castling-rights object.
-    constexpr CastlingRights &AfterMove(const Move &move)
-    {
-        value_ &= kMoveMasks[move.from()] & kMoveMasks[move.to()];
-        return *this;
-    }
-
-    /// @brief Parse the castling field from a FEN string (e.g. "KQkq" or "-").
-    /// @param fen FEN castling field.
-    /// @return The parsed castling rights.
-    static constexpr CastlingRights FromFen(std::string_view fen)
-    {
-        uint8_t result = 0;
-        if (fen == "-")
-        {
-            return CastlingRights{result};
-        }
-        for (char c : fen)
-        {
-            switch (c)
-            {
-            case 'K':
-                result |= kWhiteKingside;
-                break;
-            case 'Q':
-                result |= kWhiteQueenside;
-                break;
-            case 'k':
-                result |= kBlackKingside;
-                break;
-            case 'q':
-                result |= kBlackQueenside;
-                break;
-            default:
-                break;
-            }
-        }
-        return CastlingRights{result};
-    }
-
-    /// @brief Serialize castling rights to FEN format.
-    /// @return string containing FEN of castling rights (e.g. "KQkq" or "-").
-    constexpr std::string ToFenString() const
-    {
-        if (value_ == 0)
-        {
-            return "-";
-        }
-        std::string s;
-        if (value_ & kWhiteKingside)
-        {
-            s += 'K';
-        }
-        if (value_ & kWhiteQueenside)
-        {
-            s += 'Q';
-        }
-        if (value_ & kBlackKingside)
-        {
-            s += 'k';
-        }
-        if (value_ & kBlackQueenside)
-        {
-            s += 'q';
-        }
-        return s;
-    }
+    constexpr CastlingRights();
+    constexpr CastlingRights(uint8_t rights);
+    constexpr bool                  MayWhiteCastleKingside() const;
+    constexpr bool                  MayWhiteCastleQueenside() const;
+    constexpr bool                  MayBlackCastleKingside() const;
+    constexpr bool                  MayBlackCastleQueenside() const;
+    constexpr zobrist_t             Hash() const;
+    constexpr CastlingRights       &AfterMove(const Move &move);
+    static constexpr CastlingRights FromFen(std::string_view fen);
+    constexpr std::string           ToFenString() const;
 
   private:
     uint8_t value_; ///< The actual flag value.
@@ -163,3 +59,118 @@ class CastlingRights
     };
     // clang-format on
 };
+
+/// @brief Default constructor; no castling rights.
+constexpr CastlingRights::CastlingRights() : value_{0}
+{
+}
+
+/// @brief Construct from a raw 4-bit flag value.
+/// @param rights Bitwise OR of the Flags enumerators.
+constexpr CastlingRights::CastlingRights(uint8_t rights) : value_{rights}
+{
+}
+
+/// @brief Whether white may still castle kingside.
+/// @return true if the white kingside right is set.
+constexpr bool CastlingRights::MayWhiteCastleKingside() const
+{
+    return !!(value_ & kWhiteKingside);
+}
+
+/// @brief Whether white may still castle queenside.
+/// @return true if the white queenside right is set.
+constexpr bool CastlingRights::MayWhiteCastleQueenside() const
+{
+    return !!(value_ & kWhiteQueenside);
+}
+
+/// @brief Whether black may still castle kingside.
+/// @return true if the black kingside right is set.
+constexpr bool CastlingRights::MayBlackCastleKingside() const
+{
+    return !!(value_ & kBlackKingside);
+}
+
+/// @brief Whether black may still castle queenside.
+/// @return true if the black queenside right is set.
+constexpr bool CastlingRights::MayBlackCastleQueenside() const
+{
+    return !!(value_ & kBlackQueenside);
+}
+
+/// @brief Zobrist hash associated with these castling rights.
+constexpr zobrist_t CastlingRights::Hash() const
+{
+    return kCastlingRightsHashes[value_];
+}
+
+/// @brief Return the castling rights that result after making a move.
+/// @param move Move being made (its from/to squares may revoke rights).
+/// @return Reference to this updated castling-rights object.
+constexpr CastlingRights &CastlingRights::AfterMove(const Move &move)
+{
+    value_ &= kMoveMasks[move.from()] & kMoveMasks[move.to()];
+    return *this;
+}
+
+/// @brief Parse the castling field from a FEN string (e.g. "KQkq" or "-").
+/// @param fen FEN castling field.
+/// @return The parsed castling rights.
+constexpr CastlingRights CastlingRights::FromFen(std::string_view fen)
+{
+    uint8_t result = 0;
+    if (fen == "-")
+    {
+        return CastlingRights{result};
+    }
+    for (char c : fen)
+    {
+        switch (c)
+        {
+        case 'K':
+            result |= kWhiteKingside;
+            break;
+        case 'Q':
+            result |= kWhiteQueenside;
+            break;
+        case 'k':
+            result |= kBlackKingside;
+            break;
+        case 'q':
+            result |= kBlackQueenside;
+            break;
+        default:
+            break;
+        }
+    }
+    return CastlingRights{result};
+}
+
+/// @brief Serialize castling rights to FEN format.
+/// @return string containing FEN of castling rights (e.g. "KQkq" or "-").
+constexpr std::string CastlingRights::ToFenString() const
+{
+    if (value_ == 0)
+    {
+        return "-";
+    }
+    std::string s;
+    if (value_ & kWhiteKingside)
+    {
+        s += 'K';
+    }
+    if (value_ & kWhiteQueenside)
+    {
+        s += 'Q';
+    }
+    if (value_ & kBlackKingside)
+    {
+        s += 'k';
+    }
+    if (value_ & kBlackQueenside)
+    {
+        s += 'q';
+    }
+    return s;
+}

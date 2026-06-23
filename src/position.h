@@ -50,51 +50,14 @@ class Position
 
     // Const accessors.
     /// @brief Pieces of a colour attacking a square (see definition for details).
-    constexpr Bitboard AttacksTo(Square location, Color color) const;
-
-    /// @brief Generate all legal moves. @return The legal move list.
-    constexpr MoveList GenerateLegalMoves() const
-    {
-        return color_to_move_ == kWhite ? GenMoves<kWhite, true>() : GenMoves<kBlack, true>();
-    }
-
-    /// @brief Generate legal captures and promotions only. @return The legal capture list.
-    constexpr MoveList GenerateLegalCaptures() const
-    {
-        return color_to_move_ == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();
-    }
-
-    /// @brief Whether a square is attacked by a colour. @param s Target square. @param c Attacking colour. @return true
-    /// if attacked.
-    constexpr bool IsAttacked(Square s, Color c) const
-    {
-        return AttacksTo(s, c).IsNotEmpty();
-    }
-
-    /// @brief All occupied squares. @return Occupancy bitboard.
-    constexpr Bitboard OccupiedSquares() const
-    {
-        return pieces_[kNone];
-    }
-
-    /// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
-    constexpr Piece PieceAt(Square location) const
-    {
-        return squares_[location];
-    }
-
-    /// @brief King location for a colour. @param color Colour to query. @return The king's square.
-    constexpr Square KingLocation(Color color) const
-    {
-        return king_location_[color];
-    }
-
-    /// @brief Whether the side to move is in check. @return true if in check.
-    constexpr bool IsInCheck() const
-    {
-        return checkers_.IsNotEmpty();
-    }
-
+    constexpr Bitboard      AttacksTo(Square location, Color color) const;
+    constexpr MoveList      GenerateLegalMoves() const;
+    constexpr MoveList      GenerateLegalCaptures() const;
+    constexpr bool          IsAttacked(Square s, Color c) const;
+    constexpr Bitboard      OccupiedSquares() const;
+    constexpr Piece         PieceAt(Square location) const;
+    constexpr Square        KingLocation(Color color) const;
+    constexpr bool          IsInCheck() const;
     std::array<Bitboard, 7> pieces_; ///< @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the
                                      ///< occupied-squares bitboard
     std::array<Bitboard, 2> colors_; ///< @brief Per-color bitboards indexed by Color.
@@ -129,6 +92,49 @@ class Position
     bool  is_null_move_;  ///< @brief Whether the last move was a null (pass) move.
     Color color_to_move_; ///< @brief Side to move. Declared last so it occupies what was the trailing padding byte.
 };
+
+/// @brief Generate all legal moves. @return The legal move list.
+constexpr MoveList Position::GenerateLegalMoves() const
+{
+    return color_to_move_ == kWhite ? GenMoves<kWhite, true>() : GenMoves<kBlack, true>();
+}
+
+/// @brief Generate legal captures and promotions only. @return The legal capture list.
+constexpr MoveList Position::GenerateLegalCaptures() const
+{
+    return color_to_move_ == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();
+}
+
+/// @brief Whether a square is attacked by a colour. @param s Target square. @param c Attacking colour. @return true
+/// if attacked.
+constexpr bool Position::IsAttacked(Square s, Color c) const
+{
+    return AttacksTo(s, c).IsNotEmpty();
+}
+
+/// @brief All occupied squares. @return Occupancy bitboard.
+constexpr Bitboard Position::OccupiedSquares() const
+{
+    return pieces_[kNone];
+}
+
+/// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
+constexpr Piece Position::PieceAt(Square location) const
+{
+    return squares_[location];
+}
+
+/// @brief King location for a colour. @param color Colour to query. @return The king's square.
+constexpr Square Position::KingLocation(Color color) const
+{
+    return king_location_[color];
+}
+
+/// @brief Whether the side to move is in check. @return true if in check.
+constexpr bool Position::IsInCheck() const
+{
+    return checkers_.IsNotEmpty();
+}
 
 static_assert(sizeof(Position) == 160);
 
