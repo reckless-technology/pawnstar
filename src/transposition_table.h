@@ -97,15 +97,19 @@ class TranspositionTable
     /// (two 64-bit words written by different stores) is detected and treated as a miss (Hyatt's XOR trick).
     struct AtomicEntry
     {
-        std::atomic<uint64_t> key_{0};  ///< hash ^ data.
-        std::atomic<uint64_t> data_{0}; ///< Packed move bits (move + score/depth/node-type/age).
+        AtomicEntry() : key_(0), data_(0)
+        {
+        }
+
+        std::atomic<uint64_t> key_;  ///< hash ^ data.
+        std::atomic<uint64_t> data_; ///< Packed move bits (move + score/depth/node-type/age).
     };
 
     static_assert(sizeof(AtomicEntry) == 16);
 
-    std::unique_ptr<AtomicEntry[]> table_;          ///< Indexed using Zobrist hash; value-initialised to 0.
-    std::size_t                    size_       = 0; ///< Number of cells in table_.
-    uint8_t                        generation_ = 0; ///< Current generation; bumped by Age().
+    std::unique_ptr<AtomicEntry[]> table_;      ///< Indexed using Zobrist hash; value-initialised to 0.
+    std::size_t                    size_;       ///< Number of cells in table_.
+    uint8_t                        generation_; ///< Current generation; bumped by Age().
 };
 
 /// @brief Prefetch the cell a future FindTransposition(@p hash) will read, hiding the cache-miss
@@ -117,7 +121,7 @@ inline void TranspositionTable::Prefetch(zobrist_t hash) const
 
 /// @brief Create the transposition table.
 /// @param megabytes Approx max size of the table in megabytes.
-inline TranspositionTable::TranspositionTable(std::size_t megabytes)
+inline TranspositionTable::TranspositionTable(std::size_t megabytes) : size_(0), generation_(0)
 {
     Resize(megabytes);
 }

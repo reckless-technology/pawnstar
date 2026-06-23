@@ -26,15 +26,14 @@ class ChessClock
         kInfinite,   ///< Search until told to stop.
     };
 
-    ChessClock() = default;
-    ClockType clock_type_{kStandard};                   ///< The current time-control type.
-    Duration  remaining_time_{std::chrono::minutes{5}}; ///< Time left on our clock this period (UCI wtime/btime).
-    Duration  increment_{
-        Duration::zero()}; ///< Per-move increment, side to move (UCI winc/binc). Parsed but not currently used by time
-                            ///< planning — see SearchRootNode (folding it into the budget SPRT'd neutral/negative).
-    int      moves_to_go_{0}; ///< Moves until the next time control (0 = unknown / sudden death).
-    int      depth_{10};      ///< Target depth when clock_type == kFixedDepth.
-    uint64_t max_nodes_{0};   ///< Node limit for `go nodes` (0 = no limit); checked per-thread in Search.
+    ChessClock();
+    ClockType clock_type_;     ///< The current time-control type.
+    Duration  remaining_time_; ///< Time left on our clock this period (UCI wtime/btime).
+    Duration  increment_;      ///< Per-move increment, side to move (UCI winc/binc). Parsed but not currently used by
+                         ///< time planning — see SearchRootNode (folding it into the budget SPRT'd neg/neutral).
+    int      moves_to_go_; ///< Moves until the next time control (0 = unknown / sudden death).
+    int      depth_;       ///< Target depth when clock_type == kFixedDepth.
+    uint64_t max_nodes_;   ///< Node limit for `go nodes` (0 = no limit); checked per-thread in Search.
     void     Reset();
     void     StartSearch(Duration allocated, Duration maximum);
     void     StartPonderSearch(Duration allocated, Duration maximum);
@@ -50,15 +49,24 @@ class ChessClock
     // search_start_time_ and hard_deadline_ are mutated mid-search by `ponderhit` (UCI thread) and read every
     // node by the search worker threads, so they are atomic. The budgets are set before the workers start and
     // not changed mid-search, so they are plain.
-    std::atomic<TimePoint> search_start_time_{Clock::now()};
-    std::atomic<TimePoint> hard_deadline_{kNoDeadline};
+    std::atomic<TimePoint> search_start_time_;
+    std::atomic<TimePoint> hard_deadline_;
 
   public:
-    Duration allocated_time_{Duration::zero()}; ///< Soft time budget for this move (drives between-iteration stops).
+    Duration allocated_time_; ///< Soft time budget for this move (drives between-iteration stops).
 
   private:
-    Duration max_search_time_{Duration::zero()};
+    Duration max_search_time_;
 };
+
+/// @brief Construct with default time control (5-minute sudden death), no search armed. Mirrors what the
+/// previous default member initialisers set; Reset() restores these same values for a new game.
+inline ChessClock::ChessClock()
+    : clock_type_(kStandard), remaining_time_(std::chrono::minutes{5}), increment_(Duration::zero()), moves_to_go_(0),
+      depth_(10), max_nodes_(0), search_start_time_(Clock::now()), hard_deadline_(kNoDeadline),
+      allocated_time_(Duration::zero()), max_search_time_(Duration::zero())
+{
+}
 
 /// @brief Reset to default time control (called when starting a new game). Provided instead of assigning a
 /// fresh ChessClock because the atomic members below make the class non-assignable.

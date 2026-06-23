@@ -31,13 +31,13 @@ class EvalCache
     void Clear();
 
   private:
-    std::vector<std::atomic<uint64_t>> table_;    ///< Power-of-two table; each entry packs key|score.
-    std::size_t                        mask_ = 0; ///< Index mask (table size - 1).
+    std::vector<std::atomic<uint64_t>> table_; ///< Power-of-two table; each entry packs key|score.
+    std::size_t                        mask_;  ///< Index mask (table size - 1).
 };
 
 /// @brief Construct a cache of about @p megabytes MB (entry count rounded down to a power of two).
 /// @param megabytes Target size in megabytes.
-inline EvalCache::EvalCache(int megabytes)
+inline EvalCache::EvalCache(int megabytes) : mask_(0)
 {
     const std::size_t want = (static_cast<std::size_t>(megabytes) * 1024 * 1024) / sizeof(std::atomic<uint64_t>);
     std::size_t       pow2 = 1;
