@@ -11,7 +11,8 @@
       "Bash(make tools *)",
       "Bash(time ./build/gen_data /tmp/gd_smoke.txt 3 1 6 8)",
       "Bash(awk -F'|' '{print $3}' /tmp/gd_smoke.txt)",
-      "Bash(ASAN_OPTIONS=detect_leaks=0 ./build/gen_data /tmp/gd_smoke.txt 1 1 6 8)"
+      "Bash(ASAN_OPTIONS=detect_leaks=0 ./build/gen_data /tmp/gd_smoke.txt 1 1 6 8)",
+      "Bash(clang-format -i src/eval_cache.h src/transposition_table.h src/chess_clock.h)"
     ],
     "additionalDirectories": [
       "/tmp"
