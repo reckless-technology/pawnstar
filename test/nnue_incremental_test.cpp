@@ -11,15 +11,16 @@
 #include "nnue.h"
 #include "position.h"
 #include "search_state.h"
+#include "test_report.h"
 
 #include <cstdint>
+#include <format>
 #include <iostream>
 #include <random>
 
 namespace
 {
 long g_checks = 0;
-long g_fails  = 0;
 
 /// @brief Recursively play random legal moves, comparing the incremental accumulator against a full
 /// refresh at entry and again after undoing all children (to catch UndoMove reverse bugs).
@@ -32,8 +33,8 @@ void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
     ++g_checks;
     if (inc != ref)
     {
-        ++g_fails;
-        std::cout << "MISMATCH (incremental " << inc << " != refresh " << ref << ") fen=" << p.ToString() << "\n";
+        test_report::Check(false,
+                           std::format("incremental accumulator {} != full refresh {} fen={}", inc, ref, p.ToString()));
     }
     if (depth <= 0)
     {
@@ -56,9 +57,8 @@ void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
     ++g_checks;
     if (inc_after != ref)
     {
-        ++g_fails;
-        std::cout << "UNDO MISMATCH (incremental " << inc_after << " != refresh " << ref << ") fen=" << p.ToString()
-                  << "\n";
+        test_report::Check(false, std::format("incremental accumulator after undo {} != full refresh {} fen={}",
+                                              inc_after, ref, p.ToString()));
     }
 }
 } // namespace
@@ -67,20 +67,14 @@ int main(int argc, char **argv)
 {
     if (argc < 2)
     {
-        std::cout << "test_nnue_incremental: no net provided, skipping (pass).\n";
-        return 0;
+        return test_report::Summary("incremental NNUE: skipped (no net supplied)");
     }
     // Load the net into a Game; SearchState then maintains the accumulator incrementally.
     Game game;
-    if (!game.nnue_network_.Load(argv[1]))
+    if (!game.nnue_network_.Load(argv[1]) || !game.nnue_network_.loaded_)
     {
-        std::cout << "test_nnue_incremental: failed to load net '" << argv[1] << "'\n";
-        return 1;
-    }
-    if (!game.nnue_network_.loaded_)
-    {
-        std::cout << "test_nnue_incremental: net not loaded after load\n";
-        return 1;
+        test_report::Check(false, std::format("incremental NNUE: failed to load net '{}'", argv[1]));
+        return test_report::ExitCode();
     }
 
     // Several independent random search trees from the start position (the net persists across SetPosition()).
@@ -92,12 +86,5 @@ int main(int argc, char **argv)
         Walk(state, rng, /*depth=*/10, /*branch=*/2);
     }
 
-    std::cout << g_checks << " checks; " << g_fails << " mismatches\n";
-    if (g_fails != 0)
-    {
-        std::cout << "INCREMENTAL NNUE TEST FAILED\n";
-        return 1;
-    }
-    std::cout << "INCREMENTAL NNUE TEST PASS\n";
-    return 0;
+    return test_report::Summary(std::format("incremental NNUE: {} checks bit-identical to full refresh", g_checks));
 }

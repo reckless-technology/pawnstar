@@ -16,6 +16,7 @@
 #include "game.h"
 #include "move.h"
 #include "position.h"
+#include "test_report.h"
 
 #include <algorithm>
 #include <array>
@@ -106,8 +107,7 @@ int main(int argc, char *argv[])
 {
     if (argc < 2)
     {
-        std::cout << "test_bratko_kopec_nnue skipped (no net supplied)\n";
-        return 0;
+        return test_report::Summary("Bratko-Kopec NNUE: skipped (no net supplied)");
     }
     const std::string net_path = argv[1];
     const int         depth    = argc > 2 ? std::atoi(argv[2]) : bk::kDefaultDepth;
@@ -119,20 +119,13 @@ int main(int argc, char *argv[])
     setenv("PAWNSTAR_THREADS", "1", 0);
 
     Game game;
-    if (!game.nnue_network_.Load(net_path))
+    if (!game.nnue_network_.Load(net_path) || !game.nnue_network_.loaded_)
     {
-        std::cerr << "test_bratko_kopec_nnue: failed to load net '" << net_path << "'\n";
-        return 1;
-    }
-    if (!game.nnue_network_.loaded_)
-    {
-        std::cerr << "test_bratko_kopec_nnue: net not loaded after load\n";
-        return 1;
+        test_report::Check(false, std::format("Bratko-Kopec NNUE: failed to load net '{}'", net_path));
+        return test_report::ExitCode();
     }
 
     using Clock    = std::chrono::steady_clock;
-    int  solved    = 0;
-    int  errors    = 0;
     auto t_overall = Clock::now();
 
     for (int i = 0; i < (int)bk::kCases.size(); ++i)
@@ -150,36 +143,16 @@ int main(int argc, char *argv[])
         DebugXWrite();
 
         const std::string got_move = m.ToString();
+        const bool        found    = m != Move::None();
+        const bool        match = found && std::find(tc.moves_.begin(), tc.moves_.end(), got_move) != tc.moves_.end();
 
-        const bool found = m != Move::None();
-        const bool match = found && std::find(tc.moves_.begin(), tc.moves_.end(), got_move) != tc.moves_.end();
-        if (!found)
-        {
-            ++errors; // a legal move should always come back for these positions
-        }
-        if (match)
-        {
-            ++solved;
-        }
-
-        std::cout << std::format("[{}] pos{:02d} got={}/{:<6} accepted=[{}] {}ms {}\n", match ? "SOLVED" : " MISS ",
-                                 i + 1, got_move, m.score(), bk::AcceptedMovesString(tc), elapsed_ms, tc.fen_);
+        // A position is solved when a legal move comes back and it is among that position's accepted moves.
+        test_report::Check(match, std::format("BK pos{:02d} got={}/{:<6} accepted=[{}] {}ms {}", i + 1, got_move,
+                                              m.score(), bk::AcceptedMovesString(tc), elapsed_ms, tc.fen_));
     }
 
     auto      total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t_overall).count();
     const int total    = (int)bk::kCases.size();
-    std::cout << std::format("\nNNUE Bratko-Kopec: solved {}/{} at depth {}  total {}ms  (net {})\n", solved, total,
-                             depth, total_ms, net_path);
-    if (errors > 0)
-    {
-        std::cout << "FAIL: " << errors << " position(s) returned no move\n";
-        return 1;
-    }
-    if (solved != total)
-    {
-        std::cout << std::format("FAIL: solved {}/{} (expected all {})\n", solved, total, total);
-        return 1;
-    }
-    std::cout << "BRATKO-KOPEC NNUE PASS\n";
-    return 0;
+    return test_report::Summary(std::format("Bratko-Kopec NNUE: solved {}/{} at depth {} ({}ms, net {})",
+                                            total - test_report::failures, total, depth, total_ms, net_path));
 }

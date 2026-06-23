@@ -3,6 +3,7 @@
 /// Format matches the Go perft_test.go EPD set exactly.
 
 #include "position.h"
+#include "test_report.h"
 
 #include <algorithm>
 #include <chrono>
@@ -244,7 +245,6 @@ int main(int argc, char *argv[])
 
     const auto cases = ParseEPD(max_depth);
 
-    bool     pass        = true;
     uint64_t total_nodes = 0;
     auto     t0          = std::chrono::steady_clock::now();
 
@@ -262,19 +262,20 @@ int main(int argc, char *argv[])
         }
         total_nodes += got;
 
-        std::cout << std::format("{:<75} d{} nodes={:<12} {:3.0f} Mnps\n", tc.fen_, tc.depth_, got,
-                                 (double)got / elapsed_us);
-        if (got != tc.nodes_)
+        const bool  ok = (got == tc.nodes_);
+        std::string detail =
+            std::format("perft d{} {:<70} {} nodes  {:.0f} Mnps", tc.depth_, tc.fen_, got, (double)got / elapsed_us);
+        if (!ok)
         {
-            std::cout << std::format("  ERROR: expected {} got {}\n", tc.nodes_, got);
-            pass = false;
+            detail += std::format("  [expected {}]", tc.nodes_);
         }
+        test_report::Check(ok, detail);
     }
 
     auto total_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
-    std::cout << std::format("\ntotal nodes={} time={}ms {:.0f} Mnps\n", total_nodes, total_ms,
-                             (double)total_nodes / std::max(total_ms * 1000LL, 1LL));
-    std::cout << (pass ? "PERFT PASS\n" : "PERFT FAIL\n");
-    return pass ? 0 : 1;
+    const int total = (int)cases.size();
+    return test_report::Summary(std::format("perft: {}/{} positions match, {} nodes, {:.0f} Mnps",
+                                            total - test_report::failures, total, total_nodes,
+                                            (double)total_nodes / std::max(total_ms * 1000LL, 1LL)));
 }

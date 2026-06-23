@@ -2,6 +2,7 @@
 
 #include "position.h"
 #include "static_exchange_evaluation.h"
+#include "test_report.h"
 
 #include <array>
 #include <format>
@@ -203,16 +204,13 @@ static const auto tests = std::to_array<SeeTest>({
 /// @return Non-zero if any case failed.
 int main()
 {
-    int failures = 0;
     for (const auto &tc : tests)
     {
         Position pos{Position::FromString(tc.fen_)};
         const auto [score, is_checking] = EvaluateStaticExchange(pos, tc.move_);
         bool ok                         = (score == tc.want_score_) && (is_checking == tc.want_checking_);
-        if (!ok)
+        if (!test_report::Check(ok, tc.name_))
         {
-            ++failures;
-            std::cout << std::format("[FAIL] {}\n", tc.name_);
             if (score != tc.want_score_)
             {
                 std::cout << std::format("       score: got {} want {}\n", score, tc.want_score_);
@@ -222,12 +220,7 @@ int main()
                 std::cout << std::format("       givesCheck: got {} want {}\n", is_checking, tc.want_checking_);
             }
         }
-        else
-        {
-            std::cout << std::format("[PASS] {}\n", tc.name_);
-        }
     }
     const int total = (int)tests.size();
-    std::cout << std::format("\n{}/{} passed\n", total - failures, total);
-    return failures > 0 ? 1 : 0;
+    return test_report::Summary(std::format("SEE: {}/{} cases passed", total - test_report::failures, total));
 }

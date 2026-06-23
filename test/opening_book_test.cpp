@@ -7,6 +7,7 @@
 #include "move.h"
 #include "opening_book.h"
 #include "position.h"
+#include "test_report.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -20,15 +21,9 @@ namespace
 {
 constexpr const char *kStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-int g_failures = 0;
-
 void Check(bool condition, const std::string &message)
 {
-    if (!condition)
-    {
-        std::cout << "FAIL: " << message << "\n";
-        ++g_failures;
-    }
+    test_report::Check(condition, message);
 }
 
 /// @brief Advance a position by a coordinate move (e.g. "e2e4"), matching the parser's lookup.
@@ -38,8 +33,7 @@ Position Play(const Position &position, const std::string &coord)
     auto i     = std::ranges::find_if(moves, [&](const Move &m) { return m.ToString() == coord; });
     if (i == moves.end())
     {
-        std::cout << "FAIL: test bug - illegal move " << coord << "\n";
-        ++g_failures;
+        test_report::Check(false, "opening book: test bug - illegal move " + coord);
         return position;
     }
     return position.MakeMove(*i);
@@ -98,11 +92,5 @@ int main()
 
     std::remove(book_path.c_str());
 
-    if (g_failures == 0)
-    {
-        std::cout << "OPENING BOOK PASS\n";
-        return 0;
-    }
-    std::cout << "FAIL: " << g_failures << " opening-book assertion(s) failed\n";
-    return 1;
+    return test_report::Summary("opening book: '?' (questionable) move handling");
 }

@@ -7,23 +7,17 @@
 /// "no deadline" checks can never spuriously trip.
 
 #include "chess_clock.h"
+#include "test_report.h"
 
 #include <chrono>
-#include <cstdio>
 #include <thread>
 
 using namespace std::chrono_literals;
 using Duration = ChessClock::Duration;
 
-static int failures = 0;
-
 static void check(bool condition, const char *message)
 {
-    std::printf("%s: %s\n", condition ? "ok  " : "FAIL", message);
-    if (!condition)
-    {
-        ++failures;
-    }
+    test_report::Check(condition, message);
 }
 
 static void sleep(Duration d)
@@ -90,11 +84,5 @@ int main()
         check(clock.moves_to_go_ == 0 && clock.depth_ == 10, "Reset restores default moves_to_go / depth");
     }
 
-    if (failures == 0)
-    {
-        std::printf("CHESS CLOCK TEST PASS\n");
-        return 0;
-    }
-    std::printf("CHESS CLOCK TEST FAIL (%d)\n", failures);
-    return 1;
+    return test_report::Summary("chess clock: deadline / elapsed / ponderhit / reset timing");
 }

@@ -10,14 +10,14 @@ set -u
 
 ENGINE="${1:-build/pawnstar}"
 if [ ! -x "$ENGINE" ]; then
-    echo "UCI TEST: engine binary '$ENGINE' not found or not executable (run 'make' first)"
+    echo "[FAIL] UCI: engine binary '$ENGINE' not found or not executable (run 'make' first)"
     exit 1
 fi
 
 fails=0
-pass() { echo "ok  : $1"; }
+pass() { echo "[PASS] $1"; }
 fail() {
-    echo "FAIL: $1"
+    echo "[FAIL] $1"
     fails=$((fails + 1))
 }
 
@@ -100,8 +100,8 @@ else
 fi
 
 if [ "$fails" -eq 0 ]; then
-    echo "UCI TEST PASS"
+    echo "[PASS] UCI: protocol handshakes, seldepth, searchmoves, currmove, bench determinism"
     exit 0
 fi
-echo "UCI TEST: $fails failure(s)"
+echo "[FAIL] UCI: $fails check(s) failed"
 exit 1
