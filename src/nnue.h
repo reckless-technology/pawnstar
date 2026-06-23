@@ -12,7 +12,7 @@
 /// stays positive at scale). The bucket mechanism generalises over kNumKingBuckets: each perspective
 /// selects one of kNumKingBuckets banks by *its own* king's square (in that perspective's orientation), the
 /// feature row being `bucket * 768 + chess768_index`, matching bullet's `ChessBuckets::new(kKingBucketMap)`
-/// (the same 64-entry map; see nnue.cpp). A king move that crosses a file-pair bucket boundary refreshes
+/// (the same 64-entry map; see `kKingBucketMap` below). A king move that crosses a file-pair bucket boundary refreshes
 /// that whole perspective's bank rather than diffing it.
 ///
 /// A net is owned by the Game (one instance, read-only after Network::Load) and shared by all Lazy SMP
@@ -189,7 +189,7 @@ class Network
     alignas(64) std::array<int16_t, 2 * kHiddenSize> output_weights_;
     /// @brief Output weights requantised to int8 for the shipped int8 forward pass (Network::Evaluate).
     /// w8 = round(output_weight / output_w_scale_) clamped to [-127,127]; the scale keeps the largest output
-    /// weight in int8 range (1 for nets whose |weight| <= 127, e.g. the shipped v8). Populated by Load so the
+    /// weight in int8 range (1 for nets whose |weight| <= 127, e.g. the shipped net). Populated by Load so the
     /// int8 kernel needs no per-eval setup; the int16 reference (EvaluateExact) uses output_weights_ instead.
     alignas(64) std::array<int8_t, 2 * kHiddenSize> output_weights_i8_{};
     int     output_w_scale_ = 1; ///< Divisor mapping the int16 output weights into int8 range.
@@ -286,7 +286,7 @@ inline __m256i ScReluU8(const int16_t *a)
     const __m256i c1    = _mm256_min_epi16(_mm256_max_epi16(v1, zero), qa);
     auto          sq    = [&](__m256i c, bool high) {
         const __m256i w = high ? _mm256_cvtepi16_epi32(_mm256_extracti128_si256(c, 1))
-                                           : _mm256_cvtepi16_epi32(_mm256_castsi256_si128(c));
+                               : _mm256_cvtepi16_epi32(_mm256_castsi256_si128(c));
         return _mm256_srli_epi32(_mm256_add_epi32(_mm256_mullo_epi32(w, w), round), kInt8Shift);
     };
     return PackU8(sq(c0, false), sq(c0, true), sq(c1, false), sq(c1, true));
@@ -318,9 +318,7 @@ inline int32_t HsumI32(__m256i v)
 /// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
 /// own* orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map
 /// serves both perspectives. MUST be byte-identical to the array passed to ChessBuckets::new in
-/// tools/bullet/*.rs. The shipped net is all-zero: a single weight bank (no king buckets, kNumKingBuckets=1),
-/// i.e. plain Chess768. The map is retained so a future bucketed net only needs to change these values
-/// (and kNumKingBuckets) to match.
+/// tools/bullet/*.rs.
 constexpr std::array<int, 64> kKingBucketMap = {
     0, 0, 1, 1, 2, 2, 3, 3, //
     0, 0, 1, 1, 2, 2, 3, 3, //
@@ -479,7 +477,7 @@ inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, 
 
     // Requantise the output weights to int8 for the optional int8 forward pass. The scale keeps the
     // largest-magnitude output weight inside [-127, 127]; for nets whose weights already fit (|w| <= 127,
-    // e.g. the shipped v8) the scale is 1 and the int8 copy is lossless. (Always computed — it is one-time,
+    // e.g. the shipped net) the scale is 1 and the int8 copy is lossless. (Always computed — it is one-time,
     // ~2 KB, and lets the int8 kernel skip per-eval setup; the int16 path ignores it.)
     int max_ow = 0;
     for (int16_t v : output_weights_)

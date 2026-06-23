@@ -1,7 +1,7 @@
 #pragma once
 /// @file evaluation.h Position evaluation.
 ///
-/// Pawnstar evaluates exclusively with its NNUE network (see nnue.h / nnue.cpp). The handcrafted
+/// Pawnstar evaluates exclusively with its NNUE network (see nnue.h). The handcrafted
 /// evaluation (material, piece-square tables, pawn structure, king safety, mobility) was removed once
 /// NNUE became the only evaluator — a loaded net is required to search (main.cpp loads one at startup
 /// and exits if it cannot).

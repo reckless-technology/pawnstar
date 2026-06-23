@@ -8,7 +8,7 @@ using zobrist_t = uint64_t; ///< Zobrist hash value type.
 
 /// @file generated_data.h Declares precomputed lookup tables (attack/ray bitboards, pext sliding-attack
 /// tables, intervening-squares masks and Zobrist hashes) used by pawnstar for hashing, move generation and
-/// attack detection. The tables are defined in generated_data.cpp and computed once at program startup
+/// attack detection. The tables are `inline const` globals defined in this header and computed once at startup
 /// (dynamic initialisation), so there is no build-time code-generation step.
 
 ///@brief An entry in the pext bitboard move generator array.

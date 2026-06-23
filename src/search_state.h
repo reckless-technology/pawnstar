@@ -748,7 +748,7 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
 }
 
 // ----------------------------------------------------------------------------
-// Iterative deepening — one Lazy SMP thread. Game::SearchRootNode (in game.cpp)
+// Iterative deepening — one Lazy SMP thread. Game::SearchRootNode (defined below)
 // launches one of these per thread.
 // ----------------------------------------------------------------------------
 
