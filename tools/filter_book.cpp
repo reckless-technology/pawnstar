@@ -51,8 +51,8 @@ constexpr const char *kStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w
 
 struct SearchResult
 {
-    bool found;
-    int  score; ///< Side-to-move-relative centipawns of the best move.
+    bool found_;
+    int  score_; ///< Side-to-move-relative centipawns of the best move.
 };
 
 /// @brief Search a position to a fixed depth and return its best move's score.
@@ -74,24 +74,24 @@ struct SearchResult
 SearchResult Search(Game &game, const std::string &fen, int depth)
 {
     game.SetPosition(fen);
-    game.book.Free(); // never return a book move - we want the engine's own judgement, not a canned reply
-    game.time_control.clock_type = ChessClock::kFixedDepth;
-    game.time_control.depth      = depth;
-    Move m                       = game.SearchRootNode();
+    game.book_.Free(); // never return a book move - we want the engine's own judgement, not a canned reply
+    game.time_control_.clock_type_ = ChessClock::kFixedDepth;
+    game.time_control_.depth_      = depth;
+    Move m                         = game.SearchRootNode();
     return {m != Move::None(), m.score()};
 }
 
 /// @brief State shared by all worker threads.
 struct Shared
 {
-    int                         depth;
-    int                         child_depth;
-    int                         margin;
-    std::map<std::string, bool> verdict; ///< (position, move) -> questionable. Guarded by verdict_mtx.
-    std::mutex                  verdict_mtx;
-    std::mutex                  log_mtx;         ///< Serialises stderr flag messages.
-    std::atomic<int>            moves_scored{0}; ///< Search pairs computed (may double-count racing duplicates).
-    std::atomic<int>            moves_flagged{0};
+    int                         depth_;
+    int                         child_depth_;
+    int                         margin_;
+    std::map<std::string, bool> verdict_; ///< (position, move) -> questionable. Guarded by verdict_mtx.
+    std::mutex                  verdict_mtx_;
+    std::mutex                  log_mtx_;         ///< Serialises stderr flag messages.
+    std::atomic<int>            moves_scored_{0}; ///< Search pairs computed (may double-count racing duplicates).
+    std::atomic<int>            moves_flagged_{0};
 };
 
 /// @brief Decide whether a book move is questionable, consulting/updating the shared verdict cache.
@@ -125,10 +125,10 @@ bool JudgeQuestionable(Game &game, const Position &pos, const Move &mv, Shared &
 {
     // The key identifies the (position-before-the-move, move) pair. The Zobrist hash pins down the position and
     // mv.ToString() (coordinate notation, never carrying a '?') pins down the move.
-    const std::string key = std::to_string(pos.Hash()) + ":" + mv.ToString();
+    const std::string key = std::to_string(pos.hash_) + ":" + mv.ToString();
     {
-        std::lock_guard<std::mutex> lk{sh.verdict_mtx};
-        if (auto it = sh.verdict.find(key); it != sh.verdict.end())
+        std::lock_guard<std::mutex> lk{sh.verdict_mtx_};
+        if (auto it = sh.verdict_.find(key); it != sh.verdict_.end())
         {
             return it->second; // already judged (by this or another worker) - reuse it
         }
@@ -136,32 +136,32 @@ bool JudgeQuestionable(Game &game, const Position &pos, const Move &mv, Shared &
     // Cache miss: run the two scoring searches with no lock held (see threading note above).
     const std::string  parent_fen = pos.ToString();
     const std::string  child_fen  = pos.MakeMove(mv).ToString();
-    const SearchResult best       = Search(game, parent_fen, sh.depth);
-    const SearchResult child      = Search(game, child_fen, sh.child_depth);
+    const SearchResult best       = Search(game, parent_fen, sh.depth_);
+    const SearchResult child      = Search(game, child_fen, sh.child_depth_);
 
     bool questionable = false;
     // If the child has no legal move, the book move delivered mate or stalemate. A mating move is the best move
     // there is and must never be flagged; a stalemating move is a rare opening curiosity. Either way we leave it
     // unflagged rather than risk suffixing a strong move with '?'.
-    if (best.found && child.found)
+    if (best.found_ && child.found_)
     {
-        const int book_value = -child.score;          // the book move's value from the mover's perspective
-        const int loss       = best.score - book_value; // how much worse than the engine's own best choice
-        questionable         = loss > sh.margin;
-        sh.moves_scored.fetch_add(1, std::memory_order_relaxed);
+        const int book_value = -child.score_;            // the book move's value from the mover's perspective
+        const int loss       = best.score_ - book_value; // how much worse than the engine's own best choice
+        questionable         = loss > sh.margin_;
+        sh.moves_scored_.fetch_add(1, std::memory_order_relaxed);
         if (questionable)
         {
-            sh.moves_flagged.fetch_add(1, std::memory_order_relaxed);
+            sh.moves_flagged_.fetch_add(1, std::memory_order_relaxed);
             // Log every flag so the run can be reviewed: the move, the two scores, the loss, and the FEN of the
             // position it was played from. log_mtx keeps concurrent messages from interleaving on stderr.
-            std::lock_guard<std::mutex> lk{sh.log_mtx};
-            std::cerr << "  flag " << mv.ToString() << "  best=" << best.score << " book=" << book_value
+            std::lock_guard<std::mutex> lk{sh.log_mtx_};
+            std::cerr << "  flag " << mv.ToString() << "  best=" << best.score_ << " book=" << book_value
                       << " loss=" << loss << "  " << parent_fen << "\n";
         }
     }
     {
-        std::lock_guard<std::mutex> lk{sh.verdict_mtx};
-        sh.verdict[key] = questionable;
+        std::lock_guard<std::mutex> lk{sh.verdict_mtx_};
+        sh.verdict_[key] = questionable;
     }
     return questionable;
 }
@@ -216,7 +216,7 @@ std::string ProcessLine(Game &game, const std::string &line, int line_no, Shared
         {
             // Don't drop data: warn, copy the original token verbatim, and stop processing this line (the
             // remaining tokens depend on a position we can no longer reconstruct).
-            std::lock_guard<std::mutex> lk{sh.log_mtx};
+            std::lock_guard<std::mutex> lk{sh.log_mtx_};
             std::cerr << "filter_book: illegal move '" << coord << "' in line " << line_no + 1 << "; passing through\n";
             out_tokens.push_back(tok);
             break;
@@ -330,9 +330,9 @@ int main(int argc, char *argv[])
     threads = std::clamp<int>(threads, 1, (int)std::max<size_t>(1, input_lines.size()));
 
     Shared sh;
-    sh.depth       = depth;
-    sh.child_depth = std::max(1, depth - 1);
-    sh.margin      = margin;
+    sh.depth_       = depth;
+    sh.child_depth_ = std::max(1, depth - 1);
+    sh.margin_      = margin;
 
     std::cerr << "filter_book: net=" << net_path << " depth=" << depth << " margin=" << margin
               << "cp threads=" << threads << " lines=" << input_lines.size() << "\n";
@@ -345,7 +345,7 @@ int main(int argc, char *argv[])
     // those statics are populated and no concurrent map insertion happens. It also validates the net loads.
     {
         Game warm;
-        if (!warm.NnueNetwork().Load(net_path))
+        if (!warm.nnue_network_.Load(net_path))
         {
             std::cerr << "filter_book: failed to load net '" << net_path << "'\n";
             return 1;
@@ -356,14 +356,14 @@ int main(int argc, char *argv[])
     // Per-line outputs, written back at their original index so the final file order matches the input order
     // regardless of which worker finished which line when.
     std::vector<std::string> output_lines(input_lines.size());
-    std::atomic<size_t>      next{0};          // shared cursor: the next line index to claim (work-stealing)
+    std::atomic<size_t>      next{0}; // shared cursor: the next line index to claim (work-stealing)
     std::atomic<bool>        load_failed{false};
 
     auto worker = [&] {
         // Each worker owns a Game (its own ~80 MB of hash tables + its own net), so the only state shared with
         // other workers is the verdict cache/counters in `sh` - no contention on the hot search path.
         Game game;
-        if (!game.NnueNetwork().Load(net_path))
+        if (!game.nnue_network_.Load(net_path))
         {
             load_failed.store(true);
             return;
@@ -375,9 +375,9 @@ int main(int argc, char *argv[])
             const size_t done = idx + 1;
             if (done % 20 == 0) // periodic progress; "~" because claim order is not completion order
             {
-                std::lock_guard<std::mutex> lk{sh.log_mtx};
+                std::lock_guard<std::mutex> lk{sh.log_mtx_};
                 std::cerr << "filter_book: ~" << done << "/" << input_lines.size() << " lines, "
-                          << sh.moves_flagged.load() << " flagged so far\n";
+                          << sh.moves_flagged_.load() << " flagged so far\n";
             }
         }
     };
@@ -404,7 +404,7 @@ int main(int argc, char *argv[])
         out << l << '\n';
     }
 
-    std::cerr << "filter_book: done. " << input_lines.size() << " lines, " << sh.moves_scored.load()
-              << " move searches, " << sh.moves_flagged.load() << " flagged questionable. Wrote " << out_path << "\n";
+    std::cerr << "filter_book: done. " << input_lines.size() << " lines, " << sh.moves_scored_.load()
+              << " move searches, " << sh.moves_flagged_.load() << " flagged questionable. Wrote " << out_path << "\n";
     return 0;
 }

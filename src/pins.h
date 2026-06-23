@@ -16,14 +16,14 @@ class Pins
     constexpr Pins(const Position &position)
     {
         pinned_pieces_                  = kNoSquares;
-        const Color    color            = position.color_to_move;
+        const Color    color            = position.color_to_move_;
         const Bitboard occupied_squares = position.OccupiedSquares();
-        const Bitboard friendly_pieces  = position.colors[color];
+        const Bitboard friendly_pieces  = position.colors_[color];
         const Square   king_location    = position.KingLocation(color);
         const auto    &intervening      = kInterveningSquares[king_location];
         const Bitboard enemy_sliding_pieces =
-            ((kBishopAttacks[king_location] & (position.pieces[kBishop] | position.pieces[kQueen])) |
-             (kRookAttacks[king_location] & (position.pieces[kRook] | position.pieces[kQueen]))) &
+            ((kBishopAttacks[king_location] & (position.pieces_[kBishop] | position.pieces_[kQueen])) |
+             (kRookAttacks[king_location] & (position.pieces_[kRook] | position.pieces_[kQueen]))) &
             ~friendly_pieces;
         for (Square s : enemy_sliding_pieces)
         {

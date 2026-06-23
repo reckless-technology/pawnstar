@@ -19,9 +19,9 @@ using zobrist_t = uint64_t; ///< Zobrist hash value type.
 /// computed once at program startup (see generated_data.cpp); each entry owns its attack/index storage.
 struct PextBitboard
 {
-    Bitboard              occupancy_mask; ///< Occupancy mask (excludes final target square).
-    std::vector<Bitboard> attacks;        ///< Discrete attack vectors (move sets).
-    std::vector<uint8_t>  indices;        ///< Indices into the discrete attack vector array.
+    Bitboard              occupancy_mask_; ///< Occupancy mask (excludes final target square).
+    std::vector<Bitboard> attacks_;        ///< Discrete attack vectors (move sets).
+    std::vector<uint8_t>  indices_;        ///< Indices into the discrete attack vector array.
 };
 
 constexpr zobrist_t kBlackMoveHash = 0x28AB74D640E50602; ///< Zobrist hash for black to move.
@@ -241,7 +241,7 @@ inline PextBitboard ComputePext(uint8_t sq, MaskFn mask_fn, AttFn attack_fn)
 {
     PextBitboard   entry;
     const uint64_t mask               = mask_fn(sq);
-    entry.occupancy_mask              = Bitboard{mask};
+    entry.occupancy_mask_             = Bitboard{mask};
     const auto            occupancies = EnumerateMaskCombinations(mask);
     std::vector<uint64_t> dense(occupancies.size(), 0);
     for (auto occupancy : occupancies)
@@ -254,11 +254,11 @@ inline PextBitboard ComputePext(uint8_t sq, MaskFn mask_fn, AttFn attack_fn)
     for (auto attack : dense)
     {
         const auto it = std::find(unique_attacks.begin(), unique_attacks.end(), attack);
-        entry.indices.push_back(static_cast<uint8_t>(it - unique_attacks.begin()));
+        entry.indices_.push_back(static_cast<uint8_t>(it - unique_attacks.begin()));
     }
     for (auto attack : unique_attacks)
     {
-        entry.attacks.push_back(Bitboard{attack});
+        entry.attacks_.push_back(Bitboard{attack});
     }
     return entry;
 }

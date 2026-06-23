@@ -24,7 +24,7 @@ static_assert(__BMI2__, "Pawnstar requires a BMI2 (-mbmi2) build for PEXT slidin
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square s)
 {
     const PextBitboard &p = kBishopPexts[s];
-    return p.attacks[p.indices[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask)]];
+    return p.attacks_[p.indices_[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask_)]];
 }
 
 /// @brief Rook sliding attacks.
@@ -34,7 +34,7 @@ constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square s)
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square s)
 {
     const PextBitboard &p = kRookPexts[s];
-    return p.attacks[p.indices[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask)]];
+    return p.attacks_[p.indices_[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask_)]];
 }
 
 #if __GNUC__

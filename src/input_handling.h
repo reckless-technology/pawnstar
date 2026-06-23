@@ -31,14 +31,14 @@ using HandlerFn = void (*)(Game &game, std::span<std::string> args);
 /// @brief Structure to hold a hander for an input command.
 struct Handler
 {
-    HandlerFn        function;    ///< Function to be called
-    std::string_view name;        ///< Command name
-    std::string_view description; ///< Command description
+    HandlerFn        function_;    ///< Function to be called
+    std::string_view name_;        ///< Command name
+    std::string_view description_; ///< Command description
 
     /// @brief Construct a command handler entry.
     /// @param fn Handler function. @param name Command name. @param desc Human-readable description.
     constexpr Handler(HandlerFn fn, std::string_view name, std::string_view desc)
-        : function(fn), name(name), description(desc)
+        : function_(fn), name_(name), description_(desc)
     {
     }
 };
@@ -47,21 +47,21 @@ struct Handler
 /// @param game Game to act on.
 inline void handle_bookmoves(Game &game, std::span<std::string>)
 {
-    game.book.DisplayAvailableMoves(game.CurrentPosition());
+    game.book_.DisplayAvailableMoves(game.CurrentPosition());
 }
 
 /// @brief Handle the "freebook" command: release the opening book from memory.
 /// @param game Game to act on.
 inline void handle_freebook(Game &game, std::span<std::string>)
 {
-    game.book.Free();
+    game.book_.Free();
 }
 
 /// @brief Handle the "eval" command: print the static evaluation of the current position.
 /// @param game Game to act on.
 inline void handle_eval(Game &game, std::span<std::string>)
 {
-    if (!game.NnueNetwork().IsLoaded())
+    if (!game.nnue_network_.loaded_)
     {
         std::cout << "info string no NNUE net loaded (use setoption name EvalFile value <path>)\n";
         return;
@@ -74,12 +74,12 @@ inline void handle_eval(Game &game, std::span<std::string>)
 /// @param game Game to act on.
 inline void handle_nnue(Game &game, std::span<std::string>)
 {
-    if (!game.NnueNetwork().IsLoaded())
+    if (!game.nnue_network_.loaded_)
     {
         std::cout << "info string NNUE: no net loaded (use setoption name EvalFile value <path>)\n";
         return;
     }
-    std::cout << std::format("nnue {}\n", game.NnueNetwork().Evaluate(game.CurrentPosition()));
+    std::cout << std::format("nnue {}\n", game.nnue_network_.Evaluate(game.CurrentPosition()));
 }
 
 /// @brief Handle the "dbg" command: print diagnostic counters.
@@ -108,13 +108,13 @@ inline void handle_uci(Game &game, std::span<std::string>)
     std::cout << "id name Pawnstar\n";
     std::cout << "id author Jonny Reckless\n";
     std::cout << "option name Hash type spin default " << kHashtableMegabytes << " min 1 max 4096\n";
-    std::cout << "option name Threads type spin default " << game.thread_count << " min 1 max " << kMaxSearchThreads
+    std::cout << "option name Threads type spin default " << game.thread_count_ << " min 1 max " << kMaxSearchThreads
               << "\n";
     std::cout << "option name Ponder type check default false\n";
     std::cout << "option name EvalFile type string default <empty>\n";
     std::cout << "option name Clear Hash type button\n";
-    std::cout << "option name Move Overhead type spin default " << game.move_overhead.count() << " min 0 max 5000\n";
-    std::cout << "option name OwnBook type check default " << (game.use_own_book ? "true" : "false") << "\n";
+    std::cout << "option name Move Overhead type spin default " << game.move_overhead_.count() << " min 0 max 5000\n";
+    std::cout << "option name OwnBook type check default " << (game.use_own_book_ ? "true" : "false") << "\n";
     std::cout << "uciok\n";
 }
 
@@ -150,29 +150,29 @@ inline void handle_setoption(Game &game, std::span<std::string> args)
     }
     if (name == "EvalFile")
     {
-        game.NnueNetwork().Load(value);
-        game.eval_cache.Clear(); // cached evals belong to the previous net
+        game.nnue_network_.Load(value);
+        game.eval_cache_.Clear(); // cached evals belong to the previous net
     }
     else if (name == "Hash")
     {
         const int mb = std::clamp(std::atoi(value.c_str()), 1, 4096);
-        game.transposition_table.Resize(static_cast<std::size_t>(mb));
+        game.transposition_table_.Resize(static_cast<std::size_t>(mb));
     }
     else if (name == "Threads")
     {
-        game.thread_count = std::clamp(std::atoi(value.c_str()), 1, kMaxSearchThreads);
+        game.thread_count_ = std::clamp(std::atoi(value.c_str()), 1, kMaxSearchThreads);
     }
     else if (name == "Clear Hash") // a button: no value, just empty the transposition table
     {
-        game.transposition_table.Clear();
+        game.transposition_table_.Clear();
     }
     else if (name == "Move Overhead")
     {
-        game.move_overhead = ChessClock::Duration{std::clamp(std::atoi(value.c_str()), 0, 5000)};
+        game.move_overhead_ = ChessClock::Duration{std::clamp(std::atoi(value.c_str()), 0, 5000)};
     }
     else if (name == "OwnBook")
     {
-        game.use_own_book = (value == "true");
+        game.use_own_book_ = (value == "true");
     }
 }
 
@@ -186,8 +186,8 @@ inline void handle_setoption(Game &game, std::span<std::string> args)
 inline void handle_ucinewgame(Game &game, std::span<std::string>)
 {
     game.StopThinking();
-    game.transposition_table.Clear();
-    game.eval_cache.Clear();
+    game.transposition_table_.Clear();
+    game.eval_cache_.Clear();
     game.SetPosition();
 }
 
@@ -223,29 +223,29 @@ static constexpr int kBenchDepth = 13;
 inline void handle_bench(Game &game, std::span<std::string> args)
 {
     const int  depth          = args.size() > 1 ? std::atoi(args[1].c_str()) : kBenchDepth;
-    const int  saved_threads  = game.thread_count;
-    const bool saved_own_book = game.use_own_book;
-    game.thread_count         = 1;     // deterministic, single-threaded
-    game.use_own_book         = false; // never short-circuit on a book move
-    game.transposition_table.Clear();
-    game.eval_cache.Clear();
+    const int  saved_threads  = game.thread_count_;
+    const bool saved_own_book = game.use_own_book_;
+    game.thread_count_        = 1;     // deterministic, single-threaded
+    game.use_own_book_        = false; // never short-circuit on a book move
+    game.transposition_table_.Clear();
+    game.eval_cache_.Clear();
 
     uint64_t   total_nodes = 0;
     const auto start       = ChessClock::Clock::now();
     for (const char *fen : kBenchFens)
     {
         game.SetPosition(fen);
-        game.time_control.clock_type = ChessClock::kFixedDepth; // SetPosition reset the clock; set fixed depth after
-        game.time_control.depth      = depth;
+        game.time_control_.clock_type_ = ChessClock::kFixedDepth; // SetPosition reset the clock; set fixed depth after
+        game.time_control_.depth_      = depth;
         game.SearchRootNode();
-        total_nodes += game.last_search_node_count;
+        total_nodes += game.last_search_node_count_;
     }
     const long long elapsed_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(ChessClock::Clock::now() - start).count();
     const long long nps = static_cast<long long>(total_nodes) * 1000 / std::max<long long>(1, elapsed_ms);
 
-    game.thread_count = saved_threads;
-    game.use_own_book = saved_own_book;
+    game.thread_count_ = saved_threads;
+    game.use_own_book_ = saved_own_book;
     std::cout << std::format("{} nodes {} nps\n", total_nodes, nps);
 }
 
@@ -269,9 +269,9 @@ inline void handle_go(Game &game, std::span<std::string> args)
     State            state = State::kAwaitKeyword;
     std::string_view pending; // the value-taking keyword whose argument is expected next
 
-    game.is_pondering.store(false, std::memory_order_relaxed);  // set true below if this is a `go ponder`
-    game.time_control.increment = ChessClock::Duration::zero(); // cleared up front; set below if winc/binc present
-    game.time_control.max_nodes = 0;                            // cleared up front; set below if `nodes` present
+    game.is_pondering_.store(false, std::memory_order_relaxed);   // set true below if this is a `go ponder`
+    game.time_control_.increment_ = ChessClock::Duration::zero(); // cleared up front; set below if winc/binc present
+    game.time_control_.max_nodes_ = 0;                            // cleared up front; set below if `nodes` present
 
     for (std::size_t i = 1; i < args.size(); ++i)
     {
@@ -280,11 +280,11 @@ inline void handle_go(Game &game, std::span<std::string> args)
         {
             if (token == "ponder") // flag: search on the opponent's time until ponderhit / stop
             {
-                game.is_pondering.store(true, std::memory_order_relaxed);
+                game.is_pondering_.store(true, std::memory_order_relaxed);
             }
             else if (token == "infinite") // a flag, no argument
             {
-                game.time_control.clock_type = ChessClock::kInfinite; // no time limit; remaining_time is unused
+                game.time_control_.clock_type_ = ChessClock::kInfinite; // no time limit; remaining_time is unused
             }
             else if (token == "wtime" || token == "btime" || token == "winc" || token == "binc" ||
                      token == "movetime" || token == "depth" || token == "movestogo" || token == "nodes")
@@ -297,37 +297,37 @@ inline void handle_go(Game &game, std::span<std::string> args)
         else // kAwaitValue: token is the integer argument for `pending`
         {
             const int value = stoi(token);
-            if ((pending == "wtime" && game.CurrentPosition().color_to_move == kWhite) ||
-                (pending == "btime" && game.CurrentPosition().color_to_move == kBlack))
+            if ((pending == "wtime" && game.CurrentPosition().color_to_move_ == kWhite) ||
+                (pending == "btime" && game.CurrentPosition().color_to_move_ == kBlack))
             {
-                game.time_control.clock_type     = ChessClock::kStandard;
-                game.time_control.remaining_time = ChessClock::Duration{value};
+                game.time_control_.clock_type_     = ChessClock::kStandard;
+                game.time_control_.remaining_time_ = ChessClock::Duration{value};
             }
-            else if ((pending == "winc" && game.CurrentPosition().color_to_move == kWhite) ||
-                     (pending == "binc" && game.CurrentPosition().color_to_move == kBlack))
+            else if ((pending == "winc" && game.CurrentPosition().color_to_move_ == kWhite) ||
+                     (pending == "binc" && game.CurrentPosition().color_to_move_ == kBlack))
             {
-                game.time_control.increment = ChessClock::Duration{value};
+                game.time_control_.increment_ = ChessClock::Duration{value};
             }
             else if (pending == "movetime")
             {
-                game.time_control.clock_type     = ChessClock::kFixedTime;
-                game.time_control.remaining_time = ChessClock::Duration{value};
+                game.time_control_.clock_type_     = ChessClock::kFixedTime;
+                game.time_control_.remaining_time_ = ChessClock::Duration{value};
             }
             else if (pending == "depth")
             {
-                game.time_control.clock_type = ChessClock::kFixedDepth;
-                game.time_control.depth      = value;
+                game.time_control_.clock_type_ = ChessClock::kFixedDepth;
+                game.time_control_.depth_      = value;
             }
             else if (pending == "movestogo")
             {
-                game.time_control.moves_to_go = value;
+                game.time_control_.moves_to_go_ = value;
             }
             else if (pending == "nodes")
             {
                 // Node-limited search: run with no clock (kInfinite) and stop at the node budget (Search polls
                 // max_nodes). Useful for reproducible, machine-speed-independent testing.
-                game.time_control.clock_type = ChessClock::kInfinite;
-                game.time_control.max_nodes  = static_cast<uint64_t>(value);
+                game.time_control_.clock_type_ = ChessClock::kInfinite;
+                game.time_control_.max_nodes_  = static_cast<uint64_t>(value);
             }
             // (wtime/btime for the side *not* to move falls through here and is intentionally ignored.)
             state = State::kAwaitKeyword;
@@ -351,8 +351,8 @@ inline void handle_stop(Game &game, std::span<std::string>)
 /// @param game Game to act on.
 inline void handle_ponderhit(Game &game, std::span<std::string>)
 {
-    game.time_control.OnPonderhit();
-    game.is_pondering.store(false, std::memory_order_relaxed);
+    game.time_control_.OnPonderhit();
+    game.is_pondering_.store(false, std::memory_order_relaxed);
 }
 
 /// @brief Handle the "quit" command: stop searching and exit the program.
@@ -482,7 +482,7 @@ inline void handle_help(Game &, std::span<std::string>)
     std::cout << "Available commands:\n";
     for (auto &i : handlers)
     {
-        std::cout << std::format("{:<12} {}\n", i.name.data(), i.description.data());
+        std::cout << std::format("{:<12} {}\n", i.name_.data(), i.description_.data());
     }
 }
 
@@ -500,9 +500,9 @@ inline void ProcessInput(Game &game, std::string_view line)
     }
     for (const auto &handler : handlers)
     {
-        if (args[0] == handler.name)
+        if (args[0] == handler.name_)
         {
-            handler.function(game, args);
+            handler.function_(game, args);
             break;
         }
     }

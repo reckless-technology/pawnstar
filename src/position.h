@@ -55,13 +55,13 @@ class Position
     /// @brief Generate all legal moves. @return The legal move list.
     constexpr MoveList GenerateLegalMoves() const
     {
-        return color_to_move == kWhite ? GenMoves<kWhite, true>() : GenMoves<kBlack, true>();
+        return color_to_move_ == kWhite ? GenMoves<kWhite, true>() : GenMoves<kBlack, true>();
     }
 
     /// @brief Generate legal captures and promotions only. @return The legal capture list.
     constexpr MoveList GenerateLegalCaptures() const
     {
-        return color_to_move == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();
+        return color_to_move_ == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();
     }
 
     /// @brief Whether a square is attacked by a colour. @param s Target square. @param c Attacking colour. @return true
@@ -74,7 +74,7 @@ class Position
     /// @brief All occupied squares. @return Occupancy bitboard.
     constexpr Bitboard OccupiedSquares() const
     {
-        return pieces[kNone];
+        return pieces_[kNone];
     }
 
     /// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
@@ -89,33 +89,15 @@ class Position
         return king_location_[color];
     }
 
-    /// @brief Zobrist hash of the position. @return The hash.
-    constexpr zobrist_t Hash() const
-    {
-        return hash_;
-    }
-
     /// @brief Whether the side to move is in check. @return true if in check.
     constexpr bool IsInCheck() const
     {
         return checkers_.IsNotEmpty();
     }
 
-    /// @brief Full move count. @return Number of full moves.
-    constexpr uint8_t MoveCount() const
-    {
-        return full_move_count_;
-    }
-
-    /// @brief Half-move (50-move) clock. @return Consecutive reversible plies.
-    constexpr uint8_t ReversibleMoveCount() const
-    {
-        return reversible_move_count_;
-    }
-
-    std::array<Bitboard, 7> pieces; ///< @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the
-                                    ///< occupied-squares bitboard
-    std::array<Bitboard, 2> colors; ///< @brief Per-color bitboards indexed by Color.
+    std::array<Bitboard, 7> pieces_; ///< @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the
+                                     ///< occupied-squares bitboard
+    std::array<Bitboard, 2> colors_; ///< @brief Per-color bitboards indexed by Color.
 
   private:
     constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
@@ -124,19 +106,28 @@ class Position
     constexpr zobrist_t ComputeHash() const;                    ///< Compute the Zobrist hash from scratch.
     template <Color, bool> constexpr MoveList GenMoves() const; ///< Generate legal moves.
 
-    // State variables.
-    std::array<Piece, 64> squares_;               ///< Squares array for fast piece lookup.
-    Bitboard              checkers_;              ///< Set of squares which attack the king.
-    zobrist_t             hash_;                  ///< Zobrist hash of this position, maintained incrementally.
-    std::array<Square, 2> king_location_;         ///< Square index of white and black kings.
-    Square                en_passant_square_;     ///< En passant capture availability square.
-    uint8_t               reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
-    uint8_t               full_move_count_;       ///< Number of full moves (zero indexed).
-    CastlingRights        castling_rights_;       ///< Castling rights flags.
+    // State variables. The access labels below are interleaved (rather than reordering fields) so the
+    // member declaration order is preserved exactly and the layout stays 160 bytes — see the static_assert.
+    std::array<Piece, 64> squares_;  ///< Squares array for fast piece lookup.
+    Bitboard              checkers_; ///< Set of squares which attack the king.
 
   public:
-    bool  is_null_move;  ///< @brief Whether the last move was a null (pass) move.
-    Color color_to_move; ///< @brief Side to move. Declared last so it occupies what was the trailing padding byte.
+    zobrist_t hash_; ///< Zobrist hash of this position, maintained incrementally.
+
+  private:
+    std::array<Square, 2> king_location_;     ///< Square index of white and black kings.
+    Square                en_passant_square_; ///< En passant capture availability square.
+
+  public:
+    uint8_t reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
+    uint8_t full_move_count_;       ///< Number of full moves (zero indexed).
+
+  private:
+    CastlingRights castling_rights_; ///< Castling rights flags.
+
+  public:
+    bool  is_null_move_;  ///< @brief Whether the last move was a null (pass) move.
+    Color color_to_move_; ///< @brief Side to move. Declared last so it occupies what was the trailing padding byte.
 };
 
 static_assert(sizeof(Position) == 160);
@@ -149,11 +140,11 @@ constexpr Bitboard Position::AttacksTo(Square location, Color color) const
 {
     const Bitboard occupied_squares = OccupiedSquares();
     Bitboard       result =
-        color == kWhite ? kPawnAttacksBlack[location] & pieces[kPawn] : kPawnAttacksWhite[location] & pieces[kPawn];
-    result |= (kKnightAttacks[location] & pieces[kKnight]) | (kKingAttacks[location] & pieces[kKing]);
-    result |= RookAttacks(occupied_squares, location) & (pieces[kRook] | pieces[kQueen]);
-    result |= BishopAttacks(occupied_squares, location) & (pieces[kBishop] | pieces[kQueen]);
-    result &= colors[color];
+        color == kWhite ? kPawnAttacksBlack[location] & pieces_[kPawn] : kPawnAttacksWhite[location] & pieces_[kPawn];
+    result |= (kKnightAttacks[location] & pieces_[kKnight]) | (kKingAttacks[location] & pieces_[kKing]);
+    result |= RookAttacks(occupied_squares, location) & (pieces_[kRook] | pieces_[kQueen]);
+    result |= BishopAttacks(occupied_squares, location) & (pieces_[kBishop] | pieces_[kQueen]);
+    result &= colors_[color];
     return result;
 }
 
@@ -166,9 +157,9 @@ constexpr Bitboard Position::AttacksTo(Square location, Color color) const
 template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves() const
 {
     const Bitboard occupied_squares = OccupiedSquares();
-    const Bitboard friendly_pieces  = colors[color];
+    const Bitboard friendly_pieces  = colors_[color];
     const Bitboard enemy_pieces     = occupied_squares ^ friendly_pieces;
-    const Bitboard enemy_pawns      = pieces[kPawn] & enemy_pieces;
+    const Bitboard enemy_pawns      = pieces_[kPawn] & enemy_pieces;
     const Square   king_locn        = king_location_[color];
 
     MoveList moves;
@@ -183,7 +174,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     for (auto &[piece, attack_fn] : piece_attackers)
     {
-        const Bitboard b = pieces[piece] & enemy_pieces;
+        const Bitboard b = pieces_[piece] & enemy_pieces;
         for (Square s : b)
         {
             forbidden_king_squares |= attack_fn(occupied_except_king, s);
@@ -235,7 +226,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // Generate knight, bishop, rook and queen moves.
     for (auto &[piece, attack_fn] : piece_attackers_except_king)
     {
-        const Bitboard b = pieces[piece] & friendly_pieces;
+        const Bitboard b = pieces_[piece] & friendly_pieces;
         for (Square from : b)
         {
             const Bitboard attacks         = attack_fn(occupied_squares, from) & pins.AllowedSquares(from);
@@ -314,11 +305,11 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
 
     if constexpr (color == kWhite)
     {
-        pawns              = pieces[kPawn] & colors[kWhite];
+        pawns              = pieces_[kPawn] & colors_[kWhite];
         single_pushes      = pawns.ShiftNorth() & ~occupied_squares;
         double_pushes      = single_pushes.ShiftNorth() & ~occupied_squares & kRank4;
-        captures_west      = pawns.ShiftNorthwest() & colors[kBlack];
-        captures_east      = pawns.ShiftNortheast() & colors[kBlack];
+        captures_west      = pawns.ShiftNorthwest() & colors_[kBlack];
+        captures_east      = pawns.ShiftNortheast() & colors_[kBlack];
         en_passant_sources = en_passant_square_ ? kPawnAttacksBlack[en_passant_square_] & pawns : kNoSquares;
         promotions         = single_pushes & kRank8;
         promotions_west    = captures_west & kRank8;
@@ -329,11 +320,11 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     }
     else
     {
-        pawns              = pieces[kPawn] & colors[kBlack];
+        pawns              = pieces_[kPawn] & colors_[kBlack];
         single_pushes      = pawns.ShiftSouth() & ~occupied_squares;
         double_pushes      = single_pushes.ShiftSouth() & ~occupied_squares & kRank5;
-        captures_west      = pawns.ShiftSouthwest() & colors[kWhite];
-        captures_east      = pawns.ShiftSoutheast() & colors[kWhite];
+        captures_west      = pawns.ShiftSouthwest() & colors_[kWhite];
+        captures_east      = pawns.ShiftSoutheast() & colors_[kWhite];
         en_passant_sources = en_passant_square_ ? kPawnAttacksWhite[en_passant_square_] & pawns : kNoSquares;
         promotions         = single_pushes & kRank1;
         promotions_west    = captures_west & kRank1;
@@ -441,7 +432,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
                     occupied_squares ^ Bitboard(captured_pawn_locn) ^ Bitboard(from);
                 const Bitboard horizontal_attacks =
                     RookAttacks(pseudo_occupied_squares, king_locn) & kEastWest[king_locn];
-                if ((horizontal_attacks & enemy_pieces & (pieces[kRook] | pieces[kQueen])).IsEmpty())
+                if ((horizontal_attacks & enemy_pieces & (pieces_[kRook] | pieces_[kQueen])).IsEmpty())
                 {
                     // We can make this move since it's not a discovered check.
                     moves.push_back(Move::EpCapture(from, to));
@@ -475,8 +466,8 @@ using std::vector;
 constexpr Position Position::MakeNullMove() const
 {
     Position position{*this};
-    position.is_null_move  = true;
-    position.color_to_move = EnemyOf(position.color_to_move);
+    position.is_null_move_  = true;
+    position.color_to_move_ = EnemyOf(position.color_to_move_);
     position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
     position.hash_ ^= kBlackMoveHash;
     position.en_passant_square_ = Square{(uint8_t)0};
@@ -490,9 +481,9 @@ constexpr Position Position::MakeNullMove() const
 constexpr void Position::AddPiece(Color color, Piece piece, Square to)
 {
     const Bitboard to_bb = Bitboard{to};
-    pieces[piece] ^= to_bb;
-    colors[color] ^= to_bb;
-    pieces[kNone] ^= to_bb; // pieces[kNone] holds the occupied-squares bitboard
+    pieces_[piece] ^= to_bb;
+    colors_[color] ^= to_bb;
+    pieces_[kNone] ^= to_bb; // pieces[kNone] holds the occupied-squares bitboard
     hash_ ^= kPieceSquareHashes[color][piece - 1][to];
     squares_[to] = piece;
 }
@@ -504,9 +495,9 @@ constexpr void Position::AddPiece(Color color, Piece piece, Square to)
 constexpr void Position::RemovePiece(Color color, Piece piece, Square from)
 {
     const Bitboard from_bb = Bitboard{from};
-    pieces[piece] ^= from_bb;
-    colors[color] ^= from_bb;
-    pieces[kNone] ^= from_bb; // pieces[kNone] holds the occupied-squares bitboard
+    pieces_[piece] ^= from_bb;
+    colors_[color] ^= from_bb;
+    pieces_[kNone] ^= from_bb; // pieces[kNone] holds the occupied-squares bitboard
     hash_ ^= kPieceSquareHashes[color][piece - 1][from];
     squares_[from] = Piece::kNone;
 }
@@ -520,9 +511,9 @@ constexpr void Position::MovePiece(Color color, Piece piece, Square from, Square
 {
     const Bitboard                   from_to_bb = Bitboard{from} | Bitboard{to};
     const std::array<zobrist_t, 64> &hash       = kPieceSquareHashes[color][piece - 1];
-    pieces[piece] ^= from_to_bb;
-    colors[color] ^= from_to_bb;
-    pieces[kNone] ^= from_to_bb; // pieces[kNone] holds the occupied-squares bitboard
+    pieces_[piece] ^= from_to_bb;
+    colors_[color] ^= from_to_bb;
+    pieces_[kNone] ^= from_to_bb; // pieces[kNone] holds the occupied-squares bitboard
     hash_ ^= hash[to] ^ hash[from];
     squares_[from] = Piece::kNone;
     squares_[to]   = piece;
@@ -538,13 +529,13 @@ constexpr Position Position::MakeMove(const Move &move) const
     constexpr Square G8{"G8"}; // Black kingside castling king destination.
     constexpr Square C8{"C8"}; // Black queenside castling king destination.
 
-    const Color  color = color_to_move;
+    const Color  color = color_to_move_;
     const Square from  = move.from();
     const Square to    = move.to();
     const Piece  piece = move.piece();
 
     Position position{*this};
-    position.is_null_move = false;
+    position.is_null_move_ = false;
     position.castling_rights_.AfterMove(move);
     position.hash_ ^= position.castling_rights_.Hash() ^ castling_rights_.Hash();
     position.hash_ ^= kEnPassantHashes[position.en_passant_square_];
@@ -615,10 +606,10 @@ constexpr Position Position::MakeMove(const Move &move) const
         }
         break;
     }
-    position.color_to_move = EnemyOf(color);
+    position.color_to_move_ = EnemyOf(color);
     position.hash_ ^= kBlackMoveHash;
     position.full_move_count_ += color; // Increments after black's move.
-    position.king_location_[color] = (position.pieces[kKing] & position.colors[color]).Lsb();
+    position.king_location_[color] = (position.pieces_[kKing] & position.colors_[color]).Lsb();
     position.checkers_             = position.AttacksTo(position.king_location_[EnemyOf(color)], color);
     return position;
 }
@@ -671,10 +662,10 @@ inline Position Position::FromString(std::string_view fen_string)
     ss >> color_to_move;
     if (color_to_move == "b")
     {
-        position.color_to_move = kBlack;
+        position.color_to_move_ = kBlack;
     }
-    position.king_location_[kWhite] = (position.pieces[kKing] & position.colors[kWhite]).Lsb();
-    position.king_location_[kBlack] = (position.pieces[kKing] & position.colors[kBlack]).Lsb();
+    position.king_location_[kWhite] = (position.pieces_[kKing] & position.colors_[kWhite]).Lsb();
+    position.king_location_[kBlack] = (position.pieces_[kKing] & position.colors_[kBlack]).Lsb();
     // Castling rights
     string castling_rights;
     ss >> castling_rights;
@@ -706,7 +697,7 @@ inline Position Position::FromString(std::string_view fen_string)
     }
     position.hash_ = position.ComputeHash();
     // Is this position check?
-    const Color color  = position.color_to_move;
+    const Color color  = position.color_to_move_;
     position.checkers_ = position.AttacksTo(position.king_location_[color], EnemyOf(color));
     return position;
 }
@@ -734,7 +725,7 @@ inline std::string Position::ToString() const
                     ss << num_empty_squares;
                     num_empty_squares = 0;
                 }
-                const char piece = (colors[kWhite] & Bitboard(x, y)).IsNotEmpty()
+                const char piece = (colors_[kWhite] & Bitboard(x, y)).IsNotEmpty()
                                        ? " PNBRQK"[PieceAt((Square)(x + 8 * y))]
                                        : " pnbrqk"[PieceAt((Square)(x + 8 * y))];
                 ss << piece;
@@ -751,7 +742,7 @@ inline std::string Position::ToString() const
         }
     }
     // Side to move
-    ss << ' ' << (color_to_move == kBlack ? 'b' : 'w') << ' ';
+    ss << ' ' << (color_to_move_ == kBlack ? 'b' : 'w') << ' ';
     // Castling rights
     ss << castling_rights_.ToFenString();
     ss << ' ';
@@ -787,7 +778,7 @@ constexpr bool Position::IsDrawByMaterial() const
         return true;
     case 3:
         // king and bishop vs king or king and knight vs king
-        if ((pieces[kBishop] | pieces[kKnight]).IsNotEmpty())
+        if ((pieces_[kBishop] | pieces_[kKnight]).IsNotEmpty())
         {
             INCREMENT("draws by material (3)");
             return true;
@@ -796,8 +787,8 @@ constexpr bool Position::IsDrawByMaterial() const
     case 4:
         // king and bishop vs king and bishop with bishops on same color square
         {
-            const Bitboard white_bishops                   = pieces[kBishop] & colors[kWhite];
-            const Bitboard black_bishops                   = pieces[kBishop] & colors[kBlack];
+            const Bitboard white_bishops                   = pieces_[kBishop] & colors_[kWhite];
+            const Bitboard black_bishops                   = pieces_[kBishop] & colors_[kBlack];
             const bool     is_white_bishop_on_white_square = (white_bishops & kWhiteSquares).IsNotEmpty();
             const bool     is_black_bishop_on_white_square = (black_bishops & kWhiteSquares).IsNotEmpty();
             if (white_bishops.IsNotEmpty() && black_bishops.IsNotEmpty() &&
@@ -817,18 +808,18 @@ constexpr bool Position::IsDrawByMaterial() const
 /// @return the 64 bit hash
 constexpr zobrist_t Position::ComputeHash() const
 {
-    zobrist_t hash = color_to_move == kBlack ? kBlackMoveHash : 0ull;
+    zobrist_t hash = color_to_move_ == kBlack ? kBlackMoveHash : 0ull;
     hash ^= castling_rights_.Hash();
     hash ^= kEnPassantHashes[en_passant_square_];
     constexpr std::array piece_types{kPawn, kKnight, kBishop, kRook, kQueen, kKing};
     for (auto piece : piece_types)
     {
-        Bitboard b = pieces[piece] & colors[kWhite];
+        Bitboard b = pieces_[piece] & colors_[kWhite];
         for (Square s : b)
         {
             hash ^= kPieceSquareHashes[kWhite][piece - 1][s];
         }
-        b = pieces[piece] & colors[kBlack];
+        b = pieces_[piece] & colors_[kBlack];
         for (Square s : b)
         {
             hash ^= kPieceSquareHashes[kBlack][piece - 1][s];

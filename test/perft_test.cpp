@@ -160,9 +160,9 @@ static constexpr int kNumEPD = (int)(sizeof(perft_epd) / sizeof(perft_epd[0])); 
 /// @brief One perft expectation: a position and the node count at a given depth.
 struct PerftCase
 {
-    std::string fen;   ///< Position FEN.
-    int         depth; ///< Search depth.
-    uint64_t    nodes; ///< Expected node count at that depth.
+    std::string fen_;   ///< Position FEN.
+    int         depth_; ///< Search depth.
+    uint64_t    nodes_; ///< Expected node count at that depth.
 };
 
 /// @brief Recursively count leaf nodes of the move tree (perft).
@@ -250,10 +250,10 @@ int main(int argc, char *argv[])
 
     for (const auto &tc : cases)
     {
-        Position pos{Position::FromString(tc.fen)};
+        Position pos{Position::FromString(tc.fen_)};
         uint64_t got   = 0;
         auto     start = std::chrono::steady_clock::now();
-        Perft(pos, tc.depth, got);
+        Perft(pos, tc.depth_, got);
         auto elapsed_us =
             std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count();
         if (elapsed_us == 0)
@@ -262,11 +262,11 @@ int main(int argc, char *argv[])
         }
         total_nodes += got;
 
-        std::cout << std::format("{:<75} d{} nodes={:<12} {:3.0f} Mnps\n", tc.fen, tc.depth, got,
+        std::cout << std::format("{:<75} d{} nodes={:<12} {:3.0f} Mnps\n", tc.fen_, tc.depth_, got,
                                  (double)got / elapsed_us);
-        if (got != tc.nodes)
+        if (got != tc.nodes_)
         {
-            std::cout << std::format("  ERROR: expected {} got {}\n", tc.nodes, got);
+            std::cout << std::format("  ERROR: expected {} got {}\n", tc.nodes_, got);
             pass = false;
         }
     }

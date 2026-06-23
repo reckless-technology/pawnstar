@@ -123,13 +123,13 @@ inline void OpeningBook::Free()
 /// @param position Position to consider for book moves
 inline void OpeningBook::DisplayAvailableMoves(const Position &position)
 {
-    if (!book_.count(position.Hash()))
+    if (!book_.count(position.hash_))
     {
         return;
     }
     // Create an associative container, indexed by move, of how many times that move appears for this position.
     std::unordered_map<Move, int, Move> move_counts;
-    for (const auto &move : book_[position.Hash()])
+    for (const auto &move : book_[position.hash_])
     {
         ++move_counts[move];
     }
@@ -139,10 +139,10 @@ inline void OpeningBook::DisplayAvailableMoves(const Position &position)
         std::cout << std::format("{:<8} {:3}\n", move.ToString(), freq);
     }
     // Questionable moves are recognised but never played; show them flagged with '?' for diagnostics.
-    if (questionable_.count(position.Hash()))
+    if (questionable_.count(position.hash_))
     {
         std::unordered_map<Move, int, Move> q_counts;
-        for (const auto &move : questionable_[position.Hash()])
+        for (const auto &move : questionable_[position.hash_])
         {
             ++q_counts[move];
         }
@@ -182,7 +182,7 @@ inline bool OpeningBook::ParseLineOfPlay(std::string_view line)
         {
             move_string.pop_back();
         }
-        const zobrist_t hash  = position.Hash();
+        const zobrist_t hash  = position.hash_;
         auto            moves = position.GenerateLegalMoves();
         auto            i =
             std::ranges::find_if(moves, [&move_string](const Move &move) { return move.ToString() == move_string; });

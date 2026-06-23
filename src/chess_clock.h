@@ -28,25 +28,25 @@ class ChessClock
 
     ChessClock() = default;
 
-    ClockType clock_type{kStandard};                   ///< The current time-control type.
-    Duration  remaining_time{std::chrono::minutes{5}}; ///< Time left on our clock this period (UCI wtime/btime).
-    Duration  increment{
+    ClockType clock_type_{kStandard};                   ///< The current time-control type.
+    Duration  remaining_time_{std::chrono::minutes{5}}; ///< Time left on our clock this period (UCI wtime/btime).
+    Duration  increment_{
         Duration::zero()}; ///< Per-move increment, side to move (UCI winc/binc). Parsed but not currently used by time
                             ///< planning — see SearchRootNode (folding it into the budget SPRT'd neutral/negative).
-    int      moves_to_go{0}; ///< Moves until the next time control (0 = unknown / sudden death).
-    int      depth{10};      ///< Target depth when clock_type == kFixedDepth.
-    uint64_t max_nodes{0};   ///< Node limit for `go nodes` (0 = no limit); checked per-thread in Search.
+    int      moves_to_go_{0}; ///< Moves until the next time control (0 = unknown / sudden death).
+    int      depth_{10};      ///< Target depth when clock_type == kFixedDepth.
+    uint64_t max_nodes_{0};   ///< Node limit for `go nodes` (0 = no limit); checked per-thread in Search.
 
     /// @brief Reset to default time control (called when starting a new game). Provided instead of assigning a
     /// fresh ChessClock because the atomic members below make the class non-assignable.
     void Reset()
     {
-        clock_type       = kStandard;
-        remaining_time   = std::chrono::minutes{5};
-        increment        = Duration::zero();
-        moves_to_go      = 0;
-        depth            = 10;
-        max_nodes        = 0;
+        clock_type_      = kStandard;
+        remaining_time_  = std::chrono::minutes{5};
+        increment_       = Duration::zero();
+        moves_to_go_     = 0;
+        depth_           = 10;
+        max_nodes_       = 0;
         allocated_time_  = Duration::zero();
         max_search_time_ = Duration::zero();
         search_start_time_.store(Clock::now(), std::memory_order_relaxed);
@@ -91,12 +91,6 @@ class ChessClock
         return std::chrono::duration_cast<Duration>(Clock::now() - search_start_time_.load(std::memory_order_relaxed));
     }
 
-    /// @brief The soft time budget allocated for this move.
-    Duration AllocatedTime() const
-    {
-        return allocated_time_;
-    }
-
     /// @brief Whether the hard deadline has passed. Always false when there is no hard deadline.
     /// @return true if the search must stop now.
     bool HasReachedHardDeadline() const
@@ -120,6 +114,10 @@ class ChessClock
     // not changed mid-search, so they are plain.
     std::atomic<TimePoint> search_start_time_{Clock::now()};
     std::atomic<TimePoint> hard_deadline_{kNoDeadline};
-    Duration               allocated_time_{Duration::zero()};
-    Duration               max_search_time_{Duration::zero()};
+
+  public:
+    Duration allocated_time_{Duration::zero()}; ///< Soft time budget for this move (drives between-iteration stops).
+
+  private:
+    Duration max_search_time_{Duration::zero()};
 };

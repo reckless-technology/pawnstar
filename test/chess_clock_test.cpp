@@ -38,7 +38,7 @@ int main()
         ChessClock clock;
         clock.StartSearch(/*allocated=*/100ms, /*maximum=*/200ms);
         check(!clock.HasReachedHardDeadline(), "deadline not reached immediately after StartSearch");
-        check(clock.AllocatedTime() == 100ms, "AllocatedTime returns the soft budget");
+        check(clock.allocated_time_ == 100ms, "AllocatedTime returns the soft budget");
         sleep(120ms);
         check(!clock.HasReachedHardDeadline(), "deadline not reached before the maximum elapses");
         sleep(180ms); // total ~300ms > 200ms maximum
@@ -85,9 +85,9 @@ int main()
         check(clock.HasReachedHardDeadline(), "deadline reached before Reset");
         clock.Reset();
         check(!clock.HasReachedHardDeadline(), "Reset clears the hard deadline");
-        check(clock.clock_type == ChessClock::kStandard, "Reset restores kStandard clock type");
-        check(clock.remaining_time == std::chrono::minutes{5}, "Reset restores the default remaining time");
-        check(clock.moves_to_go == 0 && clock.depth == 10, "Reset restores default moves_to_go / depth");
+        check(clock.clock_type_ == ChessClock::kStandard, "Reset restores kStandard clock type");
+        check(clock.remaining_time_ == std::chrono::minutes{5}, "Reset restores the default remaining time");
+        check(clock.moves_to_go_ == 0 && clock.depth_ == 10, "Reset restores default moves_to_go / depth");
     }
 
     if (failures == 0)

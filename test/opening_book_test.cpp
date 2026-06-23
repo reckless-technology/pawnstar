@@ -53,7 +53,7 @@ zobrist_t HashAfter(std::initializer_list<std::string> moves)
     {
         p = Play(p, m);
     }
-    return p.Hash();
+    return p.hash_;
 }
 
 std::string WriteTempBook(const std::string &contents)

@@ -25,23 +25,23 @@ class Game
 {
   public:
     // clang-format off
-    TranspositionTable      transposition_table;        ///< The transposition table (shared by all Lazy SMP threads).
-    EvalCache               eval_cache;                 ///< Lockless NNUE evaluation cache (shared by all threads).
-    ChessClock              time_control;               ///< Clock controls for the current game.
-    OpeningBook             book;                       ///< The opening book.
-    std::atomic<bool>       is_cancel_pending;          ///< Shared stop flag: set on timeout, UCI stop, or search completion.
-    int                     thread_count;               ///< Lazy SMP search threads; default from PAWNSTAR_THREADS / hardware, set by UCI `Threads`.
-    ChessClock::Duration    move_overhead{ChessClock::Duration{30}}; ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
-    std::atomic<bool>       is_pondering{false};        ///< True while a `go ponder` search runs (until `ponderhit` / `stop`); suppresses time stops.
-    Move                    ponder_move{Move::None()};  ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
-    bool                    use_own_book{true};         ///< Whether to consult the built-in opening book (UCI `OwnBook`).
-    uint64_t                last_search_node_count{0};  ///< Node count of the most recent search's main thread (for `bench`).
+    TranspositionTable      transposition_table_;        ///< The transposition table (shared by all Lazy SMP threads).
+    EvalCache               eval_cache_;                 ///< Lockless NNUE evaluation cache (shared by all threads).
+    ChessClock              time_control_;               ///< Clock controls for the current game.
+    OpeningBook             book_;                       ///< The opening book.
+    std::atomic<bool>       is_cancel_pending_;          ///< Shared stop flag: set on timeout, UCI stop, or search completion.
+    int                     thread_count_;               ///< Lazy SMP search threads; default from PAWNSTAR_THREADS / hardware, set by UCI `Threads`.
+    ChessClock::Duration    move_overhead_{ChessClock::Duration{30}}; ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
+    std::atomic<bool>       is_pondering_{false};        ///< True while a `go ponder` search runs (until `ponderhit` / `stop`); suppresses time stops.
+    Move                    ponder_move_{Move::None()};  ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
+    bool                    use_own_book_{true};         ///< Whether to consult the built-in opening book (UCI `OwnBook`).
+    uint64_t                last_search_node_count_{0};  ///< Node count of the most recent search's main thread (for `bench`).
     // clang-format on
 
     /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
     Game()
-        : transposition_table{kHashtableMegabytes}, eval_cache{kEvalCacheMb}, is_cancel_pending{false},
-          thread_count{ComputeDefaultThreads()}
+        : transposition_table_{kHashtableMegabytes}, eval_cache_{kEvalCacheMb}, is_cancel_pending_{false},
+          thread_count_{ComputeDefaultThreads()}
     {
         SetPosition();
     }
@@ -62,27 +62,6 @@ class Game
     const Position &CurrentPosition() const
     {
         return positions_.back();
-    }
-
-    /// @brief Read-only view of the full game position stack, used to seed SearchState.
-    /// @return The position history stack.
-    const std::vector<Position> &Positions() const
-    {
-        return positions_;
-    }
-
-    /// @brief The NNUE network owned by this game (shared read-only by all search threads after loading).
-    /// @return Reference to the network.
-    nnue::Network &NnueNetwork()
-    {
-        return nnue_network_;
-    }
-
-    /// @brief The NNUE network (const overload).
-    /// @return Const reference to the network.
-    const nnue::Network &NnueNetwork() const
-    {
-        return nnue_network_;
     }
 
     /// @brief Set the board to the given position, resetting per-game transient state (see definition).
@@ -115,10 +94,12 @@ class Game
     Move SearchRootNode();
 
   private:
-    void                  SearchThreadEntry(); ///< Entry point of the search worker thread.
-    std::thread           worker_thread_;      ///< Worker thread for searching moves.
-    std::vector<Position> positions_;          ///< Game position history (grows with the game; no fixed cap).
-    nnue::Network         nnue_network_;       ///< NNUE network instance (loaded via EvalFile; read-only in search).
+    void        SearchThreadEntry(); ///< Entry point of the search worker thread.
+    std::thread worker_thread_;      ///< Worker thread for searching moves.
+
+  public:
+    std::vector<Position> positions_;    ///< Game position history (grows with the game; no fixed cap).
+    nnue::Network         nnue_network_; ///< NNUE network instance (loaded via EvalFile; read-only in search).
 };
 
 // ---- Definitions moved from game.cpp (header-only). SearchRootNode/SearchThreadEntry's search half
@@ -129,9 +110,9 @@ class Game
 /// @param fen_string Initial position.
 inline void Game::SetPosition(std::string_view fen_string)
 {
-    time_control.Reset();
-    is_cancel_pending.store(false, std::memory_order_relaxed);
-    eval_cache.Clear(); // evals are net-specific; start each game with a clean cache
+    time_control_.Reset();
+    is_cancel_pending_.store(false, std::memory_order_relaxed);
+    eval_cache_.Clear(); // evals are net-specific; start each game with a clean cache
     positions_.clear();
     positions_.reserve(1024); // typical games stay well under this; avoids reallocations during normal play
     positions_.push_back(Position::FromString(fen_string));
@@ -187,16 +168,16 @@ inline void Game::SearchThreadEntry()
     // UCI forbids sending `bestmove` while pondering: if the ponder search ended on its own (reached max
     // depth or a forced mate) before the GUI resolved it, wait here until `ponderhit` clears is_pondering or
     // `stop` sets is_cancel_pending. For a normal (non-ponder) search is_pondering is false, so this is a no-op.
-    while (is_pondering.load(std::memory_order_relaxed) && !is_cancel_pending.load(std::memory_order_relaxed))
+    while (is_pondering_.load(std::memory_order_relaxed) && !is_cancel_pending_.load(std::memory_order_relaxed))
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     if (move != Move::None())
     {
         PlayMove(move);
-        if (ponder_move != Move::None())
+        if (ponder_move_ != Move::None())
         {
-            std::cout << std::format("bestmove {} ponder {}\n", move.ToString(), ponder_move.ToString());
+            std::cout << std::format("bestmove {} ponder {}\n", move.ToString(), ponder_move_.ToString());
         }
         else
         {
@@ -211,7 +192,7 @@ inline void Game::SearchThreadEntry()
 /// in SearchThreadEntry exits on is_cancel_pending (set below), so a `stop` during a ponder still works.
 inline void Game::StopThinking()
 {
-    is_cancel_pending.store(true, std::memory_order_relaxed);
+    is_cancel_pending_.store(true, std::memory_order_relaxed);
     if (worker_thread_.joinable())
     {
         worker_thread_.join();

@@ -16,46 +16,46 @@ struct Transposition
 {
     using NodeType = ::NodeType; ///< Alpha-beta node type (kCut / kAll / kPv), defined in move.h.
 
-    zobrist_t hash; ///< Zobrist hash of this position.
-    Move      move; ///< Best move, with score/depth/node-type/age packed into its spare bits.
+    zobrist_t hash_; ///< Zobrist hash of this position.
+    Move      move_; ///< Best move, with score/depth/node-type/age packed into its spare bits.
 
-    constexpr Transposition() : hash(0), move(Move::None())
+    constexpr Transposition() : hash_(0), move_(Move::None())
     {
     }
 
     /// @brief Construct from a move that already has its TT metadata packed in (used when reconstructing
     /// an entry read back from the table).
-    constexpr Transposition(zobrist_t hash, Move move) : hash(hash), move(move)
+    constexpr Transposition(zobrist_t hash, Move move) : hash_(hash), move_(move)
     {
     }
 
     constexpr Transposition(zobrist_t hash, const Move &move, int score, int depth, NodeType type)
-        : hash(hash), move(move.WithTTData(score, depth, type))
+        : hash_(hash), move_(move.WithTTData(score, depth, type))
     {
     }
 
     /// @brief Score computed from this position (lower/upper bound or exact, per node_type()).
     constexpr int score() const
     {
-        return move.score();
+        return move_.score();
     }
 
     /// @brief Depth to which this position was searched.
     constexpr int depth() const
     {
-        return move.TTDepth();
+        return move_.TTDepth();
     }
 
     /// @brief Node type of the stored result.
     constexpr NodeType node_type() const
     {
-        return move.TTNodeType();
+        return move_.TTNodeType();
     }
 
     /// @brief Table generation when stored; stale when != the table's current generation.
     constexpr uint8_t age() const
     {
-        return move.TTAge();
+        return move_.TTAge();
     }
 };
 
@@ -97,8 +97,8 @@ class TranspositionTable
     /// (two 64-bit words written by different stores) is detected and treated as a miss (Hyatt's XOR trick).
     struct AtomicEntry
     {
-        std::atomic<uint64_t> key{0};  ///< hash ^ data.
-        std::atomic<uint64_t> data{0}; ///< Packed move bits (move + score/depth/node-type/age).
+        std::atomic<uint64_t> key_{0};  ///< hash ^ data.
+        std::atomic<uint64_t> data_{0}; ///< Packed move bits (move + score/depth/node-type/age).
     };
 
     static_assert(sizeof(AtomicEntry) == 16);
@@ -134,8 +134,8 @@ inline void TranspositionTable::Clear()
 {
     for (std::size_t i = 0; i < size_; ++i)
     {
-        table_[i].key.store(0, std::memory_order_relaxed);
-        table_[i].data.store(0, std::memory_order_relaxed);
+        table_[i].key_.store(0, std::memory_order_relaxed);
+        table_[i].data_.store(0, std::memory_order_relaxed);
     }
     generation_ = 0;
 }
@@ -146,8 +146,8 @@ inline void TranspositionTable::Clear()
 inline std::optional<Transposition> TranspositionTable::FindTransposition(zobrist_t hash) const
 {
     const AtomicEntry &e    = table_[hash % size_];
-    const uint64_t     data = e.data.load(std::memory_order_relaxed);
-    const uint64_t     key  = e.key.load(std::memory_order_relaxed);
+    const uint64_t     data = e.data_.load(std::memory_order_relaxed);
+    const uint64_t     key  = e.key_.load(std::memory_order_relaxed);
     if ((key ^ data) == hash)
     {
         return Transposition{hash, Move::FromBits(data)};
@@ -161,20 +161,20 @@ inline std::optional<Transposition> TranspositionTable::FindTransposition(zobris
 /// @param transposition Transposition to be inserted.
 inline void TranspositionTable::RecordTransposition(const Transposition &transposition)
 {
-    AtomicEntry   &e        = table_[transposition.hash % size_];
-    const uint64_t cur_key  = e.key.load(std::memory_order_relaxed);
-    const uint64_t cur_data = e.data.load(std::memory_order_relaxed);
+    AtomicEntry   &e        = table_[transposition.hash_ % size_];
+    const uint64_t cur_key  = e.key_.load(std::memory_order_relaxed);
+    const uint64_t cur_data = e.data_.load(std::memory_order_relaxed);
     const Move     cur      = Move::FromBits(cur_data);
     const bool     is_empty = (cur_key == 0 && cur_data == 0);
     const bool     is_old   = cur.TTAge() != generation_;
     if (is_empty || is_old || cur.TTDepth() <= transposition.depth() ||
         transposition.node_type() == Transposition::NodeType::kPv)
     {
-        Move m = transposition.move;
+        Move m = transposition.move_;
         m.SetTTAge(generation_);
         const uint64_t data = m.Bits();
-        e.key.store(transposition.hash ^ data, std::memory_order_relaxed);
-        e.data.store(data, std::memory_order_relaxed);
+        e.key_.store(transposition.hash_ ^ data, std::memory_order_relaxed);
+        e.data_.store(data, std::memory_order_relaxed);
     }
 }
 
@@ -184,7 +184,7 @@ inline std::pair<std::size_t, int> TranspositionTable::UsageStats() const
     std::size_t count = 0;
     for (std::size_t i = 0; i < size_; ++i)
     {
-        if (table_[i].data.load(std::memory_order_relaxed) != 0)
+        if (table_[i].data_.load(std::memory_order_relaxed) != 0)
         {
             ++count;
         }
@@ -205,7 +205,7 @@ inline int TranspositionTable::HashfullPermille() const
     std::size_t count = 0;
     for (std::size_t i = 0; i < sample; ++i)
     {
-        if (table_[i].data.load(std::memory_order_relaxed) != 0)
+        if (table_[i].data_.load(std::memory_order_relaxed) != 0)
         {
             ++count;
         }

@@ -89,10 +89,10 @@ int main()
     // Load the opening book from the working directory; if the file can't be loaded (wrong cwd, missing/
     // renamed file), fall back to the copy embedded in the binary (src/embedded_book.S) so the engine always
     // has a book. The book is optional, so a failure of both is only a warning, not fatal.
-    if (!game.book.Initialize(LocateResource("pawnstar.book")))
+    if (!game.book_.Initialize(LocateResource("pawnstar.book")))
     {
         const std::size_t embedded_size = static_cast<std::size_t>(pawnstar_embedded_book_end - pawnstar_embedded_book);
-        if (game.book.InitializeFromMemory(pawnstar_embedded_book, embedded_size))
+        if (game.book_.InitializeFromMemory(pawnstar_embedded_book, embedded_size))
         {
             std::cout << "info string book file load failed; using the embedded book (" << embedded_size << " bytes)\n";
         }
@@ -109,12 +109,12 @@ int main()
     // corrupt — does the engine give up.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
     const std::string net_path  = eval_file ? eval_file : LocateResource("nnue/pawnstar-v11.bin");
-    if (!game.NnueNetwork().Load(net_path))
+    if (!game.nnue_network_.Load(net_path))
     {
         const std::size_t embedded_size = static_cast<std::size_t>(pawnstar_embedded_net_end - pawnstar_embedded_net);
         std::cout << "info string NNUE: file load failed; falling back to the embedded net (" << embedded_size
                   << " bytes)\n";
-        if (!game.NnueNetwork().LoadFromMemory(pawnstar_embedded_net, embedded_size, "embedded"))
+        if (!game.nnue_network_.LoadFromMemory(pawnstar_embedded_net, embedded_size, "embedded"))
         {
             std::cout << "info string FATAL: could not load the NNUE net from '" << net_path
                       << "' or the embedded fallback. The build may be corrupt.\n";

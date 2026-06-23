@@ -26,8 +26,8 @@ long g_fails  = 0;
 void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
 {
     const Position      &p   = state.CurrentPosition();
-    const nnue::Network &net = state.game.NnueNetwork();
-    const int            inc = net.Evaluate(state.CurrentAccumulator(), p.color_to_move);
+    const nnue::Network &net = state.game_.nnue_network_;
+    const int            inc = net.Evaluate(state.accumulator_, p.color_to_move_);
     const int            ref = net.Evaluate(p); // full refresh
     ++g_checks;
     if (inc != ref)
@@ -52,7 +52,7 @@ void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
         state.UndoMove();
     }
     // After undoing every child the accumulator must again match this position's full refresh.
-    const int inc_after = net.Evaluate(state.CurrentAccumulator(), p.color_to_move);
+    const int inc_after = net.Evaluate(state.accumulator_, p.color_to_move_);
     ++g_checks;
     if (inc_after != ref)
     {
@@ -72,12 +72,12 @@ int main(int argc, char **argv)
     }
     // Load the net into a Game; SearchState then maintains the accumulator incrementally.
     Game game;
-    if (!game.NnueNetwork().Load(argv[1]))
+    if (!game.nnue_network_.Load(argv[1]))
     {
         std::cout << "test_nnue_incremental: failed to load net '" << argv[1] << "'\n";
         return 1;
     }
-    if (!game.NnueNetwork().IsLoaded())
+    if (!game.nnue_network_.loaded_)
     {
         std::cout << "test_nnue_incremental: net not loaded after load\n";
         return 1;

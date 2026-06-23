@@ -44,7 +44,7 @@ class Move
     static constexpr int64_t kAgeMask       = (int64_t)0xFF << kAgeShift;            // bits 33-40
     static constexpr int64_t kScoreMask     = ~(((int64_t)1 << kScoreShift) - 1);    // bits 41-63
     static constexpr int64_t kTTDataMask    = ~(((int64_t)1 << kNodeTypeShift) - 1); // bits 23-63
-    int64_t                  val;
+    int64_t                  val_;
 
   public:
     /// @brief Move types.
@@ -69,7 +69,7 @@ class Move
 
     /// @brief Copy constructor. Treat the move object as a 64 bit int for efficiency.
     /// @param that Move to construct from.
-    constexpr Move(const Move &that) : val(that.val)
+    constexpr Move(const Move &that) : val_(that.val_)
     {
     }
 
@@ -78,7 +78,7 @@ class Move
     /// @return Assignee move.
     constexpr Move &operator=(const Move &that)
     {
-        val = that.val;
+        val_ = that.val_;
         return *this;
     }
 
@@ -87,7 +87,7 @@ class Move
     /// @return true if moves are equivalent.
     constexpr bool operator==(const Move &that) const
     {
-        return (val & 0x3FFFFF) == (that.val & 0x3FFFFF);
+        return (val_ & 0x3FFFFF) == (that.val_ & 0x3FFFFF);
     }
 
     /// @brief Less than operator. Used to put moves into a set.
@@ -95,42 +95,42 @@ class Move
     /// @return true if move is less than that.
     constexpr bool operator<(const Move &that) const
     {
-        return val < that.val;
+        return val_ < that.val_;
     }
 
     /// @brief Destination square.
     /// @return Square index of move to.
     constexpr Square to() const
     {
-        return Square{(uint8_t)(val & 0x3F)};
+        return Square{(uint8_t)(val_ & 0x3F)};
     }
 
     /// @brief Source square.
     /// @return Square index of move from.
     constexpr Square from() const
     {
-        return Square{(uint8_t)((val >> 6) & 0x3F)};
+        return Square{(uint8_t)((val_ >> 6) & 0x3F)};
     }
 
     /// @brief Type.
     /// @return Move type.
     constexpr Type type() const
     {
-        return Type{(uint8_t)((val >> 18) & 0x0F)};
+        return Type{(uint8_t)((val_ >> 18) & 0x0F)};
     }
 
     /// @brief Moving piece
     /// @return the piece.
     constexpr Piece piece() const
     {
-        return Piece{(uint8_t)((val >> 12) & 0x07)};
+        return Piece{(uint8_t)((val_ >> 12) & 0x07)};
     }
 
     /// @brief Captured piece.
     /// @return the captured piece or kNone if not a capture move.
     constexpr Piece captured() const
     {
-        return Piece{(uint8_t)((val >> 15) & 0x07)};
+        return Piece{(uint8_t)((val_ >> 15) & 0x07)};
     }
 
     /// @brief Promoted piece.
@@ -161,39 +161,39 @@ class Move
     /// @return Move score. The arithmetic right shift sign-extends from the top bit.
     constexpr int score() const
     {
-        return (int)(val >> kScoreShift);
+        return (int)(val_ >> kScoreShift);
     }
 
     /// @brief Transposition node type (bits 23-24).
     constexpr NodeType TTNodeType() const
     {
-        return NodeType((val >> kNodeTypeShift) & 0x3);
+        return NodeType((val_ >> kNodeTypeShift) & 0x3);
     }
 
     /// @brief Transposition depth searched (bits 25-32, int8_t).
     constexpr int TTDepth() const
     {
-        return (int8_t)((val >> kDepthShift) & 0xFF);
+        return (int8_t)((val_ >> kDepthShift) & 0xFF);
     }
 
     /// @brief Transposition age / generation (bits 33-40, uint8_t).
     constexpr uint8_t TTAge() const
     {
-        return (uint8_t)((val >> kAgeShift) & 0xFF);
+        return (uint8_t)((val_ >> kAgeShift) & 0xFF);
     }
 
     /// @brief Create a from-to bits value for indexing into history tables.
     /// @return 12 bit from-to combination.
     constexpr int from_to() const
     {
-        return val & 0xFFF;
+        return val_ & 0xFFF;
     }
 
     /// @brief Does this move give check?
     /// @return true if move is checking.
     constexpr bool IsChecking() const
     {
-        return !!(val & kIsChecking);
+        return !!(val_ & kIsChecking);
     }
 
     /// @brief Whether this is a quiet move (neither a capture nor a promotion).
@@ -206,7 +206,7 @@ class Move
     /// @brief Raw 64-bit representation of the move (all packed fields). Used by the lockless TT.
     constexpr uint64_t Bits() const
     {
-        return (uint64_t)val;
+        return (uint64_t)val_;
     }
 
     /// @brief Construct a move from its raw 64-bit representation. Used by the lockless TT.
@@ -219,7 +219,7 @@ class Move
     /// @param score Score to be assigned (must fit in a signed 23-bit value).
     constexpr void AssignScore(int score)
     {
-        val = (val & ~kScoreMask) | ((int64_t)score << kScoreShift);
+        val_ = (val_ & ~kScoreMask) | ((int64_t)score << kScoreShift);
     }
 
     /// @brief Return a copy of this move with transposition metadata packed in (clearing any prior
@@ -227,7 +227,7 @@ class Move
     /// @param score Score for the position. @param depth Depth searched. @param type Node type.
     constexpr Move WithTTData(int score, int depth, NodeType type) const
     {
-        int64_t v = val & ~kTTDataMask;
+        int64_t v = val_ & ~kTTDataMask;
         v |= (int64_t)((uint8_t)type) << kNodeTypeShift;
         v |= (int64_t)(uint8_t)(int8_t)depth << kDepthShift;
         v |= (int64_t)score << kScoreShift;
@@ -238,13 +238,13 @@ class Move
     /// @param age Generation counter value.
     constexpr void SetTTAge(uint8_t age)
     {
-        val = (val & ~kAgeMask) | ((int64_t)age << kAgeShift);
+        val_ = (val_ & ~kAgeMask) | ((int64_t)age << kAgeShift);
     }
 
     /// @brief Set the flag that indicates this move gives check.
     constexpr void GivesCheck()
     {
-        val |= kIsChecking;
+        val_ |= kIsChecking;
     }
 
     /// @brief Null move.
@@ -328,7 +328,7 @@ class Move
     /// @return Hashed value of move.
     constexpr std::size_t operator()(const Move &move) const
     {
-        return (std::size_t)move.val;
+        return (std::size_t)move.val_;
     }
 
     /// @brief Convert a move to an algebraic notation string, e.g. "e1g1", "a7a8q".
@@ -346,14 +346,14 @@ class Move
   private:
     /// @brief Construct a non-capture move of a piece.
     /// @param from From square. @param to To square. @param piece Moving piece.
-    constexpr Move(Square from, Square to, Piece piece) : val(to | (from << 6) | (piece << 12))
+    constexpr Move(Square from, Square to, Piece piece) : val_(to | (from << 6) | (piece << 12))
     {
     }
 
     /// @brief Construct a typed move (no captured piece).
     /// @param from From square. @param to To square. @param piece Moving piece. @param type Move type.
     constexpr Move(Square from, Square to, Piece piece, Type type)
-        : val(to | (from << 6) | (piece << 12) | (type << 18))
+        : val_(to | (from << 6) | (piece << 12) | (type << 18))
     {
     }
 
@@ -361,13 +361,13 @@ class Move
     /// @param from From square. @param to To square. @param piece Moving piece. @param type Move type.
     /// @param captured Captured piece.
     constexpr Move(Square from, Square to, Piece piece, Type type, Piece captured)
-        : val(to | (from << 6) | (piece << 12) | (captured << 15) | (type << 18))
+        : val_(to | (from << 6) | (piece << 12) | (captured << 15) | (type << 18))
     {
     }
 
     /// @brief Construct directly from a raw 64-bit representation.
     /// @param v Raw packed move bits.
-    constexpr Move(int64_t v) : val(v)
+    constexpr Move(int64_t v) : val_(v)
     {
     }
 };

@@ -11,11 +11,11 @@
 /// @brief A single static-exchange-evaluation test case.
 struct SeeTest
 {
-    std::string_view name;          ///< Human-readable case name.
-    std::string_view fen;           ///< Position FEN.
-    Move             move;          ///< Move to evaluate.
-    int              want_score;    ///< Expected SEE score.
-    bool             want_checking; ///< Expected give-check flag.
+    std::string_view name_;          ///< Human-readable case name.
+    std::string_view fen_;           ///< Position FEN.
+    Move             move_;          ///< Move to evaluate.
+    int              want_score_;    ///< Expected SEE score.
+    bool             want_checking_; ///< Expected give-check flag.
 };
 
 // clang-format off
@@ -206,25 +206,25 @@ int main()
     int failures = 0;
     for (const auto &tc : tests)
     {
-        Position pos{Position::FromString(tc.fen)};
-        const auto [score, is_checking] = EvaluateStaticExchange(pos, tc.move);
-        bool ok                         = (score == tc.want_score) && (is_checking == tc.want_checking);
+        Position pos{Position::FromString(tc.fen_)};
+        const auto [score, is_checking] = EvaluateStaticExchange(pos, tc.move_);
+        bool ok                         = (score == tc.want_score_) && (is_checking == tc.want_checking_);
         if (!ok)
         {
             ++failures;
-            std::cout << std::format("[FAIL] {}\n", tc.name);
-            if (score != tc.want_score)
+            std::cout << std::format("[FAIL] {}\n", tc.name_);
+            if (score != tc.want_score_)
             {
-                std::cout << std::format("       score: got {} want {}\n", score, tc.want_score);
+                std::cout << std::format("       score: got {} want {}\n", score, tc.want_score_);
             }
-            if (is_checking != tc.want_checking)
+            if (is_checking != tc.want_checking_)
             {
-                std::cout << std::format("       givesCheck: got {} want {}\n", is_checking, tc.want_checking);
+                std::cout << std::format("       givesCheck: got {} want {}\n", is_checking, tc.want_checking_);
             }
         }
         else
         {
-            std::cout << std::format("[PASS] {}\n", tc.name);
+            std::cout << std::format("[PASS] {}\n", tc.name_);
         }
     }
     const int total = (int)tests.size();

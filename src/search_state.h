@@ -34,8 +34,8 @@ class Game;
 /// @brief Compact position hash entry for draw-by-repetition detection.
 struct HashEntry
 {
-    zobrist_t hash;                  ///< Zobrist hash of the position.
-    uint8_t   reversible_move_count; ///< Half-move clock at this position.
+    zobrist_t hash_;                  ///< Zobrist hash of the position.
+    uint8_t   reversible_move_count_; ///< Half-move clock at this position.
 };
 
 /// @brief A variation (typically principal variation) is a line of play or series of moves.
@@ -44,8 +44,8 @@ using Variation = std::vector<Move>;
 /// @brief Result of searching a single move: its score and whether it gives check.
 struct SingleMoveResult
 {
-    int  score;       ///< Alpha-beta score for the move.
-    bool is_checking; ///< True if the move gives check.
+    int  score_;       ///< Alpha-beta score for the move.
+    bool is_checking_; ///< True if the move gives check.
 };
 
 /// @brief When the PV changes we need to copy the new PV up the tree recursively.
@@ -67,10 +67,10 @@ constexpr void CopyVariation(Variation &dst, const Variation &src, const Move &b
 class SearchState
 {
   public:
-    Game                                    &game;      ///< Shared state: TT, clock, cancellation flag.
-    HistoryTable                             history{}; ///< Per-thread history heuristic counts (no sharing).
-    std::array<std::array<Move, 2>, kMaxPly> killers{}; ///< Killer moves indexed by ply.
-    uint64_t node_count{}; ///< Cumulative nodes this thread searched this search (nps + `go nodes`).
+    Game                                    &game_;      ///< Shared state: TT, clock, cancellation flag.
+    HistoryTable                             history_{}; ///< Per-thread history heuristic counts (no sharing).
+    std::array<std::array<Move, 2>, kMaxPly> killers_{}; ///< Killer moves indexed by ply.
+    uint64_t node_count_{}; ///< Cumulative nodes this thread searched this search (nps + `go nodes`).
 
     /// @brief Construct a search state from the current game.
     /// Builds the full hash history from the game's position stack and seeds the per-thread
@@ -90,13 +90,6 @@ class SearchState
     const Position &CurrentPosition() const
     {
         return positions_.back();
-    }
-
-    /// @brief The NNUE accumulator for the current position, maintained incrementally across make/undo.
-    /// @return Const reference to the current accumulator.
-    const nnue::Accumulator &CurrentAccumulator() const
-    {
-        return accumulator_;
     }
 
     /// @brief Make a move, pushing the resulting position onto the stack and recording its hash.
@@ -160,11 +153,11 @@ class SearchState
     /// @param move Quiet move that caused the cutoff.
     void RecordKiller(int ply, Move move)
     {
-        if (!(killers[ply][0] == move))
+        if (!(killers_[ply][0] == move))
         {
             INCREMENT("killer moves");
-            killers[ply][1] = killers[ply][0];
-            killers[ply][0] = move;
+            killers_[ply][1] = killers_[ply][0];
+            killers_[ply][0] = move;
         }
     }
 
@@ -218,9 +211,12 @@ class SearchState
     /// @return The null-move score, or @p alpha if null move was not tried / did not cut.
     int AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
 
-    std::vector<Position> positions_;     ///< Per-thread copy-make position stack (reserved in the constructor).
-    nnue::Accumulator     accumulator_{}; ///< NNUE accumulator for the tip position (incremental).
+    std::vector<Position> positions_; ///< Per-thread copy-make position stack (reserved in the constructor).
 
+  public:
+    nnue::Accumulator accumulator_{}; ///< NNUE accumulator for the tip position (incremental).
+
+  private:
     /// @brief Hash history from game-start through parent of current node (game history + search depth).
     /// A std::vector (reserved up-front in the constructor) so an arbitrarily long game cannot overflow it.
     std::vector<HashEntry> hash_stack_;
@@ -242,23 +238,23 @@ class SearchState
 /// the current position), so that IsDrawByRepetition can walk backwards through the full
 /// game history.
 inline SearchState::SearchState(Game &g)
-    : game(g), continuation_history_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
+    : game_(g), continuation_history_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
 {
-    const std::vector<Position> &pos = g.Positions();
+    const std::vector<Position> &pos = g.positions_;
     // Reserve the whole game history plus the deepest the search can descend, so no push_back during the
     // search reallocates (and an arbitrarily long game cannot overflow a fixed buffer).
     hash_stack_.reserve(pos.size() + kMaxPly + 4);
     // Push all positions except the last (current) one into the hash history.
     for (std::size_t i = 0; i + 1 < pos.size(); ++i)
     {
-        hash_stack_.push_back({pos[i].Hash(), pos[i].ReversibleMoveCount()});
+        hash_stack_.push_back({pos[i].hash_, pos[i].reversible_move_count_});
     }
     // Seed the per-thread position stack with only the current game position.
     // Reserve the deepest the search can descend so no push_back during search reallocates.
     positions_.reserve(kMaxPly + 4);
     positions_.push_back(g.CurrentPosition());
     // Seed the NNUE accumulator from the root position.
-    game.NnueNetwork().Refresh(accumulator_, positions_.back());
+    game_.nnue_network_.Refresh(accumulator_, positions_.back());
 }
 
 /// @brief Push the current position's hash then make the move on a copy of the position.
@@ -266,9 +262,9 @@ inline SearchState::SearchState(Game &g)
 inline void SearchState::PlayMove(Move move)
 {
     const Position &cur = CurrentPosition();
-    hash_stack_.push_back({cur.Hash(), cur.ReversibleMoveCount()});
+    hash_stack_.push_back({cur.hash_, cur.reversible_move_count_});
     Position next = cur.MakeMove(move);
-    game.NnueNetwork().Update(accumulator_, cur, next);
+    game_.nnue_network_.Update(accumulator_, cur, next);
     positions_.push_back(next);
 }
 
@@ -277,7 +273,7 @@ inline void SearchState::PlayMove(Move move)
 inline void SearchState::UndoMove()
 {
     const std::size_t n = positions_.size();
-    game.NnueNetwork().Update(accumulator_, positions_[n - 1], positions_[n - 2]);
+    game_.nnue_network_.Update(accumulator_, positions_[n - 1], positions_[n - 2]);
     positions_.pop_back();
     hash_stack_.pop_back();
 }
@@ -287,7 +283,7 @@ inline void SearchState::UndoMove()
 inline void SearchState::MakeNullMove()
 {
     const Position &cur = CurrentPosition();
-    hash_stack_.push_back({cur.Hash(), cur.ReversibleMoveCount()});
+    hash_stack_.push_back({cur.hash_, cur.reversible_move_count_});
     positions_.push_back(cur.MakeNullMove());
 }
 
@@ -305,8 +301,8 @@ inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_m
     static constexpr int kCountermoveScore   = kKillerBase - 1; // countermove: just below the two killers
     static constexpr int kMaxQuiet           = kKillerBase - 2; // history scores clamp just below the countermove
     const Position      &position            = CurrentPosition();
-    const Move           killer0             = killers[ply][0];
-    const Move           killer1             = killers[ply][1];
+    const Move           killer0             = killers_[ply][0];
+    const Move           killer1             = killers_[ply][1];
     for (Move &move : moves)
     {
         int sort;
@@ -333,7 +329,7 @@ inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_m
         }
         else // quiet move: main history + 1-ply continuation history, clamped below the countermove
         {
-            const uint32_t h = history.GetCount(ply, move) + (uint32_t)ContinuationHistScore(prev_move, move);
+            const uint32_t h = history_.GetCount(ply, move) + (uint32_t)ContinuationHistScore(prev_move, move);
             sort             = (int)std::min<uint32_t>(h, (uint32_t)kMaxQuiet);
         }
         move.AssignScore(sort);
@@ -344,7 +340,7 @@ inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_m
 /// @brief Check for draw by the 50-move rule.
 inline bool SearchState::IsDrawByFiftyMoves() const
 {
-    return CurrentPosition().ReversibleMoveCount() >= 100;
+    return CurrentPosition().reversible_move_count_ >= 100;
 }
 
 /// @brief Check for three-fold repetition using the compact hash history.
@@ -352,16 +348,16 @@ inline bool SearchState::IsDrawByFiftyMoves() const
 /// starting four half-moves before the current position.
 inline bool SearchState::IsDrawByRepetition() const
 {
-    const zobrist_t hash        = CurrentPosition().Hash();
+    const zobrist_t hash        = CurrentPosition().hash_;
     int             repetitions = 2;
     for (int i = (int)hash_stack_.size() - 4; i >= 0; i -= 2)
     {
-        if (hash_stack_[i].hash == hash && --repetitions == 0)
+        if (hash_stack_[i].hash_ == hash && --repetitions == 0)
         {
             INCREMENT("draws by repetition SS");
             return true;
         }
-        if (hash_stack_[i].reversible_move_count == 0)
+        if (hash_stack_[i].reversible_move_count_ == 0)
         {
             break;
         }
@@ -372,7 +368,7 @@ inline bool SearchState::IsDrawByRepetition() const
 /// @brief Check whether this thread should abort (the shared stop flag is set).
 inline bool SearchState::IsCancelled() const
 {
-    return game.is_cancel_pending.load(std::memory_order_relaxed);
+    return game_.is_cancel_pending_.load(std::memory_order_relaxed);
 }
 
 // ----------------------------------------------------------------------------
@@ -407,7 +403,7 @@ inline SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int al
     PlayMove(move);
     // Prefetch the child's TT cell now; the recursive Search probes it after its own prologue, by which
     // time the (random-access, cache-missing) line should be resident. Result-neutral speed win.
-    game.transposition_table.Prefetch(CurrentPosition().Hash());
+    game_.transposition_table_.Prefetch(CurrentPosition().hash_);
     const bool is_checking = CurrentPosition().IsInCheck();
     int        score;
     if (beta > alpha + 1 && move_index > 0 && !was_in_check && !is_checking)
@@ -437,10 +433,10 @@ inline SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int al
 inline int SearchState::AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score)
 {
     const Position &position = CurrentPosition();
-    const Color     color    = position.color_to_move;
+    const Color     color    = position.color_to_move_;
     // Only try null move pruning if all conditions are met.
-    const Bitboard friendly = position.colors[color];
-    if (!position.is_null_move &&  // previous move was not a null move
+    const Bitboard friendly = position.colors_[color];
+    if (!position.is_null_move_ && // previous move was not a null move
         friendly.PopCount() > 3 && // we have at least 4 friendly pieces
         eval_score >= beta)        // and we are already failing high statically
     {
@@ -470,11 +466,11 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     // overran by 6-10 ms and forfeited games once the increment was actually spent). 2048 nodes keeps the
     // overrun sub-ms; the clock read is negligible at this cadence. The node limit (max_nodes, 0 = none) is
     // checked per-thread, so it is exact at Threads=1 (the reproducible-testing case) and approximate above.
-    if ((++node_count & 0x7FF) == 0 &&
-        (game.time_control.HasReachedHardDeadline() ||
-         (game.time_control.max_nodes != 0 && node_count >= game.time_control.max_nodes)))
+    if ((++node_count_ & 0x7FF) == 0 &&
+        (game_.time_control_.HasReachedHardDeadline() ||
+         (game_.time_control_.max_nodes_ != 0 && node_count_ >= game_.time_control_.max_nodes_)))
     {
-        game.is_cancel_pending.store(true, std::memory_order_relaxed);
+        game_.is_cancel_pending_.store(true, std::memory_order_relaxed);
         return kSearchCancelledScore;
     }
     if (CurrentPosition().IsDrawByMaterial() || IsDrawByFiftyMoves() || IsDrawByRepetition())
@@ -492,7 +488,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         return EvaluatePosition(*this);
     }
     // Determine if there is an entry in the transposition table for this position.
-    const auto transposition = game.transposition_table.FindTransposition(CurrentPosition().Hash());
+    const auto transposition = game_.transposition_table_.FindTransposition(CurrentPosition().hash_);
     if (transposition && transposition->depth() >= depth)
     {
         switch (transposition->node_type())
@@ -526,7 +522,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     // depth with poor ordering, reduce by one ply — the shallower search still fills the TT with a best move,
     // so the cost is recouped by better ordering when this node is revisited. Applied only at sufficient depth,
     // where the per-node saving outweighs the lost ply (qsearch unaffected: depth stays >= the min depth - 1).
-    if (depth >= kInternalIterativeReductionMinDepth && (!transposition || transposition->move == Move::None()))
+    if (depth >= kInternalIterativeReductionMinDepth && (!transposition || transposition->move_ == Move::None()))
     {
         INCREMENT("internal iterative reduction");
         --depth;
@@ -568,13 +564,13 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     Move      best_move        = Move::None();
     int       best_score       = kAlpha;
     bool      has_raised_alpha = false;
-    if (transposition && transposition->move != Move::None())
+    if (transposition && transposition->move_ != Move::None())
     {
         INCREMENT("table move");
-        best_move = transposition->move;
+        best_move = transposition->move_;
         pv.clear(); // child writes its line here only if it is a PV node; clear so a terminal/cutoff child leaves it
                     // empty
-        const int score = SearchSingleMove(depth, ply, alpha, beta, transposition->move, pv, 0).score;
+        const int score = SearchSingleMove(depth, ply, alpha, beta, transposition->move_, pv, 0).score_;
         if (IsCancelled())
         {
             return kSearchCancelledScore;
@@ -582,14 +578,14 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         if (score >= beta)
         {
             INCREMENT("table move beta cutoffs");
-            game.transposition_table.RecordTransposition(Transposition{CurrentPosition().Hash(), transposition->move,
-                                                                       score, depth, Transposition::NodeType::kCut});
-            history.RecordGoodMove(ply, transposition->move);
-            RecordContinuationHistory(prev_move, transposition->move);
-            if (transposition->move.IsQuiet())
+            game_.transposition_table_.RecordTransposition(Transposition{CurrentPosition().hash_, transposition->move_,
+                                                                         score, depth, Transposition::NodeType::kCut});
+            history_.RecordGoodMove(ply, transposition->move_);
+            RecordContinuationHistory(prev_move, transposition->move_);
+            if (transposition->move_.IsQuiet())
             {
-                RecordKiller(ply, transposition->move);
-                RecordCountermove(prev_move, transposition->move);
+                RecordKiller(ply, transposition->move_);
+                RecordCountermove(prev_move, transposition->move_);
             }
             return score;
         }
@@ -599,9 +595,9 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             INCREMENT("table move raised alpha");
             alpha            = score;
             has_raised_alpha = true;
-            CopyVariation(parent_pv, pv, transposition->move); // capture the PV now, while pv holds THIS move's line
-            history.RecordGoodMove(ply, transposition->move);
-            RecordContinuationHistory(prev_move, transposition->move);
+            CopyVariation(parent_pv, pv, transposition->move_); // capture the PV now, while pv holds THIS move's line
+            history_.RecordGoodMove(ply, transposition->move_);
+            RecordContinuationHistory(prev_move, transposition->move_);
         }
     }
 
@@ -625,7 +621,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     for (const Move &move : move_list)
     {
         const int move_index = (int)(&move - move_list.begin());
-        if (transposition && move == transposition->move)
+        if (transposition && move == transposition->move_)
         {
             continue; // we already searched that one.
         }
@@ -651,7 +647,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             {
                 --lmr_depth;
                 INCREMENT("late move reduction x2");
-                if (history.GetCount(ply, move) == 0)
+                if (history_.GetCount(ply, move) == 0)
                 {
                     --lmr_depth;
                     INCREMENT("late move reduction x3");
@@ -660,11 +656,11 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         }
 
         pv.clear(); // see TT-move note: clear so a non-PV-node child leaves no stale tail in pv
-        int score = SearchSingleMove(lmr_depth, ply, alpha, beta, move, pv, move_index).score;
+        int score = SearchSingleMove(lmr_depth, ply, alpha, beta, move, pv, move_index).score_;
         if (score > alpha && lmr_depth < depth)
         {
             INCREMENT("late move reduction fails");
-            score = SearchSingleMove(depth, ply, alpha, beta, move, pv, move_index).score;
+            score = SearchSingleMove(depth, ply, alpha, beta, move, pv, move_index).score_;
         }
         if (IsCancelled())
         {
@@ -673,9 +669,9 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         if (score >= beta)
         {
             INCREMENT("beta cutoffs");
-            game.transposition_table.RecordTransposition(
-                Transposition{CurrentPosition().Hash(), move, score, depth, Transposition::NodeType::kCut});
-            history.RecordGoodMove(ply, move);
+            game_.transposition_table_.RecordTransposition(
+                Transposition{CurrentPosition().hash_, move, score, depth, Transposition::NodeType::kCut});
+            history_.RecordGoodMove(ply, move);
             RecordContinuationHistory(prev_move, move);
             if (move.IsQuiet())
             {
@@ -695,7 +691,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
                 alpha            = score;
                 has_raised_alpha = true;
                 CopyVariation(parent_pv, pv, move); // capture the PV now, while pv holds THIS move's line
-                history.RecordGoodMove(ply, move);
+                history_.RecordGoodMove(ply, move);
                 RecordContinuationHistory(prev_move, move);
             }
         }
@@ -706,9 +702,9 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     {
         // Raised alpha without a cutoff: PV node.
         INCREMENT("pv nodes");
-        game.transposition_table.RecordTransposition(
-            Transposition{CurrentPosition().Hash(), best_move, alpha, depth, Transposition::NodeType::kPv});
-        history.RecordGoodMove(ply, best_move);
+        game_.transposition_table_.RecordTransposition(
+            Transposition{CurrentPosition().hash_, best_move, alpha, depth, Transposition::NodeType::kPv});
+        history_.RecordGoodMove(ply, best_move);
         RecordContinuationHistory(prev_move, best_move);
         // parent_pv was already set, with the correct line, at the alpha-raise above.
     }
@@ -716,8 +712,8 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     {
         // Searched all moves without raising alpha: all-node.
         INCREMENT("all nodes");
-        game.transposition_table.RecordTransposition(
-            Transposition{CurrentPosition().Hash(), best_move, best_score, depth, Transposition::NodeType::kAll});
+        game_.transposition_table_.RecordTransposition(
+            Transposition{CurrentPosition().hash_, best_move, best_score, depth, Transposition::NodeType::kAll});
     }
     return best_score;
 }
@@ -769,7 +765,7 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            history.RecordGoodMove(ply, move);
+            history_.RecordGoodMove(ply, move);
             return score;
         }
         if (score > best_score)
@@ -779,7 +775,7 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent pv changed");
-                history.RecordGoodMove(ply, move);
+                history_.RecordGoodMove(ply, move);
             }
         }
     }
@@ -806,7 +802,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
 
     for (int depth = kStartDepth + 1; depth != kMaxPly; ++depth)
     {
-        if (game.time_control.clock_type == ChessClock::kFixedDepth && depth > game.time_control.depth)
+        if (game_.time_control_.clock_type_ == ChessClock::kFixedDepth && depth > game_.time_control_.depth_)
         {
             break;
         }
@@ -829,7 +825,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
         {
             const int move_index = (int)(&move - move_list.begin());
             child_pv.clear(); // clear per move so a terminal/non-PV-node child leaves no stale tail
-            const int score = SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score;
+            const int score = SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score_;
             move.AssignScore(score);
             if (IsCancelled())
             {
@@ -845,7 +841,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
                     CopyVariation(principal_variation, child_pv, best_move);
                     // Publish the predicted reply (PV[1]) as it improves, so `bestmove <m> ponder <reply>` has
                     // it on every exit path — including a hard-timeout/stop cancellation, which returns early.
-                    game.ponder_move = principal_variation.size() >= 2 ? principal_variation[1] : Move::None();
+                    game_.ponder_move_ = principal_variation.size() >= 2 ? principal_variation[1] : Move::None();
                     std::string pv_string;
                     for (const auto &m : principal_variation)
                     {
@@ -871,12 +867,12 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
                     {
                         score_string = std::format("cp {}", alpha);
                     }
-                    const long long elapsed_ms = game.time_control.ElapsedSinceSearchStart().count();
+                    const long long elapsed_ms = game_.time_control_.ElapsedSinceSearchStart().count();
                     const long long nps =
-                        static_cast<long long>(node_count) * 1000 / std::max<long long>(1, elapsed_ms);
+                        static_cast<long long>(node_count_) * 1000 / std::max<long long>(1, elapsed_ms);
                     std::cout << std::format("info depth {:2} score {} time {:5} nodes {:8} nps {} hashfull {} pv {}\n",
-                                             depth, score_string, elapsed_ms, node_count, nps,
-                                             game.transposition_table.HashfullPermille(), pv_string);
+                                             depth, score_string, elapsed_ms, node_count_, nps,
+                                             game_.transposition_table_.HashfullPermille(), pv_string);
                 }
             }
         }
@@ -886,11 +882,11 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
         }
         // Soft time management: never stop while pondering (no real clock is running yet); once `ponderhit`
         // has reset the search-start instant, elapsed is measured from the ponderhit moment.
-        if (is_main && game.time_control.clock_type == ChessClock::kStandard &&
-            !game.is_pondering.load(std::memory_order_relaxed))
+        if (is_main && game_.time_control_.clock_type_ == ChessClock::kStandard &&
+            !game_.is_pondering_.load(std::memory_order_relaxed))
         {
-            const auto allocated = game.time_control.AllocatedTime();
-            const auto elapsed   = game.time_control.ElapsedSinceSearchStart();
+            const auto allocated = game_.time_control_.allocated_time_;
+            const auto elapsed   = game_.time_control_.ElapsedSinceSearchStart();
             const bool is_best_move_consistent =
                 std::ranges::all_of(best_moves, [best_move](const Move &m) { return m == best_move; });
             const bool is_score_stable = std::ranges::all_of(best_moves, [best_move](const Move &m) {
@@ -924,17 +920,17 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
 /// @return The best move, or Move::None if there are no legal moves.
 inline Move Game::SearchRootNode()
 {
-    Game &game       = *this;        // local alias so the search body reads uniformly through `game`
-    game.ponder_move = Move::None(); // set by the main thread's IterativeDeepen if the PV has a reply move
+    Game &game        = *this;        // local alias so the search body reads uniformly through `game`
+    game.ponder_move_ = Move::None(); // set by the main thread's IterativeDeepen if the PV has a reply move
     // Clear the stop flag (set true by StartThinking's StopThinking) up front — BEFORE the book / single-move
     // early returns. Otherwise a leftover cancel makes SearchThreadEntry's ponder-wait exit immediately and
     // emit a premature `bestmove` when `go ponder` lands on a book/forced position (which returns without search).
-    game.is_cancel_pending.store(false, std::memory_order_relaxed);
-    game.last_search_node_count = 0; // set below once a real search runs (stays 0 for book/forced returns)
+    game.is_cancel_pending_.store(false, std::memory_order_relaxed);
+    game.last_search_node_count_ = 0; // set below once a real search runs (stays 0 for book/forced returns)
     // If there is a book move for this position, do not bother with search (unless OwnBook is disabled).
-    if (game.use_own_book)
+    if (game.use_own_book_)
     {
-        Move book_move = game.book.GetMove(game.CurrentPosition().Hash());
+        Move book_move = game.book_.GetMove(game.CurrentPosition().hash_);
         if (book_move != Move::None())
         {
             return book_move;
@@ -954,29 +950,29 @@ inline Move Game::SearchRootNode()
     using Duration           = ChessClock::Duration;
     Duration allocated_time  = Duration::zero(); // soft budget (drives between-iteration stopping)
     Duration max_search_time = Duration::zero(); // hard budget (deadline); zero means no hard stop
-    switch (game.time_control.clock_type)
+    switch (game.time_control_.clock_type_)
     {
     case ChessClock::kStandard:
     default: {
-        const int moves_to_go = game.time_control.moves_to_go != 0
-                                    ? game.time_control.moves_to_go
-                                    : std::max(40 - game.CurrentPosition().MoveCount(), 5);
+        const int moves_to_go = game.time_control_.moves_to_go_ != 0
+                                    ? game.time_control_.moves_to_go_
+                                    : std::max(40 - game.CurrentPosition().full_move_count_, 5);
         // Soft budget: an even slice of the remaining time. NOTE: folding the per-move increment in here
         // (`+ increment / 2`) was SPRT-tested and did NOT help — neutral-to-slightly-negative at both 8+0.08
         // (-14.5 +/- 21, 480 games) and 10+0.1 (-2.5 +/- 7.9, 3562 games), zero forfeits. In equal-clock
         // self-play at fast TCs spending the increment is ~symmetric; it may pay off at much slower increment
         // TCs (untested). `ChessClock::increment` is still parsed (winc/binc) but deliberately unused here.
-        allocated_time = game.time_control.remaining_time / moves_to_go;
+        allocated_time = game.time_control_.remaining_time_ / moves_to_go;
         // Hard budget: up to 2x the soft budget, but never spend into the last second of our clock, and always
         // allow at least 100 ms.
         max_search_time =
-            std::max(Duration{100}, std::min(allocated_time * 2, game.time_control.remaining_time - Duration{1000}));
+            std::max(Duration{100}, std::min(allocated_time * 2, game.time_control_.remaining_time_ - Duration{1000}));
         break;
     }
     case ChessClock::kFixedDepth:
         break; // no time limit; the depth loop bounds the search
     case ChessClock::kFixedTime:
-        max_search_time = game.time_control.remaining_time; // movetime: a hard budget, no soft management
+        max_search_time = game.time_control_.remaining_time_; // movetime: a hard budget, no soft management
         break;
     case ChessClock::kInfinite:
         break; // no time limit; only `stop` ends it
@@ -985,21 +981,21 @@ inline Move Game::SearchRootNode()
     // time. Only when there is a hard deadline (fixed-depth / infinite searches leave it zero = no stop).
     if (max_search_time > Duration::zero())
     {
-        max_search_time = std::max(Duration{1}, max_search_time - game.move_overhead);
+        max_search_time = std::max(Duration{1}, max_search_time - game.move_overhead_);
     }
 
     // Arm the clock. A ponder search has no hard deadline until `ponderhit` (budget-from-ponderhit); the
     // budgets are recorded so the conversion can start the real clock from that moment.
-    if (game.is_pondering)
+    if (game.is_pondering_)
     {
-        game.time_control.StartPonderSearch(allocated_time, max_search_time);
+        game.time_control_.StartPonderSearch(allocated_time, max_search_time);
     }
     else
     {
-        game.time_control.StartSearch(allocated_time, max_search_time);
+        game.time_control_.StartSearch(allocated_time, max_search_time);
     }
     DebugXClear();
-    game.transposition_table.Age();
+    game.transposition_table_.Age();
 
     // Shallow pass for initial move ordering (on a temporary state shared as the launch ordering).
     SearchState state{game};
@@ -1007,7 +1003,7 @@ inline Move Game::SearchRootNode()
     for (auto &move : move_list)
     {
         const int move_index = (int)(&move - move_list.begin());
-        const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score;
+        const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score_;
         move.AssignScore(score);
     }
     SortMoves<true>(move_list);
@@ -1018,7 +1014,7 @@ inline Move Game::SearchRootNode()
     // threads deepen the shared TT to accelerate it. Each thread has its own SearchState and move-list copy.
     // Thread count is configured via the UCI `Threads` option (or the PAWNSTAR_THREADS default at startup),
     // stored in game.thread_count; re-clamped here defensively.
-    const int                n_threads = std::clamp(game.thread_count, 1, kMaxSearchThreads);
+    const int                n_threads = std::clamp(game.thread_count_, 1, kMaxSearchThreads);
     std::vector<std::thread> helpers;
     helpers.reserve(n_threads - 1);
     for (int i = 1; i < n_threads; ++i)
@@ -1030,10 +1026,10 @@ inline Move Game::SearchRootNode()
         });
     }
 
-    best_move                   = state.IterativeDeepen(move_list, best_move, /*thread_id=*/0);
-    game.last_search_node_count = state.node_count; // main-thread node total (used by `bench`)
+    best_move                    = state.IterativeDeepen(move_list, best_move, /*thread_id=*/0);
+    game.last_search_node_count_ = state.node_count_; // main-thread node total (used by `bench`)
 
-    game.is_cancel_pending.store(true, std::memory_order_relaxed); // signal helpers to stop
+    game.is_cancel_pending_.store(true, std::memory_order_relaxed); // signal helpers to stop
     for (auto &helper : helpers)
     {
         helper.join();
@@ -1088,14 +1084,14 @@ inline int EvaluatePosition(const SearchState &state)
     // The cached value is the RAW, clock-independent NNUE eval: the Zobrist hash excludes the fifty-move
     // clock, so the same position can be probed at different clock values. The fifty-move scaling is
     // therefore applied AFTER the cache, on the way out — never stored.
-    const zobrist_t hash = position.Hash();
+    const zobrist_t hash = position.hash_;
     int             raw;
-    if (state.game.eval_cache.Probe(hash, raw))
+    if (state.game_.eval_cache_.Probe(hash, raw))
     {
         INCREMENT("eval hash hits");
-        return ScaleByRule50(raw, position.ReversibleMoveCount());
+        return ScaleByRule50(raw, position.reversible_move_count_);
     }
-    raw = state.game.NnueNetwork().Evaluate(state.CurrentAccumulator(), position.color_to_move);
-    state.game.eval_cache.Store(hash, raw);
-    return ScaleByRule50(raw, position.ReversibleMoveCount());
+    raw = state.game_.nnue_network_.Evaluate(state.accumulator_, position.color_to_move_);
+    state.game_.eval_cache_.Store(hash, raw);
+    return ScaleByRule50(raw, position.reversible_move_count_);
 }

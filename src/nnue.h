@@ -80,15 +80,15 @@ constexpr std::uint16_t kNetFormatVersion = 1; ///< Header format version (bump 
 
 struct NetHeader
 {
-    char          magic[4];       ///< kNetMagic.
-    std::uint16_t format_version; ///< kNetFormatVersion.
-    std::uint16_t input_size;     ///< kInputSize (features per perspective per bucket).
-    std::uint16_t king_buckets;   ///< kNumKingBuckets.
-    std::uint16_t hidden_size;    ///< kHiddenSize.
-    std::int16_t  qa;             ///< kQA.
-    std::int16_t  qb;             ///< kQB.
-    std::int16_t  scale;          ///< kScale.
-    std::uint8_t  reserved[14];   ///< Zero-padding to a round 32 bytes.
+    char          magic_[4];       ///< kNetMagic.
+    std::uint16_t format_version_; ///< kNetFormatVersion.
+    std::uint16_t input_size_;     ///< kInputSize (features per perspective per bucket).
+    std::uint16_t king_buckets_;   ///< kNumKingBuckets.
+    std::uint16_t hidden_size_;    ///< kHiddenSize.
+    std::int16_t  qa_;             ///< kQA.
+    std::int16_t  qb_;             ///< kQB.
+    std::int16_t  scale_;          ///< kScale.
+    std::uint8_t  reserved_[14];   ///< Zero-padding to a round 32 bytes.
 };
 
 #pragma pack(pop)
@@ -99,17 +99,17 @@ static_assert(sizeof(NetHeader) == 32, "NetHeader must be exactly 32 bytes");
 inline NetHeader ExpectedNetHeader()
 {
     NetHeader h{};
-    h.magic[0]       = kNetMagic[0];
-    h.magic[1]       = kNetMagic[1];
-    h.magic[2]       = kNetMagic[2];
-    h.magic[3]       = kNetMagic[3];
-    h.format_version = kNetFormatVersion;
-    h.input_size     = static_cast<std::uint16_t>(kInputSize);
-    h.king_buckets   = static_cast<std::uint16_t>(kNumKingBuckets);
-    h.hidden_size    = static_cast<std::uint16_t>(kHiddenSize);
-    h.qa             = static_cast<std::int16_t>(kQA);
-    h.qb             = static_cast<std::int16_t>(kQB);
-    h.scale          = static_cast<std::int16_t>(kScale);
+    h.magic_[0]       = kNetMagic[0];
+    h.magic_[1]       = kNetMagic[1];
+    h.magic_[2]       = kNetMagic[2];
+    h.magic_[3]       = kNetMagic[3];
+    h.format_version_ = kNetFormatVersion;
+    h.input_size_     = static_cast<std::uint16_t>(kInputSize);
+    h.king_buckets_   = static_cast<std::uint16_t>(kNumKingBuckets);
+    h.hidden_size_    = static_cast<std::uint16_t>(kHiddenSize);
+    h.qa_             = static_cast<std::int16_t>(kQA);
+    h.qb_             = static_cast<std::int16_t>(kQB);
+    h.scale_          = static_cast<std::int16_t>(kScale);
     return h;
 }
 
@@ -117,13 +117,13 @@ inline NetHeader ExpectedNetHeader()
 /// Maintained incrementally across make/undo so a node's evaluation does not rebuild it from scratch.
 struct Accumulator
 {
-    alignas(64) std::array<int16_t, kHiddenSize> white; ///< White-perspective accumulator.
-    alignas(64) std::array<int16_t, kHiddenSize> black; ///< Black-perspective accumulator.
+    alignas(64) std::array<int16_t, kHiddenSize> white_; ///< White-perspective accumulator.
+    alignas(64) std::array<int16_t, kHiddenSize> black_; ///< Black-perspective accumulator.
 };
 
 /// @brief A loaded, quantised NNUE network plus its accumulator/evaluation operations.
 /// Owned by the Game; read-only after Load() and shared by all Lazy SMP threads (only const methods are
-/// called concurrently). Default-constructed instances are unloaded (IsLoaded() == false); the weight
+/// called concurrently). Default-constructed instances are unloaded (loaded_ == false); the weight
 /// arrays are left uninitialised until Load() fills them, so construction is cheap.
 class Network
 {
@@ -138,13 +138,6 @@ class Network
     /// @param data Pointer to the net image. @param size Image size in bytes.
     /// @param origin Label for log messages (e.g. a path or "embedded"). @return true on success.
     bool LoadFromMemory(const std::uint8_t *data, std::size_t size, const std::string &origin);
-
-    /// @brief Whether a network has been successfully loaded (evaluation is only usable when true).
-    /// @return true if a net is loaded.
-    bool IsLoaded() const
-    {
-        return loaded_;
-    }
 
     /// @brief Rebuild both perspectives of @p acc from scratch for @p position (seed bias + every piece).
     void Refresh(Accumulator &acc, const Position &position) const;
@@ -199,9 +192,11 @@ class Network
     /// weight in int8 range (1 for nets whose |weight| <= 127, e.g. the shipped v8). Populated by Load so the
     /// int8 kernel needs no per-eval setup; the int16 reference (EvaluateExact) uses output_weights_ instead.
     alignas(64) std::array<int8_t, 2 * kHiddenSize> output_weights_i8_{};
-    int     output_w_scale_ = 1;     ///< Divisor mapping the int16 output weights into int8 range.
-    int16_t output_bias_    = 0;     ///< Output bias, in QA*QB units.
-    bool    loaded_         = false; ///< Whether Load() has succeeded.
+    int     output_w_scale_ = 1; ///< Divisor mapping the int16 output weights into int8 range.
+    int16_t output_bias_    = 0; ///< Output bias, in QA*QB units.
+
+  public:
+    bool loaded_ = false; ///< Whether Load() has succeeded.
 };
 
 // ---- Definitions moved from nnue.cpp (header-only) ----
@@ -356,12 +351,12 @@ inline std::size_t Row(int bucket, int color, int piece, int sq, bool black)
 /// @brief A perspective's king bucket: index the map with that perspective's king square, oriented to it.
 inline int WhiteBucket(const Position &p)
 {
-    return kKingBucketMap[(p.pieces[kKing] & p.colors[kWhite]).Lsb()];
+    return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kWhite]).Lsb()];
 }
 
 inline int BlackBucket(const Position &p)
 {
-    return kKingBucketMap[(p.pieces[kKing] & p.colors[kBlack]).Lsb() ^ kRankFlip];
+    return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kBlack]).Lsb() ^ kRankFlip];
 }
 
 inline void Network::RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position &position, int bucket,
@@ -370,10 +365,10 @@ inline void Network::RefreshSide(std::array<int16_t, kHiddenSize> &side, const P
     side = feature_bias_;
     for (int color = kWhite; color <= kBlack; ++color)
     {
-        const Bitboard friendly = position.colors[color];
+        const Bitboard friendly = position.colors_[color];
         for (int piece = kPawn; piece <= kKing; ++piece)
         {
-            for (Square s : position.pieces[piece] & friendly)
+            for (Square s : position.pieces_[piece] & friendly)
             {
                 AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
             }
@@ -388,8 +383,8 @@ inline void Network::DiffSide(std::array<int16_t, kHiddenSize> &side, const Posi
     {
         for (int piece = kPawn; piece <= kKing; ++piece)
         {
-            const Bitboard from_bb = from.pieces[piece] & from.colors[color];
-            const Bitboard to_bb   = to.pieces[piece] & to.colors[color];
+            const Bitboard from_bb = from.pieces_[piece] & from.colors_[color];
+            const Bitboard to_bb   = to.pieces_[piece] & to.colors_[color];
             for (Square s : from_bb & ~to_bb)
             {
                 SubColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
@@ -448,17 +443,18 @@ inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, 
 
     // Validate the stamped architecture fields against this build.
     const NetHeader expected = ExpectedNetHeader();
-    if (header.format_version != expected.format_version || header.input_size != expected.input_size ||
-        header.king_buckets != expected.king_buckets || header.hidden_size != expected.hidden_size ||
-        header.qa != expected.qa || header.qb != expected.qb || header.scale != expected.scale)
+    if (header.format_version_ != expected.format_version_ || header.input_size_ != expected.input_size_ ||
+        header.king_buckets_ != expected.king_buckets_ || header.hidden_size_ != expected.hidden_size_ ||
+        header.qa_ != expected.qa_ || header.qb_ != expected.qb_ || header.scale_ != expected.scale_)
     {
         std::fprintf(stderr,
                      "info string NNUE: net '%s' is incompatible — file is "
                      "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d, engine expects "
                      "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d\n",
-                     origin.c_str(), header.format_version, header.input_size, header.king_buckets, header.hidden_size,
-                     header.qa, header.qb, header.scale, expected.format_version, expected.input_size,
-                     expected.king_buckets, expected.hidden_size, expected.qa, expected.qb, expected.scale);
+                     origin.c_str(), header.format_version_, header.input_size_, header.king_buckets_,
+                     header.hidden_size_, header.qa_, header.qb_, header.scale_, expected.format_version_,
+                     expected.input_size_, expected.king_buckets_, expected.hidden_size_, expected.qa_, expected.qb_,
+                     expected.scale_);
         return false;
     }
     const std::size_t payload_offset = sizeof(NetHeader);
@@ -505,8 +501,8 @@ inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, 
 inline void Network::Refresh(Accumulator &acc, const Position &position) const
 {
     // Each perspective uses its own king's bucket bank; seed bias and add every piece.
-    RefreshSide(acc.white, position, WhiteBucket(position), /*black=*/false);
-    RefreshSide(acc.black, position, BlackBucket(position), /*black=*/true);
+    RefreshSide(acc.white_, position, WhiteBucket(position), /*black=*/false);
+    RefreshSide(acc.black_, position, BlackBucket(position), /*black=*/true);
 }
 
 inline void Network::Update(Accumulator &acc, const Position &from, const Position &to) const
@@ -530,19 +526,19 @@ inline void Network::Update(Accumulator &acc, const Position &from, const Positi
     {
         for (int color = kWhite; color <= kBlack; ++color)
         {
-            const Bitboard from_bb = from.colors[color];
-            const Bitboard to_bb   = to.colors[color];
+            const Bitboard from_bb = from.colors_[color];
+            const Bitboard to_bb   = to.colors_[color];
             for (Square s : from_bb & ~to_bb)
             {
                 const int piece = from.PieceAt(s);
-                SubColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
-                SubColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
+                SubColumn(acc.white_, &feature_weights_[Row(wt, color, piece, s, false)]);
+                SubColumn(acc.black_, &feature_weights_[Row(bt, color, piece, s, true)]);
             }
             for (Square s : to_bb & ~from_bb)
             {
                 const int piece = to.PieceAt(s);
-                AddColumn(acc.white, &feature_weights_[Row(wt, color, piece, s, false)]);
-                AddColumn(acc.black, &feature_weights_[Row(bt, color, piece, s, true)]);
+                AddColumn(acc.white_, &feature_weights_[Row(wt, color, piece, s, false)]);
+                AddColumn(acc.black_, &feature_weights_[Row(bt, color, piece, s, true)]);
             }
         }
         return;
@@ -551,19 +547,19 @@ inline void Network::Update(Accumulator &acc, const Position &from, const Positi
     // Rare: one king crossed a bucket boundary. Refresh that perspective; diff the other.
     if (wf != wt)
     {
-        RefreshSide(acc.white, to, wt, /*black=*/false);
+        RefreshSide(acc.white_, to, wt, /*black=*/false);
     }
     else
     {
-        DiffSide(acc.white, from, to, wt, /*black=*/false);
+        DiffSide(acc.white_, from, to, wt, /*black=*/false);
     }
     if (bf != bt)
     {
-        RefreshSide(acc.black, to, bt, /*black=*/true);
+        RefreshSide(acc.black_, to, bt, /*black=*/true);
     }
     else
     {
-        DiffSide(acc.black, from, to, bt, /*black=*/true);
+        DiffSide(acc.black_, from, to, bt, /*black=*/true);
     }
 }
 
@@ -586,8 +582,8 @@ inline int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
     // +31.8 Elo at 8+0.08) at a bounded ~26 cp deviation from EvaluateExact. The side-to-move accumulator
     // feeds the first half of the output layer.
     const bool                              white_to_move = side_to_move == kWhite;
-    const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white : acc.black;
-    const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? acc.black : acc.white;
+    const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white_ : acc.black_;
+    const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? acc.black_ : acc.white_;
 
     int64_t output = 0;
 #if defined(__AVX2__)
@@ -631,8 +627,8 @@ inline int Network::EvaluateExact(const Accumulator &acc, Color side_to_move) co
     // evaluator: it reproduces the trainer's eval within quantisation rounding (test_nnue, ±2 cp) and is the
     // baseline the int8 Evaluate above approximates. Not used on the search hot path.
     const bool                              white_to_move = side_to_move == kWhite;
-    const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white : acc.black;
-    const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? acc.black : acc.white;
+    const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white_ : acc.black_;
+    const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? acc.black_ : acc.white_;
 
     int64_t output = 0;
 #if defined(__AVX2__)
@@ -681,14 +677,14 @@ inline int Network::Evaluate(const Position &position) const
 {
     Accumulator acc;
     Refresh(acc, position);
-    return Evaluate(acc, position.color_to_move);
+    return Evaluate(acc, position.color_to_move_);
 }
 
 inline int Network::EvaluateExact(const Position &position) const
 {
     Accumulator acc;
     Refresh(acc, position);
-    return EvaluateExact(acc, position.color_to_move);
+    return EvaluateExact(acc, position.color_to_move_);
 }
 
 } // namespace nnue

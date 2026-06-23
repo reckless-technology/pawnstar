@@ -43,8 +43,8 @@ constexpr int kDefaultDepth = 8;
 /// @brief A Bratko-Kopec position and the moves accepted as correct for it.
 struct BkCase
 {
-    std::string_view                fen;   ///< Position FEN.
-    std::array<std::string_view, 5> moves; ///< Up to 5 accepted best moves; empty entries ignored.
+    std::string_view                fen_;   ///< Position FEN.
+    std::array<std::string_view, 5> moves_; ///< Up to 5 accepted best moves; empty entries ignored.
 };
 
 // clang-format off
@@ -81,7 +81,7 @@ inline constexpr std::array<BkCase, 24> kCases{{
 inline std::string AcceptedMovesString(const BkCase &tc)
 {
     std::string out;
-    for (std::string_view m : tc.moves)
+    for (std::string_view m : tc.moves_)
     {
         if (m.empty())
         {
@@ -119,12 +119,12 @@ int main(int argc, char *argv[])
     setenv("PAWNSTAR_THREADS", "1", 0);
 
     Game game;
-    if (!game.NnueNetwork().Load(net_path))
+    if (!game.nnue_network_.Load(net_path))
     {
         std::cerr << "test_bratko_kopec_nnue: failed to load net '" << net_path << "'\n";
         return 1;
     }
-    if (!game.NnueNetwork().IsLoaded())
+    if (!game.nnue_network_.loaded_)
     {
         std::cerr << "test_bratko_kopec_nnue: net not loaded after load\n";
         return 1;
@@ -139,10 +139,10 @@ int main(int argc, char *argv[])
     {
         const bk::BkCase &tc = bk::kCases[i];
 
-        game.SetPosition(tc.fen);
-        game.book.Free();
-        game.time_control.clock_type = ChessClock::kFixedDepth;
-        game.time_control.depth      = depth;
+        game.SetPosition(tc.fen_);
+        game.book_.Free();
+        game.time_control_.clock_type_ = ChessClock::kFixedDepth;
+        game.time_control_.depth_      = depth;
         DebugXClear();
         auto t_start    = Clock::now();
         Move m          = game.SearchRootNode();
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
         const std::string got_move = m.ToString();
 
         const bool found = m != Move::None();
-        const bool match = found && std::find(tc.moves.begin(), tc.moves.end(), got_move) != tc.moves.end();
+        const bool match = found && std::find(tc.moves_.begin(), tc.moves_.end(), got_move) != tc.moves_.end();
         if (!found)
         {
             ++errors; // a legal move should always come back for these positions
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
         }
 
         std::cout << std::format("[{}] pos{:02d} got={}/{:<6} accepted=[{}] {}ms {}\n", match ? "SOLVED" : " MISS ",
-                                 i + 1, got_move, m.score(), bk::AcceptedMovesString(tc), elapsed_ms, tc.fen);
+                                 i + 1, got_move, m.score(), bk::AcceptedMovesString(tc), elapsed_ms, tc.fen_);
     }
 
     auto      total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t_overall).count();
