@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <format>
 #include <iostream>
+#include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -37,6 +38,7 @@ class Game
     Move                    ponder_move_;            ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
     bool                    use_own_book_;           ///< Whether to consult the built-in opening book (UCI `OwnBook`).
     uint64_t                last_search_node_count_; ///< Node count of the most recent search's main thread (for `bench`).
+    std::vector<std::string> search_moves_;          ///< UCI `go searchmoves`: restrict the root search to these (empty = all).
     std::vector<Position>   positions_;              ///< Game position history (grows with the game; no fixed cap).
     nnue::Network           nnue_network_;           ///< NNUE network instance (loaded via EvalFile; read-only in search).
     // clang-format on

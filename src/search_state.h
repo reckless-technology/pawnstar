@@ -74,6 +74,7 @@ class SearchState
     HistoryTable                history_{};            ///< Per-thread history heuristic counts (no sharing).
     KillerArray                 killers_{};            ///< Killer moves indexed by ply.
     uint64_t                    node_count_{};         ///< Cumulative nodes this thread searched.
+    int                         seldepth_{};           ///< Max ply reached this search (selective depth, for `info`).
     std::vector<Position>       positions_;            ///< Position stack.
     nnue::Accumulator           accumulator_{};        ///< NNUE accumulator (incremental).
     std::vector<HashEntry>      hash_stack_;           ///< Draw by repetition stack.
@@ -437,6 +438,7 @@ inline int SearchState::AttemptNullMove(int depth, int ply, int alpha, int beta,
 inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move)
 {
     INCREMENT("alpha beta calls");
+    seldepth_ = std::max(seldepth_, ply); // track selective depth for `info seldepth`
     // Poll the hard deadline (and the `go nodes` limit) often — every 2048 nodes: between polls the search
     // cannot stop, so a coarse interval lets a node-heavy batch overrun the deadline (a ~64k-node interval
     // overran by 6-10 ms and forfeited games once the increment was actually spent). 2048 nodes keeps the
@@ -699,6 +701,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
 inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
 {
     INCREMENT("quiescent calls");
+    seldepth_ = std::max(seldepth_, ply); // track selective depth for `info seldepth`
     if (ply == kMaxPly)
     {
         INCREMENT("quiescent max ply");
@@ -811,6 +814,13 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
         for (auto &move : move_list)
         {
             const int move_index = (int)(&move - move_list.begin());
+            // Report the move currently being searched at the root, but only once a search is slow enough that
+            // a GUI benefits (avoids flooding info lines on the fast shallow iterations).
+            if (is_main && game_.time_control_.ElapsedSinceSearchStart() > ChessClock::Duration{3000})
+            {
+                std::cout << std::format("info depth {} currmove {} currmovenumber {}\n", depth, move.ToString(),
+                                         move_index + 1);
+            }
             child_pv.clear(); // clear per move so a terminal/non-PV-node child leaves no stale tail
             const int score = SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score_;
             move.AssignScore(score);
@@ -844,22 +854,23 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
                     std::string   score_string;
                     if (alpha >= kWinThreshold)
                     {
-                        score_string = std::format("mate {}", (kMateValue - alpha + 1) / 2);
+                        score_string = std::format("mate {:2}", (kMateValue - alpha + 1) / 2);
                     }
                     else if (alpha <= kLoseThreshold)
                     {
-                        score_string = std::format("mate {}", -((kMateValue + alpha + 1) / 2));
+                        score_string = std::format("mate {:2}", -((kMateValue + alpha + 1) / 2));
                     }
                     else
                     {
-                        score_string = std::format("cp {}", alpha);
+                        score_string = std::format("cp {:4}", alpha);
                     }
                     const long long elapsed_ms = game_.time_control_.ElapsedSinceSearchStart().count();
                     const long long nps =
                         static_cast<long long>(node_count_) * 1000 / std::max<long long>(1, elapsed_ms);
-                    std::cout << std::format("info depth {:2} score {} time {:5} nodes {:8} nps {} hashfull {} pv {}\n",
-                                             depth, score_string, elapsed_ms, node_count_, nps,
-                                             game_.transposition_table_.HashfullPermille(), pv_string);
+                    std::cout << std::format(
+                        "info depth {:2} seldepth {:2} score {} time {:5} nodes {:8} nps {:7} hashfull {:3} pv {}\n",
+                        depth, seldepth_, score_string, elapsed_ms, node_count_, nps,
+                        game_.transposition_table_.HashfullPermille(), pv_string);
                 }
             }
         }
@@ -915,7 +926,9 @@ inline Move Game::SearchRootNode()
     game.is_cancel_pending_.store(false, std::memory_order_relaxed);
     game.last_search_node_count_ = 0; // set below once a real search runs (stays 0 for book/forced returns)
     // If there is a book move for this position, do not bother with search (unless OwnBook is disabled).
-    if (game.use_own_book_)
+    // Skip the book when `go searchmoves` restricts the root (the caller wants those moves searched, not a
+    // book reply).
+    if (game.use_own_book_ && game.search_moves_.empty())
     {
         Move book_move = game.book_.GetMove(game.CurrentPosition().hash_);
         if (book_move != Move::None())
@@ -924,12 +937,30 @@ inline Move Game::SearchRootNode()
         }
     }
     MoveList move_list = game.CurrentPosition().GenerateLegalMoves();
-    // If there is only 1 legal move available, there is no point wasting time searching it, just play it.
+    // UCI `go searchmoves`: restrict the root move list to the requested moves (ignored if none of them are
+    // legal here, so a malformed list can't wedge the search).
+    if (!game.search_moves_.empty())
+    {
+        MoveList filtered;
+        for (const Move &move : move_list)
+        {
+            if (std::ranges::find(game.search_moves_, move.ToString()) != game.search_moves_.end())
+            {
+                filtered.push_back(move);
+            }
+        }
+        if (filtered.size() != 0)
+        {
+            move_list = filtered;
+        }
+    }
     if (move_list.size() == 0)
     {
         return Move::None();
     }
-    if (move_list.size() == 1)
+    // With only one legal move there is nothing to search — but when `searchmoves` is set we still search it
+    // (the caller wants its evaluation), so only take this shortcut for a genuine forced move.
+    if (move_list.size() == 1 && game.search_moves_.empty())
     {
         return move_list[0];
     }

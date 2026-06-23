@@ -81,8 +81,9 @@ tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EX
 
 # Run every suite in one shell, chained with && so the first failure aborts (and the summary below is
 # skipped). On full success report the wall-clock time spent running the tests (not the build). Depends on
-# `tools` as well so a broken helper (e.g. filter_book) fails the check instead of rotting unnoticed.
-check: tests tools
+# `tools` so a broken helper (e.g. filter_book) fails the check, and on `all` so the engine binary exists
+# for the UCI protocol test (test/uci_test.sh, which drives build/pawnstar over stdin/stdout).
+check: tests tools all
 	@start=$$(date +%s%3N); \
 	$(TEST_PERFT_EXE) && \
 	$(TEST_BK_NNUE_EXE) $(NNUE_NET) && \
@@ -91,6 +92,7 @@ check: tests tools
 	$(TEST_SEE_EXE) && \
 	$(TEST_BOOK_EXE) && \
 	$(TEST_CLOCK_EXE) && \
+	bash $(TEST_DIR)/uci_test.sh $(PROGRAM_EXE) && \
 	echo "all tests passed in $$(( $$(date +%s%3N) - start )) ms"
 
 prep:

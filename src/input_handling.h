@@ -265,6 +265,7 @@ inline void handle_go(Game &game, std::span<std::string> args)
     {
         kAwaitKeyword, ///< Expecting a keyword (`infinite`, `wtime`, `depth`, …).
         kAwaitValue,   ///< Expecting the integer argument for @c pending.
+        kCollectMoves, ///< Collecting the move list that follows `searchmoves`.
     };
 
     State            state = State::kAwaitKeyword;
@@ -273,15 +274,35 @@ inline void handle_go(Game &game, std::span<std::string> args)
     game.is_pondering_.store(false, std::memory_order_relaxed);   // set true below if this is a `go ponder`
     game.time_control_.increment_ = ChessClock::Duration::zero(); // cleared up front; set below if winc/binc present
     game.time_control_.max_nodes_ = 0;                            // cleared up front; set below if `nodes` present
+    game.search_moves_.clear();                                   // set below if `searchmoves` present
 
     for (std::size_t i = 1; i < args.size(); ++i)
     {
         const std::string &token = args[i];
+        if (state == State::kCollectMoves)
+        {
+            // Collect coordinate-notation moves until the next recognised keyword (searchmoves is usually
+            // last, but tolerate a keyword following it).
+            if (token == "ponder" || token == "infinite" || token == "wtime" || token == "btime" || token == "winc" ||
+                token == "binc" || token == "movetime" || token == "depth" || token == "movestogo" ||
+                token == "nodes" || token == "searchmoves")
+            {
+                state = State::kAwaitKeyword;
+                --i; // reprocess this keyword on the next iteration
+                continue;
+            }
+            game.search_moves_.push_back(token);
+            continue;
+        }
         if (state == State::kAwaitKeyword)
         {
             if (token == "ponder") // flag: search on the opponent's time until ponderhit / stop
             {
                 game.is_pondering_.store(true, std::memory_order_relaxed);
+            }
+            else if (token == "searchmoves") // restrict the root search to the move list that follows
+            {
+                state = State::kCollectMoves;
             }
             else if (token == "infinite") // a flag, no argument
             {
