@@ -11,19 +11,18 @@
 /// chessboard.
 ///
 /// For example:
-///
-/// The set of squares occupied by pawns
-/// The set of squares occupied by a black piece
-/// The set of squares to which a knight on e4 may move
-/// The set of squares attacked by black queens
-/// The set of squares containing a piece checking the white king
+/// - The set of squares occupied by pawns
+/// - The set of squares occupied by a black piece
+/// - The set of squares to which a knight on e4 may move
+/// - The set of squares attacked by black queens
+/// - The set of squares containing a piece checking the white king
 ///
 /// If the bit is 1, then the corresponding square is a member of that set.
 ///
-/// Bit  0 maps to square a1 (LSB)
-/// Bit  7 maps to square h1
-/// Bit 56 maps to square a8
-/// Bit 63 maps to square h8 (MSB)
+/// - Bit  0 maps to square a1 (LSB)
+/// - Bit  7 maps to square h1
+/// - Bit 56 maps to square a8
+/// - Bit 63 maps to square h8 (MSB)
 ///
 /// This is commonly referred to as LERF (little endian rank file mapping).
 class Bitboard

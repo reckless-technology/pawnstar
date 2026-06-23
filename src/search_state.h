@@ -66,103 +66,45 @@ constexpr void CopyVariation(Variation &dst, const Variation &src, const Move &b
 /// hot counters.
 class SearchState
 {
+    using KillerArray = std::array<std::array<Move, 2>, kMaxPly>;
+
   public:
-    Game                                    &game_;      ///< Shared state: TT, clock, cancellation flag.
-    HistoryTable                             history_{}; ///< Per-thread history heuristic counts (no sharing).
-    std::array<std::array<Move, 2>, kMaxPly> killers_{}; ///< Killer moves indexed by ply.
-    uint64_t node_count_{}; ///< Cumulative nodes this thread searched this search (nps + `go nodes`).
+    // State variables
+    Game                       &game_;                 ///< Shared state: TT, clock, cancellation flag.
+    HistoryTable                history_{};            ///< Per-thread history heuristic counts (no sharing).
+    KillerArray                 killers_{};            ///< Killer moves indexed by ply.
+    uint64_t                    node_count_{};         ///< Cumulative nodes this thread searched.
+    std::vector<Position>       positions_;            ///< Position stack.
+    nnue::Accumulator           accumulator_{};        ///< NNUE accumulator (incremental).
+    std::vector<HashEntry>      hash_stack_;           ///< Draw by repetition stack.
+    std::array<Move, kContKeys> countermoves_{};       ///< Best quiet countermove to prev move.
+    std::unique_ptr<int16_t[]>  continuation_history_; ///< Continuation history scores.
 
-    /// @brief Construct a search state from the current game.
-    /// Builds the full hash history from the game's position stack and seeds the per-thread
-    /// position stack with the current position only.
-    /// @param game Game to search.
+    // Interface
     explicit SearchState(Game &game);
-    Position       &CurrentPosition();
-    const Position &CurrentPosition() const;
-
-    /// @brief Make a move, pushing the resulting position onto the stack and recording its hash.
-    /// @param move Move to play.
-    void PlayMove(Move move);
-
-    /// @brief Undo the most recent move, popping the position and hash stacks.
-    void UndoMove();
-
-    /// @brief Play a null (pass) move, pushing the resulting position.
-    void MakeNullMove();
-
-    /// @brief Assign ordering scores to a move list and sort it best-first.
-    /// @param moves Move list to score and sort.
-    /// @param ply Current search ply (used for the history heuristic).
-    /// @param prev_move The move played to reach this node (for countermove / continuation history).
-    void ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) const;
-
-    /// @brief Fail-soft negamax alpha-beta search of the current node (defined in search_state.cpp).
-    /// @param depth Depth to search. @param ply Distance from root. @param alpha Alpha. @param beta Beta.
-    /// @param parent_pv Principal variation at the parent node.
-    /// @param prev_move The move played at the parent to reach this node (Move::None at root / after null).
-    /// @return The alpha-beta score for this node.
-    int Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move);
-
-    /// @brief Search a single move from the current node (defined in search_state.cpp).
-    /// @return The move's score and whether it gives check.
+    Position        &CurrentPosition();
+    const Position  &CurrentPosition() const;
+    void             PlayMove(Move move);
+    void             UndoMove();
+    void             MakeNullMove();
+    void             ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) const;
+    int              Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move);
     SingleMoveResult SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv,
                                       int move_index);
+    int              SearchQuiescent(int depth, int ply, int alpha, int beta);
+    Move             IterativeDeepen(MoveList move_list, Move best_move, int thread_id);
+    bool             IsDrawByRepetition() const;
+    bool             IsDrawByFiftyMoves() const;
+    bool             IsCancelled() const;
+    void             RecordKiller(int ply, Move move);
+    int              ContinuationHistScore(Move prev, Move move) const;
+    bool             IsCountermove(Move prev, Move move) const;
+    void             RecordContinuationHistory(Move prev, Move move);
+    void             RecordCountermove(Move prev, Move move);
 
-    /// @brief Quiescence search over captures from the current node (defined in search_state.cpp).
-    /// @return The quiescent score for this node.
-    int SearchQuiescent(int depth, int ply, int alpha, int beta);
-
-    /// @brief Run iterative deepening on this search state — one Lazy SMP thread (defined in search_root_node.cpp).
-    /// The main thread (@p thread_id 0) prints info, applies time management and produces the authoritative move.
-    /// @param move_list This thread's copy of the root move list (re-sorted per iteration).
-    /// @param best_move Best move from the shallow ordering pass (seed).
-    /// @param thread_id Thread index (0 = authoritative main thread); drives the iteration-skip schedule.
-    /// Time management reads the soft budget / start timestamp live from `game.time_control` (so `ponderhit`
-    /// can retarget a running ponder search), and the main thread publishes the ponder move to `game`.
-    /// @return The best move found by this thread.
-    Move IterativeDeepen(MoveList move_list, Move best_move, int thread_id);
-
-    /// @brief Whether the current position is a draw by threefold repetition.
-    /// @return true if drawn by repetition.
-    bool IsDrawByRepetition() const;
-
-    /// @brief Whether the current position is a draw by the fifty-move rule.
-    /// @return true if drawn by the fifty-move rule.
-    bool IsDrawByFiftyMoves() const;
-
-    /// @brief Returns true if this thread should abort because the global stop flag is set
-    /// (time limit fired, UCI stop, or another Lazy SMP thread completed the search).
-    /// @return true if the search should be abandoned.
-    bool                 IsCancelled() const;
-    void                 RecordKiller(int ply, Move move);
+  private:
+    int                  AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
     static constexpr int ContKey(Move m);
-    static constexpr int kContKeys = 7 * 64; ///< Distinct (piece, to) keys: pieces 0..6 × 64 squares.
-    int                  ContinuationHistScore(Move prev, Move move) const;
-    bool                 IsCountermove(Move prev, Move move) const;
-    void                 RecordContinuationHistory(Move prev, Move move);
-    void                 RecordCountermove(Move prev, Move move);
-
-  private:
-    /// @brief Try null-move pruning at the current node (the caller has established it is a non-PV node not in
-    /// check). Reuses the caller's precomputed static eval.
-    /// @return The null-move score, or @p alpha if null move was not tried / did not cut.
-    int                   AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
-    std::vector<Position> positions_; ///< Per-thread copy-make position stack (reserved in the constructor).
-
-  public:
-    nnue::Accumulator accumulator_{}; ///< NNUE accumulator for the tip position (incremental).
-
-  private:
-    /// @brief Hash history from game-start through parent of current node (game history + search depth).
-    /// A std::vector (reserved up-front in the constructor) so an arbitrarily long game cannot overflow it.
-    std::vector<HashEntry> hash_stack_;
-
-    /// @brief Best quiet refutation to each previous move (countermove heuristic), indexed by ContKey(prev).
-    std::array<Move, kContKeys> countermoves_{};
-
-    /// @brief 1-ply continuation history: how often a quiet move was good after a given previous move.
-    /// Heap-allocated (per-thread, ~0.4 MB) and indexed [ContKey(prev) * kContKeys + ContKey(move)].
-    std::unique_ptr<int16_t[]> continuation_history_;
 };
 
 /// @brief Current position at the tip of the search tree.
@@ -243,6 +185,7 @@ inline void SearchState::RecordCountermove(Move prev, Move move)
 /// hash_stack_ is populated with all ancestor positions (positions 0..N-1 where N is
 /// the current position), so that IsDrawByRepetition can walk backwards through the full
 /// game history.
+/// @param game Game to search.
 inline SearchState::SearchState(Game &g)
     : game_(g), continuation_history_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
 {
@@ -265,6 +208,7 @@ inline SearchState::SearchState(Game &g)
 
 /// @brief Push the current position's hash then make the move on a copy of the position.
 /// Advance the NNUE accumulator from the parent to the child by feature deltas.
+/// @param move Move to play.
 inline void SearchState::PlayMove(Move move)
 {
     const Position &cur = CurrentPosition();
@@ -300,6 +244,9 @@ inline void SearchState::MakeNullMove()
 ///   - the two killer moves for this ply: just below winning captures, above all quiet moves,
 ///   - quiet moves: their history count, clamped below the killers,
 ///   - losing captures (negative SEE): scored by their (negative) SEE, so they sort below quiet moves.
+/// @param moves Move list to score and sort.
+/// @param ply Current search ply (used for the history heuristic).
+/// @param prev_move The move played to reach this node (for countermove / continuation history).
 inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) const
 {
     static constexpr int kWinningCaptureBase = 1 << 20;         // 1,048,576: winning captures / promotions
@@ -344,6 +291,7 @@ inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_m
 }
 
 /// @brief Check for draw by the 50-move rule.
+/// @return true if drawn by the fifty-move rule.
 inline bool SearchState::IsDrawByFiftyMoves() const
 {
     return CurrentPosition().reversible_move_count_ >= 100;
@@ -352,6 +300,7 @@ inline bool SearchState::IsDrawByFiftyMoves() const
 /// @brief Check for three-fold repetition using the compact hash history.
 /// Walks backwards through hash_stack_ two entries at a time (same side to move),
 /// starting four half-moves before the current position.
+/// @return true if drawn by repetition.
 inline bool SearchState::IsDrawByRepetition() const
 {
     const zobrist_t hash        = CurrentPosition().hash_;
@@ -372,6 +321,7 @@ inline bool SearchState::IsDrawByRepetition() const
 }
 
 /// @brief Check whether this thread should abort (the shared stop flag is set).
+/// @return true if the search should be abandoned.
 inline bool SearchState::IsCancelled() const
 {
     return game_.is_cancel_pending_.load(std::memory_order_relaxed);
@@ -381,6 +331,8 @@ inline bool SearchState::IsCancelled() const
 // Alpha-beta and quiescence search (SearchState members).
 // ----------------------------------------------------------------------------
 
+/// @brief Search a single move from the current node.
+/// @return The move's score and whether it gives check.
 inline SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv,
                                                       int move_index)
 {
@@ -464,6 +416,11 @@ inline int SearchState::AttemptNullMove(int depth, int ply, int alpha, int beta,
     return alpha;
 }
 
+/// @brief Fail-soft negamax alpha-beta search of the current node.
+/// @param depth Depth to search. @param ply Distance from root. @param alpha Alpha. @param beta Beta.
+/// @param parent_pv Principal variation at the parent node.
+/// @param prev_move The move played at the parent to reach this node (Move::None at root / after null).
+/// @return The alpha-beta score for this node.
 inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move)
 {
     INCREMENT("alpha beta calls");
@@ -528,7 +485,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     // depth with poor ordering, reduce by one ply — the shallower search still fills the TT with a best move,
     // so the cost is recouped by better ordering when this node is revisited. Applied only at sufficient depth,
     // where the per-node saving outweighs the lost ply (qsearch unaffected: depth stays >= the min depth - 1).
-    if (depth >= kInternalIterativeReductionMinDepth && (!transposition || transposition->move_ == Move::None()))
+    if (depth >= kNoTTReduceMinDepth && (!transposition || transposition->move_ == Move::None()))
     {
         INCREMENT("internal iterative reduction");
         --depth;
@@ -724,6 +681,8 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     return best_score;
 }
 
+/// @brief Quiescence search over captures from the current node.
+/// @return The quiescent score for this node.
 inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
 {
     INCREMENT("quiescent calls");
@@ -793,6 +752,14 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
 // launches one of these per thread.
 // ----------------------------------------------------------------------------
 
+/// @brief Run iterative deepening on this search state — one Lazy SMP thread.
+/// The main thread (@p thread_id 0) prints info, applies time management and produces the authoritative move.
+/// @param move_list This thread's copy of the root move list (re-sorted per iteration).
+/// @param best_move Best move from the shallow ordering pass (seed).
+/// @param thread_id Thread index (0 = authoritative main thread); drives the iteration-skip schedule.
+/// Time management reads the soft budget / start timestamp live from `game.time_control` (so `ponderhit`
+/// can retarget a running ponder search), and the main thread publishes the ponder move to `game`.
+/// @return The best move found by this thread.
 inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int thread_id)
 {
     const bool is_main = thread_id == 0; // thread 0 is the authoritative main thread

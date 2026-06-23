@@ -24,73 +24,48 @@
 class Game
 {
   public:
+    // State variables
     // clang-format off
-    TranspositionTable      transposition_table_;        ///< The transposition table (shared by all Lazy SMP threads).
-    EvalCache               eval_cache_;                 ///< Lockless NNUE evaluation cache (shared by all threads).
-    ChessClock              time_control_;               ///< Clock controls for the current game.
-    OpeningBook             book_;                       ///< The opening book.
-    std::atomic<bool>       is_cancel_pending_;          ///< Shared stop flag: set on timeout, UCI stop, or search completion.
-    int                     thread_count_;               ///< Lazy SMP search threads; default from PAWNSTAR_THREADS / hardware, set by UCI `Threads`.
-    ChessClock::Duration    move_overhead_{ChessClock::Duration{30}}; ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
-    std::atomic<bool>       is_pondering_{false};        ///< True while a `go ponder` search runs (until `ponderhit` / `stop`); suppresses time stops.
-    Move                    ponder_move_{Move::None()};  ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
-    bool                    use_own_book_{true};         ///< Whether to consult the built-in opening book (UCI `OwnBook`).
-    uint64_t                last_search_node_count_{0};  ///< Node count of the most recent search's main thread (for `bench`).
+    TranspositionTable      transposition_table_;    ///< The transposition table (shared by all Lazy SMP threads).
+    EvalCache               eval_cache_;             ///< Lockless NNUE evaluation cache (shared by all threads).
+    ChessClock              time_control_;           ///< Clock controls for the current game.
+    OpeningBook             book_;                   ///< The opening book.
+    std::atomic<bool>       is_cancel_pending_;      ///< Shared stop flag: set on timeout, UCI stop, or search completion.
+    int                     thread_count_;           ///< Lazy SMP search threads; default from PAWNSTAR_THREADS / hardware, set by UCI `Threads`.
+    ChessClock::Duration    move_overhead_;          ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
+    std::atomic<bool>       is_pondering_;           ///< True while a `go ponder` search runs (until `ponderhit` / `stop`); suppresses time stops.
+    Move                    ponder_move_;            ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
+    bool                    use_own_book_;           ///< Whether to consult the built-in opening book (UCI `OwnBook`).
+    uint64_t                last_search_node_count_; ///< Node count of the most recent search's main thread (for `bench`).
+    std::vector<Position>   positions_;              ///< Game position history (grows with the game; no fixed cap).
+    nnue::Network           nnue_network_;           ///< NNUE network instance (loaded via EvalFile; read-only in search).
     // clang-format on
 
-    /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
+    // Interface
     Game();
-
-    /// @brief Default Lazy SMP thread count: PAWNSTAR_THREADS if set (>0), else hardware_concurrency,
-    /// clamped to [1, kMaxSearchThreads]. Read once at construction; the UCI `Threads` option overrides it.
     static int      ComputeDefaultThreads();
     Position       &CurrentPosition();
     const Position &CurrentPosition() const;
-
-    /// @brief Set the board to the given position, resetting per-game transient state (see definition).
-    void SetPosition(std::string_view fen_string);
-
-    /// @brief Set the board to the standard initial position (overload of SetPosition).
-    void SetPosition();
-
-    /// @brief Play a move given in algebraic notation (see definition for details).
-    Move PlayMove(std::string_view move_string);
-
-    /// @brief Play a move (see definition for details).
-    void PlayMove(Move move);
-
-    /// @brief Play a null (pass) move.
-    void MakeNullMove();
-
-    /// @brief Undo the most recent move.
-    void UndoMove();
-
-    /// @brief Start searching for a move on the worker thread.
-    void StartThinking();
-
-    /// @brief Signal the search to stop and join the worker thread.
-    void StopThinking();
-
-    /// @brief Search the current position and return the best move (see definition in search_root_node.cpp).
-    /// Returns a book move immediately on a book hit; otherwise runs the Lazy SMP iterative-deepening search.
-    /// @return The best move, or Move::None if there are no legal moves.
-    Move SearchRootNode();
+    void            SetPosition(std::string_view fen_string);
+    void            SetPosition();
+    Move            PlayMove(std::string_view move_string);
+    void            PlayMove(Move move);
+    void            MakeNullMove();
+    void            UndoMove();
+    void            StartThinking();
+    void            StopThinking();
+    Move            SearchRootNode();
 
   private:
-    void        SearchThreadEntry(); ///< Entry point of the search worker thread.
-    std::thread worker_thread_;      ///< Worker thread for searching moves.
-
-  public:
-    std::vector<Position> positions_;    ///< Game position history (grows with the game; no fixed cap).
-    nnue::Network         nnue_network_; ///< NNUE network instance (loaded via EvalFile; read-only in search).
+    void        SearchThreadEntry();
+    std::thread worker_thread_; ///< Worker thread for searching moves.
 };
 
-inline // clang-format on
-
-    /// @brief Construct a game, sizing the transposition tables and starting from the initial position.
-    Game::Game()
+/// @brief Construct a game, sizing the transposition tables and starting from the initial position.
+inline Game::Game()
     : transposition_table_{kHashtableMegabytes}, eval_cache_{kEvalCacheMb}, is_cancel_pending_{false},
-      thread_count_{ComputeDefaultThreads()}
+      thread_count_{ComputeDefaultThreads()}, move_overhead_{ChessClock::Duration{30}}, is_pondering_{false},
+      ponder_move_{Move::None()}, use_own_book_{true}, last_search_node_count_{0}
 {
     SetPosition();
 }
