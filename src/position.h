@@ -18,79 +18,44 @@
 class Position
 {
   public:
-    /// @brief Default constructor; leaves the position uninitialized.
-    constexpr Position() = default;
+    // State variables
+    std::array<Bitboard, 7> pieces_;                ///< Per-piece-type bitboards indexed by Piece;
+                                                    ///< index 0 (kNone) holds the occupied-squares bitboard.
+    std::array<Bitboard, 2> colors_;                ///< Per-color bitboards indexed by Color.
+    std::array<Piece, 64>   squares_;               ///< Squares array for fast piece lookup.
+    Bitboard                checkers_;              ///< Set of squares which attack the king.
+    zobrist_t               hash_;                  ///< Zobrist hash of this position, maintained incrementally.
+    std::array<Square, 2>   king_location_;         ///< Square index of white and black kings.
+    Square                  en_passant_square_;     ///< En passant capture availability square.
+    uint8_t                 reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
+    uint8_t                 full_move_count_;       ///< Number of full moves (zero indexed).
+    CastlingRights          castling_rights_;       ///< Castling rights flags.
+    bool                    is_null_move_;          ///< @brief Whether the last move was a null (pass) move.
+    Color                   color_to_move_;         ///< @brief Side to move.
 
-    /// @brief Copy constructor.
-    /// @param that Position to copy.
-    constexpr Position(const Position &that) = default;
-
-    /// @brief Copy assignment.
-    /// @param that Position to copy.
-    /// @return Reference to this position.
+    // Interface
+    constexpr Position()                                = default;
+    constexpr Position(const Position &that)            = default;
     constexpr Position &operator=(const Position &that) = default;
-
-    /// @brief Parse a position from a FEN string (see definition for details).
-    static Position FromString(std::string_view fen_string);
-
-    /// @brief Return a new position with the given move applied (see definition for details).
-    constexpr Position MakeMove(const Move &move) const;
-
-    /// @brief Return a new position with a null (pass) move applied.
-    /// @return The resulting position.
-    constexpr Position MakeNullMove() const;
-
-    /// @brief Whether the position is a draw by insufficient material.
-    /// @return true if drawn by material.
-    constexpr bool IsDrawByMaterial() const;
-
-    /// @brief Render the board as a human-readable string.
-    /// @return Board string.
-    std::string ToString() const;
-
-    // Const accessors.
-    /// @brief Pieces of a colour attacking a square (see definition for details).
-    constexpr Bitboard      AttacksTo(Square location, Color color) const;
-    constexpr MoveList      GenerateLegalMoves() const;
-    constexpr MoveList      GenerateLegalCaptures() const;
-    constexpr bool          IsAttacked(Square s, Color c) const;
-    constexpr Bitboard      OccupiedSquares() const;
-    constexpr Piece         PieceAt(Square location) const;
-    constexpr Square        KingLocation(Color color) const;
-    constexpr bool          IsInCheck() const;
-    std::array<Bitboard, 7> pieces_; ///< @brief Per-piece-type bitboards indexed by Piece; index 0 (kNone) holds the
-                                     ///< occupied-squares bitboard
-    std::array<Bitboard, 2> colors_; ///< @brief Per-color bitboards indexed by Color.
+    constexpr Position  MakeMove(const Move &move) const;
+    constexpr Position  MakeNullMove() const;
+    constexpr Bitboard  OccupiedSquares() const;
+    static Position     FromString(std::string_view fen_string);
+    std::string         ToString() const;
+    constexpr Bitboard  AttacksTo(Square location, Color color) const;
+    constexpr MoveList  GenerateLegalMoves() const;
+    constexpr MoveList  GenerateLegalCaptures() const;
+    constexpr bool      IsAttacked(Square s, Color c) const;
+    constexpr bool      IsDrawByMaterial() const;
+    constexpr bool      IsInCheck() const;
 
   private:
+    // Private helpers
     constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
     constexpr void      RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board.
     constexpr void      MovePiece(Color color, Piece piece, Square from, Square to); ///< Move a piece on the board.
     constexpr zobrist_t ComputeHash() const;                    ///< Compute the Zobrist hash from scratch.
     template <Color, bool> constexpr MoveList GenMoves() const; ///< Generate legal moves.
-
-    // State variables. The access labels below are interleaved (rather than reordering fields) so the
-    // member declaration order is preserved exactly and the layout stays 160 bytes — see the static_assert.
-    std::array<Piece, 64> squares_;  ///< Squares array for fast piece lookup.
-    Bitboard              checkers_; ///< Set of squares which attack the king.
-
-  public:
-    zobrist_t hash_; ///< Zobrist hash of this position, maintained incrementally.
-
-  private:
-    std::array<Square, 2> king_location_;     ///< Square index of white and black kings.
-    Square                en_passant_square_; ///< En passant capture availability square.
-
-  public:
-    uint8_t reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
-    uint8_t full_move_count_;       ///< Number of full moves (zero indexed).
-
-  private:
-    CastlingRights castling_rights_; ///< Castling rights flags.
-
-  public:
-    bool  is_null_move_;  ///< @brief Whether the last move was a null (pass) move.
-    Color color_to_move_; ///< @brief Side to move. Declared last so it occupies what was the trailing padding byte.
 };
 
 /// @brief Generate all legal moves. @return The legal move list.
@@ -116,18 +81,6 @@ constexpr bool Position::IsAttacked(Square s, Color c) const
 constexpr Bitboard Position::OccupiedSquares() const
 {
     return pieces_[kNone];
-}
-
-/// @brief Piece on a square. @param location Square to query. @return The piece (kNone if empty).
-constexpr Piece Position::PieceAt(Square location) const
-{
-    return squares_[location];
-}
-
-/// @brief King location for a colour. @param color Colour to query. @return The king's square.
-constexpr Square Position::KingLocation(Color color) const
-{
-    return king_location_[color];
 }
 
 /// @brief Whether the side to move is in check. @return true if in check.
@@ -194,7 +147,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     const Bitboard king_captures = king_move_targets & enemy_pieces;
     for (Square to : king_captures)
     {
-        moves.push_back(Move::Capture(king_locn, to, kKing, PieceAt(to)));
+        moves.push_back(Move::Capture(king_locn, to, kKing, squares_[to]));
     }
     if constexpr (do_all_moves)
     {
@@ -239,7 +192,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             const Bitboard capture_targets = attacks & allowed_captures;
             for (Square to : capture_targets)
             {
-                moves.push_back(Move::Capture(from, to, piece, PieceAt(to)));
+                moves.push_back(Move::Capture(from, to, piece, squares_[to]));
             }
             if constexpr (do_all_moves)
             {
@@ -358,10 +311,10 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             const Square from = (Square)(to - delta);
             if (pins.IsAllowed(from, to))
             {
-                moves.push_back(Move::Promotion(from, to, kQueen, PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, kRook, PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, kBishop, PieceAt(to)));
-                moves.push_back(Move::Promotion(from, to, kKnight, PieceAt(to)));
+                moves.push_back(Move::Promotion(from, to, kQueen, squares_[to]));
+                moves.push_back(Move::Promotion(from, to, kRook, squares_[to]));
+                moves.push_back(Move::Promotion(from, to, kBishop, squares_[to]));
+                moves.push_back(Move::Promotion(from, to, kKnight, squares_[to]));
             }
         }
     }
@@ -392,7 +345,7 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
             const Square from = (Square)(to - delta);
             if (pins.IsAllowed(from, to))
             {
-                moves.push_back(Move::Capture(from, to, kPawn, PieceAt(to)));
+                moves.push_back(Move::Capture(from, to, kPawn, squares_[to]));
             }
         }
     }
@@ -732,8 +685,8 @@ inline std::string Position::ToString() const
                     num_empty_squares = 0;
                 }
                 const char piece = (colors_[kWhite] & Bitboard(x, y)).IsNotEmpty()
-                                       ? " PNBRQK"[PieceAt((Square)(x + 8 * y))]
-                                       : " pnbrqk"[PieceAt((Square)(x + 8 * y))];
+                                       ? " PNBRQK"[squares_[(Square)(x + 8 * y)]]
+                                       : " pnbrqk"[squares_[(Square)(x + 8 * y)]];
                 ss << piece;
             }
         }

@@ -530,13 +530,13 @@ inline void Network::Update(Accumulator &acc, const Position &from, const Positi
             const Bitboard to_bb   = to.colors_[color];
             for (Square s : from_bb & ~to_bb)
             {
-                const int piece = from.PieceAt(s);
+                const int piece = from.squares_[s];
                 SubColumn(acc.white_, &feature_weights_[Row(wt, color, piece, s, false)]);
                 SubColumn(acc.black_, &feature_weights_[Row(bt, color, piece, s, true)]);
             }
             for (Square s : to_bb & ~from_bb)
             {
-                const int piece = to.PieceAt(s);
+                const int piece = to.squares_[s];
                 AddColumn(acc.white_, &feature_weights_[Row(wt, color, piece, s, false)]);
                 AddColumn(acc.black_, &feature_weights_[Row(bt, color, piece, s, true)]);
             }

@@ -134,8 +134,8 @@ inline std::pair<int, bool> EvaluateStaticExchange(const Position &src_position,
     Position    dst_position{src_position.MakeMove(move)};
     const bool  is_checking = dst_position.IsInCheck();
     SeeBoard    bb{dst_position};
-    const Piece piece    = src_position.PieceAt(move.from());
-    const Piece captured = move.type() == Move::kEpCapture ? kPawn : src_position.PieceAt(move.to());
+    const Piece piece    = src_position.squares_[move.from()];
+    const Piece captured = move.type() == Move::kEpCapture ? kPawn : src_position.squares_[move.to()];
     const Piece promoted = move.promoted();
     if (promoted != Piece::kNone)
     {

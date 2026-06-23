@@ -28,7 +28,7 @@ constexpr Pins::Pins(const Position &position)
     const Color    color            = position.color_to_move_;
     const Bitboard occupied_squares = position.OccupiedSquares();
     const Bitboard friendly_pieces  = position.colors_[color];
-    const Square   king_location    = position.KingLocation(color);
+    const Square   king_location    = position.king_location_[color];
     const auto    &intervening      = kInterveningSquares[king_location];
     const Bitboard enemy_sliding_pieces =
         ((kBishopAttacks[king_location] & (position.pieces_[kBishop] | position.pieces_[kQueen])) |
