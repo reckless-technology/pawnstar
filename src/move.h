@@ -21,29 +21,49 @@ enum class NodeType : uint8_t
 
 /// @brief Class for representing a chess move.
 /// A move is 64 bits in size.
+///
 /// Bits are as follows:
-///  0 -  5: to square
-///  6 - 11: from square
-/// 12 - 14: moving piece
-/// 15 - 17: captured piece (in the case of capture moves)
-/// 18 - 21: move type
-/// 22 - 22: is checking flag (move gives check)
-/// 23 - 24: transposition node type (cut, all or pv)
-/// 25 - 32: transposition depth searched (int8_t)
-/// 33 - 40: transposition age / generation (uint8_t)
-/// 41 - 63: score for this move (signed, 23-bit); used for move ordering and as the stored TT score
+/// Bits | Meaning
+/// -----|--------
+///  0 -  5 | to square
+///  6 - 11 | from square
+/// 12 - 14 | moving piece
+/// 15 - 17 | captured piece (in the case of capture moves)
+/// 18 - 21 | move type
+/// 22 - 22 | is checking flag (move gives check)
+/// 23 - 24 | transposition node type (cut, all or pv)
+/// 25 - 32 | transposition depth searched (int8_t)
+/// 33 - 40 | transposition age / generation (uint8_t)
+/// 41 - 63 | score for this move (signed, 23-bit); used for move ordering and as the stored TT score
 class Move
 {
   private:
-    static const int64_t kIsChecking = 1 << 22;
-    // Transposition metadata bit layout (see class comment).
-    static constexpr int     kNodeTypeShift = 23;
-    static constexpr int     kDepthShift    = 25;
-    static constexpr int     kAgeShift      = 33;
-    static constexpr int     kScoreShift    = 41;
-    static constexpr int64_t kAgeMask       = (int64_t)0xFF << kAgeShift;            // bits 33-40
-    static constexpr int64_t kScoreMask     = ~(((int64_t)1 << kScoreShift) - 1);    // bits 41-63
-    static constexpr int64_t kTTDataMask    = ~(((int64_t)1 << kNodeTypeShift) - 1); // bits 23-63
+    // Packed-field layout (see the class comment). Each field has a shift (its lowest bit) and, where it is
+    // read back out, a width mask. All the magic numbers live in these constants so the accessor and
+    // constructor bodies use only named constants — their only numeric literals are 0 and 1.
+    static constexpr int kToShift       = 0;  // bits 0-5:   to square
+    static constexpr int kFromShift     = 6;  // bits 6-11:  from square
+    static constexpr int kPieceShift    = 12; // bits 12-14: moving piece
+    static constexpr int kCapturedShift = 15; // bits 15-17: captured piece
+    static constexpr int kTypeShift     = 18; // bits 18-21: move type
+    static constexpr int kCheckingShift = 22; // bit 22:     gives-check flag
+    static constexpr int kNodeTypeShift = 23; // bits 23-24: TT node type
+    static constexpr int kDepthShift    = 25; // bits 25-32: TT depth searched
+    static constexpr int kAgeShift      = 33; // bits 33-40: TT age / generation
+    static constexpr int kScoreShift    = 41; // bits 41-63: score
+
+    static constexpr int64_t kSquareMask   = 0x3F;     // 6-bit to / from square field
+    static constexpr int64_t kPieceMask    = 0x07;     // 3-bit piece field (moving / captured)
+    static constexpr int64_t kTypeMask     = 0x0F;     // 4-bit move-type field
+    static constexpr int64_t kNodeTypeMask = 0x03;     // 2-bit TT node-type field
+    static constexpr int64_t kByteMask     = 0xFF;     // 8-bit TT depth / age field
+    static constexpr int64_t kFromToMask   = 0xFFF;    // bits 0-11:  from+to (history-table index)
+    static constexpr int64_t kIdentityMask = 0x3FFFFF; // bits 0-21:  to/from/piece/captured/type (move identity)
+
+    static constexpr int64_t kIsChecking = (int64_t)1 << kCheckingShift;          // bit 22 mask
+    static constexpr int64_t kAgeMask    = kByteMask << kAgeShift;                // bits 33-40
+    static constexpr int64_t kScoreMask  = ~(((int64_t)1 << kScoreShift) - 1);    // bits 41-63
+    static constexpr int64_t kTTDataMask = ~(((int64_t)1 << kNodeTypeShift) - 1); // bits 23-63
     int64_t                  val_;
 
   public:
@@ -137,7 +157,7 @@ constexpr Move &Move::operator=(const Move &that)
 /// @return true if moves are equivalent.
 constexpr bool Move::operator==(const Move &that) const
 {
-    return (val_ & 0x3FFFFF) == (that.val_ & 0x3FFFFF);
+    return (val_ & kIdentityMask) == (that.val_ & kIdentityMask);
 }
 
 /// @brief Less than operator. Used to put moves into a set.
@@ -152,35 +172,35 @@ constexpr bool Move::operator<(const Move &that) const
 /// @return Square index of move to.
 constexpr Square Move::to() const
 {
-    return Square{(uint8_t)(val_ & 0x3F)};
+    return Square{(uint8_t)(val_ & kSquareMask)};
 }
 
 /// @brief Source square.
 /// @return Square index of move from.
 constexpr Square Move::from() const
 {
-    return Square{(uint8_t)((val_ >> 6) & 0x3F)};
+    return Square{(uint8_t)((val_ >> kFromShift) & kSquareMask)};
 }
 
 /// @brief Type.
 /// @return Move type.
 constexpr Move::Type Move::type() const
 {
-    return Type{(uint8_t)((val_ >> 18) & 0x0F)};
+    return Type{(uint8_t)((val_ >> kTypeShift) & kTypeMask)};
 }
 
 /// @brief Moving piece
 /// @return the piece.
 constexpr Piece Move::piece() const
 {
-    return Piece{(uint8_t)((val_ >> 12) & 0x07)};
+    return Piece{(uint8_t)((val_ >> kPieceShift) & kPieceMask)};
 }
 
 /// @brief Captured piece.
 /// @return the captured piece or kNone if not a capture move.
 constexpr Piece Move::captured() const
 {
-    return Piece{(uint8_t)((val_ >> 15) & 0x07)};
+    return Piece{(uint8_t)((val_ >> kCapturedShift) & kPieceMask)};
 }
 
 /// @brief Promoted piece.
@@ -217,26 +237,26 @@ constexpr int Move::score() const
 /// @brief Transposition node type (bits 23-24).
 constexpr NodeType Move::TTNodeType() const
 {
-    return NodeType((val_ >> kNodeTypeShift) & 0x3);
+    return NodeType((val_ >> kNodeTypeShift) & kNodeTypeMask);
 }
 
 /// @brief Transposition depth searched (bits 25-32, int8_t).
 constexpr int Move::TTDepth() const
 {
-    return (int8_t)((val_ >> kDepthShift) & 0xFF);
+    return (int8_t)((val_ >> kDepthShift) & kByteMask);
 }
 
 /// @brief Transposition age / generation (bits 33-40, uint8_t).
 constexpr uint8_t Move::TTAge() const
 {
-    return (uint8_t)((val_ >> kAgeShift) & 0xFF);
+    return (uint8_t)((val_ >> kAgeShift) & kByteMask);
 }
 
 /// @brief Create a from-to bits value for indexing into history tables.
 /// @return 12 bit from-to combination.
 constexpr int Move::from_to() const
 {
-    return val_ & 0xFFF;
+    return val_ & kFromToMask;
 }
 
 /// @brief Does this move give check?
@@ -387,14 +407,14 @@ constexpr const std::string Move::ToString() const
 
 /// @brief Construct a non-capture move of a piece.
 /// @param from From square. @param to To square. @param piece Moving piece.
-constexpr Move::Move(Square from, Square to, Piece piece) : val_(to | (from << 6) | (piece << 12))
+constexpr Move::Move(Square from, Square to, Piece piece) : val_(to | (from << kFromShift) | (piece << kPieceShift))
 {
 }
 
 /// @brief Construct a typed move (no captured piece).
 /// @param from From square. @param to To square. @param piece Moving piece. @param type Move type.
 constexpr Move::Move(Square from, Square to, Piece piece, Type type)
-    : val_(to | (from << 6) | (piece << 12) | (type << 18))
+    : val_(to | (from << kFromShift) | (piece << kPieceShift) | (type << kTypeShift))
 {
 }
 
@@ -402,7 +422,7 @@ constexpr Move::Move(Square from, Square to, Piece piece, Type type)
 /// @param from From square. @param to To square. @param piece Moving piece. @param type Move type.
 /// @param captured Captured piece.
 constexpr Move::Move(Square from, Square to, Piece piece, Type type, Piece captured)
-    : val_(to | (from << 6) | (piece << 12) | (captured << 15) | (type << 18))
+    : val_(to | (from << kFromShift) | (piece << kPieceShift) | (captured << kCapturedShift) | (type << kTypeShift))
 {
 }
 
