@@ -71,14 +71,14 @@ class SearchState
   public:
     // State variables
     Game                       &game_;                 ///< Shared state: TT, clock, cancellation flag.
-    HistoryTable                history_{};            ///< Per-thread history heuristic counts (no sharing).
-    KillerArray                 killers_{};            ///< Killer moves indexed by ply.
-    uint64_t                    node_count_{};         ///< Cumulative nodes this thread searched.
-    int                         seldepth_{};           ///< Max ply reached this search (selective depth, for `info`).
+    HistoryTable                history_;              ///< Per-thread history heuristic counts (no sharing).
+    KillerArray                 killers_;              ///< Killer moves indexed by ply.
+    uint64_t                    node_count_;           ///< Cumulative nodes this thread searched.
+    int                         seldepth_;             ///< Max ply reached this search (selective depth, for `info`).
     std::vector<Position>       positions_;            ///< Position stack.
-    nnue::Accumulator           accumulator_{};        ///< NNUE accumulator (incremental).
+    nnue::Accumulator           accumulator_;          ///< NNUE accumulator (incremental).
     std::vector<HashEntry>      hash_stack_;           ///< Draw by repetition stack.
-    std::array<Move, kContKeys> countermoves_{};       ///< Best quiet countermove to prev move.
+    std::array<Move, kContKeys> countermoves_;         ///< Best quiet countermove to prev move.
     std::unique_ptr<int16_t[]>  continuation_history_; ///< Continuation history scores.
 
     // Interface
@@ -188,15 +188,16 @@ inline void SearchState::RecordCountermove(Move prev, Move move)
 /// game history.
 /// @param game Game to search.
 inline SearchState::SearchState(Game &g)
-    : game_(g), continuation_history_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
+    : game_(g), history_(), node_count_(0), seldepth_(0), accumulator_(),
+      continuation_history_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
 {
-    // Initialise the killer and countermove tables to "no move". Their `{}` member initialiser only
-    // aggregate-constructs each Move through Move's deliberately-uninitialised default constructor (kept
-    // cheap so per-node MoveLists need not zero 256 moves), so it does NOT clear val_; the never-recorded
-    // slots would otherwise hold garbage that ScoreAndSortMoves reads in its killer / countermove `==`
-    // comparisons. That stray read perturbed move ordering and was the long-standing uninitialised-stack
-    // read that made bench node counts differ across compiler optimisation levels (benign: legal moves and
-    // evals were unaffected, only ordering). Move::None() is Move{0} — a value no legal move equals.
+    // Initialise the killer and countermove tables to "no move". Their Move elements are default-constructed
+    // (Move's default constructor deliberately leaves val_ uninitialised, kept cheap so per-node MoveLists
+    // need not zero 256 moves), so they must be set explicitly here; the never-recorded slots would
+    // otherwise hold garbage that ScoreAndSortMoves reads in its killer / countermove `==` comparisons. That
+    // stray read perturbed move ordering and was the long-standing uninitialised-stack read that made bench
+    // node counts differ across compiler optimisation levels (benign: legal moves and evals were unaffected,
+    // only ordering). Move::None() is Move{0} — a value no legal move equals.
     for (auto &ply_killers : killers_)
     {
         ply_killers.fill(Move::None());
