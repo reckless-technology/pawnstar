@@ -159,6 +159,8 @@ net is a single `nnue::Network` instance owned by the `Game` (UCI `setoption` ro
 | `run_sprt.sh`             | SPRT / match: net-vs-net (set `BASELINE_NET`), at fixed depth or time control |
 | `rate.sh`                 | anchored absolute-Elo estimate vs rated reference engines (you supply the opponent binaries) |
 | `run_experiment.sh`       | one-shot: train + **verify** + SPRT from an existing `.data` dataset |
+| `filter_book.cpp`         | offline opening-book filter: NNUE-search every book move and flag questionable ones (lose > margin vs best) with a trailing `?`, so the engine replays them in book but never plays them (`make tools` → `build/filter_book`) |
+| `nnue_quant_study.cpp`    | offline int16→int8 quantisation feasibility study (range/saturation histograms + kernel cost split); a measurement tool, not part of the engine — see [int8_quant_study.md](int8_quant_study.md) (`make tools` → `build/nnue_quant_study`) |
 
 **Prerequisites:** `clang++`/`make` (engine), Rust/`cargo` (bullet), `fastchess` on `PATH` (SPRT). For
 GPU training, a CUDA toolkit (`CUDA_PATH`, default `~/cuda-12.2`) **and** a driver new enough for the
