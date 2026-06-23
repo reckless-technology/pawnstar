@@ -153,6 +153,6 @@ int main(int argc, char *argv[])
 
     auto      total_ms = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - t_overall).count();
     const int total    = (int)bk::kCases.size();
-    return test_report::Summary(std::format("Bratko-Kopec NNUE: solved {}/{} at depth {} ({}ms, net {})",
+    return test_report::Summary(std::format("BRATKO-KOPEC NNUE: solved {}/{} at depth {} ({}ms, net {})",
                                             total - test_report::failures, total, depth, total_ms, net_path));
 }

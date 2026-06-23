@@ -93,7 +93,7 @@ check: tests tools all
 	$(TEST_BOOK_EXE) && \
 	$(TEST_CLOCK_EXE) && \
 	bash $(TEST_DIR)/uci_test.sh $(PROGRAM_EXE) && \
-	echo "all tests passed in $$(( $$(date +%s%3N) - start )) ms"
+	echo "make check: All tests passed in $$(( $$(date +%s%3N) - start )) ms"
 
 prep:
 	mkdir -p $(BUILD_DIR)

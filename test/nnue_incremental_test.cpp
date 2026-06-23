@@ -86,5 +86,5 @@ int main(int argc, char **argv)
         Walk(state, rng, /*depth=*/10, /*branch=*/2);
     }
 
-    return test_report::Summary(std::format("incremental NNUE: {} checks bit-identical to full refresh", g_checks));
+    return test_report::Summary(std::format("INCREMENTAL NNUE: {} checks bit-identical to full refresh", g_checks));
 }

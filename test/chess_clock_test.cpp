@@ -84,5 +84,5 @@ int main()
         check(clock.moves_to_go_ == 0 && clock.depth_ == 10, "Reset restores default moves_to_go / depth");
     }
 
-    return test_report::Summary("chess clock: deadline / elapsed / ponderhit / reset timing");
+    return test_report::Summary("CHESS CLOCK: deadline / elapsed / ponderhit / reset timing");
 }

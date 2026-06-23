@@ -78,10 +78,12 @@ out=$(read_until '^bestmove' 30)
 bm=$(echo "$out" | grep '^bestmove')
 echo "$bm" | grep -q '^bestmove a2a3' && pass "go searchmoves restricts root (forced a2a3)" || fail "searchmoves: expected 'bestmove a2a3', got '$bm'"
 
-# 5) info currmove / currmovenumber: emitted once a search runs past the ~3s reporting gate.
+# 5) info currmove / currmovenumber: emitted once a search runs past the ~3s reporting gate. Use a movetime
+#    well beyond the gate (6s) so there is a comfortable ~3s window of root iterations emitting currmove — a
+#    tight window can be straddled by a single deep root move and emit nothing.
 send "position startpos"
-send "go movetime 3500"
-out=$(read_until '^bestmove' 20)
+send "go movetime 6000"
+out=$(read_until '^bestmove' 30)
 echo "$out" | grep -q 'currmove [a-h][1-8][a-h][1-8].* currmovenumber [0-9]' &&
     pass "info currmove/currmovenumber emitted on a long search" || fail "currmove/currmovenumber not emitted"
 

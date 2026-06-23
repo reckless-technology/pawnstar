@@ -92,5 +92,5 @@ int main()
 
     std::remove(book_path.c_str());
 
-    return test_report::Summary("opening book: '?' (questionable) move handling");
+    return test_report::Summary("OPENING BOOK: '?' (questionable) move handling");
 }

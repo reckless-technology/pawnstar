@@ -262,9 +262,9 @@ int main(int argc, char *argv[])
         }
         total_nodes += got;
 
-        const bool  ok = (got == tc.nodes_);
-        std::string detail =
-            std::format("perft d{} {:<70} {} nodes  {:.0f} Mnps", tc.depth_, tc.fen_, got, (double)got / elapsed_us);
+        const bool  ok     = (got == tc.nodes_);
+        std::string detail = std::format("perft d{:<2} {:<70} {:9} nodes {:3.0f} Mnps", tc.depth_, tc.fen_, got,
+                                         (double)got / elapsed_us);
         if (!ok)
         {
             detail += std::format("  [expected {}]", tc.nodes_);
@@ -275,7 +275,7 @@ int main(int argc, char *argv[])
     auto total_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count();
     const int total = (int)cases.size();
-    return test_report::Summary(std::format("perft: {}/{} positions match, {} nodes, {:.0f} Mnps",
+    return test_report::Summary(std::format("PERFT TESTS: {}/{} positions match, {} nodes, {:.0f} Mnps",
                                             total - test_report::failures, total, total_nodes,
                                             (double)total_nodes / std::max(total_ms * 1000LL, 1LL)));
 }

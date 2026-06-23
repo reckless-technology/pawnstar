@@ -222,5 +222,5 @@ int main()
         }
     }
     const int total = (int)tests.size();
-    return test_report::Summary(std::format("SEE: {}/{} cases passed", total - test_report::failures, total));
+    return test_report::Summary(std::format("SEE TESTS: {}/{} cases passed", total - test_report::failures, total));
 }
