@@ -29,7 +29,7 @@ REPO="$(cd "$(dirname "$0")" && pwd)/.."
 # Backend: GPU by default; set BULLET_FEATURES="" to train on CPU (no CUDA needed). The `---features cuda`
 # default form means "unset -> --features cuda, but empty-string -> empty" so BULLET_FEATURES="" disables it.
 FEATURES="${BULLET_FEATURES---features cuda}"
-export CUDA_PATH="${CUDA_PATH:-$HOME/cuda-12.2}"
+export CUDA_PATH="${CUDA_PATH:-/usr/local/cuda}"
 export PATH="$CUDA_PATH/bin:$PATH"
 export LD_LIBRARY_PATH="$CUDA_PATH/lib64:${LD_LIBRARY_PATH:-}"
 

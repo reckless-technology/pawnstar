@@ -11,7 +11,7 @@
 #
 # Env:
 #   ENGINE       candidate engine binary           (default: <repo>/build/pawnstar)
-#   NET          NNUE net for the candidate       (default: <repo>/nnue/pawnstar-v10.bin)
+#   NET          NNUE net for the candidate       (default: <repo>/nnue/pawnstar-v11.bin)
 #   OPENINGS     EPD opening book                  (required)
 #   TC           time control                      (default: 8+0.08)
 #   GAMES        games per anchor                  (default: 100)
@@ -19,13 +19,13 @@
 #   OUT          output directory                  (default: ./rating_out)
 #
 # Example:
-#   ENGINE=build/pawnstar NET=nnue/pawnstar-v10.bin OPENINGS=~/openings.epd \
+#   ENGINE=build/pawnstar NET=nnue/pawnstar-v11.bin OPENINGS=~/openings.epd \
 #   tools/rate.sh toga:2950:/path/to/togaii senpai:3050:/path/to/senpai
 set -uo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 ENGINE="${ENGINE:-$REPO/build/pawnstar}"
-NET="${NET:-$REPO/nnue/pawnstar-v10.bin}"
+NET="${NET:-$REPO/nnue/pawnstar-v11.bin}"
 OPENINGS="${OPENINGS:?set OPENINGS=<openings.epd>}"
 TC="${TC:-8+0.08}"
 GAMES="${GAMES:-100}"
