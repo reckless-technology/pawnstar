@@ -340,6 +340,21 @@ already priced in. **The repeated lesson: more data is the lever** (v11's 6.05B 
 Next levers: yet more data; a finer or mirrored bucket map (file+rank, or mirrored to halve the input
 space); or a wider transformer still.
 
+**Rejected architecture experiments (not in the shipped lineage):**
+- **Head depth — a hidden layer in the head (`concat 2048 → 16 → 1`, SCReLU):** REJECTED, **−11.3 ± 12.9 Elo
+  at fixed depth 8, H0 (1908 games)**. Single-variable A/B — a control (current `2048 → 1` head) and the
+  candidate trained on the *same* shuffled 200M set + same schedule, then head-to-head SPRT. Fixed depth is
+  pure eval quality, and it's already negative there, so no time-control follow-up. The FT stayed int16 +
+  incremental and the new head ran in **float** (f32-saved head weights — negligible vs the FT at fixed
+  depth, and it makes the engine match the trainer trivially). `NetHeader` gained a `hidden2_size_` field
+  (format_version 2). Branch `nnue-hidden-layer` (pushed, not merged); trainer `tools/bullet/pawnstar_h.rs`,
+  reference `tools/bullet/pawnstar_eval_h.rs`. **Caveat:** reused the 2-layer LR schedule/epochs — a deeper
+  head may want tuned hyperparameters/more data; this rejects the same-recipe hidden layer, not all heads.
+  **Gotcha:** bullet stores affine weights **input-major** (`w[input*out + output]`, like the feature
+  transformer); the `O=1` output layer hides this, so reading the `2048→16` layer output-major yields a dead
+  near-constant head — and a 0 cp `test_nnue` cross-check passes while broken (engine and reference misread
+  identically), so **sanity-check that evals track material (up-a-queen → ~+1200) before trusting a new arch.**
+
 ### Recreating `pawnstar-v11.bin` (step by step)
 
 `pawnstar-v11.bin` is a **1024-wide net with 4 king buckets (file-pair)** trained on **~6.05 billion**

@@ -203,6 +203,19 @@ file-pair `kKingBucketMap` in [nnue.h](src/nnue.h)).
   1024), **int8 output layer (+31.8 ± 10.3 at 8+0.08, shipped)** — 1.86× faster output dot. **int8 *feature*
   weights (lossless scale=1 retrain): −8 Elo, rejected** (FT `Update` not memory-bound at 1024×1). Aspiration
   windows: no gain (tried). **Quiescence TT removal + SEE sorted early-exit: +38.65 ± 13.8 at 8+0.08, shipped.**
+- **Head depth — a hidden layer in the head (`concat 2048 → 16 → 1`, SCReLU): REJECTED, −11.3 ± 12.9 Elo at
+  fixed depth 8, H0 (1908 games).** Single-variable A/B: a control (current `2048 → 1` head) and the candidate
+  trained on the *same* shuffled 200M PlentyChess set + same schedule, then head-to-head SPRT. Fixed depth is
+  pure eval quality (speed-independent) and it's already negative there, so no time-control follow-up was run
+  (a slower head that doesn't improve the evaluator at equal nodes only loses more on the clock); conservative,
+  since the control used its int8 head (~24 cp deviation) vs the candidate's exact float head and still won.
+  Kept the FT int16 + incremental and ran the **float** head (f32-saved weights). Branch `nnue-hidden-layer`
+  (pushed, not merged). **Caveat:** reused the 2-layer LR schedule/epochs — a deeper head may want tuned
+  hyperparameters and/or more data; this rejects "hidden layer with the *same recipe*", not all possible heads.
+  **Gotcha:** bullet stores affine weights **input-major** (`w[input*out+output]`); the `O=1` output layer
+  hides this, so reading the `2048→16` layer output-major gives a dead near-constant head — and a 0 cp
+  `test_nnue` cross-check *passes while broken* (engine and reference misread identically), so **sanity-check
+  that evals track material (up-a-queen → ~+1200) before trusting a new arch.**
 
 **Open levers / candidate next experiments:**
 - **More king buckets / a better bucket map** — v11 ships 4 file-pair buckets. Untested: more banks (e.g. a
