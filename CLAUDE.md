@@ -16,7 +16,7 @@ make doc      # generate Doxygen HTML into doc/html
 make clean    # remove build artifacts and generated docs
 ```
 
-Compiler flags include `-mbmi2` and `-mavx2` (BMI2 `pext` for slider attacks and AVX2 for the NNUE kernels; both present on Intel Haswell / AMD Zen 1+), `-std=c++23`, and `-I src`. Debug builds (`DEBUG=1`) add `-fsanitize=undefined,address`. There is **no LTO**: with the whole engine header-only, each translation unit already inlines across former `.cpp` boundaries at `-O3`, so ThinLTO bought nothing and was removed (perft is on par or faster without it). Warnings are on (`-Wall -Wextra -Wpedantic`) but not fatal by default; `make WERROR=1` adds `-Werror` (for CI).
+Compiler flags include `-mbmi2` and `-mavx2` (BMI2 `pext` for slider attacks and AVX2 for the NNUE kernels; both present on Intel Haswell / AMD Zen 1+), `-std=c++23`, and `-I src`. Debug builds (`DEBUG=1`) add `-fsanitize=undefined,address`. Diagnostic counters (`DEBUGX`) are compiled in by default; `make RELEASE=1` omits them. There is **no LTO**: with the whole engine header-only, each translation unit already inlines across former `.cpp` boundaries at `-O3`, so ThinLTO bought nothing and was removed (perft is on par or faster without it). Warnings are on (`-Wall -Wextra -Wpedantic`) but not fatal by default; `make WERROR=1` adds `-Werror` (for CI).
 
 Always run `make clean && make` when switching branches or after changes to generated files — stale `.d` dependency files can cause spurious build failures.
 

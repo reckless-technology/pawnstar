@@ -14,5 +14,12 @@ existing code is already formatted, so `clang-format -i <files>` only reformats 
 **Why:** Jonny formats the code and expects committed diffs to be clang-format-clean; he had to reformat
 chess_clock.h himself after I committed an unformatted refactor (2026-06-20).
 
-**How to apply:** `clang-format -i src/<changed files>` (binary at `/usr/bin/clang-format`) as the last step
-before `git add`/commit. Related: [[feedback_descriptive_names]], [[feedback_make_clean]].
+**How to apply:** `clang-format -i src/<changed files>` as the last step before `git add`/commit.
+
+**VERSION MATTERS — pin 18.1.8.** The repo is clang-format-clean only under **clang-format 18.x**; newer
+versions reformat committed code (tested 2026-06-23: v22 wants to touch chess_clock.h+nnue.h, v19/v20 touch
+1 file, v17→3, v16→5; **only 18.1.8 = 0 files changed**). On the current machine clang-format is the pip
+package `clang-format==18.1.8` installed in the venv `/home/jonny/work/.pawnstar`, symlinked to
+`~/.local/bin/clang-format` (the old `/usr/bin/clang-format` is gone). Verify clean with
+`clang-format --dry-run --Werror src/*.h src/*.cpp test/*.cpp`. See [[machine-setup-env]].
+Related: [[feedback_descriptive_names]], [[feedback_make_clean]].
