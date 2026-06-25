@@ -329,9 +329,9 @@ inline std::array<zobrist_t, 64> MakeEnPassantHashes()
 
 // ── The precomputed tables, computed once at program startup (dynamic initialisation). ──────────────
 // clang-format off
-inline const std::array<Bitboard, 64>     kEastWest            =    MakeBitboards([](uint8_t sq) { return RayFrom(sq, kEast) | RayFrom(sq, kWest); });
-inline const std::array<Bitboard, 64>     kPawnAttacksWhite    =    MakeBitboards([](uint8_t sq) { return ShiftNorthwest(SqBB(sq)) | ShiftNortheast(SqBB(sq)); });
-inline const std::array<Bitboard, 64>     kPawnAttacksBlack    =    MakeBitboards([](uint8_t sq) { return ShiftSouthwest(SqBB(sq)) | ShiftSoutheast(SqBB(sq)); });
+inline const std::array<Bitboard, 64>     kEastWest            = MakeBitboards([](uint8_t sq) { return RayFrom(sq, kEast) | RayFrom(sq, kWest); });
+inline const std::array<Bitboard, 64>     kPawnAttacksWhite    = MakeBitboards([](uint8_t sq) { return ShiftNorthwest(SqBB(sq)) | ShiftNortheast(SqBB(sq)); });
+inline const std::array<Bitboard, 64>     kPawnAttacksBlack    = MakeBitboards([](uint8_t sq) { return ShiftSouthwest(SqBB(sq)) | ShiftSoutheast(SqBB(sq)); });
 inline const std::array<Bitboard, 64>     kKnightAttacks       = MakeBitboards(KnightAttacks);
 inline const std::array<Bitboard, 64>     kBishopAttacks       = MakeBitboards(BishopAttacksOnEmptyBoard);
 inline const std::array<Bitboard, 64>     kRookAttacks         = MakeBitboards(RookAttacksOnEmptyBoard);

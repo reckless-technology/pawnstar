@@ -21,8 +21,8 @@ enum class NodeType : uint8_t
 /// @brief Class for representing a chess move.
 /// A move is 64 bits in size.
 /// Bits are as follows:
-/// Bits | Meaning
-/// -----|--------
+///   Bits  | Meaning
+/// --------|--------
 ///  0 -  5 | to square
 ///  6 - 11 | from square
 /// 12 - 14 | moving piece
@@ -95,6 +95,7 @@ class Move
     constexpr int               TTDepth() const;
     constexpr uint8_t           TTAge() const;
     constexpr int               from_to() const;
+    constexpr int               piece_to() const;
     constexpr bool              IsChecking() const;
     constexpr bool              IsQuiet() const;
     constexpr uint64_t          Bits() const;
@@ -255,6 +256,13 @@ constexpr uint8_t Move::TTAge() const
 constexpr int Move::from_to() const
 {
     return val_ & kFromToMask;
+}
+
+/// @brief Create a 9 bit key from the piece and the destination square.
+/// @return Index of [piece() << 6 + to()]
+constexpr int Move::piece_to() const
+{
+    return (val_ & kSquareMask) | ((val_ >> kFromShift) & (kPieceMask << kFromShift));
 }
 
 /// @brief Does this move give check?

@@ -104,8 +104,7 @@ class SearchState
     void             RecordCountermove(Move prev, Move move);
 
   private:
-    int                  AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
-    static constexpr int ContKey(Move m);
+    int AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
 };
 
 /// @brief Current position at the tip of the search tree.
@@ -136,23 +135,17 @@ inline void SearchState::RecordKiller(int ply, Move move)
     }
 }
 
-/// @brief Table key for a move in the countermove / continuation-history tables: (piece, to-square).
-/// Move::None (piece 0, to 0) maps to 0, a harmless dedicated slot.
-constexpr int SearchState::ContKey(Move m)
-{
-    return m.piece() * 64 + m.to();
-}
-
 /// @brief Continuation-history score for playing @p move after @p prev (0 if prev/move not quiet-tracked).
+/// The table key is Move::piece_to() — a (piece, to-square) index; Move::None maps to 0, a harmless slot.
 inline int SearchState::ContinuationHistScore(Move prev, Move move) const
 {
-    return continuation_history_[ContKey(prev) * kContKeys + ContKey(move)];
+    return continuation_history_[prev.piece_to() * kContKeys + move.piece_to()];
 }
 
 /// @brief Whether @p move is the recorded countermove (best quiet refutation) to @p prev.
 inline bool SearchState::IsCountermove(Move prev, Move move) const
 {
-    return countermoves_[ContKey(prev)] == move;
+    return countermoves_[prev.piece_to()] == move;
 }
 
 /// @brief Reward a quiet @p move that was good (raised alpha or cut) as a follow-up to @p prev.
@@ -161,7 +154,7 @@ inline void SearchState::RecordContinuationHistory(Move prev, Move move)
 {
     if (move.IsQuiet())
     {
-        int16_t &c = continuation_history_[ContKey(prev) * kContKeys + ContKey(move)];
+        int16_t &c = continuation_history_[prev.piece_to() * kContKeys + move.piece_to()];
         if (c < 16384)
         {
             ++c;
@@ -174,7 +167,7 @@ inline void SearchState::RecordCountermove(Move prev, Move move)
 {
     if (move.IsQuiet())
     {
-        countermoves_[ContKey(prev)] = move;
+        countermoves_[prev.piece_to()] = move;
     }
 }
 
