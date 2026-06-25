@@ -354,6 +354,17 @@ space); or a wider transformer still.
   transformer); the `O=1` output layer hides this, so reading the `2048→16` layer output-major yields a dead
   near-constant head — and a 0 cp `test_nnue` cross-check passes while broken (engine and reference misread
   identically), so **sanity-check that evals track material (up-a-queen → ~+1200) before trusting a new arch.**
+- **Output buckets — 8 piece-count banks (`concat 2048 → 8`, `select` by bullet `MaterialCount<8>`,
+  `bucket = (popcount(occ) − 2) / 4`):** REJECTED at scale. Single-variable A/B (control = v11 arch, candidate =
+  v11 + buckets, same pool + recipe). Weak **+6.1 ± 9.5 fixed-depth at 500M (H0, inconclusive)**, but at **6B
+  (v11's ~6.36B pool, SBS=300) it regresses at both time controls — −22.96 ± 15.71 @ 8+0.08 and −14.70 ± 13.27
+  @ 12+0.12 (both H0)**. The slower TC is less negative (−23 → −15, TC-dependence: the larger output table's
+  per-move speed cost weighs less) but never positive. Causes: bucket gains shrink with data (the king-bucket
+  pattern, §7 lineage), plus a small TC speed penalty (the int8 output table is 8× larger, 16 KB vs 2 KB; the
+  500M test was fixed-depth so never paid it). FT unchanged; the output is saved **bucket-major** (bullet
+  `.transpose()`), so each bank's 2048-weight row is contiguous and the int8/int16 dot kernels are reused on the
+  selected bank — no float path. `NetHeader` gained an `output_buckets_` field (format_version 2). Branch
+  `nnue-output-buckets` (not merged); trainer `tools/bullet/pawnstar_ob.rs`, reference `pawnstar_eval_ob.rs`.
 
 ### Recreating `pawnstar-v11.bin` (step by step)
 

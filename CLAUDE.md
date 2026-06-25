@@ -216,6 +216,16 @@ file-pair `kKingBucketMap` in [nnue.h](src/nnue.h)).
   hides this, so reading the `2048→16` layer output-major gives a dead near-constant head — and a 0 cp
   `test_nnue` cross-check *passes while broken* (engine and reference misread identically), so **sanity-check
   that evals track material (up-a-queen → ~+1200) before trusting a new arch.**
+- **Output buckets — 8 piece-count banks on the v11 head (`concat 2048 → 8`, `select` by `MaterialCount<8>`):
+  REJECTED at scale.** Single-variable A/B (control = v11 arch, candidate = v11 + buckets, same pool + recipe).
+  Weak **+6.1 ± 9.5 fixed-depth at 500M (H0, inconclusive)**, but at **6B (v11's ~6.36B pool, SBS=300) it
+  REGRESSES at both time controls: −22.96 ± 15.71 @ 8+0.08 and −14.70 ± 13.27 @ 12+0.12 (both H0)**. The slower
+  TC is less negative (−23 → −15, classic TC-dependence — the 8× output table's per-move speed cost weighs less)
+  but never positive. Two causes: **bucket gains shrink with data** (the king-bucket precedent — +29 @ 750M →
+  +11 @ 2.31B — applies to output buckets too) and a **small TC speed penalty** (int8 output table 8× larger,
+  16 KB vs 2 KB; the 500M test was fixed-depth so never paid it). FT unchanged; output saved bucket-major via
+  bullet `.transpose()`, so the int8/int16 kernels are reused on the selected bank (no float path). Branch
+  `nnue-output-buckets` (not merged); trainer `tools/bullet/pawnstar_ob.rs`, ref `pawnstar_eval_ob.rs`.
 
 **Open levers / candidate next experiments:**
 - **More king buckets / a better bucket map** — v11 ships 4 file-pair buckets. Untested: more banks (e.g. a
