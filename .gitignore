@@ -1,5 +1,8 @@
 build/
 doc/html/
 
+# Claude Code git worktrees (machine-local, created by EnterWorktree)
+.claude/worktrees/
+
 # fastchess resumable tournament config (written into the cwd during SPRT runs)
 config.json
