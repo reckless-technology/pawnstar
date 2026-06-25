@@ -5,7 +5,6 @@
 #include "constants.h"
 #include "debug_hashtable.h"
 #include "evaluation.h"
-#include "game.h"
 #include "history_table.h"
 #include "move.h"
 #include "nnue.h"
@@ -164,8 +163,12 @@ inline void SearchState::RecordCountermove(Move prev, Move move)
 }
 
 // ================= Out-of-class definitions (header-only build) =================
-// search_state.h is the hub where Game and SearchState are both complete, so the cyclic
-// definitions (SearchState methods, Game::SearchRootNode, EvaluatePosition) live here inline.
+// SearchState is complete above (it needs only the forward-declared Game for its `Game &game_` member). Pull
+// in the full Game now: the out-of-class definitions below (the SearchState methods that touch game_, and
+// EvaluatePosition) need it complete. Either include order works via #pragma once — game.h includes this hub
+// at its bottom (after class Game), and a TU that includes search_state.h first reaches this line with class
+// SearchState already complete, so game.h can then define Game::SearchRootNode (which needs SearchState).
+#include "game.h"
 
 /// @brief Construct the main-thread search state from the current game.
 /// hash_stack_ is populated with all ancestor positions (positions 0..N-1 where N is
@@ -756,7 +759,7 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
 }
 
 // ----------------------------------------------------------------------------
-// Iterative deepening — one Lazy SMP thread. Game::SearchRootNode (defined below)
+// Iterative deepening — one Lazy SMP thread. Game::SearchRootNode (defined in game.h)
 // launches one of these per thread.
 // ----------------------------------------------------------------------------
 
@@ -898,151 +901,6 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
                 break;
             }
         }
-    }
-    return best_move;
-}
-
-// ---- Game::SearchRootNode (defined here; needs SearchState complete) ----
-
-/// @brief Search the current position and return the best move.
-/// Returns a book move immediately on a book hit; otherwise runs the Lazy SMP iterative-deepening search:
-/// one authoritative main thread plus (Game::thread_count - 1) helpers, all sharing the transposition table.
-/// @return The best move, or Move::None if there are no legal moves.
-inline Move Game::SearchRootNode()
-{
-    Game &game        = *this;        // local alias so the search body reads uniformly through `game`
-    game.ponder_move_ = Move::None(); // set by the main thread's IterativeDeepen if the PV has a reply move
-    // Clear the stop flag (set true by StartThinking's StopThinking) up front — BEFORE the book / single-move
-    // early returns. Otherwise a leftover cancel makes SearchThreadEntry's ponder-wait exit immediately and
-    // emit a premature `bestmove` when `go ponder` lands on a book/forced position (which returns without search).
-    game.is_cancel_pending_.store(false, std::memory_order_relaxed);
-    game.last_search_node_count_ = 0; // set below once a real search runs (stays 0 for book/forced returns)
-    // If there is a book move for this position, do not bother with search (unless OwnBook is disabled).
-    // Skip the book when `go searchmoves` restricts the root (the caller wants those moves searched, not a
-    // book reply).
-    if (game.use_own_book_ && game.search_moves_.empty())
-    {
-        Move book_move = game.book_.GetMove(game.CurrentPosition().hash_);
-        if (book_move != Move::None())
-        {
-            return book_move;
-        }
-    }
-    MoveList move_list = game.CurrentPosition().GenerateLegalMoves();
-    // UCI `go searchmoves`: restrict the root move list to the requested moves (ignored if none of them are
-    // legal here, so a malformed list can't wedge the search).
-    if (!game.search_moves_.empty())
-    {
-        MoveList filtered;
-        for (const Move &move : move_list)
-        {
-            if (std::ranges::find(game.search_moves_, move.ToString()) != game.search_moves_.end())
-            {
-                filtered.push_back(move);
-            }
-        }
-        if (filtered.size() != 0)
-        {
-            move_list = filtered;
-        }
-    }
-    if (move_list.size() == 0)
-    {
-        return Move::None();
-    }
-    // With only one legal move there is nothing to search — but when `searchmoves` is set we still search it
-    // (the caller wants its evaluation), so only take this shortcut for a genuine forced move.
-    if (move_list.size() == 1 && game.search_moves_.empty())
-    {
-        return move_list[0];
-    }
-    // Plan time usage for this search.
-    using Duration           = ChessClock::Duration;
-    Duration allocated_time  = Duration::zero(); // soft budget (drives between-iteration stopping)
-    Duration max_search_time = Duration::zero(); // hard budget (deadline); zero means no hard stop
-    switch (game.time_control_.clock_type_)
-    {
-    case ChessClock::kStandard:
-    default: {
-        const int moves_to_go = game.time_control_.moves_to_go_ != 0
-                                    ? game.time_control_.moves_to_go_
-                                    : std::max(40 - game.CurrentPosition().full_move_count_, 5);
-        // Soft budget: an even slice of the remaining time. NOTE: folding the per-move increment in here
-        // (`+ increment / 2`) was SPRT-tested and did NOT help — neutral-to-slightly-negative at both 8+0.08
-        // (-14.5 +/- 21, 480 games) and 10+0.1 (-2.5 +/- 7.9, 3562 games), zero forfeits. In equal-clock
-        // self-play at fast TCs spending the increment is ~symmetric; it may pay off at much slower increment
-        // TCs (untested). `ChessClock::increment` is still parsed (winc/binc) but deliberately unused here.
-        allocated_time = game.time_control_.remaining_time_ / moves_to_go;
-        // Hard budget: up to 2x the soft budget, but never spend into the last second of our clock, and always
-        // allow at least 100 ms.
-        max_search_time =
-            std::max(Duration{100}, std::min(allocated_time * 2, game.time_control_.remaining_time_ - Duration{1000}));
-        break;
-    }
-    case ChessClock::kFixedDepth:
-        break; // no time limit; the depth loop bounds the search
-    case ChessClock::kFixedTime:
-        max_search_time = game.time_control_.remaining_time_; // movetime: a hard budget, no soft management
-        break;
-    case ChessClock::kInfinite:
-        break; // no time limit; only `stop` ends it
-    }
-    // Reserve the configured move overhead (GUI/network lag) from the hard deadline so we don't forfeit on
-    // time. Only when there is a hard deadline (fixed-depth / infinite searches leave it zero = no stop).
-    if (max_search_time > Duration::zero())
-    {
-        max_search_time = std::max(Duration{1}, max_search_time - game.move_overhead_);
-    }
-
-    // Arm the clock. A ponder search has no hard deadline until `ponderhit` (budget-from-ponderhit); the
-    // budgets are recorded so the conversion can start the real clock from that moment.
-    if (game.is_pondering_)
-    {
-        game.time_control_.StartPonderSearch(allocated_time, max_search_time);
-    }
-    else
-    {
-        game.time_control_.StartSearch(allocated_time, max_search_time);
-    }
-    DebugXClear();
-    game.transposition_table_.Age();
-
-    // Shallow pass for initial move ordering (on a temporary state shared as the launch ordering).
-    SearchState state{game};
-    Variation   shallow_pv{};
-    for (auto &move : move_list)
-    {
-        const int move_index = (int)(&move - move_list.begin());
-        const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score();
-        move.AssignScore(score);
-    }
-    SortMoves<true>(move_list);
-    Move best_move = move_list[0];
-
-    // Lazy SMP: each thread runs an independent iterative-deepening search of the same root, sharing the
-    // (lockless) transposition table and (atomic) history table. The main thread is authoritative; helper
-    // threads deepen the shared TT to accelerate it. Each thread has its own SearchState and move-list copy.
-    // Thread count is configured via the UCI `Threads` option (or the PAWNSTAR_THREADS default at startup),
-    // stored in game.thread_count; re-clamped here defensively.
-    const int                n_threads = std::clamp(game.thread_count_, 1, kMaxSearchThreads);
-    std::vector<std::thread> helpers;
-    helpers.reserve(n_threads - 1);
-    for (int i = 1; i < n_threads; ++i)
-    {
-        // Each helper gets a distinct thread id, which selects its iteration-skip schedule (see IterativeDeepen).
-        helpers.emplace_back([&game, &move_list, best_move, i] {
-            SearchState helper_state{game};
-            helper_state.IterativeDeepen(move_list, best_move, /*thread_id=*/i);
-        });
-    }
-
-    best_move                    = state.IterativeDeepen(move_list, best_move, /*thread_id=*/0);
-    game.last_search_node_count_ = state.node_count_; // main-thread node total (used by `bench`)
-
-    game.is_cancel_pending_.store(true, std::memory_order_relaxed); // signal helpers to stop
-    for (auto &helper : helpers)
-    {
-        helper.join();
     }
     return best_move;
 }
