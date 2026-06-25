@@ -41,13 +41,6 @@ struct HashEntry
 /// @brief A variation (typically principal variation) is a line of play or series of moves.
 using Variation = std::vector<Move>;
 
-/// @brief Result of searching a single move: its score and whether it gives check.
-struct SingleMoveResult
-{
-    int  score_;       ///< Alpha-beta score for the move.
-    bool is_checking_; ///< True if the move gives check.
-};
-
 /// @brief When the PV changes we need to copy the new PV up the tree recursively.
 /// @param dst Destination PV.
 /// @param src Source PV.
@@ -83,25 +76,24 @@ class SearchState
 
     // Interface
     explicit SearchState(Game &game);
-    Position        &CurrentPosition();
-    const Position  &CurrentPosition() const;
-    void             PlayMove(Move move);
-    void             UndoMove();
-    void             MakeNullMove();
-    void             ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) const;
-    int              Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move);
-    SingleMoveResult SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv,
-                                      int move_index);
-    int              SearchQuiescent(int depth, int ply, int alpha, int beta);
-    Move             IterativeDeepen(MoveList move_list, Move best_move, int thread_id);
-    bool             IsDrawByRepetition() const;
-    bool             IsDrawByFiftyMoves() const;
-    bool             IsCancelled() const;
-    void             RecordKiller(int ply, Move move);
-    int              ContinuationHistScore(Move prev, Move move) const;
-    bool             IsCountermove(Move prev, Move move) const;
-    void             RecordContinuationHistory(Move prev, Move move);
-    void             RecordCountermove(Move prev, Move move);
+    Position       &CurrentPosition();
+    const Position &CurrentPosition() const;
+    void            PlayMove(Move move);
+    void            UndoMove();
+    void            MakeNullMove();
+    void            ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) const;
+    int             Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move);
+    Move            SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index);
+    int             SearchQuiescent(int depth, int ply, int alpha, int beta);
+    Move            IterativeDeepen(MoveList move_list, Move best_move, int thread_id);
+    bool            IsDrawByRepetition() const;
+    bool            IsDrawByFiftyMoves() const;
+    bool            IsCancelled() const;
+    void            RecordKiller(int ply, Move move);
+    int             ContinuationHistScore(Move prev, Move move) const;
+    bool            IsCountermove(Move prev, Move move) const;
+    void            RecordContinuationHistory(Move prev, Move move);
+    void            RecordCountermove(Move prev, Move move);
 
   private:
     int AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
@@ -340,9 +332,9 @@ inline bool SearchState::IsCancelled() const
 // ----------------------------------------------------------------------------
 
 /// @brief Search a single move from the current node.
-/// @return The move's score and whether it gives check.
-inline SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv,
-                                                      int move_index)
+/// @return The move carrying its alpha-beta score (score()) and whether it gives check (IsChecking()).
+inline Move SearchState::SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv,
+                                          int move_index)
 {
     const Position &position     = CurrentPosition();
     const bool      was_in_check = position.IsInCheck(); // check extensions are added in main Search()
@@ -389,7 +381,13 @@ inline SingleMoveResult SearchState::SearchSingleMove(int depth, int ply, int al
         score = -Search(child_depth, ply + 1, -beta, -alpha, pv, move);
     }
     UndoMove();
-    return {score, is_checking};
+    // Return the move carrying its search score and check status (callers read score() / IsChecking()).
+    move.AssignScore(score);
+    if (is_checking)
+    {
+        move.GivesCheck();
+    }
+    return move;
 }
 
 /// @brief Try null move pruning, reusing the caller's precomputed static eval.
@@ -542,7 +540,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         best_move = transposition->move_;
         pv.clear(); // child writes its line here only if it is a PV node; clear so a terminal/cutoff child leaves it
                     // empty
-        const int score = SearchSingleMove(depth, ply, alpha, beta, transposition->move_, pv, 0).score_;
+        const int score = SearchSingleMove(depth, ply, alpha, beta, transposition->move_, pv, 0).score();
         if (IsCancelled())
         {
             return kSearchCancelledScore;
@@ -628,11 +626,11 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         }
 
         pv.clear(); // see TT-move note: clear so a non-PV-node child leaves no stale tail in pv
-        int score = SearchSingleMove(lmr_depth, ply, alpha, beta, move, pv, move_index).score_;
+        int score = SearchSingleMove(lmr_depth, ply, alpha, beta, move, pv, move_index).score();
         if (score > alpha && lmr_depth < depth)
         {
             INCREMENT("late move reduction fails");
-            score = SearchSingleMove(depth, ply, alpha, beta, move, pv, move_index).score_;
+            score = SearchSingleMove(depth, ply, alpha, beta, move, pv, move_index).score();
         }
         if (IsCancelled())
         {
@@ -816,7 +814,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
                                          move_index + 1);
             }
             child_pv.clear(); // clear per move so a terminal/non-PV-node child leaves no stale tail
-            const int score = SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score_;
+            const int score = SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score();
             move.AssignScore(score);
             if (IsCancelled())
             {
@@ -1015,7 +1013,7 @@ inline Move Game::SearchRootNode()
     for (auto &move : move_list)
     {
         const int move_index = (int)(&move - move_list.begin());
-        const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score_;
+        const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score();
         move.AssignScore(score);
     }
     SortMoves<true>(move_list);
