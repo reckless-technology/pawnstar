@@ -14,3 +14,4 @@
 - [feedback_push_to_main.md](feedback_push_to_main.md) — OK to commit/push directly to main in pawnstar (no feature branch needed)
 - [feedback_descriptive_names.md](feedback_descriptive_names.md) — Naming: long descriptive names, no abbreviations; bool names start with is/has/can/may/do/does
 - [machine-setup-env.md](machine-setup-env.md) — Current machine (post-migration 2026-06-23): fastchess/rust/bullet/clang-format-18.1.8 locations, RTX 4070 + CUDA 13.2 (supersedes stale ~/cuda-12.2/1050Ti notes), openings.epd restored; anchor engines + full PlentyChess data still missing
+- [machine-cargo-version-gotcha.md](machine-cargo-version-gotcha.md) — Bullet needs rustup cargo 1.96 (edition2024); apt /bin/cargo 1.75 can't build it. Use absolute ~/.cargo/bin/cargo; beware same-line `export CUDA_PATH=.. PATH=..` prepending /bin. RTX 4070 trains ~2.48M pos/sec

@@ -39,5 +39,5 @@ The dev/training/testing stack was rebuilt from scratch on a NEW machine (2026-0
   (net-vs-net via fastchess) does NOT need them.
 - **Full PlentyChess training data** (only the 61 MB smoke shard is present).
 
-**Stale script default noticed:** `tools/rate.sh` defaults `NET=nnue/pawnstar-v10.bin`, which was retired
-when v11 shipped — pass `NET=nnue/pawnstar-v11.bin` explicitly (or fix the default). See [[machine-setup-env]] siblings.
+**`tools/rate.sh` net default:** now `NET=nnue/pawnstar-v11.bin` (verified 2026-06-26 — the earlier v10
+default was fixed, and no other repo script/Makefile references a retired net). See [[machine-setup-env]] siblings.
