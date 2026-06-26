@@ -558,14 +558,17 @@ inline void Network::Update(Accumulator &acc, const Position &from, const Positi
 }
 
 /// @brief Shared dequantisation tail: SCReLU leaves the dot in QA*QA*QB units; reduce one QA, add the bias
-/// (QA*QB units), apply the eval scale, then remove the remaining QA*QB quantisation -> centipawns.
+/// (QA*QB units), apply the eval scale, then remove the remaining QA*QB quantisation -> centipawns. The
+/// result is clamped to +/-kMaxEvaluation: pathological max-material positions (e.g. many promoted queens)
+/// can push the raw net output past int16, which would wrap when stored in the int16 eval cache and could
+/// collide with the mate band. Clamping keeps |eval| below kWinThreshold so eval and mate scores never mix.
 inline int Dequant(int64_t output, int16_t bias)
 {
     output /= kQA;
     output += bias;
     output *= kScale;
     output /= (kQA * kQB);
-    return static_cast<int>(output);
+    return static_cast<int>(std::clamp<int64_t>(output, -kMaxEvaluation, kMaxEvaluation));
 }
 
 inline int Network::Evaluate(const Accumulator &acc, Color side_to_move) const

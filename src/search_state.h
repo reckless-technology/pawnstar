@@ -845,7 +845,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
                     // mated) rather than a huge `cp` value; otherwise the centipawn score. Mate scores are
                     // +/-(kMateValue - plies_to_mate), so plies_to_mate = kMateValue - |score| and the move
                     // count rounds up (+1)/2.
-                    constexpr int kMateValue = -kCheckmatedScore; // 10000
+                    constexpr int kMateValue = -kCheckmatedScore; // 31900
                     std::string   score_string;
                     if (alpha >= kWinThreshold)
                     {

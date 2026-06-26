@@ -17,8 +17,8 @@
 /// wins). Because the stored score depends on the active network, the cache MUST be cleared whenever the
 /// loaded net changes (a different net produces a different eval for the same hash).
 ///
-/// Static evaluations are well within int16 range (the search treats kBeta = 11000 as larger than any
-/// eval, and only static evals — never mate scores — are cached), so 16 bits suffice for the score and
+/// Static evaluations are clamped to +/-kMaxEvaluation (30000) in Dequant, well within int16 range (and
+/// only static evals — never mate scores — are cached), so 16 bits suffice for the score and
 /// the other 48 bits go to the key. A zeroed slot has key 0, so a position whose top 48 hash bits are
 /// exactly 0 (probability ~2^-48) reads a spurious score of 0; this is a heuristic cache, so that
 /// vanishingly rare event only perturbs one leaf evaluation and never affects correctness.
