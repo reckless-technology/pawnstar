@@ -125,11 +125,28 @@ inline int EvaluateSwapOff(SeeBoard &bb, Square location, Color color, Piece pie
     return scores[0];
 }
 
-/// @brief Compute the static exchange evaluation of a capture, resolving the full capture sequence.
-/// @param src_position Position to evaluate.
-/// @param move Move to evaluate.
-/// @return Pair of {static exchange evaluation score for this move, whether the move gives check}.
-inline std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move move)
+/// @brief SeeBoard mirror of Position::AttacksTo: the set of @p color pieces attacking @p location, using
+/// the working board's bitboards and its occupancy (bb.pieces_[kNone]). Kept byte-for-byte equivalent to
+/// Position::AttacksTo so the SEE check test matches Position::checkers_ exactly.
+/// @param bb Working board (after the capturing move has been applied).
+/// @param location Target square (the opposing king, for a check test).
+/// @param color Attacking color.
+/// @return Bitboard of @p color attackers of @p location.
+inline Bitboard SeeAttackersTo(const SeeBoard &bb, Square location, Color color)
+{
+    const Bitboard occupied = bb.pieces_[kNone];
+    Bitboard result = (color == kWhite ? kPawnAttacksBlack[location] : kPawnAttacksWhite[location]) & bb.pieces_[kPawn];
+    result |= (kKnightAttacks[location] & bb.pieces_[kKnight]) | (kKingAttacks[location] & bb.pieces_[kKing]);
+    result |= RookAttacks(occupied, location) & (bb.pieces_[kRook] | bb.pieces_[kQueen]);
+    result |= BishopAttacks(occupied, location) & (bb.pieces_[kBishop] | bb.pieces_[kQueen]);
+    result &= bb.colors_[color];
+    return result;
+}
+
+/// @brief MakeMove-based SEE, kept only as the reference the cross-check test asserts the fast path against.
+/// @param src_position Position to evaluate. @param move Move to evaluate.
+/// @return Pair of {static exchange evaluation score, whether the move gives check}.
+inline std::pair<int, bool> EvaluateStaticExchangeReference(const Position &src_position, Move move)
 {
     Position    dst_position{src_position.MakeMove(move)};
     const bool  is_checking = dst_position.IsInCheck();
@@ -144,4 +161,60 @@ inline std::pair<int, bool> EvaluateStaticExchange(const Position &src_position,
                 is_checking};
     }
     return {piece_values[captured] - EvaluateSwapOff(bb, move.to(), dst_position.color_to_move_, piece), is_checking};
+}
+
+/// @brief Compute the static exchange evaluation of a capture, resolving the full capture sequence.
+///
+/// SEE only needs the post-move piece/colour bitboards and occupancy, so rather than a full Position
+/// MakeMove (which also recomputes the Zobrist hash, castling rights, en passant and the checkers
+/// bitboard, then copies squares_[64]) this applies just the capturing move to a lightweight SeeBoard.
+/// The check flag is derived directly: a move gives check iff the side that just moved now attacks the
+/// opposing king, which covers direct, discovered, promotion and en-passant-discovered checks uniformly
+/// — the same definition Position uses for checkers_. Bit-identical to EvaluateStaticExchangeReference
+/// for every capture/promotion (asserted by test_see's cross-check); SEE is never called on castling.
+/// @param src_position Position to evaluate.
+/// @param move Move to evaluate.
+/// @return Pair of {static exchange evaluation score for this move, whether the move gives check}.
+inline std::pair<int, bool> EvaluateStaticExchange(const Position &src_position, Move move)
+{
+    const Color  color    = src_position.color_to_move_;
+    const Color  enemy    = EnemyOf(color);
+    const Square from     = move.from();
+    const Square to       = move.to();
+    const Piece  mover    = src_position.squares_[from];
+    const Piece  promoted = move.promoted();
+    const bool   is_ep    = move.type() == Move::kEpCapture;
+    // En-passant captures the pawn on `to`'s file at `from`'s rank; otherwise the captured piece sits on `to`
+    // (kNone for a non-capturing promotion).
+    const Square captured_square = is_ep ? Square(to.File(), from.Rank()) : to;
+    const Piece  captured        = is_ep ? kPawn : src_position.squares_[to];
+    const Piece  piece_on_to     = promoted != Piece::kNone ? promoted : mover;
+
+    // Apply only the capturing move to a working board (no Zobrist/castling/squares_ recompute).
+    SeeBoard       bb{src_position};
+    const Bitboard from_bb{from};
+    const Bitboard to_bb{to};
+    if (captured != Piece::kNone) // a non-capturing promotion leaves `to` empty
+    {
+        const Bitboard captured_bb{captured_square};
+        bb.pieces_[captured] ^= captured_bb;
+        bb.colors_[enemy] ^= captured_bb;
+    }
+    bb.pieces_[mover] ^= from_bb; // lift the mover off `from`...
+    bb.colors_[color] ^= from_bb;
+    bb.pieces_[piece_on_to] ^= to_bb; // ...and place it (promoted type if promoting) on `to`
+    bb.colors_[color] ^= to_bb;
+    bb.pieces_[kNone] = bb.colors_[kWhite] | bb.colors_[kBlack]; // refreshed occupancy for the swap-off
+
+    // Check = the side that just moved now attacks the opposing king (matches Position::checkers_).
+    const Square enemy_king  = (bb.pieces_[kKing] & bb.colors_[enemy]).Lsb();
+    const bool   is_checking = SeeAttackersTo(bb, enemy_king, color).IsNotEmpty();
+
+    if (promoted != Piece::kNone)
+    {
+        return {piece_values[captured] + piece_values[promoted] - piece_values[kPawn] -
+                    EvaluateSwapOff(bb, to, enemy, promoted),
+                is_checking};
+    }
+    return {piece_values[captured] - EvaluateSwapOff(bb, to, enemy, mover), is_checking};
 }

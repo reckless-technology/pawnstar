@@ -200,10 +200,60 @@ static const auto tests = std::to_array<SeeTest>({
 });
 // clang-format on
 
+// Cross-check: the fast (MakeMove-free) EvaluateStaticExchange must be bit-identical — score AND
+// give-check flag — to the MakeMove reference for every capture/promotion. Walks a recursive move tree
+// from capture/ep/promotion-rich roots so it exercises en passant, promotion captures, and discovered /
+// promotion / en-passant-discovered checks.
+static long long see_checks     = 0;
+static long long see_mismatches = 0;
+
+static void CrossCheckSee(const Position &pos, int depth)
+{
+    MoveList moves{pos.GenerateLegalMoves()};
+    for (const auto &m : moves)
+    {
+        if (!m.IsQuiet())
+        {
+            ++see_checks;
+            const auto fast = EvaluateStaticExchange(pos, m);
+            const auto ref  = EvaluateStaticExchangeReference(pos, m);
+            if (fast != ref)
+            {
+                ++see_mismatches;
+                if (see_mismatches <= 8)
+                {
+                    std::cout << std::format("       SEE MISMATCH on {}: fast {{{},{}}} ref {{{},{}}}\n", m.ToString(),
+                                             fast.first, fast.second, ref.first, ref.second);
+                }
+            }
+        }
+        if (depth > 0)
+        {
+            CrossCheckSee(pos.MakeMove(m), depth - 1);
+        }
+    }
+}
+
 /// @brief Run all SEE test cases.
 /// @return Non-zero if any case failed.
 int main()
 {
+    // Capture/ep/promotion-rich standard positions (startpos, kiwipete, perft pos3 ep, perft pos4, a promotion pos).
+    static constexpr std::string_view kCrossCheckFens[] = {
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+        "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+        "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+        "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1",
+    };
+    for (const auto fen : kCrossCheckFens)
+    {
+        CrossCheckSee(Position::FromString(fen), 3);
+    }
+    test_report::Check(
+        see_mismatches == 0,
+        std::format("fast SEE == MakeMove reference over {} captures ({} mismatches)", see_checks, see_mismatches));
+
     for (const auto &tc : tests)
     {
         Position pos{Position::FromString(tc.fen_)};
