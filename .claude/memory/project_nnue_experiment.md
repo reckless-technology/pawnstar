@@ -291,7 +291,11 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   (incl. black-to-move + advanced-half kings — the cases the rank-invariant 4-bucket map never exercised),
   incremental bit-identical, symmetric material sanity. bullet `ChessBuckets` is stm-relative (FromStr does
   `piece^=8; square^=56`), matching the engine's `WhiteBucket`/`BlackBucket` for both side-to-move cases.
-  Trainer `tools/bullet/pawnstar_8kb.rs` + `pawnstar_eval_8kb.rs`. **Not yet shipped as v12** (awaiting go).
+  Trainer is now the canonical `tools/bullet/pawnstar.rs` + `pawnstar_eval.rs` (updated to the 8-bucket map).
+  **SHIPPED as v12 (2026-06-27, commit b1211b8, pushed):** `kNumKingBuckets=8`, `nnue/pawnstar-v12.bin`
+  (12,589,152 B); v11 retired; `test/nnue_reference.txt` + Bratko-Kopec accepted moves regenerated (24/24 at
+  depths 8-11); docs updated; `make check` green (bench signature 6857880). Enabled by the heap-allocate
+  Game/Network commit 279f087 (the 12.6 MB inline FT array would overflow the 8 MB stack).
 
 Known pre-existing bug surfaced during matches: frequent "Illegal PV move" warnings from
 **both** evaluators — the reported PV *string* sometimes contains an illegal continuation

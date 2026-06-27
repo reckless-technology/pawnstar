@@ -1,7 +1,7 @@
 # Memory Index
 
 - [project_go_port.md](project_go_port.md) — Go port status: all phases complete, UCI + search fully working
-- [project_nnue_experiment.md](project_nnue_experiment.md) — NNUE lineage; HCE REMOVED (NNUE-only, net mandatory); SHIPPED v11 (1024 + 4 file-pair king buckets, ~6.05B data, +9.28 over v10); ≈2900 CCRL-ballpark; more data is the recurring lever (gain shrinking). 2026-06-26: confirmed king buckets still worth ~12 Elo at 6B (no-bucket −12.36 @ 8+0.08, −11.71 @ 12+0.12; bucket gain PLATEAUED, not shrinking further)
+- [project_nnue_experiment.md](project_nnue_experiment.md) — NNUE lineage; HCE REMOVED (NNUE-only, net mandatory); **SHIPPED v12 (1024 + 8 king buckets = file-pair × board-half, ~6B data) — beat v11 by +17.29 @ 8+0.08, +10.97 @ 12+0.12 (both H1); king buckets NOT diminishing (0→4 +11.4, 4→8 bigger)**. ≈2900+ CCRL-ballpark; more data + more buckets are both live levers. Needs heap-allocated Game (commit 279f087) for the 12.6 MB net — NOT a unique_ptr to a separate weight array (cache-set aliasing −10% nps)
 - [project_tried_search_features.md](project_tried_search_features.md) — Search features already SPRT-tested (e.g. aspiration windows: no gain) — ask before re-recommending
 - [project_tried_pext_direct_lookup.md](project_tried_pext_direct_lookup.md) — Tried & REJECTED: direct-index pext lookup (drop indices_ indirection) — +3.9% perft but Elo-neutral in play (movegen ~1-2% of node cost); don't repeat
 - [project_tried_hidden_layer.md](project_tried_hidden_layer.md) — Tried & REJECTED: adding an NNUE head hidden layer (2048->16->1) — -11.3 ± 12.9 Elo at fixed depth vs plain 2048->1, H0 (1908 games, same 200M+recipe); branch nnue-hidden-layer, not merged. Incl. the bullet input-major affine-weight-layout gotcha
