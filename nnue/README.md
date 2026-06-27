@@ -76,7 +76,10 @@ methods), **owned by the `Game`** — there are no nnue globals. The `Game` is *
 weights stay an **inline member** rather than a `unique_ptr` to a separate array — a separate (page-aligned)
 allocation makes the 2048-byte feature-column stride alias the same cache sets, costing ~10% nps (measured);
 keeping the array inline in the heap object is speed-neutral. Its accumulator is **maintained
-incrementally** across make/undo on each thread's `SearchState`: in the common case (no king-bucket
+incrementally and lazily** on each thread's `SearchState` — `PlayMove` defers the update; the accumulator is
+brought current only when an evaluation reads it (and only on an eval-cache miss), so nodes that cut off
+before evaluating pay nothing (SPRT-measured +20.66 ± 9.04 Elo at 8+0.08, +13.6% nps). The *delta* in the
+common case (no king-bucket
 crossing — the common case) `Network::Update` derives the changed squares directly from
 the parent/child **colour bitboards** — a move touches only 2–4 squares, and captures, en passant,
 castling and promotion all fall out uniformly — and applies just those feature-column deltas to both
@@ -341,8 +344,9 @@ already bulletformat — `bullet-utils validate` a shard first (some are corrupt
 `cat` a few clean ones together, `shuffle`, then train per §6, skipping the text-`convert` step).
 
 The eval is also fast on the clock: the **incremental accumulator** (~+80 Elo equal-time vs full
-refresh), **AVX2 SIMD kernels** (~+180 Elo equal-time vs scalar), and the **eval cache** mean NNUE wins on
-time as well as depth. v12's 8-bucket table is 8× the feature rows of a single-bank net (12.6 MB vs 1.58 MB)
+refresh), **lazy/deferred accumulator updates** (skip the update for nodes that cut off before evaluating —
+**+20.66 ± 9.04 Elo at 8+0.08**, +13.6% nps), **AVX2 SIMD kernels** (~+180 Elo equal-time vs scalar), the
+**int8 output layer** (+31.8 Elo), and the **eval cache** mean NNUE wins on time as well as depth. v12's 8-bucket table is 8× the feature rows of a single-bank net (12.6 MB vs 1.58 MB)
 and slightly heavier per eval (and needs the owning `Game` heap-allocated, since the inline weight array would
 overflow the default stack), but every shipping SPRT (v8→v9→v10→v11→v12) was at a time control, so that cost is
 already priced in. **The lessons: more data is the lever** (v12's ~6B is still only ~29% of the ~21B PlentyChess

@@ -370,8 +370,9 @@ intervening work. This is purely a latency optimization and does not change resu
 ### Evaluation
 
 `EvaluatePosition` (declared in [src/evaluation.h](src/evaluation.h), defined in the [src/search_state.h](src/search_state.h) hub) is **NNUE-only**: after a draw
-short-circuit it returns the network's score for the incrementally-maintained accumulator (memoised by
-Zobrist hash in an eval cache). See [NNUE evaluation](#nnue-evaluation) below. Earlier versions also had a
+short-circuit it returns the network's score for the (lazily-maintained) accumulator, clamped to ±30000 so
+a pathological max-material eval can't overflow the int16 eval cache, memoised by Zobrist hash in that eval
+cache. See [NNUE evaluation](#nnue-evaluation) below. Earlier versions also had a
 tapered hand-crafted evaluation (material, piece-square tables, pawn structure, king safety, mobility);
 it was removed once NNUE became the sole evaluator.
 
@@ -403,9 +404,10 @@ output layer that produces a centipawn score. `EvaluatePosition` evaluates with 
 draw short-circuit) — NNUE is the only evaluator. The network is an `nnue::Network` instance owned by the
 `Game` (no globals, and **heap-allocated** — at 8 king buckets the inline ~12.6 MB weight array would overflow the
 default stack), read-only after load and shared by all search threads. Its accumulator is **maintained
-incrementally** across make/undo on each thread's `SearchState` — only the feature columns for the pieces
+incrementally and lazily** on each thread's `SearchState` — only the feature columns for the pieces
 that moved are updated (a king crossing a file-pair or board-half bucket boundary rebuilds that one perspective's
-accumulator). This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
+accumulator), and the update itself is deferred until an evaluation actually reads the accumulator, so nodes
+that cut off first pay nothing. This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
 `int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) from the
 [bullet](https://github.com/jw1912/bullet) trainer. The feature transformer and accumulator stay `int16`,
 but the shipped forward pass runs the **output layer in `int8`** (uint8 SCReLU activations × int8 output
@@ -590,8 +592,9 @@ the published node counts for the standard positions.
 - **No syzygy/tablebase** support.
 - **NNUE is the only evaluator.** The engine loads the shipped net at startup, falls back to a copy
   embedded in the binary if the file can't be loaded, and **exits** only if both fail (there is no
-  hand-crafted fallback). The accumulator is maintained incrementally across make/undo (with a refresh of
-  one perspective when its king crosses a file-pair or board-half bucket boundary) and the kernels are AVX2-vectorised,
+  hand-crafted fallback). The accumulator is maintained incrementally and **lazily** across make/undo (the
+  update is deferred until an evaluation reads it; one perspective is rebuilt when its king crosses a file-pair
+  or board-half bucket boundary) and the kernels are AVX2-vectorised,
   so it is fast on the clock; the shipped net is a 1024-wide, 8-king-bucket (file-pair × board-half) `ChessBuckets` net
   (v12). The owning `Game` is heap-allocated, since the inline ~12.6 MB weight array would overflow the default stack.
 
