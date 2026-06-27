@@ -6,14 +6,16 @@
 ///   768 inputs per (perspective, king bucket)  ->  kHiddenSize feature transformer  (x2 perspectives)
 ///   SCReLU activation, concat[own | opponent] = 2*kHiddenSize  ->  1 output (centipawns, stm relative)
 ///
-/// The shipped net is **1024-wide with kNumKingBuckets = 4** — four king-square weight banks selected by
-/// king file-pair (`kKingBucketMap`, below). On ~2.25B positions this beat the single-bank 1024 net (v8)
-/// by **+11.4 ± 6.75 Elo at 8+0.08** (the bucket advantage shrinks with data — it was +29 at 750M — but
-/// stays positive at scale). The bucket mechanism generalises over kNumKingBuckets: each perspective
-/// selects one of kNumKingBuckets banks by *its own* king's square (in that perspective's orientation), the
-/// feature row being `bucket * 768 + chess768_index`, matching bullet's `ChessBuckets::new(kKingBucketMap)`
-/// (the same 64-entry map; see `kKingBucketMap` below). A king move that crosses a file-pair bucket boundary refreshes
-/// that whole perspective's bank rather than diffing it.
+/// The shipped net (**v12**) is **1024-wide with kNumKingBuckets = 8** — eight king-square weight banks
+/// selected by king **file-pair × board-half** (`kKingBucketMap`, below): the file-pair `file/2` (a/b→0 …
+/// g/h→3) plus +4 when the king is in the advanced half (its own ranks 5–8, per perspective). On the same
+/// ~6B data this beat the 4-bucket v11 by **+17.3 ± 8.7 Elo at 8+0.08 and +11.0 ± 6.6 at 12+0.12** — king
+/// buckets are NOT at diminishing returns (0→4 was +11.4; 4→8 is bigger), the rank-split capturing real
+/// king-safety signal (own-half vs advanced king). The bucket mechanism generalises over kNumKingBuckets:
+/// each perspective selects one of kNumKingBuckets banks by *its own* king's square (in that perspective's
+/// orientation), the feature row being `bucket * 768 + chess768_index`, matching bullet's
+/// `ChessBuckets::new(kKingBucketMap)` (the same 64-entry map; see `kKingBucketMap` below). A king move that
+/// crosses a bucket boundary refreshes that whole perspective's bank rather than diffing it.
 ///
 /// A net is owned by the Game (one instance, read-only after Network::Load) and shared by all Lazy SMP
 /// threads, which call only its const methods. The accumulator is maintained incrementally across
@@ -52,7 +54,7 @@ namespace nnue
 {
 
 constexpr int kInputSize      = 768; ///< Features per perspective per bucket: 2 colors * 6 types * 64 squares.
-constexpr int kNumKingBuckets = 4;   ///< King-square weight banks (1 = single bank, i.e. no king buckets).
+constexpr int kNumKingBuckets = 8;   ///< King-square weight banks (1 = single bank, i.e. no king buckets).
 constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
 constexpr int kHiddenSize     = 1024; ///< Feature-transformer / accumulator width per perspective.
 
@@ -320,10 +322,10 @@ constexpr std::array<int, 64> kKingBucketMap = {
     0, 0, 1, 1, 2, 2, 3, 3, //
     0, 0, 1, 1, 2, 2, 3, 3, //
     0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
 };
 
 /// @brief Feature row for a piece in one perspective's bucket bank.

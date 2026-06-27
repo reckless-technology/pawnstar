@@ -111,7 +111,7 @@ int main()
     // engine always has a working evaluator. Only if even that fails — which would mean the build is
     // corrupt — does the engine give up.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
-    const std::string net_path  = eval_file ? eval_file : LocateResource("nnue/pawnstar-v11.bin");
+    const std::string net_path  = eval_file ? eval_file : LocateResource("nnue/pawnstar-v12.bin");
     if (!game.nnue_network_.Load(net_path))
     {
         const std::size_t embedded_size = static_cast<std::size_t>(pawnstar_embedded_net_end - pawnstar_embedded_net);
