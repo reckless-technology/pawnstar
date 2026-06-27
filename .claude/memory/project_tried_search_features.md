@@ -119,6 +119,18 @@ Search features already experimented on in Pawnstar (SPRT-tested) — do not re-
   poll the deadline finely; and isolate the variable — the first −29.6 was confounded by the forfeit fix's own
   time-trimming.**
 
+- **Lazy / deferred NNUE accumulator updates: SHIPPED, +20.66 ± 9.04 Elo @ 8+0.08** (2026-06-27, commit
+  7502314, merged+pushed). `PlayMove` no longer advances the accumulator eagerly; `SearchState::CurrentAccumulator()`
+  brings it current only when an eval actually reads it (and only on the eval-cache MISS path, so the ~42%
+  hits skip it too). A `mutable int accumulator_ply_` tracks which `positions_` index the accumulator
+  reflects; the catch-up applies one ply at a time, and `UndoMove` reverses a ply only if the catch-up had
+  reached it — so nodes that cut off before evaluating (TT cutoffs, RFP/LMP/null-move returns) pay ZERO
+  accumulator cost. **+13.6% bench nps** (1.62M→1.85M, idle, non-overlapping). Bit-identical to eager (same
+  deltas, same order): `test_nnue_incremental` green, **bench node count unchanged (6857880)** — the key
+  correctness gate (eval values identical ⇒ search identical), then SPRT'd as a pure speed→Elo win. Much
+  bigger than the SEE micro-opt because the accumulator update is a real chunk of an NNUE-bound node, not
+  ~1–2% like movegen. **Lesson: defer per-node NNUE work past the pruning that might skip it.**
+
 **How to apply:** before recommending a search/eval change, assume Jonny may have already SPRT-tested it
 and ask. The SPRT harness (`tools/run_sprt.sh` + fastchess) is the arbiter — he tests changes rather
 than taking them on theory. See [[project_nnue_experiment]].
