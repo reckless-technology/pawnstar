@@ -47,6 +47,7 @@
 #include <utility>
 #include <vector>
 #if defined(__AVX2__)
+#include <cpuid.h>
 #include <immintrin.h>
 #endif
 
@@ -290,19 +291,6 @@ inline __m256i ScReluU8(const int16_t *a)
     return PackU8(sq(c0, false), sq(c0, true), sq(c1, false), sq(c1, true));
 }
 
-/// @brief uint8 x int8 dot, accumulated into an int32 vector. Uses VNNI vpdpbusd where available (exact int32
-/// accumulation); else AVX2 maddubs (uint8*int8 -> int16 pairwise, saturating) + madd widening to int32.
-/// With kInt8Shift=9 the maddubs intermediate never saturates, so both forms give identical results.
-inline __m256i DotU8I8(__m256i acc, __m256i u8, __m256i w8)
-{
-#if defined(__AVXVNNI__) || defined(__AVX512VNNI__)
-    return _mm256_dpbusd_avx_epi32(acc, u8, w8);
-#else
-    const __m256i prod = _mm256_maddubs_epi16(u8, w8);
-    return _mm256_add_epi32(acc, _mm256_madd_epi16(prod, _mm256_set1_epi16(1)));
-#endif
-}
-
 /// @brief Horizontal sum of the 8 int32 lanes.
 inline int32_t HsumI32(__m256i v)
 {
@@ -311,6 +299,66 @@ inline int32_t HsumI32(__m256i v)
     s         = _mm_add_epi32(s, _mm_shuffle_epi32(s, _MM_SHUFFLE(2, 3, 0, 1)));
     return _mm_cvtsi128_si32(s);
 }
+
+/// @brief The int8 output dot over both perspectives -> int32, AVX2 maddubs version: uint8*int8 -> int16
+/// pairwise (saturating) + madd widening to int32. With kInt8Shift=9 the maddubs intermediate never
+/// saturates, so this is bit-identical to the VNNI version. @p stm/@p ntm are the two perspective
+/// accumulators; @p w is the int8 output weights (kHiddenSize for stm, then kHiddenSize for ntm).
+[[gnu::target("avx2")]] inline int32_t OutputDotInt8Avx2(const int16_t *stm, const int16_t *ntm, const int8_t *w)
+{
+    __m256i        acc     = _mm256_setzero_si256();
+    const int16_t *acts[2] = {stm, ntm};
+    for (int side = 0; side < 2; ++side)
+    {
+        const int16_t *a  = acts[side];
+        const int8_t  *ww = w + side * kHiddenSize;
+        for (int i = 0; i < kHiddenSize; i += 32)
+        {
+            const __m256i u8   = ScReluU8(a + i);
+            const __m256i w8   = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ww + i));
+            const __m256i prod = _mm256_maddubs_epi16(u8, w8);
+            acc                = _mm256_add_epi32(acc, _mm256_madd_epi16(prod, _mm256_set1_epi16(1)));
+        }
+    }
+    return HsumI32(acc);
+}
+
+/// @brief Same dot via the AVX-VNNI vpdpbusd instruction (exact int32 accumulation in one op). Compiled with
+/// avxvnni codegen for THIS FUNCTION ONLY (function-level target attribute), so the engine binary stays a
+/// baseline-AVX2 build that loads and runs on AVX2-only CPUs — the function is simply never called there
+/// (Network::Evaluate dispatches on the runtime cpuid check below). Bit-identical to OutputDotInt8Avx2.
+[[gnu::target("avx2,avxvnni")]] inline int32_t OutputDotInt8Vnni(const int16_t *stm, const int16_t *ntm,
+                                                                 const int8_t *w)
+{
+    __m256i        acc     = _mm256_setzero_si256();
+    const int16_t *acts[2] = {stm, ntm};
+    for (int side = 0; side < 2; ++side)
+    {
+        const int16_t *a  = acts[side];
+        const int8_t  *ww = w + side * kHiddenSize;
+        for (int i = 0; i < kHiddenSize; i += 32)
+        {
+            const __m256i u8 = ScReluU8(a + i);
+            const __m256i w8 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(ww + i));
+            acc              = _mm256_dpbusd_avx_epi32(acc, u8, w8);
+        }
+    }
+    return HsumI32(acc);
+}
+
+/// @brief Whether the running CPU supports AVX-VNNI (CPUID.(EAX=7,ECX=1):EAX bit 4). Detected once at
+/// static init and read-only afterwards, so the Lazy SMP threads share it without synchronisation.
+inline bool DetectAvxVnni()
+{
+    unsigned int eax, ebx, ecx, edx;
+    if (!__get_cpuid_count(7, 1, &eax, &ebx, &ecx, &edx))
+    {
+        return false;
+    }
+    return (eax & (1u << 4)) != 0u;
+}
+
+inline const bool kCpuHasAvxVnni = DetectAvxVnni();
 #endif // __AVX2__
 
 /// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
@@ -587,21 +635,12 @@ inline int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
     int64_t output = 0;
 #if defined(__AVX2__)
     // dot8 ~= raw_dot / (output_w_scale_ * 2^kInt8Shift), so multiply that factor back in before dequant.
-    __m256i        acc32      = _mm256_setzero_si256();
-    const int16_t *acts[2]    = {stm_acc.data(), ntm_acc.data()};
-    const int8_t  *weights[2] = {output_weights_i8_.data(), output_weights_i8_.data() + kHiddenSize};
-    for (int side = 0; side < 2; ++side)
-    {
-        const int16_t *a = acts[side];
-        const int8_t  *w = weights[side];
-        for (int i = 0; i < kHiddenSize; i += 32)
-        {
-            const __m256i u8 = ScReluU8(a + i);
-            const __m256i w8 = _mm256_loadu_si256(reinterpret_cast<const __m256i *>(w + i));
-            acc32            = DotU8I8(acc32, u8, w8);
-        }
-    }
-    output = static_cast<int64_t>(HsumI32(acc32)) * output_w_scale_ * (1 << kInt8Shift);
+    // Pick the AVX-VNNI kernel at runtime on capable CPUs (bit-identical, ~faster output dot), else AVX2.
+    const int16_t *stm = stm_acc.data();
+    const int16_t *ntm = ntm_acc.data();
+    const int8_t  *w   = output_weights_i8_.data();
+    const int32_t  dot = kCpuHasAvxVnni ? OutputDotInt8Vnni(stm, ntm, w) : OutputDotInt8Avx2(stm, ntm, w);
+    output             = static_cast<int64_t>(dot) * output_w_scale_ * (1 << kInt8Shift);
 #else
     // Scalar int8 fallback, bit-identical to the AVX2 path: clamp [0,QA], square, round, >>S to uint8.
     int64_t dot8 = 0;

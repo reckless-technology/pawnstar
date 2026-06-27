@@ -64,12 +64,11 @@ ifeq ($(WERROR), 1)
 endif
 
 # The NNUE output layer is int8 by default (uint8 SCReLU activations x int8 output weights; ~1.86x faster
-# than the exact int16 dot, +31.8 Elo at 8+0.08, ~26 cp deviation). It runs on the engine's baseline AVX2
-# target via pmaddubsw; VNNI=1 enables AVX-VNNI (256-bit vpdpbusd) for an exact, faster dot on capable CPUs
-# (bit-identical result). The exact int16 forward pass remains as EvaluateExact (the test_nnue reference).
-ifeq ($(VNNI), 1)
-	CXXFLAGS += -mavxvnni
-endif
+# than the exact int16 dot, +31.8 Elo at 8+0.08, ~26 cp deviation). On AVX-VNNI CPUs the output dot uses the
+# 256-bit vpdpbusd instruction (bit-identical, ~+1.3% nps), chosen at RUNTIME via cpuid with the vpdpbusd
+# kernel compiled behind a function-level target attribute — so the engine stays a single baseline -mavx2
+# binary that also runs on AVX2-only CPUs (no -mavxvnni build flag needed; see Network::Evaluate /
+# OutputDotInt8Vnni in src/nnue.h). The exact int16 forward pass remains as EvaluateExact (test_nnue ref).
 
 .PHONY: all tests check prep clean doc tools
 
