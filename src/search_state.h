@@ -62,37 +62,39 @@ class SearchState
 
   public:
     // State variables
-    Game                       &game_;                 ///< Shared state: TT, clock, cancellation flag.
-    HistoryTable                history_;              ///< Per-thread history heuristic counts (no sharing).
-    KillerArray                 killers_;              ///< Killer moves indexed by ply.
-    uint64_t                    node_count_;           ///< Cumulative nodes this thread searched.
-    int                         seldepth_;             ///< Max ply reached this search (selective depth, for `info`).
-    std::vector<Position>       positions_;            ///< Position stack.
-    nnue::Accumulator           accumulator_;          ///< NNUE accumulator (incremental).
-    std::vector<HashEntry>      hash_stack_;           ///< Draw by repetition stack.
-    std::array<Move, kContKeys> countermoves_;         ///< Best quiet countermove to prev move.
+    Game                       &game_;                ///< Shared state: TT, clock, cancellation flag.
+    HistoryTable                history_;             ///< Per-thread history heuristic counts (no sharing).
+    KillerArray                 killers_;             ///< Killer moves indexed by ply.
+    uint64_t                    node_count_;          ///< Cumulative nodes this thread searched.
+    int                         seldepth_;            ///< Max ply reached this search (selective depth, for `info`).
+    std::vector<Position>       positions_;           ///< Position stack.
+    mutable nnue::Accumulator   accumulator_;         ///< NNUE accumulator (lazily maintained; see CurrentAccumulator).
+    mutable int                 accumulator_ply_ = 0; ///< positions_ index the accumulator currently reflects.
+    std::vector<HashEntry>      hash_stack_;          ///< Draw by repetition stack.
+    std::array<Move, kContKeys> countermoves_;        ///< Best quiet countermove to prev move.
     std::unique_ptr<int16_t[]>  continuation_history_; ///< Continuation history scores.
 
     // Interface
     explicit SearchState(Game &game);
-    Position       &CurrentPosition();
-    const Position &CurrentPosition() const;
-    void            PlayMove(Move move);
-    void            UndoMove();
-    void            MakeNullMove();
-    void            ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) const;
-    int             Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move);
-    Move            SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index);
-    int             SearchQuiescent(int depth, int ply, int alpha, int beta);
-    Move            IterativeDeepen(MoveList move_list, Move best_move, int thread_id);
-    bool            IsDrawByRepetition() const;
-    bool            IsDrawByFiftyMoves() const;
-    bool            IsCancelled() const;
-    void            RecordKiller(int ply, Move move);
-    int             ContinuationHistScore(Move prev, Move move) const;
-    bool            IsCountermove(Move prev, Move move) const;
-    void            RecordContinuationHistory(Move prev, Move move);
-    void            RecordCountermove(Move prev, Move move);
+    Position                &CurrentPosition();
+    const Position          &CurrentPosition() const;
+    void                     PlayMove(Move move);
+    void                     UndoMove();
+    void                     MakeNullMove();
+    const nnue::Accumulator &CurrentAccumulator() const;
+    void                     ScoreAndSortMoves(MoveList &moves, int ply, Move prev_move) const;
+    int                      Search(int depth, int ply, int alpha, int beta, Variation &parent_pv, Move prev_move);
+    Move SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index);
+    int  SearchQuiescent(int depth, int ply, int alpha, int beta);
+    Move IterativeDeepen(MoveList move_list, Move best_move, int thread_id);
+    bool IsDrawByRepetition() const;
+    bool IsDrawByFiftyMoves() const;
+    bool IsCancelled() const;
+    void RecordKiller(int ply, Move move);
+    int  ContinuationHistScore(Move prev, Move move) const;
+    bool IsCountermove(Move prev, Move move) const;
+    void RecordContinuationHistory(Move prev, Move move);
+    void RecordCountermove(Move prev, Move move);
 
   private:
     int AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
@@ -210,25 +212,44 @@ inline SearchState::SearchState(Game &g)
 }
 
 /// @brief Push the current position's hash then make the move on a copy of the position.
-/// Advance the NNUE accumulator from the parent to the child by feature deltas.
+/// The NNUE accumulator is NOT advanced here — it is brought current lazily by CurrentAccumulator the next
+/// time an evaluation actually needs it, so a node that cuts off before evaluating pays no accumulator cost.
 /// @param move Move to play.
 inline void SearchState::PlayMove(Move move)
 {
     const Position &cur = CurrentPosition();
     hash_stack_.push_back({cur.hash_, cur.reversible_move_count_});
-    Position next = cur.MakeMove(move);
-    game_.nnue_network_.Update(accumulator_, cur, next);
-    positions_.push_back(next);
+    positions_.push_back(cur.MakeMove(move));
 }
 
 /// @brief Pop the position and hash stacks to undo the last move.
-/// Reverse the NNUE accumulator from the child back to the parent (Update is reversible).
+/// Reverse the accumulator one ply ONLY if the lazy catch-up had advanced it to this child (otherwise it was
+/// never touched for this move, so undo is free). Update is reversible, so the reverse restores the parent.
 inline void SearchState::UndoMove()
 {
-    const std::size_t n = positions_.size();
-    game_.nnue_network_.Update(accumulator_, positions_[n - 1], positions_[n - 2]);
+    const int tip = static_cast<int>(positions_.size()) - 1;
+    if (accumulator_ply_ == tip)
+    {
+        game_.nnue_network_.Update(accumulator_, positions_[tip], positions_[tip - 1]);
+        --accumulator_ply_;
+    }
     positions_.pop_back();
     hash_stack_.pop_back();
+}
+
+/// @brief The accumulator for the current tip position, brought current by applying any feature updates
+/// deferred since the last evaluation (advancing one ply at a time through the position stack; null-move
+/// plies apply a no-op update since placements are unchanged). Bit-identical to eager maintenance — the same
+/// deltas in the same order — but nodes that never evaluate (e.g. TT cutoffs) skip the work entirely.
+inline const nnue::Accumulator &SearchState::CurrentAccumulator() const
+{
+    const int tip = static_cast<int>(positions_.size()) - 1;
+    while (accumulator_ply_ < tip)
+    {
+        game_.nnue_network_.Update(accumulator_, positions_[accumulator_ply_], positions_[accumulator_ply_ + 1]);
+        ++accumulator_ply_;
+    }
+    return accumulator_;
 }
 
 /// @brief Push a null move (skip this side's turn) used for null-move pruning.
@@ -959,7 +980,7 @@ inline int EvaluatePosition(const SearchState &state)
         INCREMENT("eval hash hits");
         return ScaleByRule50(raw, position.reversible_move_count_);
     }
-    raw = state.game_.nnue_network_.Evaluate(state.accumulator_, position.color_to_move_);
+    raw = state.game_.nnue_network_.Evaluate(state.CurrentAccumulator(), position.color_to_move_);
     state.game_.eval_cache_.Store(hash, raw);
     return ScaleByRule50(raw, position.reversible_move_count_);
 }
