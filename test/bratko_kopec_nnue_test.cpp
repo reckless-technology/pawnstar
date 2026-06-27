@@ -17,6 +17,7 @@
 #include "move.h"
 #include "position.h"
 #include "test_report.h"
+#include <memory>
 
 #include <algorithm>
 #include <array>
@@ -118,7 +119,9 @@ int main(int argc, char *argv[])
     // regenerating the accepted-move sets.
     setenv("PAWNSTAR_THREADS", "1", 0);
 
-    Game game;
+    auto game_ptr = std::make_unique<Game>();
+
+    Game &game = *game_ptr;
     if (!game.nnue_network_.Load(net_path) || !game.nnue_network_.loaded_)
     {
         test_report::Check(false, std::format("Bratko-Kopec NNUE: failed to load net '{}'", net_path));

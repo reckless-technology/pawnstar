@@ -6,6 +6,7 @@
 #include "opening_book.h"
 #include "position.h"
 #include "transposition_table.h"
+#include <memory>
 
 #include <execinfo.h>
 #include <filesystem>
@@ -85,7 +86,9 @@ int main()
                  "(C) Jonny Reckless 2009 - 2026\n"
                  "Compiled: " __DATE__ " " __TIME__ "\n";
 
-    Game game{};
+    auto game_ptr = std::make_unique<Game>();
+
+    Game &game = *game_ptr;
     // Load the opening book from the working directory; if the file can't be loaded (wrong cwd, missing/
     // renamed file), fall back to the copy embedded in the binary (src/embedded_book.S) so the engine always
     // has a book. The book is optional, so a failure of both is only a warning, not fatal.

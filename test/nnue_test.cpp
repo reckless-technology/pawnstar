@@ -15,6 +15,7 @@
 #include "nnue.h"
 #include "position.h"
 #include "test_report.h"
+#include <memory>
 
 #include <cmath>
 #include <cstdlib>
@@ -36,7 +37,8 @@ int main(int argc, char **argv)
     {
         return test_report::Summary("NNUE: skipped (no net/reference supplied)");
     }
-    nnue::Network net;
+    auto           net_ptr = std::make_unique<nnue::Network>();
+    nnue::Network &net     = *net_ptr;
     if (!net.Load(argv[1]))
     {
         test_report::Check(false, std::format("NNUE: failed to load net '{}'", argv[1]));
