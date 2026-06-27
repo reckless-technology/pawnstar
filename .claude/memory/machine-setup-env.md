@@ -37,7 +37,15 @@ The dev/training/testing stack was rebuilt from scratch on a NEW machine (2026-0
   arminius~2750, toga~2950, senpai~3050, arasan~3150). Gone, no backup found; they're the user's local
   binaries passed as `name:rating:cmd`. rate.sh is only for absolute-Elo estimates — the core SPRT loop
   (net-vs-net via fastchess) does NOT need them.
-- **Full PlentyChess training data** (only the 61 MB smoke shard is present).
+- **Anchor engines still missing** (for absolute-Elo `rate.sh`; not needed for net-vs-net SPRT).
+
+**2026-06-26 RE-BOOTSTRAP (this is a fresh/bare machine again; the 2026-06-23 stack above was wiped).** Full
+toolchain re-created from scratch this session and the **v11 16-shard PlentyChess pool (~179 GB / 5.99B
+positions) IS now downloaded** at `~/pawnstar_nnue/data/` (the 16 shards in nnue/README §7) + reshuffled to
+`~/pawnstar_nnue/exp_nobucket_6b/shuffled.data`. Present now: rustup `cargo 1.96` (NOT the apt 1.75 — see
+[[machine-cargo-version-gotcha]]), bullet at `~/pawnstar_nnue/bullet` (CUDA 13.2, RTX 4070 sm_89, ~2.4–2.9M
+pos/s), `fastchess` at `~/.local/bin`, `clang-format 18.1.8` (pip --user), `openings.epd` (UHO_Lichess_4852,
+2.63M lines) at `~/pawnstar_nnue/openings.epd`. Still missing: anchor engines for `rate.sh`.
 
 **`tools/rate.sh` net default:** now `NET=nnue/pawnstar-v11.bin` (verified 2026-06-26 — the earlier v10
 default was fixed, and no other repo script/Makefile references a retired net). See [[machine-setup-env]] siblings.

@@ -247,6 +247,52 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   the prebuilt example binary. Shard sizes vary (~58M–379M); target the POSITION count, not a fixed shard
   count. See [[project_tried_search_features]] for the (separate) search-experiment log.
 
+**Update (2026-06-26) — CONFIRMED at 6B: king buckets still worth ~12 Elo (the bucket gain has PLATEAUED, not kept shrinking). NOT a new net; v11 arch reaffirmed.**
+- Single-variable A/B at v11's data scale: trained a **1024-wide, NO-king-bucket (single bank)** net on the
+  **same ~6B pool re-downloaded + re-shuffled** (16 shards, 5,988,211,081 positions; same SBS=300/BPS=3688
+  schedule as v11; final loss 0.02332 vs v11's 0.0228 — slightly worse, an early hint). This is the v8 arch
+  at v11's data. SPRT'd vs shipped v11 (1024 + 4 file-pair buckets), candidate engine rebased onto current
+  main so the ONLY diff is king buckets (cross-arch, binary-vs-binary, CAND_STARTUP_NET wrapper).
+- **Result: buckets WIN at both TCs. 8+0.08 → no-bucket −12.36 ± 9.09 Elo (nElo −16.5, 3150 games, LLR −3.00,
+  H0[-10,0]); 12+0.12 → −11.71 ± 8.65 (nElo −16.6, 3088 games, LLR −2.97, H0[-10,0]).** Both decisive; the
+  no-bucket net even had a small speed edge (1.58MB FT vs 6.3MB → less cache pressure) and still lost.
+- **Key refinement to the "bucket gain shrinks with data" story: it shrank then PLATEAUED.** +29 @ 750M →
+  +11.4 @ 2.31B (v9) → **~+12 @ 6B** — i.e. essentially flat from 2.31B to 6B, not continuing toward zero.
+  At equal width, buckets remain a firm ~11–12 Elo at scale. v11's 4-file-pair-bucket arch is the right call.
+- Reproduce: all-zero the `KING_BUCKETS` map in a copy of the trainer (→ `get_num_buckets`=1) and set engine
+  `kNumKingBuckets=1` + zeroed `kKingBucketMap`; trainer variants were `tools/bullet/pawnstar_nb.rs` +
+  `pawnstar_eval_nb.rs` (no-bucket), candidate engine on a throwaway worktree. Net/data in
+  `~/pawnstar_nnue/exp_nobucket_6b/`. Toolchain was re-bootstrapped from bare metal this session — see
+  [[machine-cargo-version-gotcha]] and [[machine-setup-env]]. Open bucket lever now: MORE banks / a finer
+  map (file+rank, or mirrored), since 4 buckets clearly still pay at 6B.
+
+**Update (2026-06-27) — 8 KING BUCKETS (file-pair × board-half) BEAT v11 at both TCs. Shippable as v12.**
+- Doubled buckets 4→8: kept v11's 1024 width + file-pair files but ALSO split by board half at the middle
+  rank (own half ranks 1–4 → banks 0–3, advanced ranks 5–8 → banks 4–7; per-perspective oriented, so a
+  king in *its own* half → low bank). `kKingBucketMap` rows 5–8 = `4,4,5,5,6,6,7,7`. Trained on the SAME
+  ~5.99B pool (reused `exp_nobucket_6b/shuffled.data`, same SBS=300/BPS=3688), final loss **0.02260 < v11's
+  0.0228**. Net `~/pawnstar_nnue/exp_8kb/cand-8kb.bin` (12,589,120 B payload — 2× v11). Single variable vs
+  v11 = bucket count (8 vs 4).
+- **SPRT 8-bucket vs v11: 8+0.08 → +17.29 ± 8.68 (H1, 3520 games, LLR 2.96); 12+0.12 → +10.97 ± 6.57 (H1,
+  5610 games, LLR 2.95).** Both accepted. Smaller + slower-to-decide at 12+0.12 (the 2× net size costs more
+  on the clock), but a clear win on both controls.
+- **KEY: king buckets are NOT at diminishing returns.** 0→4 was +11.4 (v9); 4→8 is +17/+11 — *bigger*. The
+  rank-split captures real king-safety signal (own-half vs advanced king). More/finer buckets is now a live
+  lever, not a tapped-out one. Next: 8→more banks, or a finer map (file+rank quadrants), still on the ~6B pool.
+- **Required engine change (shipped to main first): heap-allocate Game/Network — the inline ~12.6 MB
+  feature_weights_ overflows the 8 MB stack at 8 buckets.** Done via `std::make_unique<Game>()` in main + the
+  tests, keeping the FT weights an INLINE member (commit 279f087). NOT a unique_ptr to a separate weight
+  array: that block is page-aligned and the 2048-byte column stride then collides in the same cache sets →
+  **−10% nps (measured, unloaded; `restrict`/hoist didn't help; hugepages wouldn't either — it's cache-set
+  aliasing, not TLB)**. Inline-in-heap-Game puts the base at a struct offset → columns scatter across sets →
+  speed-neutral (bench nps parity, node count unchanged). **Lesson: a separate page-aligned weight allocation
+  with a power-of-2 column stride is a cache-conflict trap; keep big weight tables inline in a heap object.**
+- Layout verified before SPRT: engine EvaluateExact == bullet `pawnstar_eval_8kb` at **0 cp** over 250 FENs
+  (incl. black-to-move + advanced-half kings — the cases the rank-invariant 4-bucket map never exercised),
+  incremental bit-identical, symmetric material sanity. bullet `ChessBuckets` is stm-relative (FromStr does
+  `piece^=8; square^=56`), matching the engine's `WhiteBucket`/`BlackBucket` for both side-to-move cases.
+  Trainer `tools/bullet/pawnstar_8kb.rs` + `pawnstar_eval_8kb.rs`. **Not yet shipped as v12** (awaiting go).
+
 Known pre-existing bug surfaced during matches: frequent "Illegal PV move" warnings from
 **both** evaluators — the reported PV *string* sometimes contains an illegal continuation
 (TT-collision in PV reconstruction); the move actually played is always legal (0 forfeits).
