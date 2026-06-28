@@ -8,18 +8,40 @@
 #include "transposition_table.h"
 #include <memory>
 
-#include <execinfo.h>
 #include <filesystem>
 #include <iostream>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
 #include <string_view>
-#include <unistd.h>
+
+#if defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h> // GetModuleFileNameW (executable path); contained to this TU
+#endif
 
 namespace
 {
+/// @brief Absolute path of the running executable, or an empty path on failure. Used by LocateResource to
+/// find the shipped net/book relative to the binary. Per-OS: GetModuleFileNameW on Windows, /proc/self/exe
+/// elsewhere.
+std::filesystem::path ExecutablePath()
+{
+#if defined(_WIN32)
+    wchar_t     buf[MAX_PATH];
+    const DWORD n = GetModuleFileNameW(nullptr, buf, static_cast<DWORD>(std::size(buf)));
+    if (n == 0 || n >= std::size(buf))
+    {
+        return {}; // failed or truncated
+    }
+    return std::filesystem::path(std::wstring(buf, n));
+#else
+    std::error_code ec;
+    return std::filesystem::read_symlink("/proc/self/exe", ec); // empty path on error
+#endif
+}
+
 /// @brief Locate a resource file shipped with the engine (the net or the opening book).
 /// Tries the path as given (relative to the current working directory) first, then relative to the
 /// running executable's directory and that directory's parent (so the engine finds nnue/ and the book
@@ -36,8 +58,8 @@ std::string LocateResource(const std::string &relpath)
     {
         return relpath;
     }
-    const fs::path exe = fs::read_symlink("/proc/self/exe", ec);
-    if (!ec)
+    const fs::path exe = ExecutablePath();
+    if (!exe.empty())
     {
         const fs::path exe_dir = exe.parent_path();
         for (const fs::path &base : {exe_dir, exe_dir.parent_path()})

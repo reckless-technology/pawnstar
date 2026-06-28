@@ -1,6 +1,7 @@
 #pragma once
 /// @file bitboard.h Types, values and functions for using chess Bitboards.
 
+#include <bit>
 #include <cstdint>
 #include <string>
 
@@ -108,7 +109,7 @@ constexpr bool Bitboard::Iterator::operator==(const Sentinel &) const
 /// @return Square index of the least significant set bit.
 constexpr Square Bitboard::Iterator::operator*() const
 {
-    return Square{(uint8_t)__builtin_ctzll(i_)};
+    return Square{(uint8_t)std::countr_zero(i_)};
 }
 
 /// @brief Advance to the next set bit by clearing the least significant set bit.
@@ -265,21 +266,21 @@ constexpr Bitboard Bitboard::operator~() const
 /// @return Square index of LSB.
 constexpr Square Bitboard::Lsb() const
 {
-    return Square{(uint8_t)__builtin_ctzll(v_)};
+    return Square{(uint8_t)std::countr_zero(v_)};
 }
 
 /// @brief Most significant bit.
 /// @return Square index of MSB.
 constexpr Square Bitboard::Msb() const
 {
-    return Square{(uint8_t)(63 - __builtin_clzll(v_))};
+    return Square{(uint8_t)(63 - std::countl_zero(v_))};
 }
 
 /// @brief Population count.
 /// @return Number of bits set.
 constexpr int Bitboard::PopCount() const
 {
-    return __builtin_popcountll(v_);
+    return std::popcount(v_);
 }
 
 /// @brief Check if bitboard is empty.

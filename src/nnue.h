@@ -35,6 +35,7 @@
 /// the trainer's eval (verified by test_nnue).
 
 #include "constants.h"
+#include "platform.h"
 #include "position.h"
 
 #include <algorithm>
@@ -48,7 +49,6 @@
 #include <utility>
 #include <vector>
 #if defined(__AVX2__)
-#include <cpuid.h>
 #include <immintrin.h>
 #endif
 
@@ -347,19 +347,10 @@ inline int32_t HsumI32(__m256i v)
     return HsumI32(acc);
 }
 
-/// @brief Whether the running CPU supports AVX-VNNI (CPUID.(EAX=7,ECX=1):EAX bit 4). Detected once at
-/// static init and read-only afterwards, so the Lazy SMP threads share it without synchronisation.
-inline bool DetectAvxVnni()
-{
-    unsigned int eax, ebx, ecx, edx;
-    if (!__get_cpuid_count(7, 1, &eax, &ebx, &ecx, &edx))
-    {
-        return false;
-    }
-    return (eax & (1u << 4)) != 0u;
-}
-
-inline const bool kCpuHasAvxVnni = DetectAvxVnni();
+/// @brief Whether to use the AVX-VNNI output-dot kernel. Detected once at static init (via platform::
+/// HasAvxVnni, which handles the GCC/Clang vs MSVC cpuid difference) and read-only afterwards, so the Lazy
+/// SMP threads share it without synchronisation.
+inline const bool kCpuHasAvxVnni = platform::HasAvxVnni();
 #endif // __AVX2__
 
 /// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
