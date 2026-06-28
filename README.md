@@ -284,21 +284,22 @@ general?"*. The **countermove** and **continuation-history** tables refine that 
 **previous move** — the one move the opponent played to reach this node. That move is threaded down the
 tree as `Search`'s `prev_move` parameter (`Move::None()` at the root and after a null move).
 
-Both previous-move tables share a key that abstracts a move down to **`(piece, to-square)`**:
+Both previous-move tables share a key that abstracts a move down to **`(piece, to-square)`** — the
+`Move::piece_to()` method:
 
 ```cpp
-static constexpr int ContKey(Move m) { return m.piece() * 64 + m.to(); }   // 7 × 64 = 448 keys
+int Move::piece_to() const;   // (piece() << 6) | to()  →  7 × 64 = kContKeys (448) keys
 ```
 
 This is the standard "a piece lands on a square" abstraction — it generalises across positions (a knight
 reaching f5 is the *same* follow-up however it got there), and `Move::None` collapses to a harmless slot 0.
 
-- **Countermove** (`countermoves_`, an `array<Move, 448>`) — a single best refutation per previous move.
-  When a quiet move causes a beta cutoff it is recorded keyed by `ContKey(prev_move)`
+- **Countermove** (`countermoves_`, an `array<Move, kContKeys>` of 448) — a single best refutation per previous
+  move. When a quiet move causes a beta cutoff it is recorded keyed by `prev_move.piece_to()`
   (`RecordCountermove`). In ordering it is a *boolean* signal — a move that equals the recorded
   countermove gets the one fixed band just below the killers (`kKillerBase − 1`).
-- **Continuation history** (`continuation_history_`, a 448 × 448 `int16_t` table, ~0.4 MB, indexed
-  `[ContKey(prev) * 448 + ContKey(move)]`) — a *graded* score for every `(prev → move)` pairing. It is a
+- **Continuation history** (`continuation_history_`, a `kContKeys × kContKeys` (448 × 448) `int16_t` table,
+  ~0.4 MB, indexed `[prev.piece_to() * kContKeys + move.piece_to()]`) — a *graded* score for every `(prev → move)` pairing. It is a
   saturating counter (caps at 16384, like the main `HistoryTable`) bumped whenever a quiet move proves
   good as a follow-up to `prev`: on a beta cutoff, on an alpha-raise, and for the final PV best move
   (`RecordContinuationHistory`). In ordering, an ordinary quiet move's score is **`main_history(ply, move) +
