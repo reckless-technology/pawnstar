@@ -127,12 +127,12 @@ See [NNUE evaluation](#nnue-evaluation) below for how it works and how to train 
 ### Board representation
 
 `Position` ([src/position.h](src/position.h)) is the central immutable state class. It stores
-per-piece-type bitboards in `pieces` and per-colour bitboards in `colors` (public members), a 64-entry square→piece
+per-piece-type bitboards in `pieces_` and per-colour bitboards in `colors_` (public members), a 64-entry square→piece
 array for O(1) lookup, the incrementally-maintained Zobrist hash, castling rights, the en passant
-square, the half-move clock, and a `checkers` bitboard. `MakeMove` and `MakeNullMove` return a brand
+square, the half-move clock, and a `checkers_` bitboard. `MakeMove` and `MakeNullMove` return a brand
 new `Position` by value (copy-make); there is no unmake.
 
-`pieces` is a `std::array<Bitboard, 7>` indexed by piece type, but `pieces[0]` (the `kNone` slot)
+`pieces_` is a `std::array<Bitboard, 7>` indexed by piece type, but `pieces_[0]` (the `kNone` slot)
 holds the occupied-squares set — the union of all pieces of both colours — rather than a piece
 bitboard; the six real piece types occupy indices 1–6. This lets occupancy queries and the `pext`-based
 attack lookups read it directly without recomputing a union.
@@ -314,7 +314,7 @@ on. Both tables are **per-thread** (owned by `SearchState`), so there is no cros
 
 #### Parallel search (Lazy SMP)
 
-Parallelism is provided by **Lazy SMP**: `Game::SearchRootNode` launches `Game::thread_count` threads
+Parallelism is provided by **Lazy SMP**: `Game::SearchRootNode` launches `Game::thread_count_` threads
 (clamped to `kMaxSearchThreads`), each running its *own* complete iterative-deepening search of the root
 position via `SearchState::IterativeDeepen`. There is no tree splitting and no work queue — the threads cooperate
 purely through the shared lockless transposition table, where one thread's deeper or earlier results
@@ -323,7 +323,7 @@ hash history, killers, node count) **and its own ordering tables** (history, cou
 continuation history), so the only cross-thread sharing is the transposition tables and the
 cancellation flag; there is no per-(ply, move) counter contention.
 
-The thread count is set by the UCI **`Threads`** option (stored in `Game::thread_count`); its default is
+The thread count is set by the UCI **`Threads`** option (stored in `Game::thread_count_`); its default is
 computed once at construction from the `PAWNSTAR_THREADS` environment variable if set (>0), else
 `hardware_concurrency()`, clamped to `[1, kMaxSearchThreads]` (e.g. `PAWNSTAR_THREADS=1` forces a
 deterministic single-threaded search, used to regenerate Bratko-Kopec reference data).
