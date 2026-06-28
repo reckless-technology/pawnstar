@@ -18,8 +18,9 @@
 /// crosses a bucket boundary refreshes that whole perspective's bank rather than diffing it.
 ///
 /// A net is owned by the Game (one instance, read-only after Network::Load) and shared by all Lazy SMP
-/// threads, which call only its const methods. The accumulator is maintained incrementally across
-/// make/undo (see SearchState); Network::Refresh rebuilds it from scratch. A shipped net is prepended
+/// threads, which call only its const methods. The accumulator is maintained incrementally and **lazily**
+/// across make/undo (the update is deferred until an eval reads it — see SearchState::CurrentAccumulator);
+/// Network::Refresh rebuilds it from scratch. A shipped net is prepended
 /// with a self-describing NetHeader (see below) that the loader validates against this build; the weight
 /// payload itself is the `bullet` trainer's native quantised output (see nnue/README.md), a tightly
 /// packed little-endian struct in this exact order (bullet save_format):

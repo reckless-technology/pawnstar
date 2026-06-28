@@ -64,8 +64,11 @@ out /= QA * QB            # -> centipawns, side-to-move relative
 **Shipped output layer is int8** (`Network::Evaluate`, the search hot path): the activations are requantised
 to uint8 (`screlu(x) >> 9` → `[0,127]`) and the output weights to int8, with the dot accumulated in int32 —
 ~1.86× faster than the int16 dot (a measured **+31.8 ± 10.3 Elo at 8+0.08**) at a bounded ~26 cp deviation
-from `EvaluateExact`. It runs on the baseline AVX2 build via `pmaddubsw`; the `>>9` keeps every adjacent pair
-inside int16, so the AVX2 and VNNI (`vpdpbusd`, `make VNNI=1`) kernels are saturation-free and bit-identical.
+from `EvaluateExact`. The `>>9` keeps every adjacent pair inside int16, so the AVX2 (`pmaddubsw`) and
+AVX-VNNI (`vpdpbusd`) kernels are saturation-free and bit-identical. **Which one runs is decided at runtime
+by cpuid** (`CPUID.7.1:EAX` bit 4; ~+1.3% nps on VNNI CPUs); the VNNI kernel sits behind a function-level
+`target("avx2,avxvnni")` attribute, so the engine is a single baseline `-mavx2` binary that also runs on
+AVX2-only CPUs (no `make VNNI=1` flag — the gate just never calls the VNNI kernel there).
 The int16 *accumulator* and feature transformer are unchanged (the int8 *feature*-weight experiment was
 measured and **removed** after a definitive −8 Elo SPRT; see [int8_quant_study.md](int8_quant_study.md)).
 

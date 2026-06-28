@@ -131,6 +131,21 @@ Search features already experimented on in Pawnstar (SPRT-tested) — do not re-
   bigger than the SEE micro-opt because the accumulator update is a real chunk of an NNUE-bound node, not
   ~1–2% like movegen. **Lesson: defer per-node NNUE work past the pruning that might skip it.**
 
+- **Runtime AVX-VNNI dispatch for the int8 output dot: SHIPPED, bit-identical, ~+1.3% nps** (2026-06-27,
+  commit 1aec979, merged+pushed). The int8 output dot now picks the AVX-VNNI `vpdpbusd` kernel
+  (`nnue::OutputDotInt8Vnni`) at runtime on capable CPUs, else AVX2 `maddubs` (`OutputDotInt8Avx2`), via a
+  cached cpuid check (`kCpuHasAvxVnni` = `CPUID.7.1:EAX` bit 4). **AVX2-only compatible** — the VNNI kernel is
+  compiled behind a function-level `[[gnu::target("avx2,avxvnni")]]` attribute, so `vpdpbusd` is emitted ONLY
+  in that one function (verified by `objdump`); the engine stays a single baseline `-mavx2` binary that loads
+  and runs on AVX2-only CPUs (the cpuid gate simply never calls it). Replaced the old compile-time `VNNI=1`
+  (`-mavxvnni`) Makefile flag, which made the whole binary VNNI and would fault on AVX2-only. Bit-identical
+  (`kInt8Shift=9`, no maddubs saturation): test_nnue 0 cp, bench node count unchanged; both VNNI and
+  forced-AVX2 builds verified. SPRT @ 8+0.08 trended **+5.44 ± 6.33** (5758 games, LLR 1.06 toward H1) before
+  being stopped to merge — bit-identical so a non-regression by construction; an SPRT is the wrong gate for a
+  ~+1% bit-identical speed change (effect below practical resolution). **`__builtin_cpu_supports("avxvnni")`
+  is NOT available in clang 18 — use raw `__get_cpuid_count(7,1,...)`.** `target_clones` compiles in clang 18
+  but warns; manual cpuid + two target-attributed functions is cleaner.
+
 **How to apply:** before recommending a search/eval change, assume Jonny may have already SPRT-tested it
 and ask. The SPRT harness (`tools/run_sprt.sh` + fastchess) is the arbiter — he tests changes rather
 than taking them on theory. See [[project_nnue_experiment]].
