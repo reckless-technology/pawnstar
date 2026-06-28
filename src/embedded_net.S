@@ -12,7 +12,12 @@
 #ifndef EMBED_NET_PATH
 #error "EMBED_NET_PATH must be defined by the build (see the Makefile EMBED_OBJECT rule)"
 #endif
+/* Read-only data section: ELF uses .rodata, COFF (Windows) uses .rdata. */
+#if defined(__ELF__)
     .section .rodata
+#else
+    .section .rdata, "dr"
+#endif
     .balign 64
     .global pawnstar_embedded_net
 pawnstar_embedded_net:
@@ -20,5 +25,8 @@ pawnstar_embedded_net:
     .global pawnstar_embedded_net_end
 pawnstar_embedded_net_end:
 
-/* Mark the stack non-executable (data-only object); silences the linker's executable-stack warning. */
+#if defined(__ELF__)
+/* Mark the stack non-executable (data-only object); silences the linker's executable-stack warning.
+ * ELF-only: COFF has no such note. */
     .section .note.GNU-stack,"",@progbits
+#endif
