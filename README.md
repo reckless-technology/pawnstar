@@ -24,9 +24,9 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 
 ## Requirements
 
-- `clang++` with C++23 support.
+- `clang++` with C++23 support. (MSVC is **not** supported — the engine uses clang/GCC builtins and a function-level target attribute for the AVX-VNNI kernel; on Windows use clang.)
 - A CPU with the BMI2 and AVX2 instruction sets (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`. BMI2 is required for the `pext` instruction (sliding move generation) and AVX2 is required for the NNUE evaluation SIMD calculation.
-- GNU `make`.
+- GNU `make` for the Linux build, or **CMake ≥ 3.20** for the cross-platform / Windows build (see below).
 - `doxygen` (and optionally Graphviz `dot`) only if you want to build the API docs.
 
 ## Build
@@ -56,6 +56,35 @@ The `DEBUGX` diagnostic counters (the `dbg` command's data) are compiled in by d
 
 After switching branches or changing generated files, run `make clean && make` — stale `.d`
 dependency files can otherwise cause spurious build failures.
+
+### Windows / cross-platform (CMake)
+
+The engine is portable to Windows with **clang** (the GNU Makefile above is the primary Linux build; a
+`CMakeLists.txt` builds the same engine, tools, and tests on both platforms). With a clang toolchain and
+Ninja:
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+This produces `build/pawnstar.exe` on Windows. The Windows build is **bit-identical** to Linux (same
+`bench` node count) and passes the full test suite.
+
+Cross-compiling a self-contained `pawnstar.exe` from Linux (clang + MinGW-w64, statically linked so it needs
+no runtime DLLs) uses the bundled toolchain file; with `wine` installed, `ctest` runs the `.exe` suites
+under it:
+
+```bash
+cmake -S . -B build-win -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-clang-toolchain.cmake -DCMAKE_BUILD_TYPE=Release
+cmake --build build-win                      # -> build-win/pawnstar.exe
+ctest --test-dir build-win --output-on-failure
+```
+
+The few platform-specific bits live in `src/platform.h` (CPU feature detection) and `main.cpp`
+(executable-path lookup); everything else is portable C++23.
 
 ## Usage
 
