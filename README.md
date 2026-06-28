@@ -69,12 +69,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-This produces `build/pawnstar.exe` on Windows. The Windows build is **bit-identical** to Linux (same
-`bench` node count) and passes the full test suite.
+This produces a **self-contained** `build/pawnstar.exe` on Windows: the NNUE net and the opening book are
+compiled into the binary (the same `.incbin` embedding used on Linux), so it needs no external files — an
+on-disk `nnue/…bin` / `pawnstar.book` is only an optional override. The Windows build is **bit-identical** to
+Linux (same `bench` node count and perft) and passes the full test suite.
 
-Cross-compiling a self-contained `pawnstar.exe` from Linux (clang + MinGW-w64, statically linked so it needs
-no runtime DLLs) uses the bundled toolchain file; with `wine` installed, `ctest` runs the `.exe` suites
-under it:
+Cross-compiling that `pawnstar.exe` from Linux (clang + MinGW-w64, statically linked so it also needs no
+runtime DLLs) uses the bundled toolchain file; with `wine` installed, `ctest` runs the `.exe` suites under
+it:
 
 ```bash
 cmake -S . -B build-win -G Ninja \

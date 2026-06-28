@@ -135,9 +135,10 @@ a 6297664-byte payload — so this 1024-wide 8-bucket build size/header-gates th
 
 A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v12.bin` (cwd-relative) at
 startup. **Embedded fallback:** a byte-identical copy of the shipped net is compiled into the engine
-binary (`src/embedded_net.S` `.incbin`'s the net at the Makefile's `EMBED_NET` path — passed in via
-`-DEMBED_NET_PATH`, the single source of truth, so the embedded copy can't drift from the shipped net;
-linked into the engine only, not the test binaries). If the on-disk file can't be loaded — wrong cwd, missing or renamed file, or a stamped net that
+binary (`src/embedded_net.S` `.incbin`'s the net at the build's `EMBED_NET` path — the Makefile and the
+CMake build both pass it via `-DEMBED_NET_PATH`, the single source of truth, so the embedded copy can't
+drift from the shipped net; the `.S` embeds into ELF `.rodata` or COFF `.rdata`, so the engine binary is
+self-contained on Linux and Windows alike; linked into the engine only, not the test binaries). If the on-disk file can't be loaded — wrong cwd, missing or renamed file, or a stamped net that
 fails architecture validation — the engine loads the embedded copy via `Network::LoadFromMemory` (same
 header detection/validation as `Network::Load`), so it always has a working evaluator; it exits only if
 both the file and the embedded copy fail. To use a *different* net, point the engine at it — at launch:
