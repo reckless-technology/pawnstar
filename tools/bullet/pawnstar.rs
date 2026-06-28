@@ -1,6 +1,6 @@
 /*
 Pawnstar NNUE trainer: arch (768xNUM_BUCKETS king-bucketed -> HIDDEN_SIZE)x2 -> 1, SCReLU, matching the
-in-engine inference in src/nnue.cpp (the KING_BUCKETS map below must stay byte-identical to its
+in-engine inference in src/nnue.h (the KING_BUCKETS map below must stay byte-identical to its
 kKingBucketMap). Based on bullet's `simple` example. Configured via environment variables:
 
     PAWNSTAR_DATA   path to a BulletFormat .data file        (default: data/pawnstar.data)
@@ -9,7 +9,7 @@ kKingBucketMap). Based on bullet's `simple` example. Configured via environment 
     PAWNSTAR_OUT    output checkpoint directory               (default: checkpoints)
 
 The final quantised net is written to <out>/pawnstar-<sbs>/pawnstar-<sbs>.bin in bullet's native
-headerless format, which src/nnue.cpp loads directly.
+headerless format, which src/nnue.h loads directly.
 */
 use bullet_lib::{
     game::inputs::{ChessBuckets, get_num_buckets},
@@ -27,10 +27,10 @@ const SCALE: i32 = 400;
 const QA: i16 = 255;
 const QB: i16 = 64;
 
-// King-square -> weight-bank map. MUST be byte-identical to kKingBucketMap in src/nnue.cpp. The shipped net
-// is all-zero: a single bank, i.e. no king buckets (plain Chess768); NUM_BUCKETS auto-derives to 1. For a
-// bucketed net put the per-square bank indices here (indexed by each perspective's own king square — bullet
-// orients our_ksq/opp_ksq per perspective, matching the engine's white/black).
+// King-square -> weight-bank map. MUST be byte-identical to kKingBucketMap in src/nnue.h. The shipped net
+// (v12) uses 8 banks by king file-pair × board-half: file/2 (a/b->0 … g/h->3), plus +4 when the king is in
+// its own advanced half (ranks 5-8); NUM_BUCKETS auto-derives to 8. The map is indexed by each perspective's
+// own king square — bullet orients our_ksq/opp_ksq per perspective, matching the engine's white/black.
 #[rustfmt::skip]
 const KING_BUCKETS: [usize; 64] = [
     0, 0, 1, 1, 2, 2, 3, 3,
@@ -71,7 +71,7 @@ fn main() {
         .build(|builder, stm_inputs, ntm_inputs| {
             let l0 = builder.new_affine("l0", 768 * NUM_BUCKETS, HIDDEN_SIZE);
             let l1 = builder.new_affine("l1", 2 * HIDDEN_SIZE, 1);
-            // SCReLU activation (matches src/nnue.cpp).
+            // SCReLU activation (matches src/nnue.h).
             let stm_hidden = l0.forward(stm_inputs).screlu();
             let ntm_hidden = l0.forward(ntm_inputs).screlu();
             let hidden_layer = stm_hidden.concat(ntm_hidden);

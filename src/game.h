@@ -333,8 +333,8 @@ inline Move Game::SearchRootNode()
     SortMoves<true>(move_list);
     Move best_move = move_list[0];
 
-    // Lazy SMP: each thread runs an independent iterative-deepening search of the same root, sharing the
-    // (lockless) transposition table and (atomic) history table. The main thread is authoritative; helper
+    // Lazy SMP: each thread runs an independent iterative-deepening search of the same root, sharing only the
+    // (lockless) transposition table (history/killers/etc. are per-thread on each SearchState). The main thread is authoritative; helper
     // threads deepen the shared TT to accelerate it. Each thread has its own SearchState and move-list copy.
     // Thread count is configured via the UCI `Threads` option (or the PAWNSTAR_THREADS default at startup),
     // stored in game.thread_count; re-clamped here defensively.

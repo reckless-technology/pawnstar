@@ -181,7 +181,8 @@ lockless transposition table rather than splitting the tree between them.
 
 #### Iterative deepening and time management
 
-`Game::SearchRootNode` (defined in the [src/search_state.h](src/search_state.h) hub) runs on a dedicated worker
+`Game::SearchRootNode` (declared in `class Game` and defined at the bottom of [src/game.h](src/game.h), after
+the search_state.h hub is included so `SearchState` is complete) runs on a dedicated worker
 thread — started by `Game::StartThinking` — so the UCI `stop` command, which sets an atomic
 cancellation flag polled throughout the tree, can interrupt it at any time. It searches the root move
 list at increasing depths starting from `kStartDepth` (3) up to `kMaxPly` (64), emitting an

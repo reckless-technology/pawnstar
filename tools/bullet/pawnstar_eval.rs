@@ -1,5 +1,5 @@
 /*
-Reference evaluator for cross-checking the in-engine NNUE inference (src/nnue.cpp) against bullet.
+Reference evaluator for cross-checking the in-engine NNUE inference (src/nnue.h) against bullet.
 
 Reads a trained net (bullet's native quantised .bin) and a list of FENs (one per line, on stdin or a
 file argument), and prints "<fen> | <eval_cp>" using the SAME king-bucketed ChessBuckets feature formula
@@ -17,9 +17,10 @@ const QA: i32 = 255;
 const QB: i32 = 64;
 const SCALE: i32 = 400;
 
-// King-square -> weight-bank map. MUST be byte-identical to kKingBucketMap in src/nnue.cpp and to
-// KING_BUCKETS in pawnstar.rs. The shipped v9 net uses 4 king buckets by king file-pair (file/2:
-// a/b->0, c/d->1, e/f->2, g/h->3); NUM_BUCKETS below must match (4).
+// King-square -> weight-bank map. MUST be byte-identical to kKingBucketMap in src/nnue.h and to
+// KING_BUCKETS in pawnstar.rs. The shipped v12 net uses 8 king buckets by king file-pair × board-half
+// (file/2: a/b->0 … g/h->3, plus +4 when the king is in its own advanced half, ranks 5-8); NUM_BUCKETS
+// below must match (8).
 #[rustfmt::skip]
 const KING_BUCKETS: [usize; 64] = [
     0, 0, 1, 1, 2, 2, 3, 3,

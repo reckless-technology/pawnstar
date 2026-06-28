@@ -60,12 +60,12 @@ Pawnstar is a UCI chess engine using bitboard board representation and parallel 
 ### Board representation
 
 `Position` ([position.h](src/position.h)) is the central state class. It stores:
-- A public `pieces[7]` array of per-piece-type bitboards (indexed by `Piece`; index 0 / `kNone` holds the occupied-squares set) and a public `colors[2]` array of per-color bitboards.
+- A public `pieces_[7]` array of per-piece-type bitboards (indexed by `Piece`; index 0 / `kNone` holds the occupied-squares set) and a public `colors_[2]` array of per-color bitboards.
 - A `squares_[64]` array for O(1) square→piece lookup.
 - Zobrist hash, castling rights (`CastlingRights`), en passant square, half-move clock, and a checkers bitboard (squares giving check to the side to move).
 - A public `bool is_null_move` (null-move marker) and a public `Color color_to_move` (side to move), the latter declared last so it occupies what was otherwise a trailing padding byte (`sizeof(Position) == 160`).
 
-`Position` is immutable after construction. `MakeMove` and `MakeNullMove` return a new `Position` by value. `GenerateLegalMoves` / `GenerateLegalCaptures` dispatch to the templated `GenMoves<Color, bool>()`, which uses `Pins` to filter pseudo-legal moves. `pieces`/`colors`/`is_null_move`/`color_to_move` are public data members read directly (no getters); UCI does not declare game results, so there are no `IsGameOver`/`IsCheckmate`/`IsStalemate` helpers.
+`Position` is immutable after construction. `MakeMove` and `MakeNullMove` return a new `Position` by value. `GenerateLegalMoves` / `GenerateLegalCaptures` dispatch to the templated `GenMoves<Color, bool>()`, which uses `Pins` to filter pseudo-legal moves. `pieces_`/`colors_`/`is_null_move_`/`color_to_move_` are public data members read directly (no getters); UCI does not declare game results, so there are no `IsGameOver`/`IsCheckmate`/`IsStalemate` helpers.
 
 `Bitboard` ([bitboard.h](src/bitboard.h)) wraps a `uint64_t` with bitwise operations and a range-based iterator over set bits (`Square` values).
 
@@ -127,10 +127,10 @@ The headroom is on **move-ordering quality** (history/SEE refinements) and the *
 
 `SearchState` ([search_state.h](src/search_state.h)) owns:
 - A reference to the shared `Game` (TT, clock, cancellation).
-- `history` — the **per-thread** `HistoryTable` (no cross-thread sharing).
-- `killers[kMaxPly][2]` — killer moves.
+- `history_` — the **per-thread** `HistoryTable` (no cross-thread sharing).
+- `killers_` (a `KillerArray` = `std::array<std::array<Move, 2>, kMaxPly>`) — killer moves.
 - `countermoves_` and `continuation_history_` — the **per-thread** countermove table and 1-ply continuation-history table (keyed by the previous move's (piece, to-square); `continuation_history_` is heap-allocated, ~0.4 MB).
-- `node_count` — nodes searched by this thread.
+- `node_count_` — nodes searched by this thread.
 - `positions_` (`std::vector<Position>`, reserved to `kMaxPly + 4` in the constructor) — per-thread copy-make position stack for the search tree. Reserved once up front so no `push_back` during search reallocates (which would invalidate the `CurrentPosition()` reference and break incremental NNUE updates).
 - `accumulator_` (`nnue::Accumulator`) plus `accumulator_ply_` — the NNUE accumulator for the tip position, maintained incrementally but **lazily**: `PlayMove`/`MakeNullMove` do *not* advance it; `SearchState::CurrentAccumulator()` catches it up (one ply at a time, tracked by `accumulator_ply_`) only when an evaluation actually reads it, and only on an eval-cache **miss**, so nodes that cut off before evaluating (TT cutoffs, RFP/LMP/null-move returns) pay zero accumulator cost. `UndoMove` reverses a ply only if the catch-up had reached it. Bit-identical to eager maintenance (same deltas, same order; `test_nnue_incremental` gate) — SPRT-measured **+20.66 ± 9.04 Elo at 8+0.08** (+13.6% nps). A net is always loaded wherever a `SearchState` exists (the engine loads one at startup; the NNUE tests load one before searching; perft/SEE/book tests never build a `Game`), so the accumulator is maintained unconditionally.
 - `hash_stack_` (`std::vector<HashEntry>`, reserved in the constructor to game length + `kMaxPly` + 4) — Zobrist hash history for 50-move/repetition detection. One reservation per search, so the per-node hot path still allocates nothing.
