@@ -86,7 +86,7 @@ endif()
 # The UCI integration test is a bash script — register it only where a shell is available (skipped on a
 # bash-less Windows host).
 find_program(BASH_EXE bash)
-if(BASH_EXE)
+if(BASH_EXE AND NOT CMAKE_CROSSCOMPILING)
   add_test(NAME uci COMMAND ${BASH_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/test/uci_test.sh $<TARGET_FILE:pawnstar>
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()

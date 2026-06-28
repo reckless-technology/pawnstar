@@ -117,7 +117,14 @@ int main(int argc, char *argv[])
     // even a fixed-depth search non-deterministic — helper threads race through the shared TT). overwrite=0
     // so a caller can export PAWNSTAR_THREADS to run multi-threaded and sample that variation when
     // regenerating the accepted-move sets.
+#if defined(_WIN32)
+    if (std::getenv("PAWNSTAR_THREADS") == nullptr) // overwrite=0: respect a caller-set value
+    {
+        _putenv_s("PAWNSTAR_THREADS", "1");
+    }
+#else
     setenv("PAWNSTAR_THREADS", "1", 0);
+#endif
 
     auto game_ptr = std::make_unique<Game>();
 

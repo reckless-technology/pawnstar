@@ -297,7 +297,11 @@ int main(int argc, char *argv[])
 
     // Force every SearchRootNode call single-threaded so each search is deterministic (see Search()). All the
     // parallelism in this tool is at the book-line level instead. Set once, before any Game is constructed.
+#if defined(_WIN32)
+    _putenv_s("PAWNSTAR_THREADS", "1");
+#else
     setenv("PAWNSTAR_THREADS", "1", 1);
+#endif
 
     // Read the whole book into memory up front. It is tiny (hundreds of lines) and keeping the inputs indexed
     // lets workers grab lines in any order while we still emit output in the original order.
