@@ -156,7 +156,7 @@ setoption name EvalFile value /path/to/net.bin
 `EvalFile` is advertised in the `uci` response; there is no `UseNNUE` option (nothing to toggle to). The
 `eval` command prints the NNUE evaluation of the current position; `nnue` prints the raw network eval. The
 net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (UCI `setoption` routes to
-`game.NnueNetwork().Load(...)`), read-only after load and shared by all Lazy SMP threads through their
+`game.nnue_network_.Load(...)`), read-only after load and shared by all Lazy SMP threads through their
 `Game&` — they call only its `const` methods.
 
 ## 4. Tooling
@@ -295,9 +295,6 @@ NNUE strength is measured by game play. NNUE is the only evaluator, so an SPRT i
   score=20`) to keep games short and decisive (recommended, not required — the old fixed game-history
   cap that crashed long games is gone; the history is a dynamic `std::vector` now);
 - `-sprt elo0=$ELO0 elo1=$ELO1 alpha=0.05 beta=0.05` (default bounds 0 / 10) and concurrency `nproc`.
-
-fastchess prints "Illegal PV move" warnings occasionally — these are cosmetic (a junk move in the
-printed PV tail; the actual best move played is legal).
 
 For an **absolute** rating (rather than a net-vs-net delta), `rate.sh <name:rating:cmd> ...` plays the
 engine against one or more externally-rated reference engines (e.g. the CCRL engines bundled with Arena —

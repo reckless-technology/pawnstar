@@ -21,6 +21,7 @@ internal iterative reduction), and the trailing-underscore member style is kept 
 When in doubt, match the fuller spelling and ask. Related: [[project_tried_search_features]].
 
 **Boolean naming (2026-06-20):** boolean variables and functions that return `bool` should start with one of
-`is` / `has` / `can` / `may` / `do` / `does`, to make the meaning of `true` clear. E.g. `IsLoaded()`,
-`is_pondering`, `is_cancel_pending` (good); `NnueActive()` was bad and was deleted/replaced by
-`Network::IsLoaded()`. Apply to all new bool identifiers.
+`is` / `has` / `can` / `may` / `do` / `does`, to make the meaning of `true` clear. E.g. `is_pondering_`,
+`is_cancel_pending_`, `Position::IsInCheck()` (good). The old `NnueActive()` toggle was bad naming and was
+deleted outright when NNUE became the only evaluator (net presence is now the plain `Network::loaded_`
+member). Apply to all new bool identifiers.

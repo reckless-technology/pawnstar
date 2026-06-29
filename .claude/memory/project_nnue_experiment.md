@@ -299,7 +299,8 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   depths 8-11); docs updated; `make check` green (bench signature 6857880). Enabled by the heap-allocate
   Game/Network commit 279f087 (the 12.6 MB inline FT array would overflow the 8 MB stack).
 
-Known pre-existing bug surfaced during matches: frequent "Illegal PV move" warnings from
-**both** evaluators — the reported PV *string* sometimes contains an illegal continuation
-(TT-collision in PV reconstruction); the move actually played is always legal (0 forfeits).
-See [[project_go_port]].
+Pre-existing bug surfaced during matches, now **FIXED** (commit d376b8a): frequent "Illegal PV move"
+warnings from both evaluators — the reported PV *string* sometimes contained an illegal continuation
+(stale PV reconstruction); the move actually played was always legal (0 forfeits). Fixed by clearing the
+PV buffer before each move's search and copying into the parent PV the moment a move raises alpha
+(illegal-PV warnings 435 → 0 over 30 self-play games). See [[project_go_port]].

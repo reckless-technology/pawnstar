@@ -17,7 +17,16 @@ int8 emulation error sweep, AVX2 saturation rates, and per-call kernel timings. 
 `Evaluate` over single-threaded `go depth 12` searches (counters reverted afterwards — not in the tree).
 
 Environment: clang-18, this box is `znver`/Intel-class with **AVX2 + AVX-512 + AVX-VNNI/AVX-512-VNNI**
-(`/proc/cpuinfo`), but the shipped binary targets only `-mavx2` (Makefile), so VNNI is currently unused.
+(`/proc/cpuinfo`); the shipped binary still targets only `-mavx2` (Makefile), but the AVX-VNNI `vpdpbusd`
+kernel is now compiled behind a function-level target attribute and selected at runtime via cpuid (so it
+runs on VNNI CPUs while the single binary still loads on AVX2-only ones — see the Phase 2 RESULTS).
+
+> **Outcome (shipped).** The int8 *output* layer shipped at **S=9** (not the S=8 first sketched below —
+> S=9 is saturation-free on AVX2), AVX2 `pmaddubsw`-primary with the AVX-VNNI `vpdpbusd` kernel chosen at
+> runtime by cpuid (the single `-mavx2` binary still runs on AVX2-only CPUs); +31.8 ± 10.3 Elo at 8+0.08.
+> The int8 *feature*-weight idea (the later int8-FT section) was **rejected (−8 Elo) and its code removed**.
+> The pre-measurement planning text below (S=8, "VNNI is the right kernel", an `INT8=1` build flag) is the
+> original sketch — the Phase 2/3 RESULTS sections supersede it.
 
 ---
 
@@ -137,7 +146,7 @@ i.e. int8 is gated on a VNNI target, which the dev/cloud box now provides.
 
 ## Phase 2 — RESULTS (int8 output layer — now the **shipped default**)
 
-Implemented the int8 output forward pass as `nnue::Network::Evaluate` (`src/nnue.cpp`) — **the engine's
+Implemented the int8 output forward pass as `nnue::Network::Evaluate` (`src/nnue.h`) — **the engine's
 default evaluator** as of this work. The exact int16 SCReLU dot is retained as `Network::EvaluateExact`, the
 reference that `test_nnue` cross-checks against bullet (±2 cp) and that the int8 path is checked against
 (≤40 cp). Output weights are requantised to int8 at load (`output_weights_i8_`); SCReLU activations to uint8

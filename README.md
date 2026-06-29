@@ -233,7 +233,7 @@ lockless transposition table rather than splitting the tree between them.
 the search_state.h hub is included so `SearchState` is complete) runs on a dedicated worker
 thread — started by `Game::StartThinking` — so the UCI `stop` command, which sets an atomic
 cancellation flag polled throughout the tree, can interrupt it at any time. It searches the root move
-list at increasing depths starting from `kStartDepth` (3) up to `kMaxPly` (64), emitting an
+list at increasing depths starting from `kStartDepth` (3) up to `kMaxPly − 1` (63), emitting an
 `info depth … score … time … nodes … nps … hashfull … pv …` line each time the best move improves
 (`score mate <±moves>` once a forced mate is found, otherwise `score cp <centipawns>`). After every iteration the root
 moves are re-sorted by their scores from the previous iteration, so the prior best move is tried first
@@ -624,8 +624,8 @@ Pawnstar has no official CCRL rating. The figures currently tracked are:
 - **Move generation** — roughly 600 million legal moves per second on a modern laptop core.
 - **Bratko-Kopec** — `test_bratko_kopec_nnue` solves 24/24 at each depth 8–11 with the shipped net (depth 8 runs in `make check`).
 - **Strength (rough).** `nnue/pawnstar-v12.bin` measures roughly ~2900+ Elo (CCRL-ballpark, anchored
-  against reference engines at a fast time control; v8 is +31.9 ± 16.6 over v7 at 40/20, and v7 measured
-  ~2900) — far above the since-removed hand-crafted eval (~2350). At equal *time*, the incremental accumulator is
+  against reference engines at a fast time control) — far above the since-removed hand-crafted eval (~2350);
+  v12 is the strongest shipped net, each step in the lineage above adding measured Elo over its predecessor. At equal *time*, the incremental accumulator is
   worth ~+80 Elo over a full refresh and the AVX2 SIMD kernels a further ~+180 Elo over the scalar
   versions (both by SPRT).
 
