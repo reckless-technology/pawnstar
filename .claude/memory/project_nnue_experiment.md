@@ -241,9 +241,11 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   clearly positive and the cheapest lever (no code/arch change). v11's 6.05B is still only ~29% of the ~21B pool.
 - Verify clean (raw net: 0/250 0cp; incremental 36807/0 mismatches); make check green; BK regenerated 24/24
   at depths 8-11. v10 retired from repo. Docs (CLAUDE/README/nnue-README §7 lineage+recipe) updated to v11.
-- **CUDA env gotcha (this box):** no toolkit at `/usr/local/cuda`; it lives at `~/cuda-12.2`. The prebuilt
-  bullet `pawnstar`/`pawnstar_eval` need `LD_LIBRARY_PATH=~/cuda-12.2/targets/x86_64-linux/lib` (else
-  libnvrtc.so.12 / libcublas.so.12 'not found'). Same arch as v10, so NO trainer rebuild was needed — reused
+- **CUDA env gotcha (SUPERSEDED — was the pre-migration box):** at the time of the v11 run this machine had
+  no toolkit at `/usr/local/cuda`; it lived at `~/cuda-12.2`, so the prebuilt bullet `pawnstar`/`pawnstar_eval`
+  needed `LD_LIBRARY_PATH=~/cuda-12.2/targets/x86_64-linux/lib` (else libnvrtc.so.12 / libcublas.so.12 'not
+  found'). **This no longer holds:** the current (post-2026-06-23 migration) machine has CUDA 13.2 at
+  `/usr/local/cuda` — see [[machine-setup-env]]. Same arch as v10, so NO trainer rebuild was needed — reused
   the prebuilt example binary. Shard sizes vary (~58M–379M); target the POSITION count, not a fixed shard
   count. See [[project_tried_search_features]] for the (separate) search-experiment log.
 
