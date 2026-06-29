@@ -614,7 +614,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
 
     for (const Move &move : move_list)
     {
-        const int move_index = (int)(&move - move_list.begin());
+        const int move_index = (int)(&move - &move_list[0]);
         if (transposition && move == transposition->move_)
         {
             continue; // we already searched that one.
@@ -829,7 +829,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
         }
         for (auto &move : move_list)
         {
-            const int move_index = (int)(&move - move_list.begin());
+            const int move_index = (int)(&move - &move_list[0]);
             // Report the move currently being searched at the root, but only once a search is slow enough that
             // a GUI benefits (avoids flooding info lines on the fast shallow iterations).
             if (is_main && game_.time_control_.ElapsedSinceSearchStart() > ChessClock::Duration{3000})

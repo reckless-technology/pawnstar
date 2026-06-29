@@ -86,8 +86,17 @@ if(EXISTS "${EMBED_NET}")
   set_tests_properties(bratko_kopec_nnue PROPERTIES ENVIRONMENT "PAWNSTAR_THREADS=1")
 endif()
 # The UCI integration test is a bash script — register it only where a shell is available (skipped on a
-# bash-less Windows host).
-find_program(BASH_EXE bash)
+# bash-less Windows host). HINTS point at Git for Windows' bash and are searched before the system PATH, so
+# on Windows we prefer Git Bash (which understands C:/... paths) over the WSL `bash.exe` stub in System32
+# (which cannot read a Windows-style script path); on Linux these hints don't exist and it falls through to
+# the system /bin/bash.
+find_program(BASH_EXE NAMES bash
+  HINTS
+    "$ENV{ProgramFiles}/Git/bin"
+    "$ENV{ProgramFiles}/Git/usr/bin"
+    "$ENV{ProgramW6432}/Git/bin"
+    "$ENV{ProgramW6432}/Git/usr/bin"
+    "$ENV{ProgramFiles\(x86\)}/Git/bin")
 if(BASH_EXE AND NOT CMAKE_CROSSCOMPILING)
   add_test(NAME uci COMMAND ${BASH_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/test/uci_test.sh $<TARGET_FILE:pawnstar>
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

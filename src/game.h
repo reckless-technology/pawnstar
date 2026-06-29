@@ -326,7 +326,7 @@ inline Move Game::SearchRootNode()
     Variation   shallow_pv{};
     for (auto &move : move_list)
     {
-        const int move_index = (int)(&move - move_list.begin());
+        const int move_index = (int)(&move - &move_list[0]);
         const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score();
         move.AssignScore(score);
     }

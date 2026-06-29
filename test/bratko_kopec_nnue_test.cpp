@@ -35,6 +35,12 @@
 /// gate there; under multi-threaded Lazy SMP the authoritative move varies run-to-run and no finite sampled
 /// set fully covers that distribution, so a multi-threaded run may occasionally dip below 24. Regenerate the
 /// move sets if the net or search changes (see the regeneration note in nnue/README.md §7).
+///
+/// The sets are also mildly *toolchain*-specific: equal-ordering-score moves are tie-broken by std::sort,
+/// whose ordering of equal keys differs between STL implementations (libstdc++/libc++ vs MSVC's STL), so a
+/// fixed-depth search can cascade to a different (still-legal) best move on a different compiler. A few moves
+/// here are the deterministic best moves of the Windows clang (MSVC-STL) build added alongside the reference
+/// (Linux clang/libstdc++) ones — c8d8/e7d8 (pos03), g5g6/c2c4 (pos06), f7f6/c8f5 (pos23).
 namespace bk
 {
 
@@ -54,10 +60,10 @@ struct BkCase
 inline constexpr std::array<BkCase, 24> kCases{{
     {"1k1r4/pp1b1R2/3q2pp/4p3/2B5/4Q3/PPP2B2/2K5 b - -", {"d6d1"}},
     {"3r1k2/4npp1/1ppr3p/p6P/P2PPPP1/1NR5/5K2/2R5 w - -", {"d4d5"}},
-    {"2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - -", {"a6a5", "c8c7", "c8d8", "f8g8"}},
+    {"2q1rr1k/3bbnnp/p2p1pp1/2pPp3/PpP1P1P1/1P2BNNP/2BQ1PRK/7R b - -", {"a6a5", "c8c7", "c8d8", "f8g8", "e7d8"}},
     {"rnbqkb1r/p3pppp/1p6/2ppP3/3N4/2P5/PPP1QPPP/R1B1KB1R w KQkq -", {"e5e6"}},
     {"r1b2rk1/2q1b1pp/p2ppn2/1p6/3QP3/1BN1B3/PPP3PP/R4RK1 w - -", {"c3d5"}},
-    {"2r3k1/pppR1pp1/4p3/4P1P1/5P2/1P4K1/P1P5/8 w - -", {"g5g6"}},
+    {"2r3k1/pppR1pp1/4p3/4P1P1/5P2/1P4K1/P1P5/8 w - -", {"g5g6", "c2c4"}},
     {"1nk1r1r1/pp2n1pp/4p3/q2pPp1N/b1pP1P2/B1P2R2/2P1B1PP/R2Q2K1 w - -", {"a3d6", "f3g3"}},
     {"4b3/p3kp2/6p1/3pP2p/2pP1P2/4K1P1/P3N2P/8 w - -", {"e2c3", "f4f5"}},
     {"2kr1bnr/pbpq4/2n1pp2/3p3p/3P1P1B/2N2N1Q/PPP3PP/2KR1B1R w - -", {"d1e1", "f1d3"}},
@@ -74,7 +80,7 @@ inline constexpr std::array<BkCase, 24> kCases{{
     {"r4k2/pb2bp1r/1p1qp2p/3pNp2/3P1P2/2N3P1/PPP1Q2P/2KRR3 w - -", {"g3g4"}},
     {"3rn2k/ppb2rpp/2ppqp2/5N2/2P1P3/1P5Q/PB3PPP/3RR1K1 w - -", {"f5h6"}},
     {"2r2rk1/1bqnbpp1/1p1ppn1p/pP6/N1P1P3/P2B1N1P/1B2QPP1/R2R2K1 b - -", {"f6h5"}},
-    {"r1bqk2r/pp2bppp/2p5/3pP3/P2Q1P2/2N1B3/1PP3PP/R4RK1 b kq -", {"f7f6"}},
+    {"r1bqk2r/pp2bppp/2p5/3pP3/P2Q1P2/2N1B3/1PP3PP/R4RK1 b kq -", {"f7f6", "c8f5"}},
     {"r2qnrnk/p2b2b1/1p1p2pp/2pPpp2/1PP1P3/PRNBB3/3QNPPP/5RK1 w - -", {"f2f4"}},
 }};
 // clang-format on
