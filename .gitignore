@@ -8,3 +8,5 @@ doc/html/
 config.json
 cmake-build/
 /build-*/
+
+.vs/

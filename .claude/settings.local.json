@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(clang++ --version)",
+      "Bash(cmake --version)",
+      "Bash(ninja --version)",
+      "Bash(make --version)",
+      "Bash(git --version)",
+      "PowerShell(foreach \\($t in 'clang++','clang','cmake','ninja','make'\\) { $c = Get-Command $t -ErrorAction SilentlyContinue; if \\($c\\) { \"{0,-10} {1}\" -f $t, $c.Source } else { \"{0,-10} NOT FOUND\" -f $t } })"
+    ]
+  }
+}
