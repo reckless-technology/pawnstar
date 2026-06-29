@@ -85,6 +85,9 @@ cmake --build build-win                      # -> build-win/pawnstar.exe
 ctest --test-dir build-win --output-on-failure
 ```
 
+`tools/build_windows.sh [release|debug]` wraps the cross-compile above (release = `-DPAWNSTAR_DEBUGX=OFF`,
+the build to distribute) and runs `bench` under `wine` as a smoke test.
+
 The few platform-specific bits live in `src/platform.h` (CPU feature detection) and `main.cpp`
 (executable-path lookup); everything else is portable C++23.
 
