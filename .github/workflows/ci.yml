@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancel a previous in-flight run on the same ref when a new commit arrives.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Primary build + test via the Makefile (the canonical Linux build). Builds the engine, tools and all
+  # eight test suites with warnings-as-errors, then runs them — including the bench determinism signature.
+  build-test:
+    name: build + test (make)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang-18 make
+      - name: Check runner has AVX2 + BMI2
+        # The engine emits AVX2 (NNUE) and BMI1/2 bit-scan instructions, so the test binaries need a CPU
+        # that supports them. GitHub-hosted runners do; fail fast with a clear message if one ever doesn't.
+        run: |
+          grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
+            || { echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1; }
+      - name: Build + test
+        run: make -j"$(nproc)" WERROR=1 CXX=clang++-18 check
+
+  # Style gate: the whole tree must be clang-format-clean (clang-format is version-sensitive, so pin 18 to
+  # match the project's local clang-format-18).
+  format:
+    name: clang-format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format-18
+      - name: Check formatting
+        run: clang-format-18 --dry-run -Werror src/*.h src/*.cpp test/*.cpp tools/*.cpp
+
+  # Cross-platform build path: the CMake build (used for Windows) must also stay green on Linux. Mirrors
+  # `make check` via ctest (the bash UCI test runs natively here).
+  cmake-ctest:
+    name: cmake + ctest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang-18 cmake ninja-build
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++-18
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure

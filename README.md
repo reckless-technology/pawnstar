@@ -1,5 +1,7 @@
 # Pawnstar
 
+[![CI](https://github.com/jonny-reckless/pawnstar/actions/workflows/ci.yml/badge.svg)](https://github.com/jonny-reckless/pawnstar/actions/workflows/ci.yml)
+
 Pawnstar is a [UCI](https://en.wikipedia.org/wiki/Universal_Chess_Interface) chess engine written in
 C++23. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
 a lockless transposition table, and a perspective NNUE evaluation. The engine is **header-only** — every
