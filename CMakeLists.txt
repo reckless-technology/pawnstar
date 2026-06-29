@@ -30,6 +30,14 @@ add_compile_options(-mbmi2 -mavx2 -Wall -Wextra -Wpedantic)
 add_compile_options($<$<CONFIG:Release>:-O3>)
 add_compile_options($<$<CONFIG:RelWithDebInfo>:-O3>)
 
+# On Windows, clang targets the MSVC ABI and pulls in Microsoft's UCRT headers, which mark standard C
+# functions (getenv, setbuf, ...) "deprecated/insecure" via _CRT_INSECURE_DEPRECATE. Those uses are correct,
+# portable C++ here (getenv has no portable non-deprecated replacement), so silence the noise — before
+# WERROR turns it into errors. No effect on the Linux/MinGW builds.
+if(WIN32)
+  add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+endif()
+
 option(WERROR "Treat warnings as errors (CI)" OFF)
 if(WERROR)
   add_compile_options(-Werror)
