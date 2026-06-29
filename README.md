@@ -10,7 +10,7 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 
 ## Features
 
-- Bitboard board representation with BMI2 `pext`-based sliding-piece attacks.
+- Bitboard board representation with magic-bitboard sliding-piece attacks (portable 64-bit multiply, no `pext`).
 - Fully legal move generator (pins, checks, en passant edge cases, and castling handled directly).
 - Parallel iterative-deepening alpha-beta search with principal variation search (PVS).
 - Lazy SMP parallelism: independent per-thread searches sharing one lockless transposition table.
@@ -25,7 +25,7 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 ## Requirements
 
 - `clang++` with C++23 support. (MSVC is **not** supported — the engine uses clang/GCC builtins and a function-level target attribute for the AVX-VNNI kernel; on Windows use clang.)
-- A CPU with the BMI2 and AVX2 instruction sets (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`. BMI2 is required for the `pext` instruction (sliding move generation) and AVX2 is required for the NNUE evaluation SIMD calculation.
+- A CPU with the AVX2 instruction set (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`. AVX2 is required for the NNUE evaluation SIMD calculation (`-mbmi2` supplies the `tzcnt`/`blsr` bit-scan builtins). Sliding move generation uses magic bitboards (a portable multiply), so the `pext` instruction is **not** required.
 - GNU `make` for the Linux build, or **CMake ≥ 3.20** for the cross-platform / Windows build (see below).
 - `doxygen` (and optionally Graphviz `dot`) only if you want to build the API docs.
 
@@ -168,7 +168,7 @@ new `Position` by value (copy-make); there is no unmake.
 
 `pieces_` is a `std::array<Bitboard, 7>` indexed by piece type, but `pieces_[0]` (the `kNone` slot)
 holds the occupied-squares set — the union of all pieces of both colours — rather than a piece
-bitboard; the six real piece types occupy indices 1–6. This lets occupancy queries and the `pext`-based
+bitboard; the six real piece types occupy indices 1–6. This lets occupancy queries and the magic-bitboard
 attack lookups read it directly without recomputing a union.
 
 `Bitboard` ([src/bitboard.h](src/bitboard.h)) wraps a `uint64_t` with the usual set operations plus a
@@ -199,9 +199,14 @@ stack are `std::vector`s, the position stack reserved once up front; see the des
 
 ### Attack generation
 
-Sliding-piece attacks (bishop, rook, queen) use the BMI2 `_pext_u64` instruction to gather the
-occupancy bits relevant to a square and index a precomputed per-square attack table. Knight, king and
-pawn attacks are plain 64-entry lookup tables. All tables are computed once at program startup in
+Sliding-piece attacks (bishop, rook, queen) use **magic bitboards**: the occupancy bits relevant to a
+square are masked, multiplied by a precomputed magic and shifted down to a hash slot
+(`hash = (occupancy & mask) * magic >> shift`). This is a plain 64-bit multiply — portable and fast on
+every x86-64 CPU (the previous `pext`-based lookup is microcoded/slow on AMD Zen 1/2). The hash indexes a
+1-byte-per-slot index array that in turn selects a de-duplicated attack set, which (since most occupancies
+share an attack set) shrinks the tables ~5× to ~155 KB. The magic multipliers are baked-in constants found
+offline by `tools/dump_magics`; only the index/attack tables are filled at startup. Knight, king and pawn
+attacks are plain 64-entry lookup tables. All tables are computed once at program startup in
 `src/generated_data.h`.
 
 `Pins` ([src/pins.h](src/pins.h)) computes absolute pins and the squares
@@ -619,10 +624,11 @@ the published node counts for the standard positions.
 
 ## Limitations and known issues
 
-- **BMI2 + AVX2 required.** The sliding-piece attacks use `_pext_u64` (BMI2) and the NNUE kernels use
-  AVX2, so the engine needs an Intel Haswell / AMD Zen 1 (or newer) CPU and is built with `-mbmi2 -mavx2`.
-  On early AMD Zen parts `pext` is microcoded and comparatively slow. (The NNUE kernels keep scalar
-  fallbacks behind `#if defined(__AVX2__)`, but the default build enables AVX2.)
+- **AVX2 required.** The NNUE kernels use AVX2, so the engine needs an Intel Haswell / AMD Zen 1 (or
+  newer) CPU and is built with `-mbmi2 -mavx2`. Sliding-piece attacks use magic bitboards (a portable
+  multiply), so the `pext` instruction is no longer required — this notably helps early AMD Zen parts,
+  where `pext` is microcoded and comparatively slow. (The NNUE kernels keep scalar fallbacks behind
+  `#if defined(__AVX2__)`, but the default build enables AVX2.)
 - **Thread count** is set by the `Threads` UCI option (Lazy SMP, 1–256); its default comes from the
   `PAWNSTAR_THREADS` environment variable if set, otherwise `hardware_concurrency()`.
 - **No syzygy/tablebase** support.

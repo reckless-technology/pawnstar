@@ -1,17 +1,16 @@
 #pragma once
-/// @file attacks.h Sliding piece bitboard attacks. Uses precomputed pext bitboards to lookup sliding piece attacks
-/// without loops or branches.
+/// @file attacks.h Sliding piece bitboard attacks. Uses precomputed magic bitboards to look up sliding
+/// piece attacks without loops or branches.
 
 #include "constants.h"
 #include "generated_data.h"
 
-#include <immintrin.h>
-
-// Sliding attacks use the hardware PEXT instruction (the build targets BMI2 via `-mbmi2`). The functions
-// are marked constexpr for use in constexpr contexts (e.g. AttacksTo); since `_pext_u64` is not itself a
-// constant expression, suppress the resulting -Winvalid-constexpr diagnostic.
-static_assert(__BMI2__, "Pawnstar requires a BMI2 (-mbmi2) build for PEXT sliding attacks");
-
+// Sliding attacks use magic bitboards: a masked occupancy times a precomputed magic, shifted down to a
+// hash slot (hash = (occupancy & mask) * magic >> shift); the slot's 1-byte indices_ entry then selects
+// the de-duplicated attack set in attacks_. This is a plain 64-bit multiply — portable and fast on every
+// x86-64 CPU (unlike pext, which is microcoded/slow on AMD Zen 1/2). The functions are marked constexpr
+// for use in constexpr contexts (e.g. AttacksTo); since they read a runtime-initialised global table they
+// are never actually constant-evaluated, so suppress the -Winvalid-constexpr diagnostic.
 #if __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Winvalid-constexpr"
@@ -23,8 +22,8 @@ static_assert(__BMI2__, "Pawnstar requires a BMI2 (-mbmi2) build for PEXT slidin
 /// @return Set of squares attacked by a bishop on location.
 constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square s)
 {
-    const PextBitboard &p = kBishopPexts[s];
-    return p.attacks_[p.indices_[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask_)]];
+    const MagicBitboard &m = kBishopMagics[s];
+    return m.attacks_[m.indices_[(((uint64_t)occupied_squares & (uint64_t)m.occupancy_mask_) * m.magic_) >> m.shift_]];
 }
 
 /// @brief Rook sliding attacks.
@@ -33,8 +32,8 @@ constexpr Bitboard BishopAttacks(Bitboard occupied_squares, Square s)
 /// @return Set of squares attacked by a rook on location.
 constexpr Bitboard RookAttacks(Bitboard occupied_squares, Square s)
 {
-    const PextBitboard &p = kRookPexts[s];
-    return p.attacks_[p.indices_[_pext_u64((uint64_t)occupied_squares, (uint64_t)p.occupancy_mask_)]];
+    const MagicBitboard &m = kRookMagics[s];
+    return m.attacks_[m.indices_[(((uint64_t)occupied_squares & (uint64_t)m.occupancy_mask_) * m.magic_) >> m.shift_]];
 }
 
 #if __GNUC__

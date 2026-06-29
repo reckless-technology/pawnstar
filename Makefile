@@ -10,6 +10,7 @@ TOOLS_DIR           = tools
 TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net
 TOOL_FILTERBOOK_EXE = $(BUILD_DIR)/filter_book
 TOOL_QUANT_EXE      = $(BUILD_DIR)/nnue_quant_study
+TOOL_DUMPMAGICS_EXE = $(BUILD_DIR)/dump_magics
 
 # Header-only engine: every engine class/function lives in src/*.h as `inline` definitions, so there are
 # no per-class engine .cpp files or object files to link. The only compiled engine translation unit is
@@ -74,7 +75,7 @@ endif
 
 all: prep $(PROGRAM_EXE)
 
-tools: prep $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE) $(TOOL_QUANT_EXE)
+tools: prep $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE) $(TOOL_QUANT_EXE) $(TOOL_DUMPMAGICS_EXE)
 
 tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) $(TEST_CLOCK_EXE)
 
@@ -102,6 +103,7 @@ clean:
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
 	      $(TOOL_FILTERBOOK_EXE) $(BUILD_DIR)/filter_book.o $(BUILD_DIR)/filter_book.d \
 	      $(TOOL_QUANT_EXE) $(BUILD_DIR)/nnue_quant_study.o $(BUILD_DIR)/nnue_quant_study.d \
+	      $(TOOL_DUMPMAGICS_EXE) $(BUILD_DIR)/dump_magics.o $(BUILD_DIR)/dump_magics.d \
 	      $(OBJECTS) $(EMBED_OBJECT) $(EMBED_BOOK_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS)
 
 # Generate API documentation with doxygen (output configured by the Doxyfile).
@@ -168,6 +170,9 @@ $(TOOL_FILTERBOOK_EXE): $(BUILD_DIR)/filter_book.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 $(TOOL_QUANT_EXE): $(BUILD_DIR)/nnue_quant_study.o
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
+$(TOOL_DUMPMAGICS_EXE): $(BUILD_DIR)/dump_magics.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
 -include $(DEPS)

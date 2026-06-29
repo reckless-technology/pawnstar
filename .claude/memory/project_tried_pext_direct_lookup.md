@@ -7,6 +7,11 @@ metadata:
   originSessionId: 4d178dc7-b2cc-4bef-90ca-ce2b53eb2817
 ---
 
+**Superseded by [[project_magic_bitboards]] (2026-06-29): pext is gone — sliders now use magic bitboards.**
+But the lesson below still governs: the same `indices_` 1-byte compression was kept for the magic tables
+(the user asked for it), re-confirming that the direct one-load layout's perft edge isn't worth the cache
+cost. The experiment below is the original pext-era data.
+
 Experiment (2026-06-23, branch `pext-direct-lookup`, now deleted): removed the `indices_` indirection from
 the pext sliding-attack lookup. Baseline does `attacks_[indices_[pext(occ,mask)]]` (two dependent loads;
 de-dups rooks' 4096 occupancies to ~100 unique attack sets behind a 1-byte index table). Variant indexed

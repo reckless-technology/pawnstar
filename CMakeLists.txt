@@ -58,6 +58,7 @@ add_executable(pawnstar src/main.cpp src/embedded_net.S src/embedded_book.S)
 add_executable(stamp_net        tools/stamp_net.cpp)
 add_executable(filter_book      tools/filter_book.cpp)
 add_executable(nnue_quant_study tools/nnue_quant_study.cpp)
+add_executable(dump_magics      tools/dump_magics.cpp)
 
 # --- Tests (each a standalone TU with its own main()). ---
 enable_testing()
