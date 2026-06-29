@@ -4,13 +4,25 @@ CPPFLAGS            = -I src
 CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++23 -mbmi2 -mavx2
 BUILD_DIR           = build
 DOC_DIR             = doc/html
-PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)
+
+# Windows fallback (e.g. Git Bash + the VS-bundled clang). The Makefile is the primary Linux build; these two
+# lines just let it serve as a clean Windows build too: emit .exe-suffixed binaries (so they run from cmd,
+# Explorer and chess GUIs, not only from a Unix-style shell) and define _CRT_SECURE_NO_WARNINGS to silence
+# MSVC's UCRT "insecure" deprecation warnings on getenv/setbuf (correct, portable C++) — mirroring what
+# CMakeLists.txt does for WIN32. OS=Windows_NT is set by Windows and inherited by Git Bash/make. No effect on
+# Linux (EXE_SUFFIX stays empty, the define is not added).
+ifeq ($(OS),Windows_NT)
+EXE_SUFFIX          = .exe
+CPPFLAGS           += -D_CRT_SECURE_NO_WARNINGS
+endif
+
+PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)$(EXE_SUFFIX)
 TEST_DIR            = test
 TOOLS_DIR           = tools
-TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net
-TOOL_FILTERBOOK_EXE = $(BUILD_DIR)/filter_book
-TOOL_QUANT_EXE      = $(BUILD_DIR)/nnue_quant_study
-TOOL_DUMPMAGICS_EXE = $(BUILD_DIR)/dump_magics
+TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net$(EXE_SUFFIX)
+TOOL_FILTERBOOK_EXE = $(BUILD_DIR)/filter_book$(EXE_SUFFIX)
+TOOL_QUANT_EXE      = $(BUILD_DIR)/nnue_quant_study$(EXE_SUFFIX)
+TOOL_DUMPMAGICS_EXE = $(BUILD_DIR)/dump_magics$(EXE_SUFFIX)
 
 # Header-only engine: every engine class/function lives in src/*.h as `inline` definitions, so there are
 # no per-class engine .cpp files or object files to link. The only compiled engine translation unit is
@@ -27,13 +39,13 @@ EMBED_OBJECT        = $(BUILD_DIR)/embedded_net.o
 EMBED_BOOK          = pawnstar.book
 EMBED_BOOK_OBJECT   = $(BUILD_DIR)/embedded_book.o
 
-TEST_PERFT_EXE      = $(BUILD_DIR)/test_perft
-TEST_SEE_EXE        = $(BUILD_DIR)/test_see
-TEST_BK_NNUE_EXE    = $(BUILD_DIR)/test_bratko_kopec_nnue
-TEST_NNUE_EXE       = $(BUILD_DIR)/test_nnue
-TEST_NNUE_INC_EXE   = $(BUILD_DIR)/test_nnue_incremental
-TEST_BOOK_EXE       = $(BUILD_DIR)/test_opening_book
-TEST_CLOCK_EXE      = $(BUILD_DIR)/test_chess_clock
+TEST_PERFT_EXE      = $(BUILD_DIR)/test_perft$(EXE_SUFFIX)
+TEST_SEE_EXE        = $(BUILD_DIR)/test_see$(EXE_SUFFIX)
+TEST_BK_NNUE_EXE    = $(BUILD_DIR)/test_bratko_kopec_nnue$(EXE_SUFFIX)
+TEST_NNUE_EXE       = $(BUILD_DIR)/test_nnue$(EXE_SUFFIX)
+TEST_NNUE_INC_EXE   = $(BUILD_DIR)/test_nnue_incremental$(EXE_SUFFIX)
+TEST_BOOK_EXE       = $(BUILD_DIR)/test_opening_book$(EXE_SUFFIX)
+TEST_CLOCK_EXE      = $(BUILD_DIR)/test_chess_clock$(EXE_SUFFIX)
 # Shipped net + checked-in trainer reference, used by `make check` to exercise NNUE inference and the
 # incremental accumulator. Resolved with wildcard so the checks degrade to a no-op (still green) if absent.
 NNUE_NET            = $(wildcard nnue/pawnstar-v12.bin)
