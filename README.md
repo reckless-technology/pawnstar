@@ -457,7 +457,11 @@ default stack), read-only after load and shared by all search threads. Its accum
 incrementally and lazily** on each thread's `SearchState` — only the feature columns for the pieces
 that moved are updated (a king crossing a file-pair or board-half bucket boundary rebuilds that one perspective's
 accumulator), and the update itself is deferred until an evaluation actually reads the accumulator, so nodes
-that cut off first pay nothing. This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
+that cut off first pay nothing. Concretely, each `SearchState` tracks which ply its accumulator reflects
+(`accumulator_ply_`): `PlayMove` only pushes the child position, and `CurrentAccumulator()` walks the
+accumulator forward one cheap per-ply delta at a time — solely on an eval-cache *miss* that reads it (a hit
+skips even that) — while `UndoMove` reverses a ply only if the walk had reached it. This keeps NNUE
+competitive on equal time, not just equal depth. Weights are quantised
 `int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) from the
 [bullet](https://github.com/jw1912/bullet) trainer. The feature transformer and accumulator stay `int16`,
 but the shipped forward pass runs the **output layer in `int8`** (uint8 SCReLU activations × int8 output
