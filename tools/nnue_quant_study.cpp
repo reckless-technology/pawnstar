@@ -25,6 +25,7 @@
 #include "move.h"
 #include "nnue.h"
 #include "position.h"
+#include <memory>
 
 #include <algorithm>
 #include <chrono>
@@ -131,8 +132,10 @@ int main(int argc, char **argv)
     const std::string net_path = argv[1];
     const std::string ref_path = argc >= 3 ? argv[2] : "test/nnue_reference.txt";
 
-    nnue::Network net;
-    if (!net.Load(net_path))
+    // Heap-allocate: at 8 king buckets the Network's inline ~12.6 MB feature_weights_ array overflows the
+    // default 8 MB stack if it is a local (same reason the engine's Game is heap-allocated).
+    auto net = std::make_unique<nnue::Network>();
+    if (!net->Load(net_path))
     {
         std::printf("failed to load net '%s'\n", net_path.c_str());
         return 1;
@@ -194,7 +197,7 @@ int main(int argc, char **argv)
     for (const Position &pos : positions)
     {
         nnue::Accumulator acc;
-        net.Refresh(acc, pos);
+        net->Refresh(acc, pos);
         const bool                              wtm = pos.color_to_move_ == kWhite;
         const std::array<int16_t, kHiddenSize> &stm = wtm ? acc.white_ : acc.black_;
         const std::array<int16_t, kHiddenSize> &ntm = wtm ? acc.black_ : acc.white_;
@@ -229,7 +232,7 @@ int main(int argc, char **argv)
             raw += (std::int64_t)cn * cn * w.output_weights_[kHiddenSize + i];
         }
         dot_dist.add(std::abs((double)raw));
-        const int ref_cp = net.Evaluate(pos); // engine int16 path (== Evaluate(acc, stm))
+        const int ref_cp = net->Evaluate(pos); // engine int16 path (== Evaluate(acc, stm))
         ref_cps.push_back(ref_cp);
 
         // int8 emulation, swept over S. u8 = clamp(round(screlu / 2^S), 0, 255); weights -> int8 via WS.
@@ -323,19 +326,19 @@ int main(int argc, char **argv)
     const Position child = base.MakeMove(move);
 
     nnue::Accumulator acc;
-    net.Refresh(acc, base);
+    net->Refresh(acc, base);
 
     auto now = [] { return std::chrono::steady_clock::now(); };
     auto ns  = [](auto d) { return std::chrono::duration_cast<std::chrono::nanoseconds>(d).count(); };
 
-    // Update: net.Update(acc, base, child) advances; net.Update(acc, child, base) reverses (acc restored).
+    // Update: net->Update(acc, base, child) advances; net->Update(acc, child, base) reverses (acc restored).
     const long   kUpdIters = 4'000'000;
     volatile int sink      = 0;
     auto         t0        = now();
     for (long i = 0; i < kUpdIters; ++i)
     {
-        net.Update(acc, base, child);
-        net.Update(acc, child, base);
+        net->Update(acc, base, child);
+        net->Update(acc, child, base);
     }
     auto         t1     = now();
     const double upd_ns = (double)ns(t1 - t0) / (2.0 * kUpdIters);
@@ -345,7 +348,7 @@ int main(int argc, char **argv)
     auto       t2         = now();
     for (long i = 0; i < kEvalIters; ++i)
     {
-        sink += net.Evaluate(acc, base.color_to_move_);
+        sink += net->Evaluate(acc, base.color_to_move_);
     }
     auto         t3      = now();
     const double eval_ns = (double)ns(t3 - t2) / (double)kEvalIters;
@@ -355,7 +358,7 @@ int main(int argc, char **argv)
     auto       t4        = now();
     for (long i = 0; i < kRefIters; ++i)
     {
-        net.Refresh(acc, base);
+        net->Refresh(acc, base);
     }
     auto         t5     = now();
     const double ref_ns = (double)ns(t5 - t4) / (double)kRefIters;
