@@ -26,7 +26,7 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 
 ## Requirements
 
-- `clang++` with C++23 support. (MSVC is **not** supported — the engine uses clang/GCC builtins and a function-level target attribute for the AVX-VNNI kernel; on Windows use clang.)
+- `clang++` with C++23 support; use **clang** on Windows too (the recommended, CI-validated path). MSVC `cl` is not a wired-up build — the embedded net/book `.S` files (`.incbin`) can't be assembled by `cl` — but the engine *source* is otherwise `cl`-compatible: it compiles and runs bit-identically under `cl /arch:AVX2 /std:c++latest` (the `[[gnu::target]]` attributes are harmlessly ignored). Clang stays preferred and is ~5–15% faster.
 - A CPU with the AVX2 instruction set (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`. AVX2 is required for the NNUE evaluation SIMD calculation; `-mbmi2` only lets the compiler emit BMI1 `tzcnt`/`blsr` bit-scan instructions for the `std::countr_zero` bit iteration. Sliding move generation uses magic bitboards (a portable multiply), so the `pext` instruction is **not** required.
 - GNU `make` for the Linux build (also works on Windows under Git Bash — see below), or **CMake ≥ 3.20** for the cross-platform / Windows build.
 - `doxygen` (and optionally Graphviz `dot`) only if you want to build the API docs.
