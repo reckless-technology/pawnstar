@@ -176,7 +176,7 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 | `nnue_quant_study.cpp`    | offline int16→int8 quantisation feasibility study (range/saturation histograms + kernel cost split); a measurement tool, not part of the engine — see [int8_quant_study.md](int8_quant_study.md) (`make tools` → `build/nnue_quant_study`) |
 
 **Prerequisites:** `clang++`/`make` (engine), Rust/`cargo` (bullet), `fastchess` on `PATH` (SPRT). For
-GPU training, a CUDA toolkit (`CUDA_PATH`, default `~/cuda-12.2`) **and** a driver new enough for the
+GPU training, a CUDA toolkit (`CUDA_PATH`, default `/usr/local/cuda`) **and** a driver new enough for the
 toolkit: bullet's CUDA backend calls `cuFuncLoad`, which needs a driver supporting CUDA ≥ 12.3
 (driver ≥ 545). Otherwise train on CPU with `BULLET_FEATURES=""` — the net is small enough that CPU
 training is practical.
@@ -228,9 +228,9 @@ Trainer hyperparameters ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)
 AdamW, `batch_size=16384`, loss `sigmoid(out)` squared-error against
 `target = wdl·result + (1-wdl)·sigmoid(score/SCALE)` with `ConstantWDL=0.5`, `StepLR{start=0.001,
 gamma=0.3, step=SBS/3}`, `eval_scale=400`. Overridable via env: `PAWNSTAR_DATA`, `PAWNSTAR_BPS`,
-`PAWNSTAR_SBS`, `PAWNSTAR_OUT`. GPU training reports the device (e.g. `Training on NVIDIA GeForce GTX
-1050 Ti (sm_61)`) and runs at ~0.34M positions/sec on that card for this 1024-wide net (~2.4M on an RTX
-4070; see §7).
+`PAWNSTAR_SBS`, `PAWNSTAR_OUT`. GPU training reports the device (e.g. `Training on NVIDIA GeForce RTX
+4070`) and runs at ~2.4M positions/sec on that card for this 1024-wide net (~0.34M on an older GTX
+1050 Ti; see §7).
 
 ### Openings
 

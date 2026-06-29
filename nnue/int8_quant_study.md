@@ -1,12 +1,13 @@
 # int16 → int8 NNUE quantisation — feasibility study & plan
 
 Measured investigation of switching Pawnstar's NNUE quantisation from 16-bit to 8-bit: where the time
-goes, what int8 can actually accelerate, and what it costs in eval accuracy / dynamic range. All numbers
-are reproducible with the bundled tool:
+goes, what int8 can actually accelerate, and what it costs in eval accuracy / dynamic range. The figures
+below were measured on `pawnstar-v8.bin` (since retired); the methodology reproduces on the shipped net
+with the bundled tool (the figures are net-specific, so they shift slightly):
 
 ```bash
 make build/nnue_quant_study
-build/nnue_quant_study nnue/pawnstar-v8.bin test/nnue_reference.txt
+build/nnue_quant_study nnue/pawnstar-v12.bin test/nnue_reference.txt
 ```
 
 The tool ([tools/nnue_quant_study.cpp](../tools/nnue_quant_study.cpp)) loads the shipped net, drives the
@@ -140,7 +141,7 @@ Implemented the int8 output forward pass as `nnue::Network::Evaluate` (`src/nnue
 default evaluator** as of this work. The exact int16 SCReLU dot is retained as `Network::EvaluateExact`, the
 reference that `test_nnue` cross-checks against bullet (±2 cp) and that the int8 path is checked against
 (≤40 cp). Output weights are requantised to int8 at load (`output_weights_i8_`); SCReLU activations to uint8
-via `>> kInt8Shift`. The dot uses `vpdpbusd` (build `VNNI=1`) where VNNI is present and AVX2
+via `>> kInt8Shift`. The dot uses `vpdpbusd` (selected at runtime by cpuid) where VNNI is present and AVX2
 `pmaddubsw`+`madd` otherwise — bit-identical. (Earlier this lived behind an `INT8=1` flag; it is now
 unconditional, and the Bratko-Kopec accepted-move sets were regenerated for the int8 eval.)
 
@@ -286,11 +287,12 @@ emulation/microbench are self-contained.
 ```bash
 # Phase 0/1 dynamic-range study + per-call kernel timings (int8 Evaluate vs int16 reference internally):
 make build/nnue_quant_study
-build/nnue_quant_study nnue/pawnstar-v8.bin test/nnue_reference.txt
-build/test_nnue nnue/pawnstar-v8.bin test/nnue_reference.txt   # EvaluateExact==trainer; int8 within 40 cp
+build/nnue_quant_study nnue/pawnstar-v12.bin test/nnue_reference.txt
+build/test_nnue nnue/pawnstar-v12.bin test/nnue_reference.txt   # EvaluateExact==trainer; int8 within 40 cp
 
-# VNNI vpdpbusd kernel (capable CPUs only; bit-identical to AVX2 pmaddubsw):
-make clean && make VNNI=1
+# The VNNI vpdpbusd kernel needs no build flag — it is selected at runtime by cpuid on capable CPUs
+# (bit-identical to the AVX2 pmaddubsw path); a single `make` builds the binary that runs on both.
+make
 
 # Phase 3 SPRT was int8 (now default) vs an int16-output build. Since int8 is unconditional, an int16-search
 # A/B build is no longer a flag; reproduce by checking out the pre-ship commit for the int16 binary, e.g.:

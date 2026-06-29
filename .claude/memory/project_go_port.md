@@ -20,7 +20,11 @@ The Go port lives in its own repo at `/home/jonny/work/pawnstar-go`. All phases 
 **Binary:** build from repo root:
 `go build -o pawnstar-go ./cmd/pawnstar/`
 
-**Performance:** ~35 Mnps (Go ray-table) vs ~192 Mnps (C++ PEXT). Gap is from PEXT vs ray-table sliding piece attacks.
+**Performance (point-in-time, 2026):** ~35 Mnps (Go ray-table) vs ~192 Mnps (C++). Gap is from the
+sliding-piece attack method.
 
-**Why:** The C++ version uses BMI2 _pext_u64 via hardware PEXT instruction; Go uses software ray-table XOR trick.
-How to apply: if optimising Go perft speed, implementing magic bitboards would be the main lever.
+**Why:** at the time of this benchmark the C++ version used BMI2 `_pext_u64` (hardware PEXT) while Go used a
+software ray-table XOR trick. NOTE: the C++ engine has since switched from pext to **magic bitboards** (a
+portable multiply, see [[project_magic_bitboards]]) — so it no longer uses pext, though the slider-method
+gap vs Go's ray-table remains the point. How to apply: if optimising Go perft speed, implementing magic
+bitboards would be the main lever.

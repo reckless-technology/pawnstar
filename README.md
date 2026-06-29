@@ -27,7 +27,7 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 ## Requirements
 
 - `clang++` with C++23 support. (MSVC is **not** supported — the engine uses clang/GCC builtins and a function-level target attribute for the AVX-VNNI kernel; on Windows use clang.)
-- A CPU with the AVX2 instruction set (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`. AVX2 is required for the NNUE evaluation SIMD calculation (`-mbmi2` supplies the `tzcnt`/`blsr` bit-scan builtins). Sliding move generation uses magic bitboards (a portable multiply), so the `pext` instruction is **not** required.
+- A CPU with the AVX2 instruction set (Intel Haswell / AMD Zen 1 or later); the build passes `-mbmi2 -mavx2`. AVX2 is required for the NNUE evaluation SIMD calculation; `-mbmi2` only lets the compiler emit BMI1 `tzcnt`/`blsr` bit-scan instructions for the `std::countr_zero` bit iteration. Sliding move generation uses magic bitboards (a portable multiply), so the `pext` instruction is **not** required.
 - GNU `make` for the Linux build, or **CMake ≥ 3.20** for the cross-platform / Windows build (see below).
 - `doxygen` (and optionally Graphviz `dot`) only if you want to build the API docs.
 
@@ -37,6 +37,7 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 make           # build/pawnstar
 make check     # build and run all test suites
 make tests     # build the test executables without running them
+make tools     # build helper tools (stamp_net, filter_book, nnue_quant_study, dump_magics)
 make doc       # generate Doxygen HTML into doc/html
 make clean     # remove build artifacts and generated docs
 ```
@@ -537,7 +538,8 @@ prints the available book moves and their frequencies for the current position.
 make check
 ```
 
-builds and runs seven standalone test executables:
+builds and runs seven standalone test executables (plus a shell-driven UCI integration test,
+`test/uci_test.sh`, run against `build/pawnstar` — eight suites in all):
 
 | Executable | Description |
 |---|---|
@@ -581,7 +583,7 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 |---|---|
 | `src/` | Engine source and headers |
 | `test/` | Standalone test programs |
-| `tools/` | Bullet trainer sources, training/verify/SPRT scripts, and helper tools (`stamp_net`, `filter_book`, `nnue_quant_study`) |
+| `tools/` | Bullet trainer sources, training/verify/SPRT scripts, and helper tools (`stamp_net`, `filter_book`, `nnue_quant_study`, `dump_magics`) |
 | `nnue/` | The shipped NNUE net (`pawnstar-v12.bin`) plus training-pipeline documentation |
 | `Doxyfile` | Doxygen configuration |
 | `LICENSE` | GNU General Public License v3 |

@@ -22,7 +22,8 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Engine ISA: BMI2 (pext sliding attacks) + AVX2 (NNUE SIMD). The AVX-VNNI output-dot kernel is compiled
+# Engine ISA: AVX2 (NNUE SIMD); -mbmi2 only lets the compiler emit BMI1 tzcnt/blsr for std::countr_zero
+# (sliding attacks use magic bitboards, not pext). The AVX-VNNI output-dot kernel is compiled
 # behind a function-level target attribute and chosen at runtime by cpuid, so no global -mavxvnni is needed
 # and the binary still runs on AVX2-only CPUs.
 add_compile_options(-mbmi2 -mavx2 -Wall -Wextra -Wpedantic)
