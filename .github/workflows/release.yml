@@ -1,0 +1,136 @@
+name: Release
+
+# Manually promote a successful CI run into a GitHub Release. Reuses the per-OS engine binaries that CI
+# already built and tested (downloaded from the chosen run — not rebuilt), and adds Doxygen HTML docs and a
+# source archive generated from that run's exact commit. Manual-only (workflow_dispatch); since dispatch is
+# restricted to users with write access, only maintainers can cut a release.
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "CI run to promote (numeric run id). Leave blank to use the latest successful CI run on main."
+        required: false
+        type: string
+      draft:
+        description: "Create the release as a draft (review before publishing)."
+        required: false
+        type: boolean
+        default: true
+
+# contents: write to create the tag + release; actions: read for gh run view/list/download (a permissions
+# block sets every unspecified scope to none, so actions: read must be explicit).
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    name: promote CI run to release
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # 1) Resolve the run id (input, or the latest successful CI run on main) and validate it is a green CI
+      #    run. Capture the run's commit SHA — the release is tagged at exactly that commit.
+      - name: Resolve and validate CI run
+        id: resolve
+        run: |
+          set -euo pipefail
+          run_id="${{ inputs.run_id }}"
+          if [ -z "$run_id" ]; then
+            run_id=$(gh run list --workflow CI --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId // ""')
+            [ -n "$run_id" ] || { echo "::error::no successful CI run found on main"; exit 1; }
+            echo "No run_id given; using latest successful CI run on main: $run_id"
+          fi
+          info=$(gh run view "$run_id" --json workflowName,conclusion,headSha)
+          workflow=$(echo "$info" | jq -r '.workflowName')
+          conclusion=$(echo "$info" | jq -r '.conclusion')
+          sha=$(echo "$info" | jq -r '.headSha')
+          [ "$workflow" = "CI" ]      || { echo "::error::run $run_id is workflow '$workflow', not 'CI'"; exit 1; }
+          [ "$conclusion" = "success" ] || { echo "::error::run $run_id did not succeed (conclusion=$conclusion)"; exit 1; }
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Promoting CI run $run_id at commit $sha"
+
+      # 2) Check out the promoted commit so docs and the source archive come from exactly that revision.
+      - name: Checkout promoted commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ steps.resolve.outputs.sha }}
+
+      # 3) Download the binary artifacts that CI built and tested for that run.
+      - name: Download CI artifacts
+        run: gh run download "${{ steps.resolve.outputs.run_id }}" --dir ci-artifacts
+
+      # 4) Derive the version from a binary filename (pawnstar_0_12_589 -> 0.12.589) so the tag always
+      #    matches the actual built binary, and stage the binaries under collision-free, platform-suffixed
+      #    names (the Linux and macOS binaries share the bare name pawnstar_<ver>).
+      - name: Stage binaries
+        id: stage
+        run: |
+          set -euo pipefail
+          linux_bin=$(ls ci-artifacts/pawnstar-linux-x86_64/pawnstar_*)
+          base=$(basename "$linux_bin")
+          ver=$(echo "$base" | sed -E 's/^pawnstar_([0-9]+)_([0-9]+)_([0-9]+)$/\1.\2.\3/')
+          [ "$ver" != "$base" ] || { echo "::error::could not parse version from '$base'"; exit 1; }
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          mkdir -p assets
+          cp ci-artifacts/pawnstar-linux-x86_64/pawnstar_*      "assets/pawnstar-$ver-linux-x86_64"
+          cp ci-artifacts/pawnstar-macos-arm64/pawnstar_*       "assets/pawnstar-$ver-macos-arm64"
+          cp ci-artifacts/pawnstar-windows-x86_64/pawnstar_*.exe "assets/pawnstar-$ver-windows-x86_64.exe"
+          echo "Staged binaries for version $ver"
+
+      # 5) Generate the Doxygen HTML docs from the promoted commit (graphviz/dot powers the diagrams).
+      - name: Install doc toolchain
+        run: sudo apt-get update && sudo apt-get install -y doxygen graphviz make
+      - name: Generate docs
+        run: |
+          set -euo pipefail
+          make doc
+          ( cd doc && zip -rq "../assets/pawnstar-${{ steps.stage.outputs.version }}-docs-html.zip" html )
+
+      # 6) Source archive at the promoted commit (clean tree, no .git). This is in addition to the "Source
+      #    code (zip/tar.gz)" archives GitHub auto-attaches to every release.
+      - name: Source archive
+        run: |
+          set -euo pipefail
+          ver="${{ steps.stage.outputs.version }}"
+          git archive --format=tar.gz --prefix="pawnstar-$ver/" -o "assets/pawnstar-$ver-source.tar.gz" HEAD
+
+      # 7) Create the release at the promoted commit with the staged assets. Notes = a provenance line
+      #    (which CI run / commit) followed by GitHub's auto-generated changelog. Fails if the tag already
+      #    exists (no clobber).
+      - name: Create release
+        run: |
+          set -euo pipefail
+          ver="${{ steps.stage.outputs.version }}"
+          tag="v$ver"
+          sha="${{ steps.resolve.outputs.sha }}"
+          run_id="${{ steps.resolve.outputs.run_id }}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "::error::release/tag $tag already exists — refusing to clobber"; exit 1
+          fi
+          changelog=$(gh api -X POST "repos/$GH_REPO/releases/generate-notes" \
+            -f tag_name="$tag" -f target_commitish="$sha" --jq '.body')
+          {
+            echo "Promoted from CI run [#$run_id](https://github.com/$GH_REPO/actions/runs/$run_id) at commit \`$sha\`."
+            echo
+            echo "$changelog"
+          } > notes.md
+          draft_flag=""
+          if [ "${{ inputs.draft }}" = "true" ]; then draft_flag="--draft"; fi
+          url=$(gh release create "$tag" \
+            --target "$sha" \
+            --title "Pawnstar $ver" \
+            --notes-file notes.md \
+            $draft_flag \
+            assets/*)
+          echo "Created release $tag: $url"
+          {
+            echo "### Release $tag"
+            echo "- Promoted CI run: #$run_id"
+            echo "- Commit: \`$sha\`"
+            echo "- Draft: ${{ inputs.draft }}"
+            echo "- URL: $url"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,6 @@
+# Exclude agent/harness state from `git archive` output — i.e. the source tarball the release workflow
+# (.github/workflows/release.yml) attaches to a release. These are local tooling files, not engine source.
+# Caveat: GitHub's automatically-attached "Source code (zip/tar.gz)" archives do not reliably honor
+# export-ignore, so this guarantees only our explicit source archive is clean; to keep these out of every
+# possible release bundle they would have to be untracked from the repo entirely.
+.claude/ export-ignore
