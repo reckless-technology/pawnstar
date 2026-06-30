@@ -11,7 +11,7 @@
 // a given commit. It defaults to 0 so that the test/tool translation units (which pull the engine in through
 // its headers but are not the engine build) and editor tooling still compile cleanly without the define.
 inline constexpr int kVersionMajor = 0;
-inline constexpr int kVersionMinor = 12;
+inline constexpr int kVersionMinor = 13;
 
 #ifndef PAWNSTAR_BUILD_NUMBER
 #define PAWNSTAR_BUILD_NUMBER 0
