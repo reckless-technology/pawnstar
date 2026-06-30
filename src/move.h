@@ -444,17 +444,66 @@ static_assert(sizeof(Move) == sizeof(uint64_t));
 /// A StackList is much faster than a std::vector, and more convenient than a raw std::array.
 typedef StackList<Move, kMaxMovesPerPosition> MoveList;
 
-/// @brief Sort moves best first, i.e. in descending score order.
-/// @tparam is_stable_sort True for stable (slower) sort, only required when processing the root node of the search.
-/// @param moves List of moves to be sorted.
-template <bool is_stable_sort> constexpr void SortMoves(MoveList &moves)
+/// @brief Sort moves best first (descending score) with an in-house stable bottom-up merge sort.
+///
+/// Stable and fully deterministic: equal-score moves keep their original generation order on every platform
+/// and C++ standard library, so the search tree — and the `bench` node count — is identical across
+/// libstdc++, libc++ and MSVC's STL. `std::sort` / `std::ranges::sort` leave the relative order of
+/// equal-keyed elements unspecified, and the three standard libraries tie-break differently, which made a
+/// fixed-depth search diverge between platforms (it would settle on a different, still-legal best move and
+/// report a different node count). A merge sort is naturally stable, so it removes that divergence at the
+/// source. (The former root-only `std::stable_sort` path is gone: every sort is now this one stable sort, so
+/// the root and the interior nodes order moves identically.)
+///
+/// The working buffer is a fixed @ref kMaxMovesPerPosition -element array on the stack, so the sort performs
+/// no heap allocation. It ping-pongs the data between the move list and that scratch buffer, one doubling
+/// pass at a time, and copies the result back into the list only if the final pass left it in the scratch.
+/// @param moves List of moves to be sorted in place.
+inline void SortMoves(MoveList &moves)
 {
-    if constexpr (is_stable_sort)
+    const int element_count = static_cast<int>(moves.size());
+    if (element_count < 2)
     {
-        std::ranges::stable_sort(moves, [](const Move &a, const Move &b) { return a.score() > b.score(); });
+        return;
     }
-    else
+    std::array<Move, kMaxMovesPerPosition> scratch; // stack working buffer; no heap allocation
+    Move                                  *source      = &moves[0];
+    Move                                  *destination = scratch.data();
+    for (int run_width = 1; run_width < element_count; run_width *= 2)
     {
-        std::ranges::sort(moves, [](const Move &a, const Move &b) { return a.score() > b.score(); });
+        for (int left = 0; left < element_count; left += 2 * run_width)
+        {
+            const int middle = std::min(left + run_width, element_count);
+            const int right  = std::min(left + 2 * run_width, element_count);
+            int       l = left, r = middle, out = left;
+            while (l < middle && r < right)
+            {
+                // Descending order. Take from the right run only when it is STRICTLY greater, so on equal
+                // scores the left (earlier-generated) move is kept first — this is what makes the sort stable.
+                if (source[r].score() > source[l].score())
+                {
+                    destination[out++] = source[r++];
+                }
+                else
+                {
+                    destination[out++] = source[l++];
+                }
+            }
+            while (l < middle)
+            {
+                destination[out++] = source[l++];
+            }
+            while (r < right)
+            {
+                destination[out++] = source[r++];
+            }
+        }
+        Move *const merged = destination; // the merged output is the input to the next, wider pass
+        destination        = source;
+        source             = merged;
+    }
+    if (source != &moves[0]) // an odd number of passes left the sorted data in scratch; copy it back
+    {
+        std::copy(source, source + element_count, &moves[0]);
     }
 }

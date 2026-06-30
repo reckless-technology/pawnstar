@@ -311,7 +311,7 @@ inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_m
         }
         move.AssignScore(sort);
     }
-    SortMoves<false>(moves);
+    SortMoves(moves);
 }
 
 /// @brief Check for draw by the 50-move rule.
@@ -820,7 +820,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
                 continue; // this helper thread skips this iteration depth
             }
         }
-        SortMoves<true>(move_list); // Sort based on scores from the previous iteration.
+        SortMoves(move_list); // Sort based on scores from the previous iteration.
         Variation child_pv{};
         int       alpha = kAlpha;
         if (is_main)

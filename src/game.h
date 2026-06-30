@@ -330,7 +330,7 @@ inline Move Game::SearchRootNode()
         const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score();
         move.AssignScore(score);
     }
-    SortMoves<true>(move_list);
+    SortMoves(move_list);
     Move best_move = move_list[0];
 
     // Lazy SMP: each thread runs an independent iterative-deepening search of the same root, sharing only the
