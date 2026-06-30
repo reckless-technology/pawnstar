@@ -22,11 +22,22 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Engine ISA: AVX2 (NNUE SIMD); -mbmi2 only lets the compiler emit BMI1 tzcnt/blsr for std::countr_zero
-# (sliding attacks use magic bitboards, not pext). The AVX-VNNI output-dot kernel is compiled
-# behind a function-level target attribute and chosen at runtime by cpuid, so no global -mavxvnni is needed
-# and the binary still runs on AVX2-only CPUs.
-add_compile_options(-mbmi2 -mavx2 -Wall -Wextra -Wpedantic)
+# Engine ISA, per architecture. On x86-64: AVX2 (NNUE SIMD); -mbmi2 only lets the compiler emit BMI1
+# tzcnt/blsr for std::countr_zero (sliding attacks use magic bitboards, not pext). The AVX-VNNI output-dot
+# kernel is compiled behind a function-level target attribute and chosen at runtime by cpuid, so no global
+# -mavxvnni is needed and the binary still runs on AVX2-only CPUs. On arm64 (Apple Silicon / aarch64) those
+# x86 options are hard errors; target a baseline with the AdvSIMD dot-product extension (FEAT_DotProd) the
+# NEON NNUE kernels use, with the SIMD scalar fallback in between.
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(arm64|aarch64|ARM64)$")
+  if(APPLE)
+    add_compile_options(-mcpu=apple-m1)
+  else()
+    add_compile_options(-march=armv8.2-a+dotprod)
+  endif()
+else()
+  add_compile_options(-mbmi2 -mavx2)
+endif()
+add_compile_options(-Wall -Wextra -Wpedantic)
 add_compile_options($<$<CONFIG:Release>:-O3>)
 add_compile_options($<$<CONFIG:RelWithDebInfo>:-O3>)
 

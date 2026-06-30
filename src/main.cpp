@@ -19,13 +19,16 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h> // GetModuleFileNameW (executable path); contained to this TU
+#elif defined(__APPLE__)
+#include <climits>       // PATH_MAX
+#include <mach-o/dyld.h> // _NSGetExecutablePath (executable path on macOS)
 #endif
 
 namespace
 {
 /// @brief Absolute path of the running executable, or an empty path on failure. Used by LocateResource to
-/// find the shipped net/book relative to the binary. Per-OS: GetModuleFileNameW on Windows, /proc/self/exe
-/// elsewhere.
+/// find the shipped net/book relative to the binary. Per-OS: GetModuleFileNameW on Windows,
+/// _NSGetExecutablePath on macOS, /proc/self/exe elsewhere.
 std::filesystem::path ExecutablePath()
 {
 #if defined(_WIN32)
@@ -36,6 +39,19 @@ std::filesystem::path ExecutablePath()
         return {}; // failed or truncated
     }
     return std::filesystem::path(std::wstring(buf, n));
+#elif defined(__APPLE__)
+    char          buf[PATH_MAX];
+    std::uint32_t size = sizeof(buf);
+    if (_NSGetExecutablePath(buf, &size) != 0)
+    {
+        return {}; // buffer too small (PATH_MAX is ample in practice, so this is effectively unreachable)
+    }
+    // _NSGetExecutablePath may yield a non-canonical path (symlinks, .., relative); canonicalise it so the
+    // resource lookup resolves, but fall back to the raw path if canonical() fails.
+    std::error_code       ec;
+    std::filesystem::path raw(buf);
+    std::filesystem::path resolved = std::filesystem::canonical(raw, ec);
+    return ec ? raw : resolved;
 #else
     std::error_code ec;
     return std::filesystem::read_symlink("/proc/self/exe", ec); // empty path on error

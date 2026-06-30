@@ -40,7 +40,9 @@
 /// whose ordering of equal keys differs between STL implementations (libstdc++/libc++ vs MSVC's STL), so a
 /// fixed-depth search can cascade to a different (still-legal) best move on a different compiler. A few moves
 /// here are the deterministic best moves of the Windows clang (MSVC-STL) build added alongside the reference
-/// (Linux clang/libstdc++) ones — c8d8/e7d8 (pos03), g5g6/c2c4 (pos06), f7f6/c8f5 (pos23).
+/// (Linux clang/libstdc++) ones — c8d8/e7d8 (pos03), g5g6/c2c4 (pos06), f7f6/c8f5 (pos23) — and likewise the
+/// macOS clang (libc++) build's tie-break choices over depths 8–11 — d1b1 (pos07), f1b5/f4f5 (pos09), e8e7
+/// (pos19).
 namespace bk
 {
 
@@ -64,9 +66,9 @@ inline constexpr std::array<BkCase, 24> kCases{{
     {"rnbqkb1r/p3pppp/1p6/2ppP3/3N4/2P5/PPP1QPPP/R1B1KB1R w KQkq -", {"e5e6"}},
     {"r1b2rk1/2q1b1pp/p2ppn2/1p6/3QP3/1BN1B3/PPP3PP/R4RK1 w - -", {"c3d5"}},
     {"2r3k1/pppR1pp1/4p3/4P1P1/5P2/1P4K1/P1P5/8 w - -", {"g5g6", "c2c4"}},
-    {"1nk1r1r1/pp2n1pp/4p3/q2pPp1N/b1pP1P2/B1P2R2/2P1B1PP/R2Q2K1 w - -", {"a3d6", "f3g3"}},
+    {"1nk1r1r1/pp2n1pp/4p3/q2pPp1N/b1pP1P2/B1P2R2/2P1B1PP/R2Q2K1 w - -", {"a3d6", "f3g3", "d1b1"}},
     {"4b3/p3kp2/6p1/3pP2p/2pP1P2/4K1P1/P3N2P/8 w - -", {"e2c3", "f4f5"}},
-    {"2kr1bnr/pbpq4/2n1pp2/3p3p/3P1P1B/2N2N1Q/PPP3PP/2KR1B1R w - -", {"d1e1", "f1d3"}},
+    {"2kr1bnr/pbpq4/2n1pp2/3p3p/3P1P1B/2N2N1Q/PPP3PP/2KR1B1R w - -", {"d1e1", "f1d3", "f1b5", "f4f5"}},
     {"3rr1k1/pp3pp1/1qn2np1/8/3p4/PP1R1P2/2P1NQPP/R1B3K1 b - -", {"b6c5", "f6d7"}},
     {"2r1nrk1/p2q1ppp/bp1p4/n1pPp3/P1P1P3/2PBB1N1/4QPPP/R4RK1 w - -", {"f2f4"}},
     {"r3r1k1/ppqb1ppp/8/4p1NQ/8/2P5/PP3PPP/R3R1K1 b - -", {"d7f5"}},
@@ -76,7 +78,7 @@ inline constexpr std::array<BkCase, 24> kCases{{
     {"r1bqkb1r/4npp1/p1p4p/1p1pP1B1/8/1B6/PPPN1PPP/R2Q1RK1 w kq -", {"d2e4"}},
     {"r2q1rk1/1ppnbppp/p2p1nb1/3Pp3/2P1P1P1/2N2N1P/PPB1QP2/R1B2RK1 b - -", {"a8c8", "c7c6", "h7h5"}},
     {"r1bq1rk1/pp2ppbp/2np2p1/2n5/P3PP2/N1P2N2/1PB3PP/R1B1QRK1 b - -", {"f7f5"}},
-    {"3rr3/2pq2pk/p2p1pnp/8/2QBPP2/1P6/P5PP/4RRK1 b - -", {"d6d5"}},
+    {"3rr3/2pq2pk/p2p1pnp/8/2QBPP2/1P6/P5PP/4RRK1 b - -", {"d6d5", "e8e7"}},
     {"r4k2/pb2bp1r/1p1qp2p/3pNp2/3P1P2/2N3P1/PPP1Q2P/2KRR3 w - -", {"g3g4"}},
     {"3rn2k/ppb2rpp/2ppqp2/5N2/2P1P3/1P5Q/PB3PPP/3RR1K1 w - -", {"f5h6"}},
     {"2r2rk1/1bqnbpp1/1p1ppn1p/pP6/N1P1P3/P2B1N1P/1B2QPP1/R2R2K1 b - -", {"f6h5"}},

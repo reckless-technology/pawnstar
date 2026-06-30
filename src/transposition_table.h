@@ -1,6 +1,5 @@
 #pragma once
 #include <atomic>
-#include <immintrin.h> // _mm_prefetch
 #include <memory>
 #include <optional>
 #include <utility>
@@ -117,7 +116,9 @@ class TranspositionTable
 /// latency of the random table access. Result-neutral. @param hash Zobrist hash to be probed soon.
 inline void TranspositionTable::Prefetch(zobrist_t hash) const
 {
-    _mm_prefetch(reinterpret_cast<const char *>(&table_[hash % size_]), _MM_HINT_T2 /*low temporal locality*/);
+    // Portable prefetch (clang/gcc on x86 and ARM alike): read access (rw = 0), low temporal locality
+    // (locality = 1, the equivalent of x86 _MM_HINT_T2). Avoids the x86-only <immintrin.h> _mm_prefetch.
+    __builtin_prefetch(reinterpret_cast<const char *>(&table_[hash % size_]), 0, 1);
 }
 
 /// @brief Create the transposition table.

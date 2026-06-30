@@ -1,7 +1,25 @@
 PROGRAM             = pawnstar
 CXX                 = clang++
 CPPFLAGS            = -I src
-CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++23 -mbmi2 -mavx2
+
+# Per-architecture ISA flags. x86-64 needs -mavx2 (NNUE SIMD) and -mbmi2 (BMI1 tzcnt/blsr for
+# std::countr_zero); those options are hard errors on ARM. On arm64 (Apple Silicon / aarch64) we instead
+# target a baseline that includes the AdvSIMD dot-product extension (FEAT_DotProd) the NEON NNUE kernels
+# will use, and the engine's SIMD falls back to its scalar path until the NEON kernels land. Detected from
+# uname so a single Makefile serves x86-64 Linux/Windows and arm64 macOS/Linux.
+UNAME_S             := $(shell uname -s 2>/dev/null)
+UNAME_M             := $(shell uname -m 2>/dev/null)
+ifneq (,$(filter arm64 aarch64,$(UNAME_M)))
+  ifeq ($(UNAME_S),Darwin)
+    ARCH_FLAGS      = -mcpu=apple-m1
+  else
+    ARCH_FLAGS      = -march=armv8.2-a+dotprod
+  endif
+else
+  ARCH_FLAGS        = -mbmi2 -mavx2
+endif
+
+CXXFLAGS            = $(CPPFLAGS) -Wall -Wextra -Wpedantic -std=c++23 $(ARCH_FLAGS)
 BUILD_DIR           = build
 DOC_DIR             = doc/html
 
@@ -96,7 +114,8 @@ tests: prep $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EX
 # `tools` so a broken helper (e.g. filter_book) fails the check, and on `all` so the engine binary exists
 # for the UCI protocol test (test/uci_test.sh, which drives build/pawnstar over stdin/stdout).
 check: tests tools all
-	@start=$$(date +%s%3N); \
+	@now_ms() { t=$$(date +%s%3N); case "$$t" in *[!0-9]*) echo $$(( $$(date +%s) * 1000 ));; *) echo "$$t";; esac; }; \
+	start=$$(now_ms); \
 	$(TEST_PERFT_EXE) && \
 	$(TEST_BK_NNUE_EXE) $(NNUE_NET) && \
 	$(TEST_NNUE_EXE) $(NNUE_NET) $(NNUE_REF) && \
@@ -105,7 +124,7 @@ check: tests tools all
 	$(TEST_BOOK_EXE) && \
 	$(TEST_CLOCK_EXE) && \
 	bash $(TEST_DIR)/uci_test.sh $(PROGRAM_EXE) && \
-	echo "make check: All tests passed in $$(( $$(date +%s%3N) - start )) ms"
+	echo "make check: All tests passed in $$(( $$(now_ms) - start )) ms"
 
 prep:
 	mkdir -p $(BUILD_DIR)
