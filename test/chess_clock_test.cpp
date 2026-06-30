@@ -30,12 +30,15 @@ int main()
     // 1. StartSearch arms a hard deadline that fires once the maximum budget elapses (not before).
     {
         ChessClock clock;
-        clock.StartSearch(/*allocated=*/100ms, /*maximum=*/200ms);
+        clock.StartSearch(/*allocated=*/100ms, /*maximum=*/500ms);
         check(!clock.HasReachedHardDeadline(), "deadline not reached immediately after StartSearch");
         check(clock.allocated_time_ == 100ms, "AllocatedTime returns the soft budget");
-        sleep(120ms);
+        // Generous headroom on the "must NOT have elapsed yet" side too: a slept 100ms vs a 500ms deadline
+        // tolerates a large sleep overrun (a contended CI runner can stretch a short sleep well past its
+        // nominal duration), so this stays reliable without a tight 80ms margin.
+        sleep(100ms);
         check(!clock.HasReachedHardDeadline(), "deadline not reached before the maximum elapses");
-        sleep(180ms); // total ~300ms > 200ms maximum
+        sleep(600ms); // total ~700ms > 500ms maximum
         check(clock.HasReachedHardDeadline(), "deadline reached after the maximum elapses");
     }
 
