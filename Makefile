@@ -42,6 +42,15 @@ VERSION_MAJOR      := $(shell sed -n 's/.*kVersionMajor = \([0-9][0-9]*\);.*/\1/
 VERSION_MINOR      := $(shell sed -n 's/.*kVersionMinor = \([0-9][0-9]*\);.*/\1/p' src/version.h)
 PROGRAM             = $(PROGRAM_BASE)_$(VERSION_MAJOR)_$(VERSION_MINOR)_$(BUILD_NUMBER)
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)$(EXE_SUFFIX)
+# Stable convenience name (build/pawnstar[.exe]) pointing at the version-named binary, so tooling, scripts
+# and docs can use a fixed path. A symlink on Linux/macOS; a plain copy on Windows (symlinks need privilege
+# there). The symlink target is the bare filename, so it resolves relative to build/.
+PROGRAM_ALIAS       = $(BUILD_DIR)/$(PROGRAM_BASE)$(EXE_SUFFIX)
+ifeq ($(OS),Windows_NT)
+MAKE_ALIAS          = cp -f $(PROGRAM_EXE) $(PROGRAM_ALIAS)
+else
+MAKE_ALIAS          = ln -sf $(PROGRAM)$(EXE_SUFFIX) $(PROGRAM_ALIAS)
+endif
 TEST_DIR            = test
 TOOLS_DIR           = tools
 TOOL_STAMP_EXE      = $(BUILD_DIR)/stamp_net$(EXE_SUFFIX)
@@ -195,9 +204,11 @@ $(EMBED_OBJECT): src/embedded_net.S $(EMBED_NET) | prep
 $(EMBED_BOOK_OBJECT): src/embedded_book.S $(EMBED_BOOK) | prep
 	$(CXX) -c -DEMBED_BOOK_PATH='"$(EMBED_BOOK)"' -o $@ src/embedded_book.S
 
-# Link the main executable (with the embedded-net and embedded-book objects).
+# Link the main executable (with the embedded-net and embedded-book objects), then refresh the stable
+# build/pawnstar alias pointing at it.
 $(PROGRAM_EXE): $(OBJECTS) $(EMBED_OBJECT) $(EMBED_BOOK_OBJECT)
 	$(CXX) $(CXXFLAGS) $(DEBUG_FLAGS) -o $(PROGRAM_EXE) $(OBJECTS) $(EMBED_OBJECT) $(EMBED_BOOK_OBJECT)
+	$(MAKE_ALIAS)
 
 # Header-only engine: each test executable is a single TU (its *_test.o) that pulls the engine in through
 # headers, so it links on its own — there are no engine objects to link against any more (and no main.o).

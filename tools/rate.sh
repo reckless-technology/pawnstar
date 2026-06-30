@@ -24,9 +24,9 @@
 set -uo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-# The engine binary is version-named (pawnstar_<major>_<minor>_<build>); default to the most recently built.
-ENGINE_DEFAULT="$(ls -t "$REPO"/build/pawnstar_* 2>/dev/null | head -n1)"
-ENGINE="${ENGINE:-${ENGINE_DEFAULT:-$REPO/build/pawnstar}}"
+# build/pawnstar is the stable symlink the build maintains to the latest version-named binary
+# (pawnstar_<major>_<minor>_<build>).
+ENGINE="${ENGINE:-$REPO/build/pawnstar}"
 NET="${NET:-$REPO/nnue/pawnstar-v12.bin}"
 OPENINGS="${OPENINGS:?set OPENINGS=<openings.epd>}"
 TC="${TC:-8+0.08}"

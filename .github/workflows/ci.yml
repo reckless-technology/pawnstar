@@ -64,3 +64,77 @@ jobs:
         run: cmake --build build
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  # ---------------------------------------------------------------------------------------------------------
+  # Build artifacts: a native engine executable for each OS, uploaded only after that platform's build AND
+  # test suite pass (the upload is a later step, so a failed build/test ends the job before it runs). Each
+  # job is self-contained — it builds a release binary (DEBUGX counters off) and runs the full suite on its
+  # own runner — so the uploaded binary is exactly the one that was tested. The executable is version-named
+  # pawnstar_<major>_<minor>_<build> (the build number is the git commit count, hence the full-history
+  # checkout). Download them from the run's "Artifacts" section.
+  # ---------------------------------------------------------------------------------------------------------
+
+  # Linux x86-64 (Makefile / clang, the canonical build).
+  artifact-linux:
+    name: artifact (linux x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang-18 make
+      - name: Check runner has AVX2 + BMI2
+        run: |
+          grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
+            || { echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1; }
+      - name: Build + test (release)
+        run: make -j"$(nproc)" RELEASE=1 WERROR=1 CXX=clang++-18 check
+      - name: Upload engine binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pawnstar-linux-x86_64
+          path: build/pawnstar_*
+          if-no-files-found: error
+
+  # macOS arm64 (Apple Silicon, Makefile / Apple clang; the arm64 path targets -mcpu=apple-m1).
+  artifact-macos:
+    name: artifact (macos arm64)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      # WERROR is omitted here: Apple clang's warning set differs from clang-18's and is not the CI gate.
+      - name: Build + test (release)
+        run: make -j"$(sysctl -n hw.logicalcpu)" RELEASE=1 check
+      - name: Upload engine binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pawnstar-macos-arm64
+          path: build/pawnstar_*
+          if-no-files-found: error
+
+  # Windows x86-64 (CMake + Ninja + clang, the CI-validated Windows path). msvc-dev-cmd supplies the MSVC
+  # STL/SDK that the VS-targeting clang links against; Git Bash (preinstalled) runs the ctest `uci` test.
+  artifact-windows:
+    name: artifact (windows x86_64)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: seanmiddleditch/gha-setup-ninja@v6
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAWNSTAR_DEBUGX=OFF -DCMAKE_CXX_COMPILER=clang++
+      - name: Build
+        run: cmake --build build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+      - name: Upload engine binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: pawnstar-windows-x86_64
+          path: build/pawnstar_*.exe
+          if-no-files-found: error

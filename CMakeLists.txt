@@ -109,6 +109,21 @@ if(NOT _vrc EQUAL 0 OR NOT _vbuild MATCHES "^[0-9]+$")
 endif()
 set_target_properties(pawnstar PROPERTIES OUTPUT_NAME "pawnstar_${_vmajor}_${_vminor}_${_vbuild}")
 
+# Stable convenience name (build/pawnstar[.exe]) pointing at the version-named binary, so tooling, scripts
+# and docs can use a fixed path. A symlink on Linux/macOS; a copy on Windows (symlinks need privilege there).
+# Mirrors the Makefile's PROGRAM_ALIAS.
+if(WIN32)
+  add_custom_command(TARGET pawnstar POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+      "$<TARGET_FILE:pawnstar>" "$<TARGET_FILE_DIR:pawnstar>/pawnstar${CMAKE_EXECUTABLE_SUFFIX}"
+    VERBATIM)
+else()
+  add_custom_command(TARGET pawnstar POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+      "$<TARGET_FILE_NAME:pawnstar>" "$<TARGET_FILE_DIR:pawnstar>/pawnstar${CMAKE_EXECUTABLE_SUFFIX}"
+    VERBATIM)
+endif()
+
 # --- Helper tools. ---
 add_executable(stamp_net        tools/stamp_net.cpp)
 add_executable(filter_book      tools/filter_book.cpp)

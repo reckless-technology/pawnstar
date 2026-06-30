@@ -45,9 +45,10 @@ make clean     # remove build artifacts and generated docs
 The engine binary is **version-named** `pawnstar_<major>_<minor>_<build>` (e.g. `build/pawnstar_0_12_587`).
 The major/minor come from [src/version.h](src/version.h) (edit by hand); the build number is the git commit
 count (`git rev-list --count HEAD`) — globally reproducible, identical for every clone at a given commit. The
-same string is reported to the UCI host as `id name Pawnstar <major>.<minor>.<build>`. The run examples below
-write `build/pawnstar`; substitute the version-named binary your build produced (`tools/run_sprt.sh` /
-`tools/rate.sh` auto-detect the most recently built one).
+same string is reported to the UCI host as `id name Pawnstar <major>.<minor>.<build>`. Each build also
+maintains a stable **`build/pawnstar`** alias (a symlink on Linux/macOS, a copy on Windows) pointing at the
+newest version-named binary, so the commands throughout this README — and tooling such as the VS Code
+debugger and `tools/run_sprt.sh` / `tools/rate.sh` — can use that fixed path regardless of the version.
 
 Debug build with AddressSanitizer + UndefinedBehaviorSanitizer:
 
