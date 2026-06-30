@@ -42,7 +42,7 @@ make doc       # generate Doxygen HTML into doc/html
 make clean     # remove build artifacts and generated docs
 ```
 
-The engine binary is **version-named** `pawnstar_<major>_<minor>_<build>` (e.g. `build/pawnstar_0_12_587`).
+The engine binary is **version-named** `pawnstar_<major>_<minor>_<build>` (e.g. `build/pawnstar_0_13_593`).
 The major/minor come from [src/version.h](src/version.h) (edit by hand); the build number is the git commit
 count (`git rev-list --count HEAD`) — globally reproducible, identical for every clone at a given commit. The
 same string is reported to the UCI host as `id name Pawnstar <major>.<minor>.<build>`. Each build also
@@ -107,6 +107,50 @@ the build to distribute) and runs `bench` under `wine` as a smoke test.
 
 The few platform-specific bits live in `src/platform.h` (CPU feature detection) and `main.cpp`
 (executable-path lookup); everything else is portable C++23.
+
+## Continuous integration and releases
+
+### CI
+
+Every push to `main`, every pull request to `main`, and manual dispatch runs
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) (the status badge at the top of this README reflects
+its latest result on `main`). The jobs:
+
+- **build + test (make)** — the canonical Linux build: `make WERROR=1 CXX=clang++-18 check` builds the
+  engine, tools and all eight test suites and runs them, behind a fail-fast AVX2/BMI2 runner check.
+- **clang-format** — the whole tree must be clang-format-clean (`clang-format-18 --dry-run -Werror`).
+- **cmake + ctest** — the cross-platform CMake build plus `ctest`, so the Windows build path can't rot.
+- **artifact (linux x86_64 / macos arm64 / windows x86_64)** — three per-OS jobs that build a release
+  binary, run the full test suite on that platform, and — only on success — upload the version-named
+  executable (`pawnstar_<major>_<minor>_<build>`, `.exe` on Windows) as a downloadable build artifact for
+  that run. The upload is the job's last step, so a failed build or test ends the job before anything is
+  published.
+
+CI checks out full git history (`fetch-depth: 0`) because the build number is the git commit count. `main`
+is not branch-protected, so CI reports but does not block direct pushes.
+
+### Releases
+
+Releases are cut manually by **promoting a successful CI run** — no separate rebuild — via
+[`.github/workflows/release.yml`](.github/workflows/release.yml), a `workflow_dispatch` workflow that only
+maintainers with write access can trigger. From the repository's **Actions → Release → Run workflow**, with
+two inputs:
+
+- **`run_id`** — the CI run to promote; leave blank to use the latest successful `CI` run on `main`.
+- **`draft`** — create the release as a draft to review before publishing (default `true`).
+
+It validates that the chosen run is a green `CI` run, downloads the exact binaries that run built and
+tested, checks out that commit to regenerate the docs and source, and creates a GitHub Release tagged
+`v<major>.<minor>.<build>` at that commit (failing if the tag already exists). Attached assets:
+
+- the three platform executables — `pawnstar-<ver>-linux-x86_64`, `pawnstar-<ver>-macos-arm64`,
+  `pawnstar-<ver>-windows-x86_64.exe`;
+- the Doxygen HTML documentation — `pawnstar-<ver>-docs-html.zip`;
+- a source archive — `pawnstar-<ver>-source.tar.gz` (alongside GitHub's automatic "Source code" archives).
+
+Because the binaries are the ones CI already tested, a release is a faithful promotion of a known-good
+build. Promote within the artifacts' retention window (90 days), since the workflow downloads the CI run's
+uploaded artifacts.
 
 ## Usage
 

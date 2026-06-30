@@ -1,4 +1,8 @@
 #pragma once
+/// @file generated_data.h Precomputed lookup tables (attack/ray bitboards, magic sliding-attack tables,
+/// intervening-squares masks and Zobrist hashes) used by pawnstar for hashing, move generation and attack
+/// detection. The tables are `inline const` globals defined in this header and computed once at startup
+/// (dynamic initialisation), so there is no build-time code-generation step.
 #include "bitboard.h"
 #include <algorithm>
 #include <array>
@@ -10,11 +14,6 @@
 #include <vector>
 
 using zobrist_t = uint64_t; ///< Zobrist hash value type.
-
-/// @file generated_data.h Declares precomputed lookup tables (attack/ray bitboards, magic sliding-attack
-/// tables, intervening-squares masks and Zobrist hashes) used by pawnstar for hashing, move generation and
-/// attack detection. The tables are `inline const` globals defined in this header and computed once at startup
-/// (dynamic initialisation), so there is no build-time code-generation step.
 
 /// @brief A magic-bitboard entry in the sliding-piece move generator array, for one square of one piece.
 /// Maps a masked occupancy to an attack set via a multiply-and-shift hash (hash = (occupancy * magic_) >>

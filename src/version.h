@@ -1,4 +1,5 @@
 #pragma once
+/// @file version.h Engine version constants and the "major.minor.build" version string.
 
 #include <format>
 #include <string>

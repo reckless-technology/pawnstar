@@ -1,4 +1,5 @@
 #pragma once
+/// @file transposition_table.h Lockless transposition table (Hyatt XOR trick) memoising search results.
 #include <atomic>
 #include <memory>
 #include <optional>

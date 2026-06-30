@@ -4,7 +4,7 @@
 # Idempotent: safe to re-run.
 #
 # The installed examples (tools/bullet/pawnstar.rs, pawnstar_eval.rs) hard-code the net width
-# (HIDDEN_SIZE / HIDDEN), which MUST equal the engine's nnue::kHiddenSize (512 for the shipped v4 net).
+# (HIDDEN_SIZE / HIDDEN), which MUST equal the engine's nnue::kHiddenSize (1024 for the shipped v12 net).
 # Change all three together to train a different-width architecture.
 #
 # Usage: setup_bullet.sh

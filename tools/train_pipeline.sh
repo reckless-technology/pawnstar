@@ -8,14 +8,14 @@
 #   * an already-converted bulletformat .data FILE (e.g. public PlentyChess data, already shuffled) ->
 #     trained directly, skipping the combine/convert/shuffle steps.
 #
-# The shipped nets (nnue/pawnstar-v4.bin and its predecessors from v2 on) were trained the second way,
+# The shipped net (nnue/pawnstar-v12.bin) and its predecessors from v2 on were trained the second way,
 # on public PlentyChess bulletformat data — strong-engine label quality, not self-play volume, is what
 # made NNUE beat the handcrafted eval. Self-play text was only the original bootstrap source.
 #
 # Usage: train_pipeline.sh <data_dir | shuffled.data> <out_net.bin> [end_superbatch]
 #
 # The net width is fixed by the trainer example (tools/bullet/pawnstar.rs, HIDDEN_SIZE) and MUST match
-# the engine's nnue::kHiddenSize (512 for v4). setup_bullet.sh installs/builds that example.
+# the engine's nnue::kHiddenSize (1024 for v12). setup_bullet.sh installs/builds that example.
 #
 # Prerequisites: CUDA toolkit at $CUDA_PATH, bullet cloned at $BULLET (default ~/pawnstar_nnue/bullet).
 set -euo pipefail

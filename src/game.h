@@ -1,4 +1,6 @@
 #pragma once
+/// @file game.h Game: the shared engine state (transposition table, clock, NNUE net, book, options) and the
+/// root search entry point, pulled in by all Lazy SMP threads.
 
 #include <algorithm>
 #include <array>

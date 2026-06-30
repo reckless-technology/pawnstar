@@ -9,7 +9,8 @@
 # Usage: tools/build_windows.sh [release|debug] [build_dir]
 #   release  (default) -DPAWNSTAR_DEBUGX=OFF — diagnostic counters compiled out; the build to distribute.
 #   debug              -DPAWNSTAR_DEBUGX=ON  — keeps the `dbg` UCI counters (slightly slower).
-#   build_dir          output directory (default build-win). The .exe lands at <build_dir>/pawnstar.exe.
+#   build_dir          output directory (default build-win). The version-named .exe lands at
+#                      <build_dir>/pawnstar_<major>_<minor>_<build>.exe, with a stable <build_dir>/pawnstar.exe alias.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."   # repo root

@@ -165,9 +165,11 @@ clean:
 	      $(TOOL_DUMPMAGICS_EXE) $(BUILD_DIR)/dump_magics.o $(BUILD_DIR)/dump_magics.d \
 	      $(OBJECTS) $(EMBED_OBJECT) $(EMBED_BOOK_OBJECT) $(TEST_OBJECTS) $(DEPS) $(TEST_DEPS)
 
-# Generate API documentation with doxygen (output configured by the Doxyfile).
+# Generate API documentation with doxygen (output configured by the Doxyfile). PROJECT_NUMBER is injected
+# here from the current version (appended to the piped config — doxygen takes the last assignment) so the
+# docs show major.minor.build without a stale hardcode in the Doxyfile.
 doc:
-	doxygen Doxyfile
+	( cat Doxyfile; printf 'PROJECT_NUMBER = %s.%s.%s\n' '$(VERSION_MAJOR)' '$(VERSION_MINOR)' '$(BUILD_NUMBER)' ) | doxygen -
 
 # Compile an engine source object.
 $(BUILD_DIR)/%.o: src/%.cpp
