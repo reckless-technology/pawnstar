@@ -105,9 +105,13 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+      # macOS ships bash 3.2 as /bin/bash, which lacks `coproc` (bash 4.0+) used by the UCI test; install a
+      # modern bash and point the Makefile at it via BASH.
+      - name: Install modern bash
+        run: brew install bash
       # WERROR is omitted here: Apple clang's warning set differs from clang-18's and is not the CI gate.
       - name: Build + test (release)
-        run: make -j"$(sysctl -n hw.logicalcpu)" RELEASE=1 check
+        run: make -j"$(sysctl -n hw.logicalcpu)" RELEASE=1 BASH="$(brew --prefix)/bin/bash" check
       - name: Upload engine binary
         uses: actions/upload-artifact@v4
         with:

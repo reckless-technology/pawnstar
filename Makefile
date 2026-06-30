@@ -1,5 +1,8 @@
 PROGRAM_BASE        = pawnstar
 CXX                 = clang++
+# Shell used to run the UCI integration test. It needs bash >= 4 (the script uses `coproc`); macOS still
+# ships bash 3.2 as /bin/bash, so override on macOS, e.g. `make check BASH=$(brew --prefix)/bin/bash`.
+BASH               ?= bash
 CPPFLAGS            = -I src
 
 # Per-architecture ISA flags. x86-64 needs -mavx2 (NNUE SIMD) and -mbmi2 (BMI1 tzcnt/blsr for
@@ -148,7 +151,7 @@ check: tests tools all
 	$(TEST_SEE_EXE) && \
 	$(TEST_BOOK_EXE) && \
 	$(TEST_CLOCK_EXE) && \
-	bash $(TEST_DIR)/uci_test.sh $(PROGRAM_EXE) && \
+	$(BASH) $(TEST_DIR)/uci_test.sh $(PROGRAM_EXE) && \
 	echo "make check: All tests passed in $$(( $$(now_ms) - start )) ms"
 
 prep:
