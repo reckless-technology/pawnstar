@@ -121,8 +121,9 @@ int main()
                  "(________) \n"
                  "/________\\\n"
                  "Pawnstar: a UCI compatible chess engine\n"
-                 "(C) Jonny Reckless 2009 - 2026\n"
-                 "Compiled: " __DATE__ " " __TIME__ "\n";
+                 "(C) Jonny Reckless 2009 - 2026\n";
+
+    std::cout << std::format("Version {} Compiled {} {}\n", VersionString(), __DATE__, __TIME__);
 
     auto game_ptr = std::make_unique<Game>();
 

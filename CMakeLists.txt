@@ -71,8 +71,43 @@ set_source_files_properties(src/embedded_net.S PROPERTIES
 set_source_files_properties(src/embedded_book.S PROPERTIES
   COMPILE_DEFINITIONS "EMBED_BOOK_PATH=\"${EMBED_BOOK}\"" OBJECT_DEPENDS "${EMBED_BOOK}")
 
+# --- Globally-reproducible build number (the git commit count) stamped into the engine version. Mirrors the
+#     Makefile's VERSION_HEADER: a per-build script writes a header defining PAWNSTAR_BUILD_NUMBER (only when
+#     the number changes), which is force-included into main.cpp (so version.h picks it up and the UCI "id
+#     name" carries the build number). The custom target has no OUTPUT, so it runs on every build.
+set(PAWNSTAR_BUILD_HEADER "${CMAKE_CURRENT_BINARY_DIR}/generated/pawnstar_build_number.h")
+add_custom_target(pawnstar_build_number
+  BYPRODUCTS "${PAWNSTAR_BUILD_HEADER}"
+  COMMAND ${CMAKE_COMMAND}
+    -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+    -DHEADER_FILE=${PAWNSTAR_BUILD_HEADER}
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/write_build_number.cmake
+  COMMENT "Writing Pawnstar build number"
+  VERBATIM)
+
 # --- Engine (entry point + the two embedded-resource objects, like the Makefile's engine link). ---
 add_executable(pawnstar src/main.cpp src/embedded_net.S src/embedded_book.S)
+add_dependencies(pawnstar pawnstar_build_number)
+set_source_files_properties(src/main.cpp PROPERTIES
+  COMPILE_OPTIONS "-include;${PAWNSTAR_BUILD_HEADER}")
+
+# Name the output executable pawnstar_<major>_<minor>_<build> (+ .exe on Windows), matching the Makefile.
+# Major/minor are read from src/version.h (single source of truth); the build number is the git commit count.
+# These are resolved at configure time, so reconfigure after a commit to refresh the filename (the embedded
+# version always tracks via the per-build header above).
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/version.h" _version_h)
+string(REGEX MATCH "kVersionMajor = ([0-9]+)" _ "${_version_h}")
+set(_vmajor "${CMAKE_MATCH_1}")
+string(REGEX MATCH "kVersionMinor = ([0-9]+)" _ "${_version_h}")
+set(_vminor "${CMAKE_MATCH_1}")
+execute_process(
+  COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" rev-list --count HEAD
+  OUTPUT_VARIABLE _vbuild OUTPUT_STRIP_TRAILING_WHITESPACE
+  RESULT_VARIABLE _vrc ERROR_QUIET)
+if(NOT _vrc EQUAL 0 OR NOT _vbuild MATCHES "^[0-9]+$")
+  set(_vbuild 0)
+endif()
+set_target_properties(pawnstar PROPERTIES OUTPUT_NAME "pawnstar_${_vmajor}_${_vminor}_${_vbuild}")
 
 # --- Helper tools. ---
 add_executable(stamp_net        tools/stamp_net.cpp)

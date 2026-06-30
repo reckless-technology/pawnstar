@@ -19,7 +19,10 @@ jobs:
     name: build + test (make)
     runs-on: ubuntu-latest
     steps:
+      # Full history (not a shallow clone) so `git rev-list --count HEAD` yields the true build number.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Install toolchain
         run: sudo apt-get update && sudo apt-get install -y clang-18 make
       - name: Check runner has AVX2 + BMI2
@@ -49,7 +52,10 @@ jobs:
     name: cmake + ctest
     runs-on: ubuntu-latest
     steps:
+      # Full history (not a shallow clone) so `git rev-list --count HEAD` yields the true build number.
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Install toolchain
         run: sudo apt-get update && sudo apt-get install -y clang-18 cmake ninja-build
       - name: Configure

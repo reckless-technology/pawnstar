@@ -24,6 +24,7 @@
 #include "position.h"
 #include "search_state.h"
 #include "transposition_table.h"
+#include "version.h"
 
 /// @brief Pointer to a command handler taking the game and the command's argument list.
 using HandlerFn = void (*)(Game &game, std::span<std::string> args);
@@ -106,7 +107,7 @@ inline void handle_getboard(Game &game, std::span<std::string>)
 /// @brief Handle the "uci" command: identify the engine and acknowledge UCI mode.
 inline void handle_uci(Game &game, std::span<std::string>)
 {
-    std::cout << "id name Pawnstar\n";
+    std::cout << std::format("id name Pawnstar {}\n", VersionString());
     std::cout << "id author Jonny Reckless\n";
     std::cout << "option name Hash type spin default " << kHashtableMegabytes << " min 1 max 4096\n";
     std::cout << "option name Threads type spin default " << game.thread_count_ << " min 1 max " << kMaxSearchThreads

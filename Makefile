@@ -1,4 +1,4 @@
-PROGRAM             = pawnstar
+PROGRAM_BASE        = pawnstar
 CXX                 = clang++
 CPPFLAGS            = -I src
 
@@ -34,6 +34,13 @@ EXE_SUFFIX          = .exe
 CPPFLAGS           += -D_CRT_SECURE_NO_WARNINGS
 endif
 
+# The target executable carries the engine version: pawnstar_<major>_<minor>_<build> (+ .exe on Windows).
+# Major/minor are read from src/version.h (the single source of truth, same as the C++ build); the build
+# number is the git commit count (BUILD_NUMBER, defined below). PROGRAM is recursively expanded, so it picks
+# up VERSION_MAJOR/MINOR/BUILD_NUMBER defined further down.
+VERSION_MAJOR      := $(shell sed -n 's/.*kVersionMajor = \([0-9][0-9]*\);.*/\1/p' src/version.h)
+VERSION_MINOR      := $(shell sed -n 's/.*kVersionMinor = \([0-9][0-9]*\);.*/\1/p' src/version.h)
+PROGRAM             = $(PROGRAM_BASE)_$(VERSION_MAJOR)_$(VERSION_MINOR)_$(BUILD_NUMBER)
 PROGRAM_EXE         = $(BUILD_DIR)/$(PROGRAM)$(EXE_SUFFIX)
 TEST_DIR            = test
 TOOLS_DIR           = tools
@@ -48,6 +55,12 @@ TOOL_DUMPMAGICS_EXE = $(BUILD_DIR)/dump_magics$(EXE_SUFFIX)
 # through its headers. Full cross-"file" inlining now happens within each TU at -O3, with no LTO needed.
 OBJECTS             = $(BUILD_DIR)/main.o
 DEPS                = $(OBJECTS:.o=.d)
+# Globally-reproducible build number = the git commit count (`git rev-list --count HEAD`): identical for
+# every clone at a given commit, monotonic along history, no state file. Falls back to 0 outside a git
+# checkout (e.g. a source tarball). Stamped into the engine via a generated header (see VERSION_HEADER) so
+# the UCI "id name" carries it. NOTE: a shallow clone (CI default) undercounts — fetch full history.
+BUILD_NUMBER       := $(shell git rev-list --count HEAD 2>/dev/null || echo 0)
+VERSION_HEADER      = $(BUILD_DIR)/version_build.h
 # The shipped NNUE net embedded into the engine binary (.incbin) as a runtime-load fallback. Linked into
 # the engine executable only — the test binaries load nets explicitly and don't need it.
 EMBED_NET           = nnue/pawnstar-v12.bin
@@ -101,9 +114,12 @@ endif
 # binary that also runs on AVX2-only CPUs (no -mavxvnni build flag needed; see Network::Evaluate /
 # OutputDotInt8Vnni in src/nnue.h). The exact int16 forward pass remains as EvaluateExact (test_nnue ref).
 
-.PHONY: all tests check prep clean doc tools
+.PHONY: all tests check prep clean doc tools FORCE
 
 all: prep $(PROGRAM_EXE)
+
+# Always-out-of-date target: a prerequisite of $(VERSION_HEADER) so the commit count is re-checked each build.
+FORCE:
 
 tools: prep $(TOOL_STAMP_EXE) $(TOOL_FILTERBOOK_EXE) $(TOOL_QUANT_EXE) $(TOOL_DUMPMAGICS_EXE)
 
@@ -130,7 +146,7 @@ prep:
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -f $(PROGRAM_EXE) $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) $(TEST_CLOCK_EXE) \
+	rm -f $(BUILD_DIR)/$(PROGRAM_BASE)* $(TEST_PERFT_EXE) $(TEST_SEE_EXE) $(TEST_BK_NNUE_EXE) $(TEST_NNUE_EXE) $(TEST_NNUE_INC_EXE) $(TEST_BOOK_EXE) $(TEST_CLOCK_EXE) \
 	      $(TOOL_STAMP_EXE) $(BUILD_DIR)/stamp_net.o $(BUILD_DIR)/stamp_net.d \
 	      $(TOOL_FILTERBOOK_EXE) $(BUILD_DIR)/filter_book.o $(BUILD_DIR)/filter_book.d \
 	      $(TOOL_QUANT_EXE) $(BUILD_DIR)/nnue_quant_study.o $(BUILD_DIR)/nnue_quant_study.d \
@@ -144,6 +160,19 @@ doc:
 # Compile an engine source object.
 $(BUILD_DIR)/%.o: src/%.cpp
 	$(CXX) -c $(CXXFLAGS) -MMD -MP -o $@ $<
+
+# Generate the build-number header (#define PAWNSTAR_BUILD_NUMBER <commit count>). The FORCE prerequisite
+# re-runs this every build so the committed count is always current, but the recipe rewrites the file only
+# when the number actually changes (cmp), so main.o — which force-includes it — recompiles only on a real
+# change, not on every `make`.
+$(VERSION_HEADER): FORCE | prep
+	@printf '#pragma once\n#define PAWNSTAR_BUILD_NUMBER %s\n' '$(BUILD_NUMBER)' > $@.tmp; \
+	if cmp -s $@.tmp $@; then rm -f $@.tmp; else mv $@.tmp $@; fi
+
+# Compile the engine entry point, force-including the generated build-number header (off every other TU, so
+# they don't all rebuild). This explicit rule takes precedence over the pattern rule above for main.o.
+$(BUILD_DIR)/main.o: src/main.cpp $(VERSION_HEADER) | prep
+	$(CXX) -c $(CXXFLAGS) -include $(VERSION_HEADER) -MMD -MP -o $@ $<
 
 # Compile a test source object.
 $(BUILD_DIR)/%.o: $(TEST_DIR)/%.cpp

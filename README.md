@@ -34,13 +34,20 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 ## Build
 
 ```bash
-make           # build/pawnstar
+make           # build/pawnstar_<major>_<minor>_<build>
 make check     # build and run all test suites
 make tests     # build the test executables without running them
 make tools     # build helper tools (stamp_net, filter_book, nnue_quant_study, dump_magics)
 make doc       # generate Doxygen HTML into doc/html
 make clean     # remove build artifacts and generated docs
 ```
+
+The engine binary is **version-named** `pawnstar_<major>_<minor>_<build>` (e.g. `build/pawnstar_0_12_587`).
+The major/minor come from [src/version.h](src/version.h) (edit by hand); the build number is the git commit
+count (`git rev-list --count HEAD`) — globally reproducible, identical for every clone at a given commit. The
+same string is reported to the UCI host as `id name Pawnstar <major>.<minor>.<build>`. The run examples below
+write `build/pawnstar`; substitute the version-named binary your build produced (`tools/run_sprt.sh` /
+`tools/rate.sh` auto-detect the most recently built one).
 
 Debug build with AddressSanitizer + UndefinedBehaviorSanitizer:
 

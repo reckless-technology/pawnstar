@@ -27,7 +27,10 @@ DEPTH="${4:-8}"
 BASELINE_NET="${BASELINE_NET:?set BASELINE_NET=<baseline net.bin> (NNUE is the only evaluator; SPRT is net-vs-net)}"
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-PS="$REPO/build/pawnstar"
+# The engine binary is version-named (pawnstar_<major>_<minor>_<build>); default to the most recently built
+# one. Override with BIN_A / BIN_B to A/B two specific versions.
+PS="$(ls -t "$REPO"/build/pawnstar_* 2>/dev/null | head -n1)"
+PS="${PS:-$REPO/build/pawnstar}"
 BIN_A="${BIN_A:-$PS}"
 BIN_B="${BIN_B:-$PS}"
 ELO0="${ELO0:-0}"
