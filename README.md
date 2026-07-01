@@ -78,7 +78,9 @@ make RELEASE=1
 
 The `DEBUGX` diagnostic counters (the `dbg` command's data) are compiled in by default and cost roughly
 6% on the search hot path; `RELEASE=1` leaves them out. It composes with `DEBUG=1` independently, and
-`WERROR=1` (`-DWERROR=ON`) turns warnings into errors.
+`WERROR=1` (`-DWERROR=ON`) turns warnings into errors. `make check` runs `ctest -V`, so each suite's own
+output (the `[PASS]`/`[FAIL]` lines, perft/bench numbers) is shown; pass `CTEST_ARGS=--output-on-failure`
+for a terse summary that prints a suite's output only when it fails.
 
 The wrapper reconfigures on each invocation, so branch/knob changes are picked up automatically; if a build
 ever looks stale, `make clean` and rebuild. Switching `CXX` for an existing tree needs `make clean` first

@@ -20,6 +20,10 @@
 BUILD_DIR ?= build
 CMAKE     ?= cmake
 CTEST     ?= ctest
+# ctest verbosity for `make check`. The default -V streams each suite's own output (the [PASS]/[FAIL] lines,
+# perft/SEE/bench numbers, ...) like the former direct-executable `make check`. Override for a terse summary,
+# e.g. `make check CTEST_ARGS=--output-on-failure` (prints a suite's output only when it fails).
+CTEST_ARGS ?= -V
 
 # Prefer Ninja; fall back to Unix Makefiles if it is not installed.
 ifeq ($(shell command -v ninja 2>/dev/null),)
@@ -83,7 +87,7 @@ tests: configure
 # Build everything (engine, tools, tests) and run the full ctest suite — the former `make check`.
 check: configure
 	$(CMAKE) --build $(BUILD_DIR) --parallel
-	$(CTEST) --test-dir $(BUILD_DIR) --output-on-failure
+	$(CTEST) --test-dir $(BUILD_DIR) $(CTEST_ARGS)
 
 doc: configure
 	$(CMAKE) --build $(BUILD_DIR) --target doc
