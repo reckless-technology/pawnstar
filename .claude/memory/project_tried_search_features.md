@@ -146,6 +146,21 @@ Search features already experimented on in Pawnstar (SPRT-tested) — do not re-
   is NOT available in clang 18 — use raw `__get_cpuid_count(7,1,...)`.** `target_clones` compiles in clang 18
   but warns; manual cpuid + two target-attributed functions is cleaner.
 
+- **Lazy material eval short-circuit: REJECTED, big loss −118 Elo @ 10+0.1** (2026-06-30, not shipped,
+  reverted; recorded in CLAUDE.md). Threaded `(alpha,beta)` into `EvaluatePosition`; if a cheap material-only
+  score (SEE piece values, rule50-scaled) was outside the window by `kLazyEvalMargin` it returned material and
+  skipped the NNUE forward pass *and* the accumulator catch-up. **Speedup was real** (margin 300: fired on 59%
+  of eval calls, forward passes −70%, +38% bench nps, ~21% faster to fixed depth) but quality collapsed:
+  Bratko-Kopec 24→**22/24 at d8, worsening to 21/24 at d12** (NOT recoverable shallow-depth sharpness), and
+  binary-vs-binary SPRT vs baseline (same v12 net, TC 10+0.1): **H0 accepted at 256 games, −118.4 ± 28.2 Elo
+  (33.6%, W51/L135/D70)**. Wider 600cp margin still failed BK 22/24 with firing down to 27% (speedup gutted).
+  **Root cause: NNUE diverges from raw material by ≫ any margin that still fires often enough to help**
+  (positional pressure, king safety, sac compensation), so the lazy path returns evals that are simply wrong
+  and wreck RFP/null-move/qsearch selection. A "cheap proxy" would have to *be* the net (FT-only estimate),
+  which isn't cheap. **Don't re-propose lazy eval with raw material.** (Gotcha that cost a minute: the engine
+  is header-only, so `make` rebuilds only the engine — test binaries embed the engine code and must be
+  rebuilt (`make check`/`make tests`) after reverting, else a stale test binary shows the old behaviour.)
+
 **How to apply:** before recommending a search/eval change, assume Jonny may have already SPRT-tested it
 and ask. The SPRT harness (`tools/run_sprt.sh` + fastchess) is the arbiter — he tests changes rather
 than taking them on theory. See [[project_nnue_experiment]].
