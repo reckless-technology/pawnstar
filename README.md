@@ -33,13 +33,25 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 
 ## Build
 
+CMake is the build system; a thin `Makefile` wrapper preserves the classic `make` UX on Unix-y shells (each
+target just invokes CMake). Both need `clang++` and CMake ≥ 3.20 with a generator (Ninja preferred; the
+wrapper falls back to Unix Makefiles if Ninja is absent). Use whichever you prefer:
+
 ```bash
-make           # build/pawnstar_<major>_<minor>_<build>
-make check     # build and run all test suites
+make           # engine → build/pawnstar_<major>_<minor>_<build> (+ the build/pawnstar alias)
+make check     # build everything and run all test suites (ctest)
 make tests     # build the test executables without running them
 make tools     # build helper tools (stamp_net, filter_book, nnue_quant_study, dump_magics)
 make doc       # generate Doxygen HTML into doc/html
-make clean     # remove build artifacts and generated docs
+make clean     # remove the build/ tree
+```
+
+or drive CMake directly (the canonical path, and how you build on Windows):
+
+```bash
+cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 The engine binary is **version-named** `pawnstar_<major>_<minor>_<build>` (e.g. `build/pawnstar_0_13_593`).
@@ -50,55 +62,54 @@ maintains a stable **`build/pawnstar`** alias (a symlink on Linux/macOS, a copy 
 newest version-named binary, so the commands throughout this README — and tooling such as the VS Code
 debugger and `tools/run_sprt.sh` / `tools/rate.sh` — can use that fixed path regardless of the version.
 
-Debug build with AddressSanitizer + UndefinedBehaviorSanitizer:
+Debug build with AddressSanitizer + UndefinedBehaviorSanitizer (`DEBUG=1` → CMake `-DCMAKE_BUILD_TYPE=Debug
+-DPAWNSTAR_SANITIZE=ON`):
 
 ```bash
 make DEBUG=1
 ```
 
-Release build for benchmarking, which omits the `DEBUGX` diagnostic counters:
+Release build for benchmarking, which omits the `DEBUGX` diagnostic counters (`RELEASE=1` →
+`-DPAWNSTAR_DEBUGX=OFF`):
 
 ```bash
 make RELEASE=1
 ```
 
 The `DEBUGX` diagnostic counters (the `dbg` command's data) are compiled in by default and cost roughly
-6% on the search hot path; `RELEASE=1` leaves them out. It composes with `DEBUG=1` independently.
+6% on the search hot path; `RELEASE=1` leaves them out. It composes with `DEBUG=1` independently, and
+`WERROR=1` (`-DWERROR=ON`) turns warnings into errors.
 
-After switching branches or changing generated files, run `make clean && make` — stale `.d`
-dependency files can otherwise cause spurious build failures.
+The wrapper reconfigures on each invocation, so branch/knob changes are picked up automatically; if a build
+ever looks stale, `make clean` and rebuild. Switching `CXX` for an existing tree needs `make clean` first
+(CMake caches the compiler).
 
-### Windows / cross-platform (CMake)
+### Windows / cross-platform
 
-The engine is portable to Windows with **clang** (the GNU Makefile above is the primary Linux build; a
-`CMakeLists.txt` builds the same engine, tools, and tests on both platforms). With a clang toolchain and
-Ninja:
+CMake builds the same engine, tools, and tests on Linux, macOS and Windows. On Windows use a **clang**
+toolchain with Ninja — the CI-validated path (the `make` wrapper is a Unix-shell convenience and isn't
+needed here):
 
 ```bash
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++
 cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-This produces a **self-contained** `build/pawnstar.exe` on Windows: the NNUE net and the opening book are
-compiled into the binary (the same `.incbin` embedding used on Linux), so it needs no external files — an
-on-disk `nnue/…bin` / `pawnstar.book` is only an optional override. The Windows build is **bit-identical** to
-Linux (same `bench` node count and perft) and passes the full test suite.
+This produces a **self-contained**, version-named `build/pawnstar_<major>_<minor>_<build>.exe` (plus a
+`build/pawnstar.exe` alias): the NNUE net and the opening book are compiled into the binary (the same
+`.incbin` embedding used on Linux), so it needs no external files — an on-disk `nnue/…bin` / `pawnstar.book`
+is only an optional override. The Windows build is **bit-identical** to Linux (same `bench` node count and
+perft) and passes the full test suite.
 
-The **Makefile** above also builds natively on Windows under **Git Bash** with the VS-bundled clang: it
-auto-detects Windows (`OS=Windows_NT`) to emit `.exe`-suffixed binaries (runnable from cmd/Explorer/GUIs,
-not only a Unix shell) and to silence MSVC's UCRT `getenv`/`setbuf` deprecation warnings, so `make`,
-`make WERROR=1`, and `make check` are all warning-clean. CMake + Ninja remains the recommended Windows path
-(it's what CI exercises); the Makefile is a convenient one-command fallback.
-
-Cross-compiling that `pawnstar.exe` from Linux (clang + MinGW-w64, statically linked so it also needs no
+Cross-compiling that `.exe` from Linux (clang + MinGW-w64, statically linked so it also needs no
 runtime DLLs) uses the bundled toolchain file; with `wine` installed, `ctest` runs the `.exe` suites under
 it:
 
 ```bash
 cmake -S . -B build-win -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-clang-toolchain.cmake -DCMAKE_BUILD_TYPE=Release
-cmake --build build-win                      # -> build-win/pawnstar.exe
+cmake --build build-win                      # -> build-win/pawnstar_<…>.exe (+ pawnstar.exe alias)
 ctest --test-dir build-win --output-on-failure
 ```
 
@@ -116,10 +127,10 @@ Every push to `main`, every pull request to `main`, and manual dispatch runs
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (the status badge at the top of this README reflects
 its latest result on `main`). The jobs:
 
-- **build + test (make)** — the canonical Linux build: `make WERROR=1 CXX=clang++-18 check` builds the
-  engine, tools and all eight test suites and runs them, behind a fail-fast AVX2/BMI2 runner check.
+- **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
+  build through the wrapper and runs all eight suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean (`clang-format-18 --dry-run -Werror`).
-- **cmake + ctest** — the cross-platform CMake build plus `ctest`, so the Windows build path can't rot.
 - **artifact (linux x86_64 / macos arm64 / windows x86_64)** — three per-OS jobs that build a release
   binary, run the full test suite on that platform, and — only on success — upload the version-named
   executable (`pawnstar_<major>_<minor>_<build>`, `.exe` on Windows) as a downloadable build artifact for
@@ -617,9 +628,9 @@ builds and runs seven standalone test executables (plus a shell-driven UCI integ
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
 asserts the incremental accumulator matches a full refresh at every node, and `test_bratko_kopec_nnue`
 which searches the 24 BK positions with the net (single-threaded, deterministic) and **must solve all 24**
-— each position's best move must be in its accepted-move set (the `kCases` array in `test/bratko_kopec_nnue_test.cpp`). The Makefile
-passes the net/reference via `$(wildcard …)`, so these degrade to a green no-op only if those files are
-absent. When you ship a new net, regenerate **both** `test/nnue_reference.txt` (bullet `pawnstar_eval`)
+— each position's best move must be in its accepted-move set (the `kCases` array in `test/bratko_kopec_nnue_test.cpp`). The NNUE
+ctest cases are registered only when the shipped net is present, so a checkout without it still configures
+and those suites simply don't run. When you ship a new net, regenerate **both** `test/nnue_reference.txt` (bullet `pawnstar_eval`)
 and the BK accepted moves (the net-specific union over depths 8–11) — see [nnue/README.md](nnue/README.md)
 §7.
 

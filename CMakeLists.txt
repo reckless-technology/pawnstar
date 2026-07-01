@@ -38,8 +38,22 @@ else()
   add_compile_options(-mbmi2 -mavx2)
 endif()
 add_compile_options(-Wall -Wextra -Wpedantic)
+# Optimisation/debug flavours matching the Makefile: Release is -O3 with debug info kept (the Makefile's
+# default `-g -O3 -DNDEBUG`; CMake defines NDEBUG for Release), Debug is `-Og -g` with asserts on (-DDEBUG).
 add_compile_options($<$<CONFIG:Release>:-O3>)
+add_compile_options($<$<CONFIG:Release>:-g>)
 add_compile_options($<$<CONFIG:RelWithDebInfo>:-O3>)
+add_compile_options($<$<CONFIG:Debug>:-Og>)
+add_compile_options($<$<CONFIG:Debug>:-g>)
+add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)
+
+# Optional AddressSanitizer + UndefinedBehaviorSanitizer (the Makefile's DEBUG=1), applied to compile and
+# link. The Makefile pairs this with a Debug build; the Makefile wrapper sets Debug + PAWNSTAR_SANITIZE together.
+option(PAWNSTAR_SANITIZE "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
+if(PAWNSTAR_SANITIZE)
+  add_compile_options(-fsanitize=undefined -fsanitize=address)
+  add_link_options(-fsanitize=undefined -fsanitize=address)
+endif()
 
 # On Windows, clang targets the MSVC ABI and pulls in Microsoft's UCRT headers, which mark standard C
 # functions (getenv, setbuf, ...) "deprecated/insecure" via _CRT_INSECURE_DEPRECATE. Those uses are correct,
@@ -100,12 +114,19 @@ string(REGEX MATCH "kVersionMajor = ([0-9]+)" _ "${_version_h}")
 set(_vmajor "${CMAKE_MATCH_1}")
 string(REGEX MATCH "kVersionMinor = ([0-9]+)" _ "${_version_h}")
 set(_vminor "${CMAKE_MATCH_1}")
-execute_process(
-  COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" rev-list --count HEAD
-  OUTPUT_VARIABLE _vbuild OUTPUT_STRIP_TRAILING_WHITESPACE
-  RESULT_VARIABLE _vrc ERROR_QUIET)
-if(NOT _vrc EQUAL 0 OR NOT _vbuild MATCHES "^[0-9]+$")
-  set(_vbuild 0)
+# The build number is the git commit count. The Makefile wrapper passes it as -DPAWNSTAR_VERSION_BUILD so
+# the versioned filename tracks each commit without a manual reconfigure (a changed cache value reconfigures
+# automatically); a direct cmake invocation without it falls back to computing the count here.
+if(DEFINED PAWNSTAR_VERSION_BUILD AND "${PAWNSTAR_VERSION_BUILD}" MATCHES "^[0-9]+$")
+  set(_vbuild "${PAWNSTAR_VERSION_BUILD}")
+else()
+  execute_process(
+    COMMAND git -C "${CMAKE_CURRENT_SOURCE_DIR}" rev-list --count HEAD
+    OUTPUT_VARIABLE _vbuild OUTPUT_STRIP_TRAILING_WHITESPACE
+    RESULT_VARIABLE _vrc ERROR_QUIET)
+  if(NOT _vrc EQUAL 0 OR NOT _vbuild MATCHES "^[0-9]+$")
+    set(_vbuild 0)
+  endif()
 endif()
 set_target_properties(pawnstar PROPERTIES OUTPUT_NAME "pawnstar_${_vmajor}_${_vminor}_${_vbuild}")
 
@@ -159,14 +180,35 @@ endif()
 # on Windows we prefer Git Bash (which understands C:/... paths) over the WSL `bash.exe` stub in System32
 # (which cannot read a Windows-style script path); on Linux these hints don't exist and it falls through to
 # the system /bin/bash.
+# HINTS are searched before the system PATH. On Windows they point at Git Bash (which understands C:/…
+# paths) over the WSL bash.exe stub. On macOS they point at Homebrew's bash — the system /bin/bash is 3.2
+# and lacks `coproc` (used by uci_test.sh), so a `brew install bash` is preferred over it. Override with
+# -DBASH_EXE=… (the Makefile wrapper maps `make check BASH=…` to it). On Linux none of these exist and it
+# falls through to /bin/bash.
 find_program(BASH_EXE NAMES bash
   HINTS
     "$ENV{ProgramFiles}/Git/bin"
     "$ENV{ProgramFiles}/Git/usr/bin"
     "$ENV{ProgramW6432}/Git/bin"
     "$ENV{ProgramW6432}/Git/usr/bin"
-    "$ENV{ProgramFiles\(x86\)}/Git/bin")
+    "$ENV{ProgramFiles\(x86\)}/Git/bin"
+    /opt/homebrew/bin
+    /usr/local/bin)
 if(BASH_EXE AND NOT CMAKE_CROSSCOMPILING)
   add_test(NAME uci COMMAND ${BASH_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/test/uci_test.sh $<TARGET_FILE:pawnstar>
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
+
+# --- API documentation. `cmake --build build --target doc` (or `make doc` via the wrapper) generates the
+#     Doxygen HTML into doc/html with PROJECT_NUMBER stamped from the current version (mirrors the Makefile's
+#     piped PROJECT_NUMBER, so the docs carry major.minor.build without hardcoding it in the Doxyfile). Not
+#     built by ALL.
+add_custom_target(doc
+  COMMAND ${CMAKE_COMMAND}
+    -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+    -DBIN_DIR=${CMAKE_CURRENT_BINARY_DIR}
+    -DVERSION=${_vmajor}.${_vminor}.${_vbuild}
+    -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_doxygen.cmake
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+  COMMENT "Generating Doxygen HTML (Pawnstar ${_vmajor}.${_vminor}.${_vbuild})"
+  VERBATIM)

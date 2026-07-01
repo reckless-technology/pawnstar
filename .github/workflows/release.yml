@@ -81,14 +81,18 @@ jobs:
           cp ci-artifacts/pawnstar-windows-x86_64/pawnstar_*.exe "assets/pawnstar-$ver-windows-x86_64.exe"
           echo "Staged binaries for version $ver"
 
-      # 5) Generate the Doxygen HTML docs from the promoted commit (graphviz/dot powers the diagrams).
+      # 5) Generate the Doxygen HTML docs from the promoted commit (graphviz/dot powers the diagrams). Run
+      #    the doc helper directly via `cmake -P` (same script the `doc` target uses, with the version
+      #    stamped as PROJECT_NUMBER) rather than `make doc` — this needs only cmake + doxygen, not a C++
+      #    compiler/generator, so the release job stays lean.
       - name: Install doc toolchain
-        run: sudo apt-get update && sudo apt-get install -y doxygen graphviz make
+        run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
       - name: Generate docs
         run: |
           set -euo pipefail
-          make doc
-          ( cd doc && zip -rq "../assets/pawnstar-${{ steps.stage.outputs.version }}-docs-html.zip" html )
+          ver="${{ steps.stage.outputs.version }}"
+          cmake -DSOURCE_DIR="$PWD" -DBIN_DIR="$PWD/build" -DVERSION="$ver" -P cmake/run_doxygen.cmake
+          ( cd doc && zip -rq "../assets/pawnstar-$ver-docs-html.zip" html )
 
       # 6) Source archive at the promoted commit (clean tree, no .git). This is in addition to the "Source
       #    code (zip/tar.gz)" archives GitHub auto-attaches to every release.
