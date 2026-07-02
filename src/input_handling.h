@@ -232,6 +232,10 @@ inline void handle_bench(Game &game, std::span<std::string> args)
     game.transposition_table_.Clear();
     game.eval_cache_.Clear();
 
+    // PAWNSTAR_BENCH_DEBUG dumps each position's bestmove and diagnostic counters after its search, for
+    // cross-engine comparison against the Go bench. Off by default, so normal bench output is unchanged.
+    const bool debug       = std::getenv("PAWNSTAR_BENCH_DEBUG") != nullptr;
+    int        pos_index   = 0;
     uint64_t   total_nodes = 0;
     const auto start       = ChessClock::Clock::now();
     for (const char *fen : kBenchFens)
@@ -239,8 +243,16 @@ inline void handle_bench(Game &game, std::span<std::string> args)
         game.SetPosition(fen);
         game.time_control_.clock_type_ = ChessClock::kFixedDepth; // SetPosition reset the clock; set fixed depth after
         game.time_control_.depth_      = depth;
-        game.SearchRootNode();
+        if (debug)
+            DebugXClear();
+        const Move move = game.SearchRootNode();
         total_nodes += game.last_search_node_count_;
+        if (debug)
+        {
+            std::cout << std::format("### pos {:02} bm={} nodes={}\n", ++pos_index, move.ToString(),
+                                     game.last_search_node_count_);
+            DebugXWrite();
+        }
     }
     const long long elapsed_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(ChessClock::Clock::now() - start).count();
