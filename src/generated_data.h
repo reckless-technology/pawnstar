@@ -317,8 +317,21 @@ constexpr MultiDimArray<Bitboard, 64, 64>::type MakeInterveningSquares()
 /// @brief The Zobrist tables are filled from this single fixed-seed PRNG. The three table globals below
 /// are defined in the historical draw order (piece-square, then castling rights, then en passant); within
 /// this translation unit they are dynamically initialised in definition order, so the PRNG is drawn in
-/// that order and the values match the old generated file. No table is stored twice.
-inline std::mt19937_64 g_zobrist_prng{0xAA55AA55AA55AA55ull};
+/// that order. A 64-bit xorshift* generator (rather than std::mt19937_64) so the Go port
+/// (engine/tables.go initZobrist) can reproduce the exact same sequence — and hence bit-identical Zobrist
+/// hashes — from a trivially portable algorithm. No table is stored twice.
+struct Xorshift64Star
+{
+    std::uint64_t state;
+    std::uint64_t operator()()
+    {
+        state ^= state >> 12;
+        state ^= state << 25;
+        state ^= state >> 27;
+        return state * 0x2545F4914F6CDD1Dull;
+    }
+};
+inline Xorshift64Star g_zobrist_prng{0xAA55AA55AA55AA55ull};
 
 inline MultiDimArray<zobrist_t, 2, 6, 64>::type MakePieceSquareHashes()
 {
