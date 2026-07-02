@@ -522,11 +522,26 @@ default stack), read-only after load and shared by all search threads. Its accum
 incrementally and lazily** on each thread's `SearchState` — only the feature columns for the pieces
 that moved are updated (a king crossing a file-pair or board-half bucket boundary rebuilds that one perspective's
 accumulator), and the update itself is deferred until an evaluation actually reads the accumulator, so nodes
-that cut off first pay nothing. Concretely, each `SearchState` tracks which ply its accumulator reflects
-(`accumulator_ply_`): `PlayMove` only pushes the child position, and `CurrentAccumulator()` walks the
-accumulator forward one cheap per-ply delta at a time — solely on an eval-cache *miss* that reads it (a hit
-skips even that) — while `UndoMove` reverses a ply only if the walk had reached it. This keeps NNUE
-competitive on equal time, not just equal depth. Weights are quantised
+that cut off first pay nothing. Concretely, each `SearchState` holds a **per-ply stack of accumulators** (`acc_stack_`, one entry per
+position on the search stack, with a parallel `acc_valid_` flag) — a *copy-make* scheme. `PlayMove` and
+`MakeNullMove` only push the child position and mark the new ply's accumulator stale; `UndoMove` is free
+(pop the stack — every ancestor accumulator stays valid for the next sibling). All the work is in
+`CurrentAccumulator()`, and only on an eval-cache *miss* that actually reads it (a hit skips even that): it
+walks back to the deepest valid ancestor, then for each ply forward **copies the parent accumulator and
+applies that move's feature delta** (add the arriving pieces' columns, subtract the departing ones; a king
+crossing a bucket boundary rebuilds that one perspective from scratch). Because ancestor accumulators are
+cached on the stack, switching to a sibling after a deep sub-search costs a single copy + delta rather than
+replaying moves. `acc_stack_` is `reserve`d to the maximum depth once at construction, so the search itself
+performs no heap allocation (and the reference `CurrentAccumulator` returns never dangles).
+
+Copy-make replaced an earlier single-accumulator *make/unmake* design (advance one accumulator forward on
+eval, reverse it on undo) after measurement. Both are bit-identical, but make/unmake does **two** incremental
+updates per evaluated node — forward on eval, reverse on undo — each re-reading feature-weight columns from
+L2, whereas copy-make does **one** update plus a cheap ~4 KB accumulator `memcpy`, and the copy is cheaper
+than a second weight-reading update. On the 16-position bench at depth 12 (identical node counts) copy-make
+measured **~14% higher nps** (≈12% less wall time), most of all in quiescence where nearly every node
+evaluates. The trade is memory footprint — a per-ply stack (~270 KB/thread) versus one 4 KB accumulator —
+for fewer weight-column reads. This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
 `int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) from the
 [bullet](https://github.com/jw1912/bullet) trainer. The feature transformer and accumulator stay `int16`,
 but the shipped forward pass runs the **output layer in `int8`** (uint8 SCReLU activations × int8 output

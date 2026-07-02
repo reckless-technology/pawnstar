@@ -68,8 +68,8 @@ class SearchState
     uint64_t                    node_count_;          ///< Cumulative nodes this thread searched.
     int                         seldepth_;            ///< Max ply reached this search (selective depth, for `info`).
     std::vector<Position>       positions_;           ///< Position stack.
-    mutable nnue::Accumulator   accumulator_;         ///< NNUE accumulator (lazily maintained; see CurrentAccumulator).
-    mutable int                 accumulator_ply_ = 0; ///< positions_ index the accumulator currently reflects.
+    mutable std::vector<nnue::Accumulator> acc_stack_; ///< Per-ply NNUE accumulators (copy-make; see CurrentAccumulator).
+    mutable std::vector<bool>              acc_valid_; ///< acc_stack_[i] is up to date iff acc_valid_[i].
     std::vector<HashEntry>      hash_stack_;          ///< Draw by repetition stack.
     std::array<Move, kContKeys> countermoves_;        ///< Best quiet countermove to prev move.
     std::unique_ptr<int16_t[]>  continuation_history_; ///< Continuation history scores.
@@ -178,7 +178,7 @@ inline void SearchState::RecordCountermove(Move prev, Move move)
 /// game history.
 /// @param game Game to search.
 inline SearchState::SearchState(Game &g)
-    : game_(g), history_(), node_count_(0), seldepth_(0), accumulator_(),
+    : game_(g), history_(), node_count_(0), seldepth_(0),
       continuation_history_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
 {
     // Initialise the killer and countermove tables to "no move". Their Move elements are default-constructed
@@ -207,8 +207,13 @@ inline SearchState::SearchState(Game &g)
     // Reserve the deepest the search can descend so no push_back during search reallocates.
     positions_.reserve(kMaxPly + 4);
     positions_.push_back(g.CurrentPosition());
-    // Seed the NNUE accumulator from the root position.
-    game_.nnue_network_.Refresh(accumulator_, positions_.back());
+    // Seed the per-ply NNUE accumulator stack. Reserve to the max depth so no push_back reallocates (which
+    // would dangle the reference CurrentAccumulator returns); acc_stack_[0] is the root accumulator.
+    acc_stack_.reserve(kMaxPly + 4);
+    acc_valid_.reserve(kMaxPly + 4);
+    acc_stack_.emplace_back();
+    acc_valid_.push_back(true);
+    game_.nnue_network_.Refresh(acc_stack_[0], positions_.back());
 }
 
 /// @brief Push the current position's hash then make the move on a copy of the position.
@@ -220,19 +225,20 @@ inline void SearchState::PlayMove(Move move)
     const Position &cur = CurrentPosition();
     hash_stack_.push_back({cur.hash_, cur.reversible_move_count_});
     positions_.push_back(cur.MakeMove(move));
+    const int d = static_cast<int>(positions_.size()) - 1; // this ply's accumulator is now stale
+    while (static_cast<int>(acc_valid_.size()) <= d)
+    {
+        acc_stack_.emplace_back();
+        acc_valid_.push_back(false);
+    }
+    acc_valid_[d] = false;
 }
 
 /// @brief Pop the position and hash stacks to undo the last move.
-/// Reverse the accumulator one ply ONLY if the lazy catch-up had advanced it to this child (otherwise it was
-/// never touched for this move, so undo is free). Update is reversible, so the reverse restores the parent.
+/// Copy-make: undo does no accumulator work — the ancestor accumulators in acc_stack_ stay valid, and this
+/// ply's slot is re-invalidated by the next PlayMove into it.
 inline void SearchState::UndoMove()
 {
-    const int tip = static_cast<int>(positions_.size()) - 1;
-    if (accumulator_ply_ == tip)
-    {
-        game_.nnue_network_.Update(accumulator_, positions_[tip], positions_[tip - 1]);
-        --accumulator_ply_;
-    }
     positions_.pop_back();
     hash_stack_.pop_back();
 }
@@ -243,13 +249,24 @@ inline void SearchState::UndoMove()
 /// deltas in the same order — but nodes that never evaluate (e.g. TT cutoffs) skip the work entirely.
 inline const nnue::Accumulator &SearchState::CurrentAccumulator() const
 {
-    const int tip = static_cast<int>(positions_.size()) - 1;
-    while (accumulator_ply_ < tip)
+    const int d = static_cast<int>(positions_.size()) - 1;
+    while (static_cast<int>(acc_stack_.size()) <= d)
     {
-        game_.nnue_network_.Update(accumulator_, positions_[accumulator_ply_], positions_[accumulator_ply_ + 1]);
-        ++accumulator_ply_;
+        acc_stack_.emplace_back();
+        acc_valid_.push_back(false);
     }
-    return accumulator_;
+    int k = d; // walk back to the deepest valid ancestor (acc_valid_[0] is seeded true)
+    while (k > 0 && !acc_valid_[k])
+    {
+        --k;
+    }
+    for (int j = k + 1; j <= d; ++j) // copy the parent accumulator, then apply this ply's feature delta
+    {
+        acc_stack_[j] = acc_stack_[j - 1];
+        game_.nnue_network_.Update(acc_stack_[j], positions_[j - 1], positions_[j]);
+        acc_valid_[j] = true;
+    }
+    return acc_stack_[d];
 }
 
 /// @brief Push a null move (skip this side's turn) used for null-move pruning.
@@ -259,6 +276,13 @@ inline void SearchState::MakeNullMove()
     const Position &cur = CurrentPosition();
     hash_stack_.push_back({cur.hash_, cur.reversible_move_count_});
     positions_.push_back(cur.MakeNullMove());
+    const int d = static_cast<int>(positions_.size()) - 1; // this ply's accumulator is now stale (null-move update is a no-op)
+    while (static_cast<int>(acc_valid_.size()) <= d)
+    {
+        acc_stack_.emplace_back();
+        acc_valid_.push_back(false);
+    }
+    acc_valid_[d] = false;
 }
 
 /// @brief Score moves for ordering, then sort descending.
