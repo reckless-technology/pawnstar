@@ -491,7 +491,16 @@ constexpr Position Position::MakeMove(const Move &move) const
     switch (move.type())
     {
     case Move::Type::kNonCapture:
-        ++position.reversible_move_count_;
+        // A single pawn push is encoded as kNonCapture (no dedicated type); like any pawn move it resets the
+        // fifty-move / reversible-move clock. Every other kNonCapture is a reversible piece move and increments.
+        if (piece == kPawn)
+        {
+            position.reversible_move_count_ = 0;
+        }
+        else
+        {
+            ++position.reversible_move_count_;
+        }
         position.MovePiece(color, piece, from, to);
         break;
 
