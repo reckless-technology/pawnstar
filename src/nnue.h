@@ -52,7 +52,7 @@ namespace nnue
 {
 
 constexpr int kInputSize      = 768; ///< Features per perspective per bucket: 2 colors * 6 types * 64 squares.
-constexpr int kNumKingBuckets = 4;   ///< King-square weight banks (1 = single bank, i.e. no king buckets).
+constexpr int kNumKingBuckets = 8;   ///< King-square weight banks (1 = single bank, i.e. no king buckets).
 constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
 constexpr int kHiddenSize     = 1024; ///< Feature-transformer / accumulator width per perspective.
 
@@ -320,10 +320,10 @@ constexpr std::array<int, 64> kKingBucketMap = {
     0, 0, 1, 1, 2, 2, 3, 3, //
     0, 0, 1, 1, 2, 2, 3, 3, //
     0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
 };
 
 /// @brief Feature row for a piece in one perspective's bucket bank.

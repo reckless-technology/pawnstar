@@ -7,6 +7,7 @@
 ///
 /// Usage:  test_nnue_incremental [net.bin]
 
+#include <memory>
 #include "game.h"
 #include "nnue.h"
 #include "position.h"
@@ -70,7 +71,8 @@ int main(int argc, char **argv)
         return test_report::Summary("incremental NNUE: skipped (no net supplied)");
     }
     // Load the net into a Game; SearchState then maintains the accumulator incrementally.
-    Game game;
+    auto game_ptr = std::make_unique<Game>();
+    Game &game = *game_ptr;
     if (!game.nnue_network_.Load(argv[1]) || !game.nnue_network_.loaded_)
     {
         test_report::Check(false, std::format("incremental NNUE: failed to load net '{}'", argv[1]));
