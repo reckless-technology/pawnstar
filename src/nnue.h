@@ -52,7 +52,7 @@ namespace nnue
 {
 
 constexpr int kInputSize      = 768; ///< Features per perspective per bucket: 2 colors * 6 types * 64 squares.
-constexpr int kNumKingBuckets = 4;   ///< King-square weight banks (1 = single bank, i.e. no king buckets).
+constexpr int kNumKingBuckets = 1;   ///< King-square weight banks (1 = single bank, i.e. no king buckets).
 constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
 constexpr int kHiddenSize     = 1024; ///< Feature-transformer / accumulator width per perspective.
 
@@ -316,14 +316,14 @@ inline int32_t HsumI32(__m256i v)
 /// serves both perspectives. MUST be byte-identical to the array passed to ChessBuckets::new in
 /// tools/bullet/*.rs.
 constexpr std::array<int, 64> kKingBucketMap = {
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
+    0, 0, 0, 0, 0, 0, 0, 0, //
 };
 
 /// @brief Feature row for a piece in one perspective's bucket bank.
