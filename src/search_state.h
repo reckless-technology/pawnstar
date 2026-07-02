@@ -122,7 +122,7 @@ inline void SearchState::RecordKiller(int ply, Move move)
 {
     if (!(killers_[ply][0] == move))
     {
-        INCREMENT("killer moves");
+        INCREMENT("killer beta cutoffs");
         killers_[ply][1] = killers_[ply][0];
         killers_[ply][0] = move;
     }
@@ -357,7 +357,7 @@ inline bool SearchState::IsDrawByRepetition() const
     {
         if (hash_stack_[i].hash_ == hash && --repetitions == 0)
         {
-            INCREMENT("draws by repetition SS");
+            INCREMENT("draws by repetition");
             return true;
         }
         if (hash_stack_[i].reversible_move_count_ == 0)
@@ -395,12 +395,12 @@ inline Move SearchState::SearchSingleMove(int depth, int ply, int alpha, int bet
     case Move::Type::kPromotionRook:
     case Move::Type::kPromotionQueen:
         ++child_depth;
-        INCREMENT("extensions promotion");
+        INCREMENT("promotion extensions");
         break;
 
     case Move::Type::kEpCapture:
         ++child_depth;
-        INCREMENT("extensions ep capture");
+        INCREMENT("ep capture extensions");
         break;
 
     default:
@@ -452,7 +452,7 @@ inline int SearchState::AttemptNullMove(int depth, int ply, int alpha, int beta,
         friendly.PopCount() > 3 && // we have at least 4 friendly pieces
         eval_score >= beta)        // and we are already failing high statically
     {
-        INCREMENT("null move");
+        INCREMENT("null move attempts");
         Variation dummy{};
         MakeNullMove();
         int score = -Search(depth - 4, ply + 1, -beta, -alpha, dummy, Move::None());
@@ -497,7 +497,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     }
     if (CurrentPosition().IsInCheck())
     {
-        INCREMENT("extensions check");
+        INCREMENT("check extensions");
         ++depth;
     }
     if (ply == kMaxPly)
@@ -542,7 +542,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     // where the per-node saving outweighs the lost ply (qsearch unaffected: depth stays >= the min depth - 1).
     if (depth >= kNoTTReduceMinDepth && (!transposition || transposition->move_ == Move::None()))
     {
-        INCREMENT("internal iterative reduction");
+        INCREMENT("internal iterative reductions");
         --depth;
     }
     // Can we go directly to the quiescence search?
@@ -562,7 +562,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         if (depth <= kRfpMaxDepth && std::abs(beta) < -kCheckmatedScore - kMaxPly &&
             eval_score - kRfpMargin * depth >= beta)
         {
-            INCREMENT("reverse futility prune");
+            INCREMENT("reverse futility prunes");
             return eval_score;
         }
         // Null move pruning, reusing the static eval.
@@ -651,7 +651,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         if (beta == alpha + 1 && !in_check_seq && depth <= kLmpMaxDepth && move.IsQuiet() && !move.IsChecking() &&
             move_index >= kLmpBase + depth * depth)
         {
-            INCREMENT("late move prune");
+            INCREMENT("late move prunes");
             continue;
         }
 
@@ -659,16 +659,16 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         int lmr_depth = depth;
         if (beta == alpha + 1 && move_index > 3 && !in_check_seq && depth > 2)
         {
-            INCREMENT("late move reduction");
+            INCREMENT("late move reduction 1");
             lmr_depth = depth - 1;
             if (depth > 3 && move_index > 6)
             {
                 --lmr_depth;
-                INCREMENT("late move reduction x2");
+                INCREMENT("late move reduction 2");
                 if (history_.GetCount(ply, move) == 0)
                 {
                     --lmr_depth;
-                    INCREMENT("late move reduction x3");
+                    INCREMENT("late move reduction 3");
                 }
             }
         }
@@ -773,7 +773,7 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
         // SEE pruning: skip captures that lose material.
         if (move.score() < 0)
         {
-            INCREMENT("quiescent negative see");
+            INCREMENT("quiescent see prunes");
             return best_score; // All moves after this are -ve SEE and may be skipped.
         }
         PlayMove(move);
@@ -800,6 +800,7 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
             }
         }
     }
+    INCREMENT("quiescent all nodes");
     return best_score;
 }
 

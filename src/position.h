@@ -724,13 +724,13 @@ constexpr bool Position::IsDrawByMaterial() const
         return true;
     case 2:
         // king vs king
-        INCREMENT("draws by material (2)");
+        INCREMENT("draws by material 2");
         return true;
     case 3:
         // king and bishop vs king or king and knight vs king
         if ((pieces_[kBishop] | pieces_[kKnight]).IsNotEmpty())
         {
-            INCREMENT("draws by material (3)");
+            INCREMENT("draws by material 3");
             return true;
         }
         return false;
@@ -744,7 +744,7 @@ constexpr bool Position::IsDrawByMaterial() const
             if (white_bishops.IsNotEmpty() && black_bishops.IsNotEmpty() &&
                 is_white_bishop_on_white_square == is_black_bishop_on_white_square)
             {
-                INCREMENT("draws by material (4)");
+                INCREMENT("draws by material 4");
                 return true;
             }
             return false;
