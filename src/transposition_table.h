@@ -109,7 +109,8 @@ class TranspositionTable
     static_assert(sizeof(AtomicEntry) == 16);
 
     std::unique_ptr<AtomicEntry[]> table_;      ///< Indexed using Zobrist hash; value-initialised to 0.
-    std::size_t                    size_;       ///< Number of cells in table_.
+    std::size_t                    size_;       ///< Number of cells in table_ (a power of two).
+    std::size_t                    mask_;       ///< size_ - 1; index = hash & mask_ (avoids a runtime modulo).
     uint8_t                        generation_; ///< Current generation; bumped by Age().
 };
 
@@ -119,7 +120,7 @@ inline void TranspositionTable::Prefetch(zobrist_t hash) const
 {
     // Portable prefetch (clang/gcc on x86 and ARM alike): read access (rw = 0), low temporal locality
     // (locality = 1, the equivalent of x86 _MM_HINT_T2). Avoids the x86-only <immintrin.h> _mm_prefetch.
-    __builtin_prefetch(reinterpret_cast<const char *>(&table_[hash % size_]), 0, 1);
+    __builtin_prefetch(reinterpret_cast<const char *>(&table_[hash & mask_]), 0, 1);
 }
 
 /// @brief Create the transposition table.
@@ -137,7 +138,16 @@ inline void TranspositionTable::Resize(std::size_t megabytes)
     {
         megabytes = 1;
     }
-    size_       = (megabytes * kMegabyte) / sizeof(AtomicEntry);
+    // Round the cell count down to a power of two so the index is a single AND (hash & mask_) rather than a
+    // modulo by a runtime size. sizeof(AtomicEntry) is 16, so a power-of-two MB request is already exact
+    // (the 64 MB default gives 2^22 cells); other requests use the largest power of two that fits the budget.
+    const std::size_t cells = (megabytes * kMegabyte) / sizeof(AtomicEntry);
+    size_                   = 1;
+    while ((size_ << 1) <= cells)
+    {
+        size_ <<= 1;
+    }
+    mask_       = size_ - 1;
     table_      = std::make_unique<AtomicEntry[]>(size_); // value-initialises every word to 0.
     generation_ = 0;
 }
@@ -159,7 +169,7 @@ inline void TranspositionTable::Clear()
 /// @return The matching transposition if found.
 inline std::optional<Transposition> TranspositionTable::FindTransposition(zobrist_t hash) const
 {
-    const AtomicEntry &e    = table_[hash % size_];
+    const AtomicEntry &e    = table_[hash & mask_];
     const uint64_t     data = e.data_.load(std::memory_order_relaxed);
     const uint64_t     key  = e.key_.load(std::memory_order_relaxed);
     if ((key ^ data) == hash)
@@ -175,7 +185,7 @@ inline std::optional<Transposition> TranspositionTable::FindTransposition(zobris
 /// @param transposition Transposition to be inserted.
 inline void TranspositionTable::RecordTransposition(const Transposition &transposition)
 {
-    AtomicEntry   &e        = table_[transposition.hash_ % size_];
+    AtomicEntry   &e        = table_[transposition.hash_ & mask_];
     const uint64_t cur_key  = e.key_.load(std::memory_order_relaxed);
     const uint64_t cur_data = e.data_.load(std::memory_order_relaxed);
     const Move     cur      = Move::FromBits(cur_data);
