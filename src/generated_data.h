@@ -323,6 +323,7 @@ constexpr MultiDimArray<Bitboard, 64, 64>::type MakeInterveningSquares()
 struct Xorshift64Star
 {
     std::uint64_t state;
+
     std::uint64_t operator()()
     {
         state ^= state >> 12;
@@ -331,6 +332,7 @@ struct Xorshift64Star
         return state * 0x2545F4914F6CDD1Dull;
     }
 };
+
 inline Xorshift64Star g_zobrist_prng{0xAA55AA55AA55AA55ull};
 
 inline MultiDimArray<zobrist_t, 2, 6, 64>::type MakePieceSquareHashes()

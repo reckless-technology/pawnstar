@@ -244,7 +244,9 @@ inline void handle_bench(Game &game, std::span<std::string> args)
         game.time_control_.clock_type_ = ChessClock::kFixedDepth; // SetPosition reset the clock; set fixed depth after
         game.time_control_.depth_      = depth;
         if (debug)
+        {
             DebugXClear();
+        }
         const Move move = game.SearchRootNode();
         total_nodes += game.last_search_node_count_;
         if (debug)
