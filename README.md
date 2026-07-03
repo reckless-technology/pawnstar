@@ -352,9 +352,10 @@ UCI thread can retarget the running search). It is covered by the `test_chess_cl
   [−15.99 ± 16.16], so the `depth − 4` cut stands.)
 - **Late-move reductions (LMR)** — at null-window nodes, any late move (past the 4th) outside a check
   sequence at `depth > 2` is searched one ply shallower, with a second ply shaved off past the 7th
-  move at `depth > 3`, and a third ply if that very-late move also has **zero history count** (the
-  least-promising quiets are pruned hardest). A reduced search that beats alpha is re-searched at full
-  depth. The third-ply reduction was SPRT-tested: roughly neutral at fast 8+0.08, but **+11 Elo
+  move at `depth > 3`, and a third ply **past the 12th move** (since the butterfly history table,
+  2026-07: pooled counts are rarely zero, so the old zero-history gate lost meaning; the ladder is now
+  purely lateness). A reduced search that beats alpha is re-searched at full
+  depth. The original zero-history third-ply reduction was SPRT-tested: roughly neutral at fast 8+0.08, but **+11 Elo
   (±18, 578 games)** at 40 moves/minute — a time-control-dependent gain that deeper trees reward.
 - **Late-move (move-count) pruning (LMP)** — at a non-PV node not in check at shallow depth (≤ 8), once
   past the `3 + depth²`-th move the remaining **quiet, non-checking** moves are skipped entirely (captures,
@@ -363,7 +364,8 @@ UCI thread can retarget the running search). It is covered by the `test_chess_cl
 - **Search extensions** for checks, promotions and en passant captures.
 - **Move ordering** — the TT move first, then winning/equal captures and promotions by static exchange
   evaluation, then the two killer moves for the ply, then the **countermove** (the best quiet refutation
-  to the previous move), then quiet moves scored by the **main history** count plus a **1-ply
+  to the previous move), then quiet moves scored by the **main history** count (a butterfly table
+  indexed by side to move and from/to square, pooling refutation statistics across all plies) plus a **1-ply
   continuation history** (how often the move was good as a follow-up to the previous move), and finally
   losing captures (negative SEE) below the quiet moves. A quiet move that causes a beta cutoff is
   recorded as a killer and as the countermove to the previous move; every good quiet move is rewarded in
