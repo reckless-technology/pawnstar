@@ -332,8 +332,9 @@ inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_m
         }
         else // quiet move: main history + 1-ply continuation history, clamped below the countermove
         {
-            const uint32_t h = history_.GetCount(ply, move) + (uint32_t)ContinuationHistScore(prev_move, move);
-            sort             = (int)std::min<uint32_t>(h, (uint32_t)kMaxQuiet);
+            const uint32_t h =
+                history_.GetCount(position.color_to_move_, move) + (uint32_t)ContinuationHistScore(prev_move, move);
+            sort = (int)std::min<uint32_t>(h, (uint32_t)kMaxQuiet);
         }
         move.AssignScore(sort);
     }
@@ -600,7 +601,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             INCREMENT("table move beta cutoffs");
             game_.transposition_table_.RecordTransposition(Transposition{CurrentPosition().hash_, transposition->move_,
                                                                          score, depth, Transposition::NodeType::kCut});
-            history_.RecordGoodMove(ply, transposition->move_);
+            history_.RecordGoodMove(CurrentPosition().color_to_move_, transposition->move_);
             RecordContinuationHistory(prev_move, transposition->move_);
             if (transposition->move_.IsQuiet())
             {
@@ -616,7 +617,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             alpha            = score;
             has_raised_alpha = true;
             CopyVariation(parent_pv, pv, transposition->move_); // capture the PV now, while pv holds THIS move's line
-            history_.RecordGoodMove(ply, transposition->move_);
+            history_.RecordGoodMove(CurrentPosition().color_to_move_, transposition->move_);
             RecordContinuationHistory(prev_move, transposition->move_);
         }
     }
@@ -667,7 +668,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             {
                 --lmr_depth;
                 INCREMENT("late move reduction 2");
-                if (history_.GetCount(ply, move) == 0)
+                if (move_index > 12)
                 {
                     --lmr_depth;
                     INCREMENT("late move reduction 3");
@@ -691,7 +692,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             INCREMENT("beta cutoffs");
             game_.transposition_table_.RecordTransposition(
                 Transposition{CurrentPosition().hash_, move, score, depth, Transposition::NodeType::kCut});
-            history_.RecordGoodMove(ply, move);
+            history_.RecordGoodMove(CurrentPosition().color_to_move_, move);
             RecordContinuationHistory(prev_move, move);
             if (move.IsQuiet())
             {
@@ -711,7 +712,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
                 alpha            = score;
                 has_raised_alpha = true;
                 CopyVariation(parent_pv, pv, move); // capture the PV now, while pv holds THIS move's line
-                history_.RecordGoodMove(ply, move);
+                history_.RecordGoodMove(CurrentPosition().color_to_move_, move);
                 RecordContinuationHistory(prev_move, move);
             }
         }
@@ -724,7 +725,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         INCREMENT("pv nodes");
         game_.transposition_table_.RecordTransposition(
             Transposition{CurrentPosition().hash_, best_move, alpha, depth, Transposition::NodeType::kPv});
-        history_.RecordGoodMove(ply, best_move);
+        history_.RecordGoodMove(CurrentPosition().color_to_move_, best_move);
         RecordContinuationHistory(prev_move, best_move);
         // parent_pv was already set, with the correct line, at the alpha-raise above.
     }
@@ -788,7 +789,7 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
         if (score >= beta)
         {
             INCREMENT("quiescent beta cutoffs");
-            history_.RecordGoodMove(ply, move);
+            history_.RecordGoodMove(CurrentPosition().color_to_move_, move);
             return score;
         }
         if (score > best_score)
@@ -798,7 +799,7 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
             {
                 alpha = score;
                 INCREMENT("quiescent pv changed");
-                history_.RecordGoodMove(ply, move);
+                history_.RecordGoodMove(CurrentPosition().color_to_move_, move);
             }
         }
     }
