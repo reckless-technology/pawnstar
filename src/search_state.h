@@ -62,16 +62,17 @@ class SearchState
 
   public:
     // State variables
-    Game                       &game_;                ///< Shared state: TT, clock, cancellation flag.
-    HistoryTable                history_;             ///< Per-thread history heuristic counts (no sharing).
-    KillerArray                 killers_;             ///< Killer moves indexed by ply.
-    uint64_t                    node_count_;          ///< Cumulative nodes this thread searched.
-    int                         seldepth_;            ///< Max ply reached this search (selective depth, for `info`).
-    std::vector<Position>       positions_;           ///< Position stack.
-    mutable std::vector<nnue::Accumulator> acc_stack_; ///< Per-ply NNUE accumulators (copy-make; see CurrentAccumulator).
-    mutable std::vector<bool>              acc_valid_; ///< acc_stack_[i] is up to date iff acc_valid_[i].
-    std::vector<HashEntry>      hash_stack_;          ///< Draw by repetition stack.
-    std::array<Move, kContKeys> countermoves_;        ///< Best quiet countermove to prev move.
+    Game                 &game_;       ///< Shared state: TT, clock, cancellation flag.
+    HistoryTable          history_;    ///< Per-thread history heuristic counts (no sharing).
+    KillerArray           killers_;    ///< Killer moves indexed by ply.
+    uint64_t              node_count_; ///< Cumulative nodes this thread searched.
+    int                   seldepth_;   ///< Max ply reached this search (selective depth, for `info`).
+    std::vector<Position> positions_;  ///< Position stack.
+    mutable std::vector<nnue::Accumulator>
+                                acc_stack_;    ///< Per-ply NNUE accumulators (copy-make; see CurrentAccumulator).
+    mutable std::vector<bool>   acc_valid_;    ///< acc_stack_[i] is up to date iff acc_valid_[i].
+    std::vector<HashEntry>      hash_stack_;   ///< Draw by repetition stack.
+    std::array<Move, kContKeys> countermoves_; ///< Best quiet countermove to prev move.
     std::unique_ptr<int16_t[]>  continuation_history_; ///< Continuation history scores.
 
     // Interface
@@ -276,7 +277,8 @@ inline void SearchState::MakeNullMove()
     const Position &cur = CurrentPosition();
     hash_stack_.push_back({cur.hash_, cur.reversible_move_count_});
     positions_.push_back(cur.MakeNullMove());
-    const int d = static_cast<int>(positions_.size()) - 1; // this ply's accumulator is now stale (null-move update is a no-op)
+    const int d =
+        static_cast<int>(positions_.size()) - 1; // this ply's accumulator is now stale (null-move update is a no-op)
     while (static_cast<int>(acc_valid_.size()) <= d)
     {
         acc_stack_.emplace_back();
