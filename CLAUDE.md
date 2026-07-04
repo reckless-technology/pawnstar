@@ -71,6 +71,21 @@ NNUE is the only evaluator (the handcrafted eval was removed), so the Bratko-Kop
 
 Three additional **artifact jobs** (`artifact-linux` ubuntu-latest, `artifact-macos` macos-latest/arm64, `artifact-windows` windows-latest) each build a release binary, run the full suite on that platform, and on success upload the version-named executable for download. The macOS job `brew install bash`s a modern bash (the system `/bin/bash` is 3.2 and lacks `coproc`, which `uci_test.sh` uses) and passes it via `make … BASH=…`. The Windows job uses the third-party `ilammy/msvc-dev-cmd` (MSVC STL/SDK) + `seanmiddleditch/gha-setup-ninja`.
 
+## Sibling ports
+
+Two **bit-exact ports** of this engine exist as sibling checkouts: **Go**
+([pawnstar-go](https://github.com/jonny-reckless/pawnstar-go), `../pawnstar-go`) and **Rust**
+([pawnstar-rs](https://github.com/jonny-reckless/pawnstar-rs), `../pawnstar-rs`). All three engines
+produce the identical single-threaded `bench` signature (6,888,983 nodes at depth 13 with net v12)
+and identical `PAWNSTAR_BENCH_DEBUG` transcripts (per-position nodes, best moves, every DEBUGX
+counter) — that transcript diff is the cross-engine parity check, and this repo's determinism
+engineering (the fixed-seed xorshift* Zobrist draw, the stable `SortMoves` insertion sort, the
+integer-only eval path) exists precisely to make it possible. **Any search/eval/ordering change
+here breaks parity with both ports until re-ported** (the Rust repo's bench-golden test fails by
+design; its CLAUDE.md documents the re-bless procedure). A 900-game round-robin at 10+0.1 (2026-07,
+300 games/pairing, UHO openings, single-threaded) measured all three within error bars of one
+another — C++ vs Rust was an exact 150–150 tie.
+
 ## Releases
 
 Releases are cut manually from [`.github/workflows/release.yml`](.github/workflows/release.yml), a `workflow_dispatch`-only workflow (so only write-access maintainers can trigger it; `gh workflow run Release`). It **promotes an existing successful CI run** rather than rebuilding: inputs are `run_id` (blank ⇒ latest successful `CI` run on `main`) and `draft` (default `true`). The job validates the run is a green `CI` run, `gh run download`s the per-OS binaries that run built and tested, checks out that exact commit, regenerates the Doxygen HTML (`make doc`) and a `git archive` source tarball from it, and `gh release create`s a release tagged `v<major>.<minor>.<build>` at the run's commit (no-clobber: fails if the tag exists). Assets: the three platform binaries (renamed `pawnstar-<ver>-<os>` to avoid the bare-name collision between Linux and macOS), `pawnstar-<ver>-docs-html.zip`, and `pawnstar-<ver>-source.tar.gz` (plus GitHub's automatic source archives). Needs `contents: write` + `actions: read`. [.gitattributes](.gitattributes) marks `.claude/ export-ignore` so the source tarball omits agent/harness state (GitHub's automatic source archives don't honour export-ignore, so only the explicit tarball is guaranteed clean). Promote within the 90-day artifact-retention window.
