@@ -371,8 +371,9 @@ inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_m
             // Signed arithmetic: the gravity update drives history entries negative, so a negative sum must
             // stay negative (and sort below the quiet band) — an unsigned clamp would wrap it to a huge value
             // and mis-order. Clamp only the HIGH side (kMaxQuiet); negative sums pass through.
-            const int h = (int)history_.GetCount(position.color_to_move_, move) + ContinuationHistScore(prev_move, move);
-            sort         = std::min(h, kMaxQuiet);
+            const int h =
+                (int)history_.GetCount(position.color_to_move_, move) + ContinuationHistScore(prev_move, move);
+            sort = std::min(h, kMaxQuiet);
         }
         move.AssignScore(sort);
     }
