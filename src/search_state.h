@@ -24,6 +24,7 @@
 #include <iterator>
 #include <memory>
 #include <ranges>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -94,8 +95,9 @@ class SearchState
     void RecordKiller(int ply, Move move);
     int  ContinuationHistScore(Move prev, Move move) const;
     bool IsCountermove(Move prev, Move move) const;
-    void RecordContinuationHistory(Move prev, Move move);
+    void ApplyContinuationHistoryBonus(Move prev, Move move, int32_t bonus);
     void RecordCountermove(Move prev, Move move);
+    void RecordGood(int ply, int depth, Move prev, Move move, bool is_cutoff, std::span<const Move> quiets_tried);
 
   private:
     int AttemptNullMove(int depth, int ply, int alpha, int beta, int eval_score);
@@ -142,18 +144,18 @@ inline bool SearchState::IsCountermove(Move prev, Move move) const
     return countermoves_[prev.piece_to()] == move;
 }
 
-/// @brief Reward a quiet @p move that was good (raised alpha or cut) as a follow-up to @p prev.
-/// Captures are ignored (they are ordered by SEE, not history). Saturating count, like HistoryTable.
-inline void SearchState::RecordContinuationHistory(Move prev, Move move)
+/// @brief Credit (bonus > 0) or debit (bonus < 0) the 1-ply continuation-history entry for playing
+/// @p move after @p prev, with the same gravity as the butterfly table. Non-quiet moves are skipped
+/// (captures are ordered by SEE, not history). The entry is stored as int16_t.
+inline void SearchState::ApplyContinuationHistoryBonus(Move prev, Move move, int32_t bonus)
 {
-    if (move.IsQuiet())
+    if (!move.IsQuiet())
     {
-        int16_t &c = continuation_history_[prev.piece_to() * kContKeys + move.piece_to()];
-        if (c < 16384)
-        {
-            ++c;
-        }
+        return;
     }
+    int32_t entry = continuation_history_[prev.piece_to() * kContKeys + move.piece_to()];
+    ApplyGravity(entry, bonus);
+    continuation_history_[prev.piece_to() * kContKeys + move.piece_to()] = static_cast<int16_t>(entry);
 }
 
 /// @brief Record a quiet @p move that caused a beta cutoff as the countermove to @p prev.
@@ -162,6 +164,40 @@ inline void SearchState::RecordCountermove(Move prev, Move move)
     if (move.IsQuiet())
     {
         countermoves_[prev.piece_to()] = move;
+    }
+}
+
+/// @brief Credit @p move (which raised alpha, or caused a beta cutoff when @p is_cutoff) into the
+/// move-ordering heuristics with a depth-weighted gravity bonus: the butterfly history and the 1-ply
+/// continuation history for @p move. On a beta cutoff it additionally (a) debits every other quiet move
+/// that was searched at this node but failed (the malus, over @p quiets_tried) and (b) makes a quiet
+/// @p move the killer at @p ply and the countermove to @p prev.
+/// @param ply Current search ply. @param depth Adjusted node depth (drives the bonus magnitude).
+/// @param prev Move played at the parent to reach this node. @param move The good move to credit.
+/// @param is_cutoff Whether @p move caused a beta cutoff (vs merely raising alpha).
+/// @param quiets_tried The quiet moves searched at this node before @p move (for the cutoff malus).
+inline void SearchState::RecordGood(int ply, int depth, Move prev, Move move, bool is_cutoff,
+                                    std::span<const Move> quiets_tried)
+{
+    const Color   c     = CurrentPosition().color_to_move_;
+    const int32_t bonus = HistoryBonus(depth);
+    history_.ApplyBonus(c, move, bonus);
+    ApplyContinuationHistoryBonus(prev, move, bonus);
+    if (is_cutoff)
+    {
+        for (const Move &quiet : quiets_tried)
+        {
+            if (!(quiet == move)) // identity compare (operator== masks to the identity bits, ignoring score)
+            {
+                history_.ApplyBonus(c, quiet, -bonus);
+                ApplyContinuationHistoryBonus(prev, quiet, -bonus);
+            }
+        }
+        if (move.IsQuiet())
+        {
+            RecordKiller(ply, move);
+            RecordCountermove(prev, move);
+        }
     }
 }
 
@@ -332,9 +368,11 @@ inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_m
         }
         else // quiet move: main history + 1-ply continuation history, clamped below the countermove
         {
-            const uint32_t h =
-                history_.GetCount(position.color_to_move_, move) + (uint32_t)ContinuationHistScore(prev_move, move);
-            sort = (int)std::min<uint32_t>(h, (uint32_t)kMaxQuiet);
+            // Signed arithmetic: the gravity update drives history entries negative, so a negative sum must
+            // stay negative (and sort below the quiet band) — an unsigned clamp would wrap it to a huge value
+            // and mis-order. Clamp only the HIGH side (kMaxQuiet); negative sums pass through.
+            const int h = (int)history_.GetCount(position.color_to_move_, move) + ContinuationHistScore(prev_move, move);
+            sort         = std::min(h, kMaxQuiet);
         }
         move.AssignScore(sort);
     }
@@ -585,6 +623,13 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     Move      best_move        = Move::None();
     int       best_score       = kAlpha;
     bool      has_raised_alpha = false;
+
+    // quiets_tried collects the quiet moves searched at this node (TT move included) so a later beta cutoff
+    // can penalise the ones that failed (the history malus in RecordGood). Stack-backed to avoid a per-node
+    // heap allocation; capped at 64 (deeper is rare and the tail matters least).
+    std::array<Move, 64> quiets_buffer;
+    int                  quiets_count = 0;
+
     if (transposition && transposition->move_ != Move::None())
     {
         INCREMENT("table move");
@@ -601,14 +646,14 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             INCREMENT("table move beta cutoffs");
             game_.transposition_table_.RecordTransposition(Transposition{CurrentPosition().hash_, transposition->move_,
                                                                          score, depth, Transposition::NodeType::kCut});
-            history_.RecordGoodMove(CurrentPosition().color_to_move_, transposition->move_);
-            RecordContinuationHistory(prev_move, transposition->move_);
-            if (transposition->move_.IsQuiet())
-            {
-                RecordKiller(ply, transposition->move_);
-                RecordCountermove(prev_move, transposition->move_);
-            }
+            RecordGood(ply, depth, prev_move, transposition->move_, true,
+                       std::span<const Move>{quiets_buffer.data(), static_cast<std::size_t>(quiets_count)});
             return score;
+        }
+        // Record the TT move as tried (after its own cutoff check) so a later sibling's cutoff penalises it.
+        if (transposition->move_.IsQuiet())
+        {
+            quiets_buffer[quiets_count++] = transposition->move_;
         }
         best_score = score;
         if (score > alpha)
@@ -617,8 +662,8 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             alpha            = score;
             has_raised_alpha = true;
             CopyVariation(parent_pv, pv, transposition->move_); // capture the PV now, while pv holds THIS move's line
-            history_.RecordGoodMove(CurrentPosition().color_to_move_, transposition->move_);
-            RecordContinuationHistory(prev_move, transposition->move_);
+            RecordGood(ply, depth, prev_move, transposition->move_, false,
+                       std::span<const Move>{quiets_buffer.data(), static_cast<std::size_t>(quiets_count)});
         }
     }
 
@@ -676,6 +721,14 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             }
         }
 
+        // Record this quiet move as tried before searching it, so a later sibling's cutoff penalises it (the
+        // eventual cutoff move is IN the list and excluded inside RecordGood). After LMP so pruned moves are
+        // not recorded — matching the Go engine.
+        if (move.IsQuiet() && quiets_count < 64)
+        {
+            quiets_buffer[quiets_count++] = move;
+        }
+
         pv.clear(); // see TT-move note: clear so a non-PV-node child leaves no stale tail in pv
         int score = SearchSingleMove(lmr_depth, ply, alpha, beta, move, pv, move_index).score();
         if (score > alpha && lmr_depth < depth)
@@ -692,13 +745,8 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             INCREMENT("beta cutoffs");
             game_.transposition_table_.RecordTransposition(
                 Transposition{CurrentPosition().hash_, move, score, depth, Transposition::NodeType::kCut});
-            history_.RecordGoodMove(CurrentPosition().color_to_move_, move);
-            RecordContinuationHistory(prev_move, move);
-            if (move.IsQuiet())
-            {
-                RecordKiller(ply, move);
-                RecordCountermove(prev_move, move);
-            }
+            RecordGood(ply, depth, prev_move, move, true,
+                       std::span<const Move>{quiets_buffer.data(), static_cast<std::size_t>(quiets_count)});
             return score;
         }
         if (score > best_score)
@@ -712,8 +760,8 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
                 alpha            = score;
                 has_raised_alpha = true;
                 CopyVariation(parent_pv, pv, move); // capture the PV now, while pv holds THIS move's line
-                history_.RecordGoodMove(CurrentPosition().color_to_move_, move);
-                RecordContinuationHistory(prev_move, move);
+                RecordGood(ply, depth, prev_move, move, false,
+                           std::span<const Move>{quiets_buffer.data(), static_cast<std::size_t>(quiets_count)});
             }
         }
     }
@@ -725,8 +773,8 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         INCREMENT("pv nodes");
         game_.transposition_table_.RecordTransposition(
             Transposition{CurrentPosition().hash_, best_move, alpha, depth, Transposition::NodeType::kPv});
-        history_.RecordGoodMove(CurrentPosition().color_to_move_, best_move);
-        RecordContinuationHistory(prev_move, best_move);
+        RecordGood(ply, depth, prev_move, best_move, false,
+                   std::span<const Move>{quiets_buffer.data(), static_cast<std::size_t>(quiets_count)});
         // parent_pv was already set, with the correct line, at the alpha-raise above.
     }
     else
