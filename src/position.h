@@ -48,9 +48,11 @@ class Position
     constexpr bool      IsAttacked(Square s, Color c) const;
     constexpr bool      IsDrawByMaterial() const;
     constexpr bool      IsInCheck() const;
+    constexpr bool      HasBothKings() const;
 
   private:
     // Private helpers
+    static Position     ParseFen(std::string_view fen_string);                       ///< Parse a FEN (may fail).
     constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
     constexpr void      RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board.
     constexpr void      MovePiece(Color color, Piece piece, Square from, Square to); ///< Move a piece on the board.
@@ -570,18 +572,54 @@ constexpr Position Position::MakeMove(const Move &move) const
     return position;
 }
 
-/// @brief Construct a position.
+/// @brief Whether the position has a king for each side — the minimum for it to be a legal, representable
+/// chess position (see FromString).
+/// @return True if both kings are on the board.
+constexpr bool Position::HasBothKings() const
+{
+    const Bitboard kings = pieces_[kKing];
+    return !(kings & colors_[kWhite]).IsEmpty() && !(kings & colors_[kBlack]).IsEmpty();
+}
+
+/// @brief Construct a position from a FEN string, falling back to the start position if the FEN does not
+/// describe a position the engine can represent.
+///
+/// Malformed input must not crash the engine: the UCI layer feeds untrusted GUI input straight in here, and
+/// an engine that dies mid-game forfeits it. The sharp case is a FEN with no king (e.g. `position fen 8/8`):
+/// Lsb() on an empty king bitboard is 64, which indexes one past every 64-entry attack table, so AttacksTo
+/// reads out of bounds at construction and move generation would do the same later. A position without both
+/// kings is not legal chess and is not representable, so reject it outright rather than carry a landmine
+/// forward.
 /// @param fen_string Forsyth Edwards string.
+/// @return The parsed position, or the start position if @p fen_string cannot be represented.
 inline Position Position::FromString(std::string_view fen_string)
+{
+    constexpr std::string_view kStartPositionFen{"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"};
+    Position                   position = ParseFen(fen_string);
+    if (!position.HasBothKings())
+    {
+        position = ParseFen(kStartPositionFen);
+    }
+    return position;
+}
+
+/// @brief Parse a FEN string. Tolerates any truncation (every field past the board is optional, and the
+/// stream extractions simply fail and leave their defaults), and returns a kingless position for input it
+/// cannot parse — which FromString treats as "invalid, use the start position".
+/// @param fen_string Forsyth Edwards string.
+/// @return The parsed position; kingless (i.e. invalid) if the board field could not be parsed.
+inline Position Position::ParseFen(std::string_view fen_string)
 {
     using std::istringstream;
     using std::string;
     using std::string_view;
     Position              position{};
-    constexpr string_view white_piece_names{"PNBRQK"};
-    constexpr string_view black_piece_names{"pnbrqk"};
+    constexpr string_view piece_names{"PNBRQKpnbrqk"}; // white then black, in Piece order (kPawn..kKing)
     istringstream         ss{string{fen_string}};
-    //  Pieces on the board
+    //  Pieces on the board. The board field is untrusted, so every placement is validated: an unrecognised
+    //  character, or a file/rank that has run off the board, aborts the parse and yields a kingless position
+    //  (which FromString rejects in favour of the start position). Without this, `position fen garbage` ran x
+    //  past 7 and wrote past the end of the 64-entry squares_ array.
     string pieces;
     ss >> pieces;
     int x = 0, y = 7;
@@ -593,27 +631,20 @@ inline Position Position::FromString(std::string_view fen_string)
             --y;
             continue;
         }
-        if (c >= '1' && c <= '8')
+        if (c >= '0' && c <= '8') // '0' is a no-op skip: tolerated for non-standard FEN notation
         {
             x += c - '0';
             continue;
         }
-        auto a = white_piece_names.find(c);
-        if (a != string::npos)
+        const auto index = piece_names.find(c);
+        if (index == string_view::npos || x > 7 || y < 0)
         {
-            const Piece piece = (Piece)(a + 1);
-            position.AddPiece(kWhite, piece, Square{x, y});
-            ++x;
-            continue;
+            return Position{}; // unparseable board field
         }
-        a = black_piece_names.find(c);
-        if (a != string::npos)
-        {
-            const Piece piece = (Piece)(a + 1);
-            position.AddPiece(kBlack, piece, Square{x, y});
-            ++x;
-            continue;
-        }
+        const Color color = index >= 6 ? kBlack : kWhite;
+        const Piece piece = (Piece)((index % 6) + 1);
+        position.AddPiece(color, piece, Square{x, y});
+        ++x;
     }
     // Side to move
     string color_to_move;
@@ -628,7 +659,7 @@ inline Position Position::FromString(std::string_view fen_string)
     string castling_rights;
     ss >> castling_rights;
     position.castling_rights_ = CastlingRights::FromFen(castling_rights);
-    // En passant capture square
+    // En passant capture square (the Square(const char *) constructor yields square 0 for a short string)
     string ep_square;
     ss >> ep_square;
     if (ep_square == "-")
@@ -654,9 +685,14 @@ inline Position Position::FromString(std::string_view fen_string)
         position.full_move_count_ = (uint8_t)fmn - 1;
     }
     position.hash_ = position.ComputeHash();
-    // Is this position check?
-    const Color color  = position.color_to_move_;
-    position.checkers_ = position.AttacksTo(position.king_location_[color], EnemyOf(color));
+    // Is this position check? Guarded: king_location_ is Lsb() of an empty bitboard (= 64) when a king is
+    // missing, and AttacksTo would index past its 64-entry tables. FromString discards any kingless result
+    // anyway, so leaving checkers_ empty here is fine.
+    if (position.HasBothKings())
+    {
+        const Color color  = position.color_to_move_;
+        position.checkers_ = position.AttacksTo(position.king_location_[color], EnemyOf(color));
+    }
     return position;
 }
 

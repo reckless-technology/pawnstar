@@ -40,8 +40,11 @@ constexpr Square::Square(int x, int y) : val_(x + 8 * y)
 }
 
 /// @brief Constructor
-/// @param str Name of square e.g. "e4"
-constexpr Square::Square(const char *str) : val_((str[0] | 0x20) - 'a' + 8 * (str[1] - '1'))
+/// @param str Name of square e.g. "e4". Its only caller is the en-passant field of Position::FromString,
+/// which is untrusted GUI input, so a short string must not read past the terminator: anything that is not
+/// two characters yields square 0 (the "no en-passant target" sentinel), the same as a "-" field.
+constexpr Square::Square(const char *str)
+    : val_(str[0] == '\0' || str[1] == '\0' ? 0 : (uint8_t)((str[0] | 0x20) - 'a' + 8 * (str[1] - '1')))
 {
 }
 
