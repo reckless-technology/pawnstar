@@ -1,9 +1,13 @@
 name: Release
 
-# Manually promote a successful CI run into a GitHub Release. Reuses the per-OS engine binaries that CI
-# already built and tested (downloaded from the chosen run — not rebuilt), and adds Doxygen HTML docs and a
-# source archive generated from that run's exact commit. Manual-only (workflow_dispatch); since dispatch is
-# restricted to users with write access, only maintainers can cut a release.
+# Manually promote a successful CI run into a GitHub Release. Reuses the Linux and Windows engine binaries that
+# CI already built and tested (downloaded from the chosen run — not rebuilt), builds and tests the macOS arm64
+# binary here at that run's exact commit, and adds Doxygen HTML docs and a source archive generated from the
+# same commit. macOS is absent from per-push CI on cost grounds: a hosted macOS minute bills ten Linux minutes
+# on a private repo, so the arm64 build and its full suite run once per release instead of on every push — and
+# the release refuses to publish if that job fails, so the arm64 binary is still exactly the one that was tested.
+# Manual-only (workflow_dispatch); since dispatch is restricted to users with write access, only maintainers can
+# cut a release.
 on:
   workflow_dispatch:
     inputs:
@@ -24,15 +28,18 @@ permissions:
   actions: read
 
 jobs:
-  release:
-    name: promote CI run to release
+  # 1) Resolve the run id (input, or the latest successful CI run on main) and validate it is a green CI run.
+  #    Capture the run's commit SHA — the macOS build and the release both work at exactly that commit.
+  resolve:
+    name: resolve CI run
     runs-on: ubuntu-latest
+    outputs:
+      run_id: ${{ steps.resolve.outputs.run_id }}
+      sha: ${{ steps.resolve.outputs.sha }}
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
     steps:
-      # 1) Resolve the run id (input, or the latest successful CI run on main) and validate it is a green CI
-      #    run. Capture the run's commit SHA — the release is tagged at exactly that commit.
       - name: Resolve and validate CI run
         id: resolve
         run: |
@@ -53,19 +60,62 @@ jobs:
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           echo "Promoting CI run $run_id at commit $sha"
 
-      # 2) Check out the promoted commit so docs and the source archive come from exactly that revision.
+  # 2) macOS arm64 (Apple Silicon, Apple clang via the make wrapper → CMake; the arm64 path targets
+  #    -mcpu=apple-m1), built and tested at the promoted commit and handed to the release job as an artifact.
+  #    These are the steps the per-push CI job ran before macOS moved here. cmake+ninja drive the wrapper; macOS
+  #    ships bash 3.2 as /bin/bash, which lacks `coproc` (bash 4.0+) used by the UCI test, so install a modern
+  #    bash and point the build at it via BASH. WERROR is omitted: Apple clang's warning set differs from
+  #    clang-18's and is not the CI gate.
+  macos:
+    name: build + test (macos arm64)
+    needs: resolve
+    runs-on: macos-latest
+    steps:
+      # Full history so `git rev-list --count HEAD` yields the true build number for the version-named binary.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          fetch-depth: 0
+      - name: Install toolchain
+        run: brew install bash cmake ninja
+      - name: Build + test (release)
+        run: make -j"$(sysctl -n hw.logicalcpu)" RELEASE=1 BASH="$(brew --prefix)/bin/bash" check
+      - name: Upload engine binary
+        uses: actions/upload-artifact@v6
+        with:
+          name: pawnstar-macos-arm64
+          path: build/pawnstar_*
+          if-no-files-found: error
+
+  release:
+    name: promote CI run to release
+    needs: [resolve, macos]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # 3) Check out the promoted commit so docs and the source archive come from exactly that revision.
       - name: Checkout promoted commit
         uses: actions/checkout@v5
         with:
-          ref: ${{ steps.resolve.outputs.sha }}
+          ref: ${{ needs.resolve.outputs.sha }}
 
-      # 3) Download the binary artifacts that CI built and tested for that run.
+      # 4) Download the Linux and Windows binaries that CI built and tested for that run, and the macOS binary
+      #    the job above built and tested at the same commit — into the same tree, so the staging step below
+      #    reads all three alike.
       - name: Download CI artifacts
-        run: gh run download "${{ steps.resolve.outputs.run_id }}" --dir ci-artifacts
+        run: gh run download "${{ needs.resolve.outputs.run_id }}" --dir ci-artifacts
+      - name: Download the macOS binary built above
+        uses: actions/download-artifact@v6
+        with:
+          name: pawnstar-macos-arm64
+          path: ci-artifacts/pawnstar-macos-arm64
 
-      # 4) Derive the version from a binary filename (pawnstar_0_12_589 -> 0.12.589) so the tag always
+      # 5) Derive the version from a binary filename (pawnstar_0_12_589 -> 0.12.589) so the tag always
       #    matches the actual built binary, and stage the binaries under collision-free, platform-suffixed
-      #    names (the Linux and macOS binaries share the bare name pawnstar_<ver>).
+      #    names (the Linux and macOS binaries share the bare name pawnstar_<ver>). The macOS binary was built
+      #    at the same commit, so its name must agree; the version-suffixed cp fails loudly if it ever drifts.
       - name: Stage binaries
         id: stage
         run: |
@@ -77,11 +127,11 @@ jobs:
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           mkdir -p assets
           cp ci-artifacts/pawnstar-linux-x86_64/pawnstar_*      "assets/pawnstar-$ver-linux-x86_64"
-          cp ci-artifacts/pawnstar-macos-arm64/pawnstar_*       "assets/pawnstar-$ver-macos-arm64"
+          cp "ci-artifacts/pawnstar-macos-arm64/$base"          "assets/pawnstar-$ver-macos-arm64"
           cp ci-artifacts/pawnstar-windows-x86_64/pawnstar_*.exe "assets/pawnstar-$ver-windows-x86_64.exe"
           echo "Staged binaries for version $ver"
 
-      # 5) Generate the Doxygen HTML docs from the promoted commit (graphviz/dot powers the diagrams). Run
+      # 6) Generate the Doxygen HTML docs from the promoted commit (graphviz/dot powers the diagrams). Run
       #    the doc helper directly via `cmake -P` (same script the `doc` target uses, with the version
       #    stamped as PROJECT_NUMBER) rather than `make doc` — this needs only cmake + doxygen, not a C++
       #    compiler/generator, so the release job stays lean.
@@ -94,7 +144,7 @@ jobs:
           cmake -DSOURCE_DIR="$PWD" -DBIN_DIR="$PWD/build" -DVERSION="$ver" -P cmake/run_doxygen.cmake
           ( cd doc && zip -rq "../assets/pawnstar-$ver-docs-html.zip" html )
 
-      # 6) Source archive at the promoted commit (clean tree, no .git). This is in addition to the "Source
+      # 7) Source archive at the promoted commit (clean tree, no .git). This is in addition to the "Source
       #    code (zip/tar.gz)" archives GitHub auto-attaches to every release.
       - name: Source archive
         run: |
@@ -102,23 +152,24 @@ jobs:
           ver="${{ steps.stage.outputs.version }}"
           git archive --format=tar.gz --prefix="pawnstar-$ver/" -o "assets/pawnstar-$ver-source.tar.gz" HEAD
 
-      # 7) Create the release at the promoted commit with the staged assets. Notes = a provenance line
-      #    (which CI run / commit) followed by GitHub's auto-generated changelog. Fails if the tag already
-      #    exists (no clobber).
+      # 8) Create the release at the promoted commit with the staged assets. Notes = a provenance line
+      #    (which CI run / commit, and that this run built the macOS binary) followed by GitHub's
+      #    auto-generated changelog. Fails if the tag already exists (no clobber).
       - name: Create release
         run: |
           set -euo pipefail
           ver="${{ steps.stage.outputs.version }}"
           tag="v$ver"
-          sha="${{ steps.resolve.outputs.sha }}"
-          run_id="${{ steps.resolve.outputs.run_id }}"
+          sha="${{ needs.resolve.outputs.sha }}"
+          run_id="${{ needs.resolve.outputs.run_id }}"
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "::error::release/tag $tag already exists — refusing to clobber"; exit 1
           fi
           changelog=$(gh api -X POST "repos/$GH_REPO/releases/generate-notes" \
             -f tag_name="$tag" -f target_commitish="$sha" --jq '.body')
           {
-            echo "Promoted from CI run [#$run_id](https://github.com/$GH_REPO/actions/runs/$run_id) at commit \`$sha\`."
+            echo "Promoted from CI run [#$run_id](https://github.com/$GH_REPO/actions/runs/$run_id) at commit \`$sha\`;"
+            echo "the macOS arm64 binary was built and tested at the same commit by release run [#$GITHUB_RUN_ID](https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID)."
             echo
             echo "$changelog"
           } > notes.md
@@ -134,6 +185,7 @@ jobs:
           {
             echo "### Release $tag"
             echo "- Promoted CI run: #$run_id"
+            echo "- macOS arm64 built by: this run (#$GITHUB_RUN_ID)"
             echo "- Commit: \`$sha\`"
             echo "- Draft: ${{ inputs.draft }}"
             echo "- URL: $url"
