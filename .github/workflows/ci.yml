@@ -106,7 +106,7 @@ jobs:
   # the MSVC STL/SDK that the VS-targeting clang links against; Git Bash (preinstalled) runs the ctest `uci` test.
   artifact-windows:
     name: artifact (windows x86_64)
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -114,7 +114,7 @@ jobs:
       # MSVC developer environment without the third-party msvc-dev-cmd action (whose latest release
       # still targets the deprecated Node 20): locate Visual Studio with vswhere, run vcvars64.bat,
       # and export the resulting environment to GITHUB_ENV — exactly what that action does internally.
-      # Ninja needs no setup step either: it is preinstalled on the windows-latest runner image.
+      # Ninja needs no setup step either: it is preinstalled on the self-hosted runner reckless-ci-win-0.
       - name: MSVC developer environment
         shell: pwsh
         run: |
