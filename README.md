@@ -133,18 +133,19 @@ its latest result on `main`). The jobs:
   build through the wrapper and runs all eight suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean (`clang-format-18 --dry-run -Werror`).
-- **artifact (linux x86_64 / macos arm64 / windows x86_64)** — three per-OS jobs that build a release
-  binary, run the full test suite on that platform, and — only on success — upload the version-named
-  executable (`pawnstar_<major>_<minor>_<build>`, `.exe` on Windows) as a downloadable build artifact for
-  that run. The upload is the job's last step, so a failed build or test ends the job before anything is
-  published.
+- **artifact (linux x86_64 / windows x86_64)** — two per-OS jobs that build a release binary, run the full
+  test suite on that platform, and — only on success — upload the version-named executable
+  (`pawnstar_<major>_<minor>_<build>`, `.exe` on Windows) as a downloadable build artifact for that run. The
+  upload is the job's last step, so a failed build or test ends the job before anything is published. There
+  is no macOS job in CI: hosted macOS runners bill ten times a Linux minute on a private repository, so the
+  macOS arm64 binary is built and tested once per release instead (below).
 
 CI checks out full git history (`fetch-depth: 0`) because the build number is the git commit count. `main`
 is not branch-protected, so CI reports but does not block direct pushes.
 
 ### Releases
 
-Releases are cut manually by **promoting a successful CI run** — no separate rebuild — via
+Releases are cut manually by **promoting a successful CI run** — nothing rebuilt but the macOS binary — via
 [`.github/workflows/release.yml`](.github/workflows/release.yml), a `workflow_dispatch` workflow that only
 maintainers with write access can trigger. From the repository's **Actions → Release → Run workflow**, with
 two inputs:
@@ -152,18 +153,20 @@ two inputs:
 - **`run_id`** — the CI run to promote; leave blank to use the latest successful `CI` run on `main`.
 - **`draft`** — create the release as a draft to review before publishing (default `true`).
 
-It validates that the chosen run is a green `CI` run, downloads the exact binaries that run built and
-tested, checks out that commit to regenerate the docs and source, and creates a GitHub Release tagged
-`v<major>.<minor>.<build>` at that commit (failing if the tag already exists). Attached assets:
+It validates that the chosen run is a green `CI` run, downloads the exact Linux and Windows binaries that
+run built and tested, builds and tests the macOS arm64 binary at that same commit on a macOS runner (a
+failure there stops the release before anything is published), checks out that commit to regenerate the
+docs and source, and creates a GitHub Release tagged `v<major>.<minor>.<build>` at that commit (failing if
+the tag already exists). Attached assets:
 
 - the three platform executables — `pawnstar-<ver>-linux-x86_64`, `pawnstar-<ver>-macos-arm64`,
   `pawnstar-<ver>-windows-x86_64.exe`;
 - the Doxygen HTML documentation — `pawnstar-<ver>-docs-html.zip`;
 - a source archive — `pawnstar-<ver>-source.tar.gz` (alongside GitHub's automatic "Source code" archives).
 
-Because the binaries are the ones CI already tested, a release is a faithful promotion of a known-good
-build. Promote within the artifacts' retention window (90 days), since the workflow downloads the CI run's
-uploaded artifacts.
+Because the Linux and Windows binaries are the ones CI already tested, and the macOS binary passes the same
+suite before the release is created, a release is a faithful promotion of a known-good build. Promote within
+the artifacts' retention window (90 days), since the workflow downloads the CI run's uploaded artifacts.
 
 ## Usage
 

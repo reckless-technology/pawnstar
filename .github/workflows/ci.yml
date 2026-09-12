@@ -49,12 +49,14 @@ jobs:
         run: clang-format-18 --dry-run -Werror src/*.h src/*.cpp test/*.cpp tools/*.cpp
 
   # ---------------------------------------------------------------------------------------------------------
-  # Build artifacts: a native engine executable for each OS, uploaded only after that platform's build AND
-  # test suite pass (the upload is a later step, so a failed build/test ends the job before it runs). Each
-  # job is self-contained — it builds a release binary (DEBUGX counters off) and runs the full suite on its
-  # own runner — so the uploaded binary is exactly the one that was tested. The executable is version-named
-  # pawnstar_<major>_<minor>_<build> (the build number is the git commit count, hence the full-history
-  # checkout). Download them from the run's "Artifacts" section.
+  # Build artifacts: a native engine executable for Linux and Windows, uploaded only after that platform's
+  # build AND test suite pass (the upload is a later step, so a failed build/test ends the job before it
+  # runs). Each job is self-contained — it builds a release binary (DEBUGX counters off) and runs the full
+  # suite on its own runner — so the uploaded binary is exactly the one that was tested. The executable is
+  # version-named pawnstar_<major>_<minor>_<build> (the build number is the git commit count, hence the
+  # full-history checkout). Download them from the run's "Artifacts" section. No macOS job here: a hosted
+  # macOS minute bills ten Linux minutes on a private repo, so the macOS arm64 binary is built and tested at
+  # release time instead (release.yml), at the promoted commit, and the release refuses to publish if it fails.
   # ---------------------------------------------------------------------------------------------------------
 
   # Linux x86-64 (clang, via the make wrapper → CMake).
@@ -77,28 +79,6 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: pawnstar-linux-x86_64
-          path: build/pawnstar_*
-          if-no-files-found: error
-
-  # macOS arm64 (Apple Silicon, Apple clang via the make wrapper → CMake; the arm64 path targets -mcpu=apple-m1).
-  artifact-macos:
-    name: artifact (macos arm64)
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      # cmake+ninja drive the wrapper. macOS ships bash 3.2 as /bin/bash, which lacks `coproc` (bash 4.0+)
-      # used by the UCI test, so install a modern bash and point the build at it via BASH.
-      - name: Install toolchain
-        run: brew install bash cmake ninja
-      # WERROR is omitted here: Apple clang's warning set differs from clang-18's and is not the CI gate.
-      - name: Build + test (release)
-        run: make -j"$(sysctl -n hw.logicalcpu)" RELEASE=1 BASH="$(brew --prefix)/bin/bash" check
-      - name: Upload engine binary
-        uses: actions/upload-artifact@v6
-        with:
-          name: pawnstar-macos-arm64
           path: build/pawnstar_*
           if-no-files-found: error
 
