@@ -66,10 +66,11 @@ jobs:
   #    ships bash 3.2 as /bin/bash, which lacks `coproc` (bash 4.0+) used by the UCI test, so install a modern
   #    bash and point the build at it via BASH. WERROR is omitted: Apple clang's warning set differs from
   #    clang-18's and is not the CI gate.
+  #    Runs on the org's Apple-silicon runner (reckless-ci-mac-1), not a hosted macos-latest runner.
   macos:
     name: build + test (macos arm64)
     needs: resolve
-    runs-on: macos-latest
+    runs-on: [self-hosted, macOS, ARM64]
     steps:
       # Full history so `git rev-list --count HEAD` yields the true build number for the version-named binary.
       - uses: actions/checkout@v5
