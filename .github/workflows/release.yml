@@ -28,11 +28,15 @@ permissions:
   actions: read
 
 jobs:
+  # resolve and release run on the org's self-hosted Linux runners ([self-hosted, Linux, X64]:
+  # reckless-ci-lin-0 and reckless-ci-lin-1), not hosted ubuntu-latest; both carry the gh CLI and jq that
+  # the steps below drive.
+
   # 1) Resolve the run id (input, or the latest successful CI run on main) and validate it is a green CI run.
   #    Capture the run's commit SHA — the macOS build and the release both work at exactly that commit.
   resolve:
     name: resolve CI run
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     outputs:
       run_id: ${{ steps.resolve.outputs.run_id }}
       sha: ${{ steps.resolve.outputs.sha }}
@@ -91,7 +95,7 @@ jobs:
   release:
     name: promote CI run to release
     needs: [resolve, macos]
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     env:
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
