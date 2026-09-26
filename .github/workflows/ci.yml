@@ -13,13 +13,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The Linux jobs below run on the org's self-hosted runners ([self-hosted, Linux, X64]: reckless-ci-lin-0
+  # and reckless-ci-lin-1), not hosted ubuntu-latest. They apt-install their own toolchain, so both runners
+  # need a sudo that asks for no password. The two machines are not identical hardware - lin-1 is an older
+  # 2-core Haswell - which is what the AVX2/BMI2 gate in the build jobs is for.
+
   # Primary build + test on Linux, driven through the `make` wrapper — which invokes the CMake build, the
   # single build system of record. Builds the engine, tools and all eight test suites with warnings-as-errors
   # and runs them via ctest — including the bench determinism signature. (Exercising the wrapper also proves
   # the plain CMake path, so there is no separate cmake job; the Windows artifact job below runs CMake directly.)
   build-test:
     name: build + test (make wrapper)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
       # Full history (not a shallow clone) so `git rev-list --count HEAD` yields the true build number.
       - uses: actions/checkout@v5
@@ -29,7 +34,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang-18 cmake ninja-build
       - name: Check runner has AVX2 + BMI2
         # The engine emits AVX2 (NNUE) and BMI1/2 bit-scan instructions, so the test binaries need a CPU
-        # that supports them. GitHub-hosted runners do; fail fast with a clear message if one ever doesn't.
+        # that supports them. The self-hosted Linux runners are not identical hardware, so this gate is what
+        # stops a runner that lacks them from reporting a green build it never actually ran.
         run: |
           grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
             || { echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1; }
@@ -40,7 +46,7 @@ jobs:
   # match the project's local clang-format-18).
   format:
     name: clang-format
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v5
       - name: Install clang-format
@@ -62,7 +68,7 @@ jobs:
   # Linux x86-64 (clang, via the make wrapper → CMake).
   artifact-linux:
     name: artifact (linux x86_64)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v5
         with:
