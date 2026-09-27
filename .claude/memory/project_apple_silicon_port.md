@@ -48,8 +48,9 @@ immaterial, well under the 40 cp gate); `test_nnue_incremental` 36807 checks bit
    Makefile's `bash` picks it up (no script change); and the `check` recipe's timer now uses a portable
    `now_ms()` helper (GNU `%s%3N` when all-digits, else `date +%s`×1000 → coarse seconds-as-ms on BSD).
 
-**clang-format is NOT installed here** (repo pins 18.1.8 — [[feedback_clang_format]]); run it on the edited
-C++ files before committing (`pip install clang-format==18.1.8`). Nothing committed/pushed yet — user wanted
+**clang-format is NOT installed here** (the organisation pins 22.1.8 since 2026-09-26 —
+`reckless-technology/claude-skills`, skill `reckless-working-practice`); run it on the edited
+C++ files before committing (`pip install clang-format==22.1.8`). Nothing committed/pushed yet — user wanted
 to review Phase 1 first.
 
 **Phase 2 — hand-written NEON NNUE kernels: TRIED & REJECTED (2026-06-30), reverted.** Implemented full

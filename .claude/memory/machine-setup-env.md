@@ -25,8 +25,9 @@ The dev/training/testing stack was rebuilt from scratch on a NEW machine (2026-0
   gotcha no longer applies. The pinned (CUDA-12-era) bullet NVRTC kernels compile + run fine on CUDA 13.2 /
   sm_89. **Smoke-tested end-to-end**: trains at **~2.4M pos/sec (~7× the old 1050 Ti's ~345K)**, writes a
   `quantised.bin` of exactly 6,297,664 B = the correct v11 arch (1024 + 4 file-pair buckets).
-- **clang-format**: pip pkg `clang-format==18.1.8` in venv `/home/jonny/work/.pawnstar`, symlinked to
-  `~/.local/bin/clang-format`. MUST be 18.x — see [[feedback_clang_format]].
+- **clang-format**: pip pkg `clang-format==22.1.8` in venv `/home/jonny/work/.pawnstar`, symlinked to
+  `~/.local/bin/clang-format`. MUST be 22.1.8 — the organisation standardised on it 2026-09-26
+  (`reckless-technology/claude-skills`, skill `reckless-working-practice`); it was 18.1.8 before.
 - **openings.epd**: `~/pawnstar_nnue/openings.epd` = UHO_Lichess_4852_v1 (2.63M lines, the engine-testing
   standard), downloaded fresh (the user's old curated openings file was not backed up).
 - **One small data shard** for smoke tests: `~/pawnstar_nnue/smoke.data` (PlentyChess 12892.data, 61 MB,
@@ -44,7 +45,7 @@ toolchain re-created from scratch this session and the **v11 16-shard PlentyChes
 positions) IS now downloaded** at `~/pawnstar_nnue/data/` (the 16 shards in nnue/README §7) + reshuffled to
 `~/pawnstar_nnue/exp_nobucket_6b/shuffled.data`. Present now: rustup `cargo 1.96` (NOT the apt 1.75 — see
 [[machine-cargo-version-gotcha]]), bullet at `~/pawnstar_nnue/bullet` (CUDA 13.2, RTX 4070 sm_89, ~2.4–2.9M
-pos/s), `fastchess` at `~/.local/bin`, `clang-format 18.1.8` (pip --user), `openings.epd` (UHO_Lichess_4852,
+pos/s), `fastchess` at `~/.local/bin`, `clang-format 22.1.8` (pip --user), `openings.epd` (UHO_Lichess_4852,
 2.63M lines) at `~/pawnstar_nnue/openings.epd`. Still missing: anchor engines for `rate.sh`.
 
 **`tools/rate.sh` net default:** now `NET=nnue/pawnstar-v11.bin` (verified 2026-06-26 — the earlier v10
