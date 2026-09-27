@@ -30,10 +30,10 @@ class ChessClock
     ClockType clock_type_;     ///< The current time-control type.
     Duration  remaining_time_; ///< Time left on our clock this period (UCI wtime/btime).
     Duration  increment_;      ///< Per-move increment, side to move (UCI winc/binc). Parsed but not currently used by
-                         ///< time planning — see SearchRootNode (folding it into the budget SPRT'd neg/neutral).
-    int      moves_to_go_; ///< Moves until the next time control (0 = unknown / sudden death).
-    int      depth_;       ///< Target depth when clock_type == kFixedDepth.
-    uint64_t max_nodes_;   ///< Node limit for `go nodes` (0 = no limit); checked per-thread in Search.
+                               ///< time planning — see SearchRootNode (folding it into the budget SPRT'd neg/neutral).
+    int      moves_to_go_;     ///< Moves until the next time control (0 = unknown / sudden death).
+    int      depth_;           ///< Target depth when clock_type == kFixedDepth.
+    uint64_t max_nodes_;       ///< Node limit for `go nodes` (0 = no limit); checked per-thread in Search.
     void     Reset();
     void     StartSearch(Duration allocated, Duration maximum);
     void     StartPonderSearch(Duration allocated, Duration maximum);

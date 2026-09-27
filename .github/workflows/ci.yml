@@ -42,17 +42,29 @@ jobs:
       - name: Build + test
         run: make -j"$(nproc)" WERROR=1 CXX=clang++-18 check
 
-  # Style gate: the whole tree must be clang-format-clean (clang-format is version-sensitive, so pin 18 to
-  # match the project's local clang-format-18).
+  # Style gate: the whole tree must be clang-format-clean. clang-format is version-sensitive - a different
+  # major restyles code that is already correct - so the version is pinned, and since 2026-09-26 it is pinned
+  # to the same 22.1.8 across the whole organisation (see reckless-technology/claude-skills, skill
+  # reckless-working-practice). It was 18 here until that day. Not apt: Ubuntu 24.04 carries no
+  # clang-format-22, and the PyPI wheel is what the development machines run, so CI and a developer's
+  # pre-commit hook agree. The venv is kept in the runner's tool cache, like the gcovr and face-plate venvs,
+  # so a later run only re-checks the install.
   format:
     name: clang-format
     runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v5
-      - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format-18
+      - name: clang-format 22.1.8, from the kept venv
+        run: |
+          venv="$RUNNER_TOOL_CACHE/reckless-clang-format-venv"
+          [ -x "$venv/bin/clang-format" ] || python3 -m venv "$venv"
+          "$venv/bin/pip" install --quiet --upgrade pip
+          "$venv/bin/pip" install --quiet 'clang-format==22.1.8'
+          echo "$venv/bin" >> "$GITHUB_PATH"
       - name: Check formatting
-        run: clang-format-18 --dry-run -Werror src/*.h src/*.cpp test/*.cpp tools/*.cpp
+        run: |
+          clang-format --version
+          clang-format --dry-run -Werror src/*.h src/*.cpp test/*.cpp tools/*.cpp
 
   # ---------------------------------------------------------------------------------------------------------
   # Build artifacts: a native engine executable for Linux and Windows, uploaded only after that platform's
