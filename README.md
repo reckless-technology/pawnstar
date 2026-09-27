@@ -132,7 +132,10 @@ its latest result on `main`). The jobs:
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
   build through the wrapper and runs all eight suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
-- **clang-format** — the whole tree must be clang-format-clean (`clang-format-18 --dry-run -Werror`).
+- **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
+  PyPI wheel in a venv kept on the runner; apt has no `clang-format-22`). This is independent of the
+  compiler, which stays clang-18 — a clang-format of a different major restyles code that is already
+  correct, so the two are pinned separately and deliberately.
 - **artifact (linux x86_64 / windows x86_64)** — two per-OS jobs that build a release binary, run the full
   test suite on that platform, and — only on success — upload the version-named executable
   (`pawnstar_<major>_<minor>_<build>`, `.exe` on Windows) as a downloadable build artifact for that run. The
