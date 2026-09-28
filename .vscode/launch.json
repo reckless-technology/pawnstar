@@ -46,6 +46,22 @@
                     "ignoreFailures": false
                 }
             ]
+        },
+        {
+            "name": "macOS: Launch pawnstar (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/pawnstar",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "terminal": "integrated",
+            "preLaunchTask": "build pawnstar"
+        },
+        {
+            "name": "macOS: Attach to pawnstar (lldb)",
+            "type": "lldb",
+            "request": "attach",
+            "program": "${workspaceFolder}/build/pawnstar"
         }
     ]
 }
