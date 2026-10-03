@@ -1,0 +1,23 @@
+#!/bin/sh
+# Refuse a commit made under any identity but Jonny Reckless <jonny@recklesstechnology.com>.
+#
+# Every commit in the reckless-technology organisation's repositories is authored and committed as
+# jonny@recklesstechnology.com. The check reads the identity git will stamp - user.email, or an --author,
+# GIT_AUTHOR_EMAIL or GIT_COMMITTER_EMAIL over it - so a machine whose git still names another address is refused
+# before the commit exists. A commit a rebase or a cherry-pick makes runs no pre-commit hook, so the pre-push hook
+# checks the commits themselves.
+#
+# Install once per clone:  git config core.hooksPath .githooks
+# Bypass, when you mean it:  git commit --no-verify
+set -u
+
+identity="jonny@recklesstechnology.com"
+for role in AUTHOR COMMITTER; do
+    email=$(git var "GIT_${role}_IDENT" 2>/dev/null | sed -n 's/.*<\(.*\)>.*/\1/p')
+    if [ "$email" != "$identity" ]; then
+        echo "pre-commit: this commit's $(echo "$role" | tr 'A-Z' 'a-z') would be <$email>; every commit here is <$identity>." >&2
+        echo "pre-commit:   git config user.name 'Jonny Reckless' && git config user.email $identity" >&2
+        exit 1
+    fi
+done
+exit 0

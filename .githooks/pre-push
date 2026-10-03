@@ -1,0 +1,32 @@
+#!/bin/sh
+# Refuse a push of any commit not authored and committed as Jonny Reckless <jonny@recklesstechnology.com>.
+#
+# The pre-commit hook checks the identity a new commit is made under; this checks the commits themselves - a rebase,
+# a cherry-pick or an amend keeps an author and stamps a committer without running pre-commit - so nothing under
+# another identity leaves the clone. The commits checked are those the remote's tracking refs do not hold already.
+#
+# Install once per clone:  git config core.hooksPath .githooks
+set -u
+
+identity="jonny@recklesstechnology.com"
+zero=0000000000000000000000000000000000000000
+
+remote="$1"
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+    if [ "$local_sha" = "$zero" ]; then
+        continue # a deletion pushes no commit
+    fi
+    foreign=$(git log --format='%h %ae %ce %s' "$local_sha" --not --remotes="$remote" |
+        awk -v want="$identity" '$2 != want || $3 != want')
+    if [ -n "$foreign" ]; then
+        echo "pre-push: refusing to push $local_ref: every commit here is authored and committed as <$identity>," >&2
+        echo "pre-push: and these are not (hash, author, committer, subject):" >&2
+        printf '%s\n' "$foreign" | sed 's/^/pre-push:   /' >&2
+        echo "pre-push: set the identity, then make the branch's commits again under it -" >&2
+        echo "pre-push:   git config user.name 'Jonny Reckless' && git config user.email $identity" >&2
+        echo "pre-push:   git rebase --exec 'git commit --amend --no-edit --reset-author' <the branch's base>" >&2
+        status=1
+    fi
+done
+exit $status
