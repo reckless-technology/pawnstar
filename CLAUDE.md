@@ -78,7 +78,7 @@ Two additional **artifact jobs** (`artifact-linux` on `[self-hosted, Linux, X64]
 Two **bit-exact ports** of this engine exist as sibling checkouts: **Go**
 ([pawnstar-go](https://github.com/jonny-reckless/pawnstar-go), `../pawnstar-go`) and **Rust**
 ([pawnstar-rs](https://github.com/jonny-reckless/pawnstar-rs), `../pawnstar-rs`). All three engines
-produce the identical single-threaded `bench` signature (6,888,983 nodes at depth 13 with net v12)
+produce the identical single-threaded `bench` signature (6,601,454 nodes at depth 13 with net v12)
 and identical `PAWNSTAR_BENCH_DEBUG` transcripts (per-position nodes, best moves, every DEBUGX
 counter) — that transcript diff is the cross-engine parity check, and this repo's determinism
 engineering (the fixed-seed xorshift* Zobrist draw, the stable `SortMoves` insertion sort, the
