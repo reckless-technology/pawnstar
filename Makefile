@@ -15,7 +15,8 @@
 #               e.g. `make check BASH=$(brew --prefix)/bin/bash`.
 #
 # The version-named binary (build/pawnstar_<major>_<minor>_<build>) and the stable build/pawnstar alias are
-# produced by CMake; the build number (git commit count) is passed through so the filename tracks each commit.
+# produced by CMake, which derives the version from the git tags (cmake/version.cmake) and configures again by itself
+# when HEAD moves, so the filename tracks each commit.
 
 BUILD_DIR ?= build
 CMAKE     ?= cmake
@@ -32,16 +33,10 @@ else
   GENERATOR := Ninja
 endif
 
-# Globally-reproducible build number = git commit count; passed to CMake so the versioned filename tracks
-# each commit without a manual reconfigure (a changed cache value reconfigures automatically).
-BUILD_NUMBER := $(shell git rev-list --count HEAD 2>/dev/null || echo 0)
-
-CMAKE_ARGS := -DPAWNSTAR_VERSION_BUILD=$(BUILD_NUMBER)
-
 ifeq ($(DEBUG),1)
-  CMAKE_ARGS += -DCMAKE_BUILD_TYPE=Debug -DPAWNSTAR_SANITIZE=ON
+  CMAKE_ARGS := -DCMAKE_BUILD_TYPE=Debug -DPAWNSTAR_SANITIZE=ON
 else
-  CMAKE_ARGS += -DCMAKE_BUILD_TYPE=Release
+  CMAKE_ARGS := -DCMAKE_BUILD_TYPE=Release
 endif
 
 ifeq ($(RELEASE),1)
@@ -95,7 +90,7 @@ doc: configure
 clean:
 	rm -rf $(BUILD_DIR)
 
-# (Re)configure the CMake build tree. A fast no-op when nothing changed; reconfigures when a knob or the
-# build number changes.
+# (Re)configure the CMake build tree. A fast no-op when nothing changed; reconfigures when a knob changes or HEAD
+# moves (the version).
 configure:
 	@$(CMAKE) -S . -B $(BUILD_DIR) -G "$(GENERATOR)" $(CMAKE_ARGS)

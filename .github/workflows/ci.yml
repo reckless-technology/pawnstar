@@ -26,7 +26,7 @@ jobs:
     name: build + test (make wrapper)
     runs-on: [self-hosted, Linux, X64]
     steps:
-      # Full history (not a shallow clone) so `git rev-list --count HEAD` yields the true build number.
+      # Full history and the tags (not a shallow clone): cmake/version.cmake derives the version from them.
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -71,10 +71,10 @@ jobs:
   # build AND test suite pass (the upload is a later step, so a failed build/test ends the job before it
   # runs). Each job is self-contained — it builds a release binary (DEBUGX counters off) and runs the full
   # suite on its own runner — so the uploaded binary is exactly the one that was tested. The executable is
-  # version-named pawnstar_<major>_<minor>_<build> (the build number is the git commit count, hence the
-  # full-history checkout). Download them from the run's "Artifacts" section. No macOS job here: a hosted
-  # macOS minute bills ten Linux minutes on a private repo, so the macOS arm64 binary is built and tested at
-  # release time instead (release.yml), at the promoted commit, and the release refuses to publish if it fails.
+  # version-named pawnstar_<major>_<minor>_<build> (the version comes from the git tags, hence the
+  # full-history checkout). Download them from the run's "Artifacts" section, for a look at a commit's build;
+  # releases are built by release.yml from nothing, on a pushed vMAJOR.MINOR tag, and signed - none of these
+  # artifacts is released. No macOS job here: the macOS arm64 binary is built and tested in release.yml.
   # ---------------------------------------------------------------------------------------------------------
 
   # Linux x86-64 (clang, via the make wrapper → CMake).

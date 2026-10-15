@@ -54,10 +54,9 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-The engine binary is **version-named** `pawnstar_<major>_<minor>_<build>` (e.g. `build/pawnstar_0_13_593`).
-The major/minor come from [src/version.h](src/version.h) (edit by hand); the build number is the git commit
-count (`git rev-list --count HEAD`) — globally reproducible, identical for every clone at a given commit. The
-same string is reported to the UCI host as `id name Pawnstar <major>.<minor>.<build>`. Each build also
+The engine binary is **version-named** `pawnstar_<major>_<minor>_<build>` (e.g. `build/pawnstar_1_0_0`). The
+version comes from git alone ([cmake/version.cmake](cmake/version.cmake); "Versions" below) and is reported to the
+UCI host as `id name Pawnstar <major>.<minor>.<build>`. Each build also
 maintains a stable **`build/pawnstar`** alias (a symlink on Linux/macOS, a copy on Windows) pointing at the
 newest version-named binary, so the commands throughout this README — and tooling such as the VS Code
 debugger and `tools/run_sprt.sh` / `tools/rate.sh` — can use that fixed path regardless of the version.
@@ -143,33 +142,52 @@ its latest result on `main`). The jobs:
   is no macOS job in CI: hosted macOS runners bill ten times a Linux minute on a private repository, so the
   macOS arm64 binary is built and tested once per release instead (below).
 
-CI checks out full git history (`fetch-depth: 0`) because the build number is the git commit count. `main`
-is not branch-protected, so CI reports but does not block direct pushes.
+CI checks out full git history and the tags (`fetch-depth: 0`), from which the version is derived. `main` is not
+branch-protected, so CI reports but does not block direct pushes. The artifacts are for a look at a commit's build;
+none is released.
+
+### Versions
+
+The version is `MAJOR.MINOR.BUILD`, from git alone, the rule all of reckless-technology's projects follow:
+
+- `MAJOR.MINOR` is the nearest annotated tag `vMAJOR.MINOR` reachable from the commit built (a *version mark*, made by
+  hand on `main`);
+- `BUILD` is the number of commits since that tag, the tagged commit itself being 0.
+
+[cmake/version.cmake](cmake/version.cmake) works it out at configure time
+(`git describe --tags --match 'v*.*' --exclude 'v*.*.*'`) and configures again by itself when `HEAD` moves. It writes
+the version into a generated header force-included into `main.cpp`, and into the binary's name and the Doxygen
+`PROJECT_NUMBER`. Nothing in the tree holds a version to edit. A tree with no mark reachable (a source tarball, a
+shallow clone, a fork without the tags) builds as `0.0.0`, with a warning. After tagging, re-run `make`, or reconfigure.
 
 ### Releases
 
-Releases are cut manually by **promoting a successful CI run** — nothing rebuilt but the macOS binary — via
-[`.github/workflows/release.yml`](.github/workflows/release.yml), a `workflow_dispatch` workflow that only
-maintainers with write access can trigger. From the repository's **Actions → Release → Run workflow**, with
-two inputs:
+[`.github/workflows/release.yml`](.github/workflows/release.yml) makes a release:
 
-- **`run_id`** — the CI run to promote; leave blank to use the latest successful `CI` run on `main`.
-- **`draft`** — create the release as a draft to review before publishing (default `true`).
+- **Pushing a mark** (`git tag -a v1.1 -m "Pawnstar 1.1" && git push origin v1.1`) releases `1.1.0`.
+- **Running it by hand** on `main` (`gh workflow run release.yml --ref main`) releases `main`'s head as
+  `MAJOR.MINOR.BUILD`. `-f dry_run=true`, from any branch, builds, tests and signs the macOS binary but publishes
+  nothing.
 
-It validates that the chosen run is a green `CI` run, downloads the exact Linux and Windows binaries that
-run built and tested, builds and tests the macOS arm64 binary at that same commit on a macOS runner (a
-failure there stops the release before anything is published), checks out that commit to regenerate the
-docs and source, and creates a GitHub Release tagged `v<major>.<minor>.<build>` at that commit (failing if
-the tag already exists). Attached assets:
+It refuses a mark that isn't `vMAJOR.MINOR`, a commit not on `main`, and a version already released. Each platform is
+built from nothing and runs the full suite, including the bench determinism signature, on the organisation's
+self-hosted runners: Linux through the `make` wrapper (clang-18, warnings as errors), Windows through CMake and clang,
+macOS (Apple silicon) through the wrapper. Each shipped binary must report the version. The workflow creates the
+release `vMAJOR.MINOR.BUILD` and its tag itself. It never runs for a pull request.
 
-- the three platform executables — `pawnstar-<ver>-linux-x86_64`, `pawnstar-<ver>-macos-arm64`,
-  `pawnstar-<ver>-windows-x86_64.exe`;
-- the Doxygen HTML documentation — `pawnstar-<ver>-docs-html.zip`;
-- a source archive — `pawnstar-<ver>-source.tar.gz` (alongside GitHub's automatic "Source code" archives).
+| File | What it is |
+|---|---|
+| `pawnstar-<version>-windows-x86_64.exe` | the engine (AVX2), Authenticode-signed through SSL.com eSigner (Jonathan Reckless) |
+| `pawnstar-<version>-macos-arm64.zip` | the engine for Apple silicon, signed with a Developer ID (hardened runtime) and notarised by Apple |
+| `pawnstar-<version>-linux-x86_64` | the engine for Linux (AVX2) |
+| `pawnstar-<version>-docs-html.zip`, `-source.tar.gz` | the Doxygen HTML documentation, and the source at the commit |
 
-Because the Linux and Windows binaries are the ones CI already tested, and the macOS binary passes the same
-suite before the release is created, a release is a faithful promotion of a known-good build. Promote within
-the artifacts' retention window (90 days), since the workflow downloads the CI run's uploaded artifacts.
+The binaries are built with `RELEASE=1` (the DEBUGX counters off). The macOS engine ships in a zip because a bare
+binary can't carry a stapled notarisation ticket: Gatekeeper looks its ticket up online, and the zip keeps the
+executable bit through a browser's download. The signing runs from `tools/sign-macos.sh` and `tools/sign-windows.ps1`,
+with the organisation's signing secrets (the same ones as its other apps). The Windows binary is signed only in a run
+that publishes, since every signing spends the eSigner account's allowance. A publishing run that would ship an
+unsigned binary fails.
 
 ## Usage
 

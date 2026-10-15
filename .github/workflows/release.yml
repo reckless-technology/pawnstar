@@ -1,197 +1,432 @@
+# Cut a release: push a version mark - an annotated two-component tag vMAJOR.MINOR on a commit of main - and the engine
+# is built and tested on Linux, Windows and macOS (Apple silicon), signed, each binary checked to report the version,
+# then published as GitHub release vMAJOR.MINOR.0. Run it by hand (workflow_dispatch) on main to release main's head
+# as vMAJOR.MINOR.BUILD. The version is cmake/version.cmake's rule, which the build stamps into the binary, so the
+# release and the binaries agree by construction: MAJOR.MINOR from the nearest vMAJOR.MINOR tag, BUILD the commits
+# since it. The workflow creates the
+# three-component tag itself; only two-component tags are version marks. A version already released is refused.
+#
+# A dry run (workflow_dispatch with dry_run, from any branch) builds, tests, signs and notarises the macOS binary -
+# which costs nothing - and publishes nothing; it leaves the Windows binary unsigned, since every eSigner signing spends
+# the SSL.com account's allowance. With no vMAJOR.MINOR tag reachable a dry run carries on as 0.0.0
+# (cmake/version.cmake's fallback); a publishing run refuses.
+#
+# The organisation's other apps (vst-plugins, ir-capture) are released the same way, with the same organisation secrets
+# for signing:
+#   - Windows: the engine is Authenticode-signed through SSL.com's eSigner (CodeSignTool pinned by version and hash, in
+#     the runner's tool cache; tools/sign-windows.ps1), the account checked before the build, which spends no signing.
+#     Only a publishing run signs, and only the one file it ships.
+#   - macOS: the engine is signed with the Developer ID Application identity, the hardened runtime and a secure
+#     timestamp on a keychain of the job's own (tools/sign-macos.sh), and notarised by Apple. A bare binary can carry no
+#     stapled ticket, so it ships in a zip - which keeps its executable bit through a browser's download - and
+#     Gatekeeper finds its ticket online, as the release checks it does.
+#   A publishing run that would ship an unsigned binary fails instead.
+#
+# The files: pawnstar-<version>-linux-x86_64, -windows-x86_64.exe and -macos-arm64.zip (the binary inside), the source
+# as -source.tar.gz (git archive at the commit) and the API documentation as -docs-html.zip (Doxygen). verify
+# opens the release as a draft and each job uploads straight onto it, so no workflow artifact stands between a build
+# and its release; publish makes the source and documentation (in a dry run too), checks all five are on the draft,
+# pushes the tag and takes the draft public. A failed job can be run again; a run that fails before it publishes leaves
+# only a draft, which the next run replaces.
+#
+# Every job runs on the organisation's self-hosted runners, never a hosted image, and never for a pull request: this
+# workflow holds the signing secrets.
+#
+# The x86-64 binaries need AVX2 and BMI2 (CMakeLists.txt's -mavx2 -mbmi2); the Linux job checks its runner has them
+# before testing, as CI does. The binaries are built with RELEASE=1 (the DEBUGX counters off), as CI's artifacts are.
 name: Release
 
-# Manually promote a successful CI run into a GitHub Release. Reuses the Linux and Windows engine binaries that
-# CI already built and tested (downloaded from the chosen run — not rebuilt), builds and tests the macOS arm64
-# binary here at that run's exact commit, and adds Doxygen HTML docs and a source archive generated from the
-# same commit. macOS is absent from per-push CI on cost grounds: a hosted macOS minute bills ten Linux minutes
-# on a private repo, so the arm64 build and its full suite run once per release instead of on every push — and
-# the release refuses to publish if that job fails, so the arm64 binary is still exactly the one that was tested.
-# Manual-only (workflow_dispatch); since dispatch is restricted to users with write access, only maintainers can
-# cut a release.
 on:
+  push:
+    tags: ['v[0-9]*']
   workflow_dispatch:
     inputs:
-      run_id:
-        description: "CI run to promote (numeric run id). Leave blank to use the latest successful CI run on main."
-        required: false
-        type: string
-      draft:
-        description: "Create the release as a draft (review before publishing)."
-        required: false
+      dry_run:
+        description: "Build, test and sign the macOS binary only; publish nothing (the Windows binary unsigned)"
         type: boolean
-        default: true
+        default: false
 
-# contents: write to create the tag + release; actions: read for gh run view/list/download (a permissions
-# block sets every unspecified scope to none, so actions: read must be explicit).
 permissions:
-  contents: write
-  actions: read
+  contents: write # the draft, the tag and the release
+
+# One release at a time: a tag push and a dispatch at once would each replace and publish drafts under the other. A run
+# waits for the one in progress rather than cancel it, which could leave a half-uploaded draft behind.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  # resolve and release run on the org's self-hosted Linux runners ([self-hosted, Linux, X64]:
-  # reckless-ci-lin-0 and reckless-ci-lin-1), not hosted ubuntu-latest; both carry the gh CLI and jq that
-  # the steps below drive.
-
-  # 1) Resolve the run id (input, or the latest successful CI run on main) and validate it is a green CI run.
-  #    Capture the run's commit SHA — the macOS build and the release both work at exactly that commit.
-  resolve:
-    name: resolve CI run
+  verify:
+    name: version and commit
     runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
     outputs:
-      run_id: ${{ steps.resolve.outputs.run_id }}
-      sha: ${{ steps.resolve.outputs.sha }}
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      publish: ${{ steps.version.outputs.publish }}
+      release_id: ${{ steps.version.outputs.release_id }}
     env:
       GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
     steps:
-      - name: Resolve and validate CI run
-        id: resolve
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the tags and the commits since the nearest one are the version
+          fetch-tags: true
+      - name: The version from the tags, the commit on main, and the draft
+        id: version
+        shell: bash
         run: |
           set -euo pipefail
-          run_id="${{ inputs.run_id }}"
-          if [ -z "$run_id" ]; then
-            run_id=$(gh run list --workflow CI --branch main --status success --limit 1 --json databaseId --jq '.[0].databaseId // ""')
-            [ -n "$run_id" ] || { echo "::error::no successful CI run found on main"; exit 1; }
-            echo "No run_id given; using latest successful CI run on main: $run_id"
+          is_dry_run=false
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            is_dry_run=true
           fi
-          info=$(gh run view "$run_id" --json workflowName,conclusion,headSha)
-          workflow=$(echo "$info" | jq -r '.workflowName')
-          conclusion=$(echo "$info" | jq -r '.conclusion')
-          sha=$(echo "$info" | jq -r '.headSha')
-          [ "$workflow" = "CI" ]      || { echo "::error::run $run_id is workflow '$workflow', not 'CI'"; exit 1; }
-          [ "$conclusion" = "success" ] || { echo "::error::run $run_id did not succeed (conclusion=$conclusion)"; exit 1; }
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-          echo "Promoting CI run $run_id at commit $sha"
+          if [ "${{ github.ref_type }}" = "tag" ] && ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$GITHUB_REF_NAME is not a version mark vMAJOR.MINOR; the three-component release tags are made by this workflow"
+            exit 1
+          fi
+          # main and nowhere else, but for a dry run, which publishes nothing and may prove a change to the release
+          # from its branch before it merges.
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if [ "$is_dry_run" = false ]; then
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "::error::a release is cut from main, not $GITHUB_REF"
+              exit 1
+            fi
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main ||
+              { echo "::error::$GITHUB_SHA is not on main: tag a commit of main"; exit 1; }
+          fi
+          describe=$(git describe --tags --long --match 'v[0-9]*.[0-9]*' --exclude 'v*.*.*' 2> /dev/null || true)
+          if [[ "$describe" =~ ^v([0-9]+)\.([0-9]+)-([0-9]+)-g[0-9a-f]+$ ]]; then
+            version="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}"
+          elif [ "$is_dry_run" = true ]; then
+            echo "::warning::no vMAJOR.MINOR tag is reachable from $GITHUB_SHA: a dry run as 0.0.0, cmake/version.cmake's fallback"
+            version=0.0.0
+          else
+            echo "::error::no vMAJOR.MINOR tag is reachable from $GITHUB_SHA (git describe: '$describe'): tag main and push the tag"
+            exit 1
+          fi
+          tag="v$version"
+          publish=true
+          [ "$is_dry_run" = true ] && publish=false
+          release_id=""
+          if [ "$publish" = true ]; then
+            if is_draft=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2> /dev/null); then
+              if [ "$is_draft" = true ]; then
+                echo "A draft of $tag is left from a run that did not publish; replacing it"
+                gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes
+              else
+                echo "::error::$tag is already released: push a commit (the build number moves on) or tag the next vMAJOR.MINOR"
+                exit 1
+              fi
+            fi
+            changes=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$tag" \
+              -f target_commitish="$GITHUB_SHA" --jq .body)
+            {
+              echo "Pawnstar $version: the Pawnstar UCI chess engine (C++, NNUE), built and tested at commit \`$GITHUB_SHA\`"
+              echo "by run [#$GITHUB_RUN_ID]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
+              echo
+              echo "- **Windows (x86-64, AVX2):** \`pawnstar-$version-windows-x86_64.exe\`, Authenticode-signed (Jonathan Reckless)."
+              echo "- **macOS (Apple silicon):** the binary in \`pawnstar-$version-macos-arm64.zip\`, signed with a"
+              echo "  Developer ID and notarised by Apple."
+              echo "- **Linux (x86-64, AVX2):** \`pawnstar-$version-linux-x86_64\`; \`chmod +x\` it."
+              echo
+              echo "$changes"
+            } > "$RUNNER_TEMP/notes.md"
+            # The REST API's answer carries the draft's numeric id, which the build jobs upload to: a draft has no tag
+            # to be found by.
+            release_id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" -f tag_name="$tag" \
+              -f target_commitish="$GITHUB_SHA" -f name="Pawnstar $version" -F draft=true \
+              -F body=@"$RUNNER_TEMP/notes.md" --jq .id)
+            echo "draft release $tag opened: id $release_id"
+          fi
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "publish=$publish"
+            echo "release_id=$release_id"
+          } >> "$GITHUB_OUTPUT"
+          echo "Pawnstar $version (git describe: ${describe:-none}); publish=$publish"
 
-  # 2) macOS arm64 (Apple Silicon, Apple clang via the make wrapper → CMake; the arm64 path targets
-  #    -mcpu=apple-m1), built and tested at the promoted commit and handed to the release job as an artifact.
-  #    These are the steps the per-push CI job ran before macOS moved here. cmake+ninja drive the wrapper; macOS
-  #    ships bash 3.2 as /bin/bash, which lacks `coproc` (bash 4.0+) used by the UCI test, so install a modern
-  #    bash and point the build at it via BASH. WERROR is omitted: Apple clang's warning set differs from
-  #    clang-18's and is not the CI gate.
-  #    Runs on the org's Apple-silicon runner (reckless-ci-mac-1), not a hosted macos-latest runner.
-  macos:
-    name: build + test (macos arm64)
-    needs: resolve
-    runs-on: [self-hosted, macOS, ARM64]
+  build:
+    name: build + test (${{ matrix.name }})
+    needs: verify
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: linux x86_64
+            runner: [self-hosted, Linux, X64]
+            asset: linux-x86_64
+          - name: windows x86_64
+            runner: [self-hosted, Windows, X64]
+            asset: windows-x86_64.exe
+          - name: macos arm64
+            runner: [self-hosted, macOS, ARM64]
+            asset: macos-arm64.zip
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240 # the macOS job waits on Apple's notary service
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      PUBLISH: ${{ needs.verify.outputs.publish }}
+      # The file shipped; on macOS a zip, which holds the binary staged under the same name without .zip.
+      SHIPPED: out/pawnstar-${{ needs.verify.outputs.version }}-${{ matrix.asset }}
+    defaults:
+      run:
+        shell: bash
     steps:
-      # Full history so `git rev-list --count HEAD` yields the true build number for the version-named binary.
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve.outputs.sha }}
-          fetch-depth: 0
-      - name: Install toolchain
+          fetch-depth: 0 # cmake/version.cmake reads the version from the tags
+          fetch-tags: true
+      - name: Start from nothing
+        run: rm -rf build out
+      - name: Toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang-18 cmake ninja-build doxygen
+          if ! grep -q avx2 /proc/cpuinfo || ! grep -q bmi2 /proc/cpuinfo; then
+            echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1
+          fi
+      - name: Toolchain (macOS)
+        if: runner.os == 'macOS'
         run: brew install bash cmake ninja
-      - name: Build + test (release)
-        run: make -j"$(sysctl -n hw.logicalcpu)" RELEASE=1 BASH="$(brew --prefix)/bin/bash" check
-      - name: Upload engine binary
-        uses: actions/upload-artifact@v6
+      # The MSVC developer environment (vswhere and vcvars64, exported to GITHUB_ENV), as ci.yml's Windows job sets it
+      # up: the VS-targeting clang links against its STL and SDK.
+      - name: Toolchain (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { Write-Error "Visual Studio with C++ tools not found"; exit 1 }
+          cmd /s /c "`"$vs\VC\Auxiliary\Build\vcvars64.bat`" && set" | ForEach-Object {
+            if ($_ -match '^([^=]+)=(.*)$') {
+              Add-Content -Path $env:GITHUB_ENV -Value "$($Matches[1])=$($Matches[2])"
+            }
+          }
+      # SSL.com's CodeSignTool, pinned by version and hash and kept in the tool cache, and the account signed in to and
+      # its certificate listed - which spends no signing - before the build rides on it.
+      - name: eSigner's signing tool, and the account checked
+        if: runner.os == 'Windows' && env.PUBLISH == 'true'
+        shell: pwsh
+        env:
+          ESIGNER_USERNAME: ${{ secrets.ESIGNER_USERNAME }}
+          ESIGNER_PASSWORD: ${{ secrets.ESIGNER_PASSWORD }}
+          ESIGNER_CREDENTIAL_ID: ${{ secrets.ESIGNER_CREDENTIAL_ID }}
+        run: |
+          if (-not $env:ESIGNER_USERNAME) { throw "no eSigner secrets: a release's Windows binary is signed" }
+          $version = 'v1.3.2'
+          $sha256 = '4afc32e8b7f79bbe1de7e4e7049aaad4e0f754357613b9bbec0e3052f06fd36b'
+          $dir = Join-Path $env:RUNNER_TOOL_CACHE "codesigntool\$version"
+          if (-not (Test-Path (Join-Path $dir 'CodeSignTool.bat'))) {
+            $zip = Join-Path $env:RUNNER_TEMP 'codesigntool.zip'
+            Invoke-WebRequest -UseBasicParsing -OutFile $zip `
+              -Uri "https://github.com/SSLcom/CodeSignTool/releases/download/$version/CodeSignTool-$version-windows.zip"
+            $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+            if ($hash -ne $sha256) { throw "CodeSignTool $version is $hash, not the pinned $sha256" }
+            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $dir
+            Expand-Archive -Path $zip -DestinationPath $dir
+            Remove-Item -Force $zip
+          }
+          "RECKLESS_CODESIGNTOOL=$dir" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+          $env:RECKLESS_CODESIGNTOOL = $dir
+          pwsh -NoProfile -File tools/sign-windows.ps1 -Check
+          if ($LASTEXITCODE -ne 0) { throw "the eSigner account is not ready to sign" }
+      # Built and tested as CI's artifact jobs are (the macOS steps release.yml ran before): the make wrapper on Linux
+      # (warnings as errors, clang-18) and macOS (a bash with coproc for the UCI test), CMake directly on Windows. Every
+      # suite runs, the UCI test with the bench determinism signature among them.
+      - name: Build + test
+        run: |
+          set -o pipefail
+          mkdir -p "$RUNNER_TEMP/logs"
+          case "$RUNNER_OS" in
+          Linux) make -j"$(nproc)" RELEASE=1 WERROR=1 CXX=clang++-18 check | tee "$RUNNER_TEMP/logs/build.log" ;;
+          macOS) make -j"$(sysctl -n hw.logicalcpu)" RELEASE=1 BASH="$(brew --prefix)/bin/bash" check |
+                   tee "$RUNNER_TEMP/logs/build.log" ;;
+          Windows)
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAWNSTAR_DEBUGX=OFF -DCMAKE_CXX_COMPILER=clang++ |
+              tee "$RUNNER_TEMP/logs/build.log"
+            cmake --build build
+            ctest --test-dir build --output-on-failure ;;
+          esac
+          grep -q -- "-- Pawnstar $VERSION\$" "$RUNNER_TEMP/logs/build.log" ||
+            { echo "::error::the configure does not report Pawnstar $VERSION"; exit 1; }
+      - name: Stage
+        run: |
+          mkdir -p out
+          cp build/pawnstar_"${VERSION//./_}"* "${SHIPPED%.zip}"
+      - name: Sign (Windows, a publishing run)
+        if: runner.os == 'Windows' && env.PUBLISH == 'true'
+        shell: pwsh
+        env:
+          ESIGNER_USERNAME: ${{ secrets.ESIGNER_USERNAME }}
+          ESIGNER_PASSWORD: ${{ secrets.ESIGNER_PASSWORD }}
+          ESIGNER_TOTP_SECRET: ${{ secrets.ESIGNER_TOTP_SECRET }}
+          ESIGNER_CREDENTIAL_ID: ${{ secrets.ESIGNER_CREDENTIAL_ID }}
+        run: |
+          pwsh -NoProfile -File tools/sign-windows.ps1 $env:SHIPPED
+          if ($LASTEXITCODE -ne 0) { throw "the Windows binary was not signed" }
+      - name: Open the signing keychain (macOS)
+        if: runner.os == 'macOS'
+        env:
+          MACOS_DEVELOPER_ID_APPLICATION_P12: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION_P12 }}
+          MACOS_SIGNING_P12_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
+          MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+        run: tools/sign-macos.sh open
+      - name: Sign and notarise (macOS)
+        if: runner.os == 'macOS'
+        env:
+          MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
+          MACOS_NOTARY_KEY_P8: ${{ secrets.MACOS_NOTARY_KEY_P8 }}
+          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
+          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
+        run: |
+          binary="${SHIPPED%.zip}"
+          tools/sign-macos.sh sign --identifier com.recklesstechnology.pawnstar "$binary"
+          # ditto, as Finder makes a zip: the executable bit and the signature come out as they went in.
+          ditto -c -k "$binary" "$SHIPPED"
+          tools/sign-macos.sh notarize "$SHIPPED"
+          tools/sign-macos.sh check "$binary"
+          rm "$binary"
+      # What ships is what is checked: the staged file itself (the zip's own binary on macOS), after signing.
+      - name: The shipped binary reports the version, and is signed where it must be
+        run: |
+          set -o pipefail
+          ls -l out
+          binary="$SHIPPED"
+          if [[ "$SHIPPED" == *.zip ]]; then
+            rm -rf "$RUNNER_TEMP/unzipped" && mkdir "$RUNNER_TEMP/unzipped"
+            ditto -x -k "$SHIPPED" "$RUNNER_TEMP/unzipped"
+            binary="$RUNNER_TEMP/unzipped/$(basename "${SHIPPED%.zip}")"
+            codesign --verify --strict --verbose=2 "$binary"
+          fi
+          name=$("$binary" <<< $'uci\nquit' | grep -m1 '^id name' || true)
+          echo "$name"
+          [ "$name" = "id name Pawnstar $VERSION" ] ||
+            { echo "::error::the binary says '$name', not Pawnstar $VERSION"; exit 1; }
+      - name: Nothing unsigned ships (Windows)
+        if: runner.os == 'Windows' && env.PUBLISH == 'true'
+        shell: pwsh
+        run: |
+          $signature = Get-AuthenticodeSignature -FilePath $env:SHIPPED
+          "$($signature.Status): $($signature.SignerCertificate.Subject)"
+          if ($signature.Status -ne 'Valid') { throw "$env:SHIPPED is not validly signed: $($signature.StatusMessage)" }
+      - name: Upload to the draft release
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.verify.outputs.release_id }}
+        run: |
+          set -o pipefail
+          name=$(basename "$SHIPPED")
+          # A file of the same name an earlier attempt left on the draft is replaced, so the job can run again (where the
+          # runner has gh; a first attempt needs no removal).
+          command -v gh > /dev/null || echo "no gh here: a file an earlier attempt left would stop this upload"
+          for stale in $(command -v gh > /dev/null && gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets" --jq ".[] | select(.name == \"$name\") | .id"); do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$stale"
+          done
+          curl --fail-with-body --silent --show-error -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/octet-stream" --data-binary "@$SHIPPED" \
+            "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$name" |
+            grep -o '"browser_download_url": *"[^"]*"'
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH != 'true'
+        continue-on-error: true
         with:
-          name: pawnstar-macos-arm64
-          path: build/pawnstar_*
-          if-no-files-found: error
+          name: ${{ matrix.asset }}
+          path: out/*
+          retention-days: 1
+      - name: Close the signing keychain (macOS)
+        if: always() && runner.os == 'macOS'
+        run: tools/sign-macos.sh close
+      - name: The workspace left clean
+        if: always()
+        run: rm -rf out "$RUNNER_TEMP/unzipped" "$RUNNER_TEMP/logs"
 
-  release:
-    name: promote CI run to release
-    needs: [resolve, macos]
+  # The source and the documentation, made in a dry run too, so a release's first run of this job is not its first run
+  # at all; then, in a publishing run, the draft checked and published. Every step is safe to run again: an upload
+  # replaces a file of the same name an earlier attempt left on the draft, and a tag an earlier attempt pushed is taken
+  # as it stands when it names this commit.
+  publish:
+    name: source, documentation, publish
+    needs: [verify, build]
     runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.verify.outputs.version }}
+      TAG: ${{ needs.verify.outputs.tag }}
+      PUBLISH: ${{ needs.verify.outputs.publish }}
+      RELEASE_ID: ${{ needs.verify.outputs.release_id }}
     steps:
-      # 3) Check out the promoted commit so docs and the source archive come from exactly that revision.
-      - name: Checkout promoted commit
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.resolve.outputs.sha }}
-
-      # 4) Download the Linux and Windows binaries that CI built and tested for that run, and the macOS binary
-      #    the job above built and tested at the same commit — into the same tree, so the staging step below
-      #    reads all three alike.
-      - name: Download CI artifacts
-        run: gh run download "${{ needs.resolve.outputs.run_id }}" --dir ci-artifacts
-      - name: Download the macOS binary built above
-        uses: actions/download-artifact@v6
-        with:
-          name: pawnstar-macos-arm64
-          path: ci-artifacts/pawnstar-macos-arm64
-
-      # 5) Derive the version from a binary filename (pawnstar_0_12_589 -> 0.12.589) so the tag always
-      #    matches the actual built binary, and stage the binaries under collision-free, platform-suffixed
-      #    names (the Linux and macOS binaries share the bare name pawnstar_<ver>). The macOS binary was built
-      #    at the same commit, so its name must agree; the version-suffixed cp fails loudly if it ever drifts.
-      - name: Stage binaries
-        id: stage
-        run: |
-          set -euo pipefail
-          linux_bin=$(ls ci-artifacts/pawnstar-linux-x86_64/pawnstar_*)
-          base=$(basename "$linux_bin")
-          ver=$(echo "$base" | sed -E 's/^pawnstar_([0-9]+)_([0-9]+)_([0-9]+)$/\1.\2.\3/')
-          [ "$ver" != "$base" ] || { echo "::error::could not parse version from '$base'"; exit 1; }
-          echo "version=$ver" >> "$GITHUB_OUTPUT"
-          mkdir -p assets
-          cp ci-artifacts/pawnstar-linux-x86_64/pawnstar_*      "assets/pawnstar-$ver-linux-x86_64"
-          cp "ci-artifacts/pawnstar-macos-arm64/$base"          "assets/pawnstar-$ver-macos-arm64"
-          cp ci-artifacts/pawnstar-windows-x86_64/pawnstar_*.exe "assets/pawnstar-$ver-windows-x86_64.exe"
-          echo "Staged binaries for version $ver"
-
-      # 6) Generate the Doxygen HTML docs from the promoted commit (graphviz/dot powers the diagrams). Run
-      #    the doc helper directly via `cmake -P` (same script the `doc` target uses, with the version
-      #    stamped as PROJECT_NUMBER) rather than `make doc` — this needs only cmake + doxygen, not a C++
-      #    compiler/generator, so the release job stays lean.
+          fetch-depth: 0
+          fetch-tags: true
+      # Doxygen through the doc target's own script (cmake -P, the version as PROJECT_NUMBER), which needs no compiler.
       - name: Install doc toolchain
         run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
-      - name: Generate docs
+      - name: The source and the documentation
         run: |
           set -euo pipefail
-          ver="${{ steps.stage.outputs.version }}"
-          cmake -DSOURCE_DIR="$PWD" -DBIN_DIR="$PWD/build" -DVERSION="$ver" -P cmake/run_doxygen.cmake
-          ( cd doc && zip -rq "../assets/pawnstar-$ver-docs-html.zip" html )
-
-      # 7) Source archive at the promoted commit (clean tree, no .git). This is in addition to the "Source
-      #    code (zip/tar.gz)" archives GitHub auto-attaches to every release.
-      - name: Source archive
+          rm -rf assets doc && mkdir assets
+          cmake -DSOURCE_DIR="$PWD" -DBIN_DIR="$PWD/build" -DVERSION="$VERSION" -P cmake/run_doxygen.cmake
+          (cd doc && zip -rq "../assets/pawnstar-$VERSION-docs-html.zip" html)
+          git archive --format=tar.gz --prefix="pawnstar-$VERSION/" -o "assets/pawnstar-$VERSION-source.tar.gz" "$GITHUB_SHA"
+          ls -l assets
+      - name: Onto the draft
+        if: env.PUBLISH == 'true'
         run: |
           set -euo pipefail
-          ver="${{ steps.stage.outputs.version }}"
-          git archive --format=tar.gz --prefix="pawnstar-$ver/" -o "assets/pawnstar-$ver-source.tar.gz" HEAD
-
-      # 8) Create the release at the promoted commit with the staged assets. Notes = a provenance line
-      #    (which CI run / commit, and that this run built the macOS binary) followed by GitHub's
-      #    auto-generated changelog. Fails if the tag already exists (no clobber).
-      - name: Create release
+          for file in assets/*; do
+            name=$(basename "$file")
+            for stale in $(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets" --jq ".[] | select(.name == \"$name\") | .id"); do
+              gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$stale"
+            done
+            curl --fail-with-body --silent --show-error -X POST \
+              -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/octet-stream" --data-binary "@$file" \
+              "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets?name=$name" |
+              grep -o '"browser_download_url": *"[^"]*"'
+          done
+      - uses: actions/upload-artifact@v4
+        if: env.PUBLISH != 'true'
+        continue-on-error: true
+        with:
+          name: source-and-docs
+          path: assets/*
+          retention-days: 1
+      - name: Publish the release
+        if: env.PUBLISH == 'true'
         run: |
           set -euo pipefail
-          ver="${{ steps.stage.outputs.version }}"
-          tag="v$ver"
-          sha="${{ needs.resolve.outputs.sha }}"
-          run_id="${{ needs.resolve.outputs.run_id }}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "::error::release/tag $tag already exists — refusing to clobber"; exit 1
+          release="repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID"
+          draft_tag=$(gh api "$release" --jq .tag_name)
+          [ "$draft_tag" = "$TAG" ] || { echo "::error::the draft (id $RELEASE_ID) is for $draft_tag, not $TAG"; exit 1; }
+          assets=$(gh api "$release" --jq '.assets[].name')
+          missing=""
+          for file in "pawnstar-$VERSION-linux-x86_64" "pawnstar-$VERSION-windows-x86_64.exe" \
+                      "pawnstar-$VERSION-macos-arm64.zip" "pawnstar-$VERSION-source.tar.gz" \
+                      "pawnstar-$VERSION-docs-html.zip"; do
+            grep -qx "$file" <<< "$assets" || { echo "::error::$file is not on the draft $TAG"; missing="$missing $file"; }
+          done
+          [ -z "$missing" ] || exit 1
+          # The release's own tag on the commit built, made with git and pushed. The tagger is named on the command
+          # alone: the runner keeps this clone, and an identity written into its config would outlive the job.
+          git tag -d "$TAG" > /dev/null 2>&1 || true
+          if git fetch --quiet origin "refs/tags/$TAG:refs/tags/$TAG" 2> /dev/null; then
+            [ "$(git rev-parse "$TAG^{commit}")" = "$GITHUB_SHA" ] ||
+              { echo "::error::$TAG already names another commit than $GITHUB_SHA"; exit 1; }
+          else
+            git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              tag -a "$TAG" "$GITHUB_SHA" -m "Pawnstar $VERSION"
+            git push origin "$TAG"
           fi
-          changelog=$(gh api -X POST "repos/$GH_REPO/releases/generate-notes" \
-            -f tag_name="$tag" -f target_commitish="$sha" --jq '.body')
-          {
-            echo "Promoted from CI run [#$run_id](https://github.com/$GH_REPO/actions/runs/$run_id) at commit \`$sha\`;"
-            echo "the macOS arm64 binary was built and tested at the same commit by release run [#$GITHUB_RUN_ID](https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID)."
-            echo
-            echo "$changelog"
-          } > notes.md
-          draft_flag=""
-          if [ "${{ inputs.draft }}" = "true" ]; then draft_flag="--draft"; fi
-          url=$(gh release create "$tag" \
-            --target "$sha" \
-            --title "Pawnstar $ver" \
-            --notes-file notes.md \
-            $draft_flag \
-            assets/*)
-          echo "Created release $tag: $url"
-          {
-            echo "### Release $tag"
-            echo "- Promoted CI run: #$run_id"
-            echo "- macOS arm64 built by: this run (#$GITHUB_RUN_ID)"
-            echo "- Commit: \`$sha\`"
-            echo "- Draft: ${{ inputs.draft }}"
-            echo "- URL: $url"
-          } >> "$GITHUB_STEP_SUMMARY"
+          gh api -X PATCH "$release" -F draft=false -f make_latest=true --jq .html_url
+          gh api "$release" --jq '.assets[] | "  \(.name)  \(.size) bytes"'
+          echo "### Released [$TAG]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG)" >> "$GITHUB_STEP_SUMMARY"
+      - name: The workspace left clean
+        if: always()
+        run: rm -rf assets doc build
