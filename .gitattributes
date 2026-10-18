@@ -11,3 +11,9 @@
 *.sh       text eol=lf
 .githooks/* text eol=lf
 Makefile   text eol=lf
+
+# Data the engine embeds or a test reads byte for byte is checked out exactly as committed, with no line-ending
+# conversion: the build .incbin's pawnstar.book into the binary, so under autocrlf=true a Windows build would embed a
+# CRLF book where Linux and macOS embed LF - a byte-different binary for the same commit.
+pawnstar.book           -text
+test/nnue_reference.txt -text
