@@ -87,9 +87,12 @@ ever looks stale, `make clean` and rebuild. Switching `CXX` for an existing tree
 
 ### Windows / cross-platform
 
-CMake builds the same engine, tools, and tests on Linux, macOS and Windows. On Windows use a **clang**
-toolchain with Ninja — the CI-validated path (the `make` wrapper is a Unix-shell convenience and isn't
-needed here):
+CMake builds the same engine, tools, and tests on Linux, macOS and Windows. On Windows,
+**`tools/build.ps1`** is the `make` wrapper's counterpart, with the same targets and knobs - `toolsuild.ps1`,
+`toolsuild.ps1 check`, `-Release` (`RELEASE=1`), `-Debug` (`DEBUG=1`), `clean`. It finds Visual Studio with
+`vswhere`, enters its x64 developer environment and puts Visual Studio's own clang first on the PATH, so it runs
+from any shell, VS Code's tasks among them. Underneath it is the CI-validated path, a **clang** toolchain
+targeting the MSVC ABI with Ninja:
 
 ```bash
 cmake -S . -B build -G Ninja -DCMAKE_CXX_COMPILER=clang++
@@ -101,7 +104,14 @@ This produces a **self-contained**, version-named `build/pawnstar_<major>_<minor
 `build/pawnstar.exe` alias): the NNUE net and the opening book are compiled into the binary (the same
 `.incbin` embedding used on Linux), so it needs no external files — an on-disk `nnue/…bin` / `pawnstar.book`
 is only an optional override. The Windows build is **bit-identical** to Linux (same `bench` node count and
-perft) and passes the full test suite.
+perft) and passes the full test suite. The link writes a `.pdb` beside each binary, so the Visual Studio
+debugger (VS Code's `cppvsdbg`, the `Windows:` configurations in `.vscode/launch.json`) has symbols. A
+`-Debug` build runs AddressSanitizer and UBSan on the release C runtime, the only one the sanitizer runtime
+supports on Windows; the script puts the sanitizer DLLs on the PATH for the tests.
+
+**VS Code** works the same on all three platforms: `.vscode/tasks.json` runs `make` on Linux and macOS and
+`tools/build.ps1` on Windows, `.vscode/launch.json` has a launch and an attach per platform (gdb, CodeLLDB,
+the Visual Studio debugger), and IntelliSense reads `build/compile_commands.json`, which every configure writes.
 
 Cross-compiling that `.exe` from Linux (clang + MinGW-w64, statically linked so it also needs no
 runtime DLLs) uses the bundled toolchain file; with `wine` installed, `ctest` runs the `.exe` suites under

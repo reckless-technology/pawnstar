@@ -22,6 +22,9 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# build/compile_commands.json, the code model VS Code's C/C++ extension reads on every platform (.vscode).
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Engine ISA, per architecture. On x86-64: AVX2 (NNUE SIMD); -mbmi2 only lets the compiler emit BMI1
 # tzcnt/blsr for std::countr_zero (sliding attacks use magic bitboards, not pext). The AVX-VNNI output-dot
 # kernel is compiled behind a function-level target attribute and chosen at runtime by cpuid, so no global
@@ -46,6 +49,10 @@ add_compile_options($<$<CONFIG:RelWithDebInfo>:-O3>)
 add_compile_options($<$<CONFIG:Debug>:-Og>)
 add_compile_options($<$<CONFIG:Debug>:-g>)
 add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)
+# clang targeting the MSVC ABI writes a .pdb only when -g reaches the link too, so a debugger has symbols there.
+if(WIN32)
+  add_link_options($<$<CONFIG:Release,RelWithDebInfo,Debug>:-g>)
+endif()
 
 # Optional AddressSanitizer + UndefinedBehaviorSanitizer (the Makefile's DEBUG=1), applied to compile and
 # link. The Makefile pairs this with a Debug build; the Makefile wrapper sets Debug + PAWNSTAR_SANITIZE together.
@@ -53,6 +60,11 @@ option(PAWNSTAR_SANITIZE "Build with AddressSanitizer + UndefinedBehaviorSanitiz
 if(PAWNSTAR_SANITIZE)
   add_compile_options(-fsanitize=undefined -fsanitize=address)
   add_link_options(-fsanitize=undefined -fsanitize=address)
+  # On Windows the sanitizer runtime supports only the release C runtime: under the debug one (ucrtbased) a Debug
+  # build reports its own allocations as a "bad-free" on the first realloc.
+  if(WIN32)
+    set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+  endif()
 endif()
 
 # On Windows, clang targets the MSVC ABI and pulls in Microsoft's UCRT headers, which mark standard C

@@ -1,7 +1,7 @@
 # Thin wrapper around the CMake build, which is Pawnstar's single build system of record (see CMakeLists.txt).
 # It preserves the historical `make` UX — `make`, `make check`, `make tools`, `make tests`, `make doc`,
 # `make clean` — by mapping to cmake + ctest, so muscle memory and existing tooling keep working. On Windows,
-# invoke CMake directly (this wrapper is for Unix-y shells).
+# tools/build.ps1 is the same wrapper for PowerShell, target for target and knob for knob.
 #
 # Requires cmake (>= 3.20) and a generator: Ninja is used if available, else Unix Makefiles.
 #

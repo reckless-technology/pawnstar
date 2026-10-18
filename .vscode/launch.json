@@ -1,8 +1,10 @@
 {
+    // One launch and one attach per platform: gdb on Linux, CodeLLDB on macOS, the Visual Studio debugger on Windows
+    // (clang there targets the MSVC ABI and writes a .pdb). Each launch builds the engine first ("build pawnstar").
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch pawnstar",
+            "name": "Linux: Launch pawnstar (gdb)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/pawnstar",
@@ -27,7 +29,7 @@
             ]
         },
         {
-            "name": "(gdb) Attach",
+            "name": "Linux: Attach to pawnstar (gdb)",
             "type": "cppdbg",
             "request": "attach",
             "program": "${workspaceFolder}/build/pawnstar",
@@ -62,6 +64,23 @@
             "type": "lldb",
             "request": "attach",
             "program": "${workspaceFolder}/build/pawnstar"
+        },
+        {
+            "name": "Windows: Launch pawnstar (Visual Studio debugger)",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/pawnstar.exe",
+            "cwd": "${workspaceFolder}",
+            "args": [],
+            "stopAtEntry": false,
+            "console": "integratedTerminal",
+            "preLaunchTask": "build pawnstar"
+        },
+        {
+            "name": "Windows: Attach to pawnstar (Visual Studio debugger)",
+            "type": "cppvsdbg",
+            "request": "attach",
+            "processId": "${command:pickProcess}"
         }
     ]
 }

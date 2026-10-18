@@ -1,33 +1,27 @@
 {
   "configurations": [
     {
-      "name": "linux-gcc-x64",
-      "includePath": [
-        "${workspaceFolder}/**",
-        "${workspaceFolder}/src"
-      ],
-      "cppStandard": "c++20",
-      "defines": [
-        "DEBUGX=1",
-        "__AVX2__=1",
-        "__BMI2__=1"
-      ],
-      "configurationProvider": "ms-vscode.makefile-tools",
-      "cStandard": "c17",
-      "compilerPath": "/usr/bin/gcc",
-      "intelliSenseMode": "linux-gcc-x64"
+      "name": "Linux",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "includePath": ["${workspaceFolder}/src"],
+      "cppStandard": "c++23",
+      "compilerPath": "/usr/bin/clang++",
+      "intelliSenseMode": "linux-clang-x64"
     },
     {
-      "name": "mac-clang-arm64",
-      "includePath": [
-        "${workspaceFolder}/**",
-        "${workspaceFolder}/src"
-      ],
+      "name": "Mac",
       "compileCommands": "${workspaceFolder}/build/compile_commands.json",
-      "cppStandard": "c++20",
-      "cStandard": "c17",
+      "includePath": ["${workspaceFolder}/src"],
+      "cppStandard": "c++23",
       "compilerPath": "/usr/bin/clang++",
       "intelliSenseMode": "macos-clang-arm64"
+    },
+    {
+      "name": "Win32",
+      "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+      "includePath": ["${workspaceFolder}/src"],
+      "cppStandard": "c++23",
+      "intelliSenseMode": "windows-clang-x64"
     }
   ],
   "version": 4

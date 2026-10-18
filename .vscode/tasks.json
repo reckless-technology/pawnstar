@@ -1,22 +1,53 @@
 {
-    "version" : "2.0.0",
+    // The Makefile's targets on Linux and macOS, tools/build.ps1's on Windows (the same targets and knobs).
+    "version": "2.0.0",
     "tasks": [
         {
-            "type": "shell",
             "label": "build pawnstar",
+            "type": "shell",
             "command": "make",
-            "args": [
-                "all"
-            ],
-            "problemMatcher": []
+            "args": ["all"],
+            "windows": {
+                "command": "powershell",
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/build.ps1", "all"]
+            },
+            "group": { "kind": "build", "isDefault": true },
+            "problemMatcher": ["$gcc"]
         },
         {
+            "label": "check pawnstar",
             "type": "shell",
-            "label": "clean pawnstar",
             "command": "make",
-            "args": [
-                "clean"
-            ]
+            "args": ["check"],
+            "windows": {
+                "command": "powershell",
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/build.ps1", "check"]
+            },
+            "group": { "kind": "test", "isDefault": true },
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "build pawnstar (debug, sanitizers)",
+            "type": "shell",
+            "command": "make",
+            "args": ["all", "DEBUG=1"],
+            "windows": {
+                "command": "powershell",
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/build.ps1", "all", "-Debug"]
+            },
+            "group": "build",
+            "problemMatcher": ["$gcc"]
+        },
+        {
+            "label": "clean pawnstar",
+            "type": "shell",
+            "command": "make",
+            "args": ["clean"],
+            "windows": {
+                "command": "powershell",
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "tools/build.ps1", "clean"]
+            },
+            "problemMatcher": []
         }
     ]
 }
