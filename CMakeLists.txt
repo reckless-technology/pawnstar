@@ -58,7 +58,9 @@ endif()
 # link. The Makefile pairs this with a Debug build; the Makefile wrapper sets Debug + PAWNSTAR_SANITIZE together.
 option(PAWNSTAR_SANITIZE "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
 if(PAWNSTAR_SANITIZE)
-  add_compile_options(-fsanitize=undefined -fsanitize=address)
+  # -fno-sanitize-recover=undefined: UBSan reports undefined behaviour and then aborts, so a finding fails the test;
+  # by default it prints and carries on, and the process still exits 0.
+  add_compile_options(-fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined)
   add_link_options(-fsanitize=undefined -fsanitize=address)
   # On Windows the sanitizer runtime supports only the release C runtime: under the debug one (ucrtbased) a Debug
   # build reports its own allocations as a "bad-free" on the first realloc.
