@@ -33,6 +33,16 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 
 ## Build
 
+**Setting up a machine.** `tools/setup-dev.ps1` (Windows) and `tools/setup-dev.sh` (Linux, macOS) install what
+building, testing, debugging and formatting need - clang, CMake and Ninja (Visual Studio's on Windows, its C++ tools
+and clang components added behind a UAC prompt; apt's `clang-18` on Linux; Xcode's clang and Homebrew's CMake and
+Ninja on macOS), a bash >= 4 for the UCI suite (Git Bash on Windows, Homebrew's on macOS) and clang-format 22.1.8
+through uv - plus the git hooks, checking each first, so they are safe to run again; `-Check` / `--check` only
+reports. `-Docs` / `--docs` adds Doxygen and Graphviz, and `-Training` / `--training` what NNUE training needs: Rust's
+stable toolchain, a check for an NVIDIA GPU and the CUDA toolkit (which the scripts never install), and bullet at the
+pinned commit in `~/pawnstar_nnue/bullet` (`%USERPROFILE%\pawnstar_nnue\bullet` on Windows). In VS Code they are the
+`setup environment` and `check environment` tasks.
+
 CMake is the build system; a thin `Makefile` wrapper preserves the classic `make` UX on Unix-y shells (each
 target just invokes CMake). Both need `clang++` and CMake ≥ 3.20 with a generator (Ninja preferred; the
 wrapper falls back to Unix Makefiles if Ninja is absent). Use whichever you prefer:
@@ -88,8 +98,8 @@ ever looks stale, `make clean` and rebuild. Switching `CXX` for an existing tree
 ### Windows / cross-platform
 
 CMake builds the same engine, tools, and tests on Linux, macOS and Windows. On Windows,
-**`tools/build.ps1`** is the `make` wrapper's counterpart, with the same targets and knobs - `toolsuild.ps1`,
-`toolsuild.ps1 check`, `-Release` (`RELEASE=1`), `-Debug` (`DEBUG=1`), `clean`. It finds Visual Studio with
+**`tools/build.ps1`** is the `make` wrapper's counterpart, with the same targets and knobs - `tools\build.ps1`,
+`tools\build.ps1 check`, `-Release` (`RELEASE=1`), `-Debug` (`DEBUG=1`), `clean`. It finds Visual Studio with
 `vswhere`, enters its x64 developer environment and puts Visual Studio's own clang first on the PATH, so it runs
 from any shell, VS Code's tasks among them. Underneath it is the CI-validated path, a **clang** toolchain
 targeting the MSVC ABI with Ninja:

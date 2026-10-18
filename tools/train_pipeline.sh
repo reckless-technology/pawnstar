@@ -17,14 +17,15 @@
 # The net width is fixed by the trainer example (tools/bullet/pawnstar.rs, HIDDEN_SIZE) and MUST match
 # the engine's nnue::kHiddenSize (1024 for v12). setup_bullet.sh installs/builds that example.
 #
-# Prerequisites: CUDA toolkit at $CUDA_PATH, bullet cloned at $BULLET (default ~/pawnstar_nnue/bullet).
+# Prerequisites: CUDA toolkit at $CUDA_PATH, bullet cloned at $BULLET (default ~/pawnstar_nnue/bullet; under
+# %USERPROFILE% on Windows, as MSYS2 has a ~ of its own).
 set -euo pipefail
 
 DATA_IN="${1:?data_dir or shuffled.data}"
 OUT_NET="${2:?out_net.bin}"
 END_SB="${3:-40}"
 
-BULLET="${BULLET:-$HOME/pawnstar_nnue/bullet}"
+BULLET="${BULLET:-${USERPROFILE:-$HOME}/pawnstar_nnue/bullet}"
 REPO="$(cd "$(dirname "$0")" && pwd)/.."
 # Backend: GPU by default; set BULLET_FEATURES="" to train on CPU (no CUDA needed). The `---features cuda`
 # default form means "unset -> --features cuda, but empty-string -> empty" so BULLET_FEATURES="" disables it.

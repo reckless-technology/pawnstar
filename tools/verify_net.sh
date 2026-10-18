@@ -5,7 +5,7 @@
 # the SPRT — a net that fails it has a format/arch mismatch and any match result would be meaningless.
 #
 # Usage: verify_net.sh <net.bin>
-# Env:   BULLET   bullet checkout (default ~/pawnstar_nnue/bullet)
+# Env:   BULLET   bullet checkout (default ~/pawnstar_nnue/bullet; under %USERPROFILE% on Windows, as MSYS2 has a ~ of its own)
 #
 # Requires: a built engine + tests (make check builds them) and the bullet pawnstar_eval example
 # (setup_bullet.sh installs it; train_pipeline.sh builds it). The net's width must match the engine's
@@ -14,7 +14,7 @@ set -euo pipefail
 
 NET="${1:?net.bin}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-BULLET="${BULLET:-$HOME/pawnstar_nnue/bullet}"
+BULLET="${BULLET:-${USERPROFILE:-$HOME}/pawnstar_nnue/bullet}"
 EVAL="$BULLET/target/release/examples/pawnstar_eval"
 
 WORK="$(mktemp -d)"

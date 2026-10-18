@@ -179,7 +179,11 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 GPU training, a CUDA toolkit (`CUDA_PATH`, default `/usr/local/cuda`) **and** a driver new enough for the
 toolkit: bullet's CUDA backend calls `cuFuncLoad`, which needs a driver supporting CUDA ≥ 12.3
 (driver ≥ 545). Otherwise train on CPU with `BULLET_FEATURES=""` — the net is small enough that CPU
-training is practical.
+training is practical. `tools/setup-dev.sh --training` (`tools\setup-dev.ps1 -Training` on Windows) installs Rust's
+stable toolchain, checks for the GPU and the toolkit and runs `setup_bullet.sh`; `fastchess` is still yours to build.
+On Windows `setup_bullet.sh` runs under Git's bash and `train_pipeline.sh` under MSYS2 (with
+`MSYS2_PATH_TYPE=inherit`, so cargo and nvcc are on its `PATH`), and `BULLET` defaults to
+`%USERPROFILE%\pawnstar_nnue\bullet`, since MSYS2's `~` is a home of its own.
 
 ## 5. Quick start (minimal retrain)
 

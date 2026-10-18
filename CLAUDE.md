@@ -4,7 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build
 
-Requires `clang++` and **CMake ≥ 3.20** with a generator (Ninja preferred, Unix Makefiles otherwise). **CMake ([CMakeLists.txt](CMakeLists.txt)) is the single build system of record** on every platform; a thin **`Makefile` wrapper** preserves the historical `make …` UX by invoking CMake, so `make` and `cmake` are interchangeable on Unix-y shells; on Windows **`tools/build.ps1`** is the same wrapper in PowerShell (`toolsuild.ps1 check`, `-Release`, `-Debug`), entering Visual Studio's developer environment and clang itself. There is no code-generation build step; the precomputed bitboard lookup tables in `src/generated_data.h` are `inline const` globals computed once at program startup.
+**Setting up a machine.** `tools/setup-dev.ps1` (Windows) and `tools/setup-dev.sh` (Linux, macOS) install what
+building, testing, debugging and formatting need - clang, CMake and Ninja (Visual Studio's on Windows, its C++ tools
+and clang components added behind a UAC prompt; apt's `clang-18` on Linux; Xcode's clang and Homebrew's CMake and
+Ninja on macOS), a bash >= 4 for the UCI suite (Git Bash on Windows, Homebrew's on macOS) and clang-format 22.1.8
+through uv - plus the git hooks, checking each first, so they are safe to run again; `-Check` / `--check` only
+reports. `-Docs` / `--docs` adds Doxygen and Graphviz, and `-Training` / `--training` what NNUE training needs: Rust's
+stable toolchain, a check for an NVIDIA GPU and the CUDA toolkit (which the scripts never install), and bullet at the
+pinned commit in `~/pawnstar_nnue/bullet` (`%USERPROFILE%\pawnstar_nnue\bullet` on Windows). In VS Code they are the
+`setup environment` and `check environment` tasks.
+
+Requires `clang++` and **CMake ≥ 3.20** with a generator (Ninja preferred, Unix Makefiles otherwise). **CMake ([CMakeLists.txt](CMakeLists.txt)) is the single build system of record** on every platform; a thin **`Makefile` wrapper** preserves the historical `make …` UX by invoking CMake, so `make` and `cmake` are interchangeable on Unix-y shells; on Windows **`tools/build.ps1`** is the same wrapper in PowerShell (`tools\build.ps1 check`, `-Release`, `-Debug`), entering Visual Studio's developer environment and clang itself. There is no code-generation build step; the precomputed bitboard lookup tables in `src/generated_data.h` are `inline const` globals computed once at program startup.
 
 The engine is **header-only**: every engine class/function lives in `src/*.h` as `inline` definitions, so there are no per-class engine `.cpp` files. The only compiled engine translation unit is `main.cpp` (the UCI entry point); each test and tool compiles as a single TU that pulls the whole engine in through its headers and links on its own. Because `game` ↔ `search_state` ↔ `evaluation` form an include cycle, `search_state.h` is the **hub**: it defines `class SearchState` (which needs only a forward-declared `Game` for its `Game &game_` member), *then* includes `game.h` and holds the inline definitions of the `SearchState` methods and `EvaluatePosition` (which need `Game` complete). `game.h` defines `class Game`, pulls the hub in at its very bottom (after `class Game` is fully defined), and then defines `Game::SearchRootNode` there — where `SearchState` is now complete. So `#include "game.h"` alone yields a complete, searchable engine in either include order (guarded by `#pragma once`).
 

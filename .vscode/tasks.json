@@ -1,7 +1,32 @@
 {
     // The Makefile's targets on Linux and macOS, tools/build.ps1's on Windows (the same targets and knobs).
+    // "setup environment" installs what building, testing, debugging and formatting need on this machine
+    // (tools/setup-dev.ps1 on Windows, tools/setup-dev.sh on Linux and macOS); "check environment" only reports.
     "version": "2.0.0",
     "tasks": [
+        {
+            "label": "setup environment",
+            "type": "shell",
+            "command": "${workspaceFolder}/tools/setup-dev.sh",
+            "windows": {
+                "command": "powershell",
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/setup-dev.ps1"]
+            },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always", "focus": true }
+        },
+        {
+            "label": "check environment",
+            "type": "shell",
+            "command": "${workspaceFolder}/tools/setup-dev.sh",
+            "args": ["--check"],
+            "windows": {
+                "command": "powershell",
+                "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}/tools/setup-dev.ps1", "-Check"]
+            },
+            "problemMatcher": [],
+            "presentation": { "reveal": "always" }
+        },
         {
             "label": "build pawnstar",
             "type": "shell",

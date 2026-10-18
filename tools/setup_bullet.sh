@@ -8,7 +8,7 @@
 # Change all three together to train a different-width architecture.
 #
 # Usage: setup_bullet.sh
-# Env:   BULLET   bullet checkout location (default ~/pawnstar_nnue/bullet)
+# Env:   BULLET   bullet checkout location (default ~/pawnstar_nnue/bullet; under %USERPROFILE% on Windows, as MSYS2 has a ~ of its own)
 #
 # Prerequisites: git, Rust/cargo. For GPU training also a CUDA toolkit (CUDA_PATH) and a driver new
 # enough for the toolkit (bullet's CUDA backend uses cuFuncLoad -> needs driver for CUDA >= 12.3).
@@ -16,7 +16,7 @@ set -euo pipefail
 
 # Pinned bullet commit that our examples/pawnstar*.rs target (bullet's API changes over time).
 BULLET_COMMIT=8893e4891781f4da2161dfbab0a776c156e22ead
-BULLET="${BULLET:-$HOME/pawnstar_nnue/bullet}"
+BULLET="${BULLET:-${USERPROFILE:-$HOME}/pawnstar_nnue/bullet}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
 # Clone only if we don't already have a checkout (re-runs reuse it).
