@@ -35,10 +35,13 @@ Legal move generation runs at roughly 600 million moves per second on a modern l
 
 **Setting up a machine.** `tools/setup-dev.ps1` (Windows) and `tools/setup-dev.sh` (Linux, macOS) install what
 building, testing, debugging and formatting need - clang, CMake and Ninja (Visual Studio's on Windows, its C++ tools
-and clang components added behind a UAC prompt; apt's `clang-18` on Linux; Xcode's clang and Homebrew's CMake and
-Ninja on macOS), a bash >= 4 for the UCI suite (Git Bash on Windows, Homebrew's on macOS) and clang-format 22.1.8
-through uv - plus the git hooks, checking each first, so they are safe to run again; `-Check` / `--check` only
-reports. `-Docs` / `--docs` adds Doxygen and Graphviz, and `-Training` / `--training` what NNUE training needs: Rust's
+added behind a UAC prompt, and its clang component unless a standalone LLVM for the MSVC ABI is there to build with
+instead - the report says which clang the build will use; apt's `clang-18` on Linux; Xcode's clang and Homebrew's
+CMake and Ninja on macOS), a bash >= 4 for the UCI suite (Git Bash on Windows, Homebrew's on macOS) and clang-format
+22.1.8 through uv - plus the git hooks, checking each first, so they are safe to run again; `-Check` / `--check` only
+reports. `-Docs` / `--docs` adds Doxygen and Graphviz (on Windows into the user's profile from their zips at pinned
+SHA-256s, `%LOCALAPPDATA%\Programs\doxygen-1.14.0` and `%LOCALAPPDATA%\Programs\graphviz`, no administrator), and
+`-Training` / `--training` what NNUE training needs: Rust's
 stable toolchain, a check for an NVIDIA GPU and the CUDA toolkit (which the scripts never install), and bullet at the
 pinned commit in `~/pawnstar_nnue/bullet` (`%USERPROFILE%\pawnstar_nnue\bullet` on Windows). In VS Code they are the
 `setup environment` and `check environment` tasks.
@@ -91,6 +94,20 @@ The `DEBUGX` diagnostic counters (the `dbg` command's data) are compiled in by d
 output (the `[PASS]`/`[FAIL]` lines, perft/bench numbers) is shown; pass `CTEST_ARGS=--output-on-failure`
 for a terse summary that prints a suite's output only when it fails.
 
+Code coverage (clang's source-based coverage, `COVERAGE=1` → `-DPAWNSTAR_COVERAGE=ON`, which adds
+`-fprofile-instr-generate -fcoverage-mapping` to compile and link):
+
+```bash
+make coverage                 # Windows: tools\build.ps1 coverage
+```
+
+builds everything instrumented, runs every ctest with `LLVM_PROFILE_FILE=build/prof/%p-%m.profraw`, merges the
+profiles with `llvm-profdata` and has `llvm-cov` report `src/`'s line, function and region coverage over the
+engine and the test binaries, writing `build/coverage/coverage.lcov` and an HTML report in `build/coverage/html`
+(the LLVM tools are taken from beside the compiler first, so they match it). The target is
+[cmake/run_coverage.cmake](cmake/run_coverage.cmake). An instrumented tree is not for benchmarking: a later plain
+`make` configures it back without the instrumentation.
+
 The wrapper reconfigures on each invocation, so branch/knob changes are picked up automatically; if a build
 ever looks stale, `make clean` and rebuild. Switching `CXX` for an existing tree needs `make clean` first
 (CMake caches the compiler).
@@ -99,9 +116,12 @@ ever looks stale, `make clean` and rebuild. Switching `CXX` for an existing tree
 
 CMake builds the same engine, tools, and tests on Linux, macOS and Windows. On Windows,
 **`tools/build.ps1`** is the `make` wrapper's counterpart, with the same targets and knobs - `tools\build.ps1`,
-`tools\build.ps1 check`, `-Release` (`RELEASE=1`), `-Debug` (`DEBUG=1`), `clean`. It finds Visual Studio with
-`vswhere`, enters its x64 developer environment and puts Visual Studio's own clang first on the PATH, so it runs
-from any shell, VS Code's tasks among them. Underneath it is the CI-validated path, a **clang** toolchain
+`tools\build.ps1 check`, `-Release` (`RELEASE=1`), `-Debug` (`DEBUG=1`), `-Coverage` / `coverage`
+(`COVERAGE=1`, `make coverage`), `clean`. It finds Visual Studio with `vswhere`, enters its x64 developer
+environment and puts a clang first on the PATH - Visual Studio's own when it has the Clang component, else a
+standalone LLVM that targets the MSVC ABI (`C:\Program Files\LLVM`, or `clang++` on the PATH; CI's Windows
+runners have Build Tools without the component and build that way) - so it runs from any shell, VS Code's tasks
+among them. Underneath it is the CI-validated path, a **clang** toolchain
 targeting the MSVC ABI with Ninja:
 
 ```bash
@@ -117,7 +137,9 @@ is only an optional override. The Windows build is **bit-identical** to Linux (s
 perft) and passes the full test suite. The link writes a `.pdb` beside each binary, so the Visual Studio
 debugger (VS Code's `cppvsdbg`, the `Windows:` configurations in `.vscode/launch.json`) has symbols. A
 `-Debug` build runs AddressSanitizer and UBSan on the release C runtime, the only one the sanitizer runtime
-supports on Windows; the script puts the sanitizer DLLs on the PATH for the tests.
+supports on Windows; the build copies the sanitizer runtime (`clang_rt.asan_dynamic-x86_64.dll`, from the
+compiler's `-print-resource-dir`) beside the executables, so ctest, a debugger and a hand-run binary need no
+PATH change.
 
 **VS Code** works the same on all three platforms: `.vscode/tasks.json` runs `make` on Linux and macOS and
 `tools/build.ps1` on Windows, `.vscode/launch.json` has a launch and an attach per platform (gdb, CodeLLDB,
@@ -149,7 +171,7 @@ Every push to `main`, every pull request to `main`, and manual dispatch runs
 its latest result on `main`). The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
-  build through the wrapper and runs all eight suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  build through the wrapper and runs all nine suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
   PyPI wheel in a venv kept on the runner; apt has no `clang-format-22`). This is independent of the
@@ -674,8 +696,8 @@ prints the available book moves and their frequencies for the current position.
 make check
 ```
 
-builds and runs seven standalone test executables (plus a shell-driven UCI integration test,
-`test/uci_test.sh`, run against `build/pawnstar` — eight suites in all):
+builds and runs eight standalone test executables (plus a shell-driven UCI integration test,
+`test/uci_test.sh`, run against `build/pawnstar` — nine suites in all):
 
 | Executable | Description |
 |---|---|
@@ -686,6 +708,15 @@ builds and runs seven standalone test executables (plus a shell-driven UCI integ
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
 | `build/test_opening_book` | Opening-book parse/lookup regression |
 | `build/test_chess_clock` | `ChessClock` `std::chrono` timing logic (deadline / elapsed / ponderhit / reset) |
+| `build/test_bench_golden` | The `bench` signature: each of the 16 positions' best move and node count, and the 6,601,454 total |
+
+`test_bench_golden` runs the `bench` recipe (`RunBench` in `src/input_handling.h`, the code the `bench` command
+runs: depth 13, single-threaded, book off, hash cleared) with the shipped net and checks it against the golden
+table in `test/bench_golden_test.cpp` - the cross-engine bit-parity signature that the Go and Rust ports
+([pawnstar-go](https://github.com/reckless-technology/pawnstar-go),
+[pawnstar-rs](https://github.com/reckless-technology/pawnstar-rs)) pin too. Any change to the search, the move
+ordering, the pruning, the TT or the eval moves it; update the table only for a deliberate, SPRT-gated change or
+a new net, and re-port the change to both ports.
 
 `make check` runs the NNUE tests against the shipped `nnue/pawnstar-v12.bin`: `test_nnue` against the
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which

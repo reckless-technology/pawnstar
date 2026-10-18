@@ -217,14 +217,23 @@ static const char *const kBenchFens[] = {
 /// @brief Default `bench` search depth (overridden by `bench <depth>`).
 static constexpr int kBenchDepth = 13;
 
-/// @brief Handle the "bench" command: search each position in kBenchFens to a fixed depth (kBenchDepth, or
-/// `bench <depth>`) and print `<nodes> nodes <nps> nps`. The node total is a determinism signature (a search
-/// change meant to be neutral that alters it shows up immediately) and the nps a quick speed-regression check.
-/// Forces a single thread and disables the opening book for reproducibility (restored afterwards); the hash is
-/// cleared up front. Leaves the board at the last bench position (run it standalone).
-inline void handle_bench(Game &game, std::span<std::string> args)
+/// @brief One bench position's outcome: the move the search chose and the nodes it took.
+struct BenchResult
 {
-    const int  depth          = args.size() > 1 ? std::atoi(args[1].c_str()) : kBenchDepth;
+    std::string best_move_; ///< The best move found, in UCI notation.
+    uint64_t    nodes_;     ///< Nodes the main thread searched for this position.
+};
+
+/// @brief The bench recipe, shared by the `bench` command and the bench-golden test (test/bench_golden_test.cpp):
+/// search each position in kBenchFens to @p depth, single-threaded with the opening book off (both restored
+/// afterwards) and the hash and eval cache cleared up front. Leaves the board at the last bench position.
+/// @param game Game to search with (a net must be loaded).
+/// @param depth Fixed search depth for every position.
+/// @param debug After each search, print the position's bestmove and nodes and dump the DEBUGX counters (cleared
+///        before it), for the cross-engine transcript diff (PAWNSTAR_BENCH_DEBUG).
+/// @return Each position's best move and node count, in kBenchFens order.
+inline std::vector<BenchResult> RunBench(Game &game, int depth, bool debug)
+{
     const int  saved_threads  = game.thread_count_;
     const bool saved_own_book = game.use_own_book_;
     game.thread_count_        = 1;     // deterministic, single-threaded
@@ -232,12 +241,7 @@ inline void handle_bench(Game &game, std::span<std::string> args)
     game.transposition_table_.Clear();
     game.eval_cache_.Clear();
 
-    // PAWNSTAR_BENCH_DEBUG dumps each position's bestmove and diagnostic counters after its search, for
-    // cross-engine comparison against the Go bench. Off by default, so normal bench output is unchanged.
-    const bool debug       = std::getenv("PAWNSTAR_BENCH_DEBUG") != nullptr;
-    int        pos_index   = 0;
-    uint64_t   total_nodes = 0;
-    const auto start       = ChessClock::Clock::now();
+    std::vector<BenchResult> results;
     for (const char *fen : kBenchFens)
     {
         game.SetPosition(fen);
@@ -248,20 +252,39 @@ inline void handle_bench(Game &game, std::span<std::string> args)
             DebugXClear();
         }
         const Move move = game.SearchRootNode();
-        total_nodes += game.last_search_node_count_;
+        results.push_back({move.ToString(), game.last_search_node_count_});
         if (debug)
         {
-            std::cout << std::format("### pos {:02} bm={} nodes={}\n", ++pos_index, move.ToString(),
-                                     game.last_search_node_count_);
+            std::cout << std::format("### pos {:02} bm={} nodes={}\n", results.size(), results.back().best_move_,
+                                     results.back().nodes_);
             DebugXWrite();
         }
+    }
+    game.thread_count_ = saved_threads;
+    game.use_own_book_ = saved_own_book;
+    return results;
+}
+
+/// @brief Handle the "bench" command: search each position in kBenchFens to a fixed depth (kBenchDepth, or
+/// `bench <depth>`) through RunBench and print `<nodes> nodes <nps> nps`. The node total is a determinism signature
+/// (a search change meant to be neutral that alters it shows up immediately; test/bench_golden_test.cpp pins it at
+/// the default depth) and the nps a quick speed-regression check. Leaves the board at the last bench position (run
+/// it standalone).
+inline void handle_bench(Game &game, std::span<std::string> args)
+{
+    const int depth = args.size() > 1 ? std::atoi(args[1].c_str()) : kBenchDepth;
+    // PAWNSTAR_BENCH_DEBUG dumps each position's bestmove and diagnostic counters after its search, for
+    // cross-engine comparison against the Go and Rust benches. Off by default, so normal bench output is unchanged.
+    const bool debug       = std::getenv("PAWNSTAR_BENCH_DEBUG") != nullptr;
+    const auto start       = ChessClock::Clock::now();
+    uint64_t   total_nodes = 0;
+    for (const BenchResult &result : RunBench(game, depth, debug))
+    {
+        total_nodes += result.nodes_;
     }
     const long long elapsed_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(ChessClock::Clock::now() - start).count();
     const long long nps = static_cast<long long>(total_nodes) * 1000 / std::max<long long>(1, elapsed_ms);
-
-    game.thread_count_ = saved_threads;
-    game.use_own_book_ = saved_own_book;
     std::cout << std::format("{} nodes {} nps\n", total_nodes, nps);
 }
 

@@ -69,6 +69,16 @@ if(PAWNSTAR_SANITIZE)
   endif()
 endif()
 
+# Optional source-based code coverage (clang's -fprofile-instr-generate -fcoverage-mapping), applied to compile and
+# link. With it on, the `coverage` target (below) runs every ctest with LLVM_PROFILE_FILE pointing into
+# <build>/prof, merges the raw profiles with llvm-profdata and reports src/'s line coverage with llvm-cov. The
+# instrumented binaries are slower and their counters are not the release build's: never ship or bench one.
+option(PAWNSTAR_COVERAGE "Instrument for source-based code coverage (clang)" OFF)
+if(PAWNSTAR_COVERAGE)
+  add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
+  add_link_options(-fprofile-instr-generate)
+endif()
+
 # On Windows, clang targets the MSVC ABI and pulls in Microsoft's UCRT headers, which mark standard C
 # functions (getenv, setbuf, ...) "deprecated/insecure" via _CRT_INSECURE_DEPRECATE. Those uses are correct,
 # portable C++ here (getenv has no portable non-deprecated replacement), so silence the noise — before
@@ -135,7 +145,7 @@ add_executable(dump_magics      tools/dump_magics.cpp)
 
 # --- Tests (each a standalone TU with its own main()). ---
 enable_testing()
-set(PAWNSTAR_TESTS perft see bratko_kopec_nnue nnue nnue_incremental opening_book chess_clock)
+set(PAWNSTAR_TESTS perft see bratko_kopec_nnue nnue nnue_incremental opening_book chess_clock bench_golden)
 foreach(t IN LISTS PAWNSTAR_TESTS)
   add_executable(test_${t} test/${t}_test.cpp)
 endforeach()
@@ -155,7 +165,11 @@ if(EXISTS "${EMBED_NET}")
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   add_test(NAME nnue_incremental COMMAND test_nnue_incremental "${EMBED_NET}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-  set_tests_properties(bratko_kopec_nnue PROPERTIES ENVIRONMENT "PAWNSTAR_THREADS=1")
+  # The bench signature - every position's best move and node count and the 6,601,454 total, which the Go and Rust
+  # ports pin too (test/bench_golden_test.cpp). RunBench forces one thread itself; the environment says so as well.
+  add_test(NAME bench_golden COMMAND test_bench_golden "${EMBED_NET}"
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  set_tests_properties(bratko_kopec_nnue bench_golden PROPERTIES ENVIRONMENT "PAWNSTAR_THREADS=1")
 endif()
 # The UCI integration test is a bash script — register it only where a shell is available (skipped on a
 # bash-less Windows host). HINTS point at Git for Windows' bash and are searched before the system PATH, so
@@ -179,6 +193,69 @@ find_program(BASH_EXE NAMES bash
 if(BASH_EXE AND NOT CMAKE_CROSSCOMPILING)
   add_test(NAME uci COMMAND ${BASH_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/test/uci_test.sh $<TARGET_FILE:pawnstar>
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
+
+set(PAWNSTAR_TEST_TARGETS ${PAWNSTAR_TESTS})
+list(TRANSFORM PAWNSTAR_TEST_TARGETS PREPEND test_)
+set(PAWNSTAR_TOOLS stamp_net filter_book nnue_quant_study dump_magics)
+set(PAWNSTAR_EXECUTABLES pawnstar ${PAWNSTAR_TOOLS} ${PAWNSTAR_TEST_TARGETS})
+
+# --- The sanitizer runtime beside the executables. Clang targeting the MSVC ABI links AddressSanitizer dynamically:
+#     every sanitized executable loads clang_rt.asan_dynamic-x86_64.dll at start and dies without it. Windows looks
+#     for a DLL first in the executable's own directory, so one copy there lets ctest, a debugger and a hand-run
+#     binary start with no PATH change. One rule makes it (so parallel links never race on the file) and every
+#     executable depends on it.
+if(PAWNSTAR_SANITIZE AND WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  execute_process(COMMAND "${CMAKE_CXX_COMPILER}" -print-resource-dir
+                  OUTPUT_VARIABLE _clang_resource_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
+  set(_asan_dll_name clang_rt.asan_dynamic-x86_64.dll)
+  set(_asan_dll "${_clang_resource_dir}/lib/windows/${_asan_dll_name}")
+  if(NOT EXISTS "${_asan_dll}")
+    message(FATAL_ERROR "PAWNSTAR_SANITIZE: ${_asan_dll_name} is not in ${_clang_resource_dir}/lib/windows")
+  endif()
+  add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${_asan_dll_name}"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_asan_dll}" "${CMAKE_CURRENT_BINARY_DIR}/${_asan_dll_name}"
+    DEPENDS "${_asan_dll}"
+    COMMENT "Copying ${_asan_dll_name} beside the executables"
+    VERBATIM)
+  add_custom_target(asan_runtime DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/${_asan_dll_name}")
+  foreach(_exe IN LISTS PAWNSTAR_EXECUTABLES)
+    add_dependencies(${_exe} asan_runtime)
+  endforeach()
+endif()
+
+# --- Code coverage. `cmake --build build --target coverage` (`make coverage`, `tools\build.ps1 coverage`) runs every
+#     ctest on the instrumented build (PAWNSTAR_COVERAGE), each process writing <build>/prof/%p-%m.profraw, merges
+#     them with llvm-profdata and has llvm-cov report the engine's (src/) line, function and region coverage over
+#     the engine and every test binary, with an lcov export and an HTML report under <build>/coverage. The LLVM tools
+#     are looked for beside the compiler first (Visual Studio's clang, /usr/lib/llvm-18/bin), so they match it.
+if(PAWNSTAR_COVERAGE)
+  get_filename_component(_cxx_real "${CMAKE_CXX_COMPILER}" REALPATH)
+  get_filename_component(_cxx_dir "${_cxx_real}" DIRECTORY)
+  string(REGEX MATCH "^[0-9]+" _cxx_major "${CMAKE_CXX_COMPILER_VERSION}")
+  find_program(LLVM_PROFDATA_EXE NAMES llvm-profdata llvm-profdata-${_cxx_major} HINTS "${_cxx_dir}" NO_CACHE)
+  find_program(LLVM_COV_EXE NAMES llvm-cov llvm-cov-${_cxx_major} HINTS "${_cxx_dir}" NO_CACHE)
+  if(NOT LLVM_PROFDATA_EXE OR NOT LLVM_COV_EXE)
+    message(FATAL_ERROR "PAWNSTAR_COVERAGE needs llvm-profdata and llvm-cov (looked beside ${_cxx_real} first)")
+  endif()
+  set(_coverage_objects "")
+  foreach(_exe IN ITEMS pawnstar ${PAWNSTAR_TEST_TARGETS}) # the tools run under no ctest
+    list(APPEND _coverage_objects "$<TARGET_FILE:${_exe}>")
+  endforeach()
+  list(JOIN _coverage_objects "|" _coverage_objects)
+  add_custom_target(coverage
+    COMMAND ${CMAKE_COMMAND}
+      -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}
+      -DBIN_DIR=${CMAKE_CURRENT_BINARY_DIR}
+      -DCTEST=${CMAKE_CTEST_COMMAND}
+      -DLLVM_PROFDATA=${LLVM_PROFDATA_EXE}
+      -DLLVM_COV=${LLVM_COV_EXE}
+      "-DOBJECTS=${_coverage_objects}"
+      -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_coverage.cmake
+    DEPENDS ${PAWNSTAR_EXECUTABLES}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Running the suites under coverage instrumentation"
+    VERBATIM)
 endif()
 
 # --- API documentation. `cmake --build build --target doc` (or `make doc` via the wrapper) generates the

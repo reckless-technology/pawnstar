@@ -4,3 +4,10 @@
 # export-ignore, so this guarantees only our explicit source archive is clean; to keep these out of every
 # possible release bundle they would have to be untracked from the repo entirely.
 .claude/ export-ignore
+
+# Files a POSIX shell or make reads stay LF in every working copy, whatever core.autocrlf says: a Windows clone with
+# autocrlf=true would otherwise check them out CRLF, and bash then reads "\r" as part of each command (Git Bash and
+# MSYS2 run these scripts on Windows) and make reads it as part of each recipe.
+*.sh       text eol=lf
+.githooks/* text eol=lf
+Makefile   text eol=lf

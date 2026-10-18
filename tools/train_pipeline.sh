@@ -31,8 +31,22 @@ REPO="$(cd "$(dirname "$0")" && pwd)/.."
 # default form means "unset -> --features cuda, but empty-string -> empty" so BULLET_FEATURES="" disables it.
 FEATURES="${BULLET_FEATURES---features cuda}"
 export CUDA_PATH="${CUDA_PATH:-/usr/local/cuda}"
-export PATH="$CUDA_PATH/bin:$PATH"
-export LD_LIBRARY_PATH="$CUDA_PATH/lib64:${LD_LIBRARY_PATH:-}"
+if command -v cygpath >/dev/null 2>&1; then
+    # MSYS2 / Git Bash on Windows: the CUDA installer sets CUDA_PATH as a Windows path (C:\Program Files\NVIDIA GPU
+    # Computing Toolkit\CUDA\v12.x), which cannot go on a POSIX PATH as it is. Put its bin on the PATH converted, so
+    # nvcc is found whatever the Windows PATH the installer edited reaches this shell; CUDA_PATH itself stays the
+    # Windows path, which the cuda crates' build scripts read. Windows finds the CUDA DLLs on the PATH, not
+    # LD_LIBRARY_PATH.
+    export PATH="$(cygpath -u "$CUDA_PATH")/bin:$PATH"
+else
+    export PATH="$CUDA_PATH/bin:$PATH"
+    export LD_LIBRARY_PATH="$CUDA_PATH/lib64:${LD_LIBRARY_PATH:-}"
+fi
+
+# A file's size in bytes on any platform: GNU stat (Linux, MSYS2), BSD stat (macOS), else wc.
+file_size() {
+    stat -c%s "$1" 2>/dev/null || stat -f%z "$1" 2>/dev/null || wc -c <"$1"
+}
 
 # [1/4] Make sure bullet is checked out at the pinned commit and build the data utils + the trainer example.
 echo "[1/4] ensuring bullet is set up, building utils + trainer ($FEATURES)"
@@ -66,7 +80,7 @@ fi
 # Each bulletformat ChessBoard record is 32 bytes, so file_size/32 is the position count. bullet measures
 # training in superbatches; ~16384 batches per superbatch makes one superbatch roughly one pass over the
 # data. Clamp to >=1 for tiny datasets.
-COUNT=$(( $(stat -c%s "$SHUF_DATA") / 32 ))
+COUNT=$(( $(file_size "$SHUF_DATA") / 32 ))
 BPS=$(( COUNT / 16384 ))
 [ "$BPS" -lt 1 ] && BPS=1
 CKPT="$WORK/checkpoints"

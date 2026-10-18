@@ -1,6 +1,6 @@
 # Thin wrapper around the CMake build, which is Pawnstar's single build system of record (see CMakeLists.txt).
 # It preserves the historical `make` UX — `make`, `make check`, `make tools`, `make tests`, `make doc`,
-# `make clean` — by mapping to cmake + ctest, so muscle memory and existing tooling keep working. On Windows,
+# `make clean`, and `make coverage` — by mapping to cmake + ctest, so muscle memory and existing tooling keep working. On Windows,
 # tools/build.ps1 is the same wrapper for PowerShell, target for target and knob for knob.
 #
 # Requires cmake (>= 3.20) and a generator: Ninja is used if available, else Unix Makefiles.
@@ -9,6 +9,7 @@
 #   RELEASE=1   omit the DEBUGX diagnostic counters               -> -DPAWNSTAR_DEBUGX=OFF
 #   DEBUG=1     Debug build with AddressSanitizer + UBSan         -> -DCMAKE_BUILD_TYPE=Debug -DPAWNSTAR_SANITIZE=ON
 #   WERROR=1    warnings-as-errors (CI)                           -> -DWERROR=ON
+#   COVERAGE=1  instrument for source-based coverage (clang)      -> -DPAWNSTAR_COVERAGE=ON (`make coverage` sets it)
 #   CXX=<cc>    C++ compiler (default clang++, which the engine requires). Changing it for an existing build
 #               tree needs `make clean` first, since CMake caches the compiler.
 #   BASH=<sh>   bash used for the UCI ctest. macOS /bin/bash is 3.2 (no `coproc`); point at a >= 4 bash,
@@ -51,6 +52,12 @@ else
   CMAKE_ARGS += -DWERROR=OFF
 endif
 
+ifeq ($(COVERAGE),1)
+  CMAKE_ARGS += -DPAWNSTAR_COVERAGE=ON
+else
+  CMAKE_ARGS += -DPAWNSTAR_COVERAGE=OFF
+endif
+
 # Default the compiler to clang++ (the engine requires clang) unless the user set CXX explicitly (command
 # line / environment); `origin` is "default" only for make's built-in value.
 ifeq ($(origin CXX),default)
@@ -65,9 +72,9 @@ endif
 
 TOOL_TARGETS := stamp_net filter_book nnue_quant_study dump_magics
 TEST_TARGETS := test_perft test_see test_bratko_kopec_nnue test_nnue test_nnue_incremental \
-                test_opening_book test_chess_clock
+                test_opening_book test_chess_clock test_bench_golden
 
-.PHONY: all tools tests check doc clean configure
+.PHONY: all tools tests check coverage doc clean configure
 
 # Default: build just the engine (matches the former `make`).
 all: configure
@@ -83,6 +90,15 @@ tests: configure
 check: configure
 	$(CMAKE) --build $(BUILD_DIR) --parallel
 	$(CTEST) --test-dir $(BUILD_DIR) $(CTEST_ARGS)
+
+# Build everything instrumented for coverage, run every ctest and report src/'s coverage (llvm-cov; the lcov export
+# and the HTML report land in $(BUILD_DIR)/coverage). Configures with COVERAGE=1 whatever the command line says, so
+# a later plain `make` configures the tree back without it.
+coverage:
+	@$(CMAKE) -S . -B $(BUILD_DIR) -G "$(GENERATOR)" $(filter-out -DPAWNSTAR_COVERAGE=%,$(CMAKE_ARGS)) \
+		-DPAWNSTAR_COVERAGE=ON
+	$(CMAKE) --build $(BUILD_DIR) --parallel
+	$(CMAKE) --build $(BUILD_DIR) --target coverage
 
 doc: configure
 	$(CMAKE) --build $(BUILD_DIR) --target doc
