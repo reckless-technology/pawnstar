@@ -99,16 +99,18 @@ function Find-VisualStudio([string[]]$components) {
 # Install Visual Studio Build Tools 2022 with the C++ workload, or add the components to the Visual Studio already
 # there. Both need an administrator: winget and the Visual Studio installer raise the UAC prompt themselves.
 function Install-VisualStudio([string[]]$components) {
-  $add = @('Microsoft.VisualStudio.Workload.VCTools') + $components | ForEach-Object { "--add $_" }
   $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
   $existing = if (Test-Path $vswhere) { & $vswhere -latest -products * -property installationPath | Select-Object -First 1 }
   if ($existing) {
     Write-Installing 'Visual Studio' "adding the C++ components to $existing (UAC prompt)"
     $setup = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\setup.exe'
+    # Components alone: the Build Tools' C++ workload id means nothing to Community or Professional.
+    $add = $components | ForEach-Object { "--add $_" }
     $p = Start-Process -FilePath $setup -ArgumentList (@('modify', '--installPath', "`"$existing`"", '--passive', '--norestart', '--includeRecommended') + $add) -Wait -PassThru
   }
   else {
     Write-Installing 'Visual Studio' 'Build Tools 2022 with the C++ workload, through winget (UAC prompt)'
+    $add = @('Microsoft.VisualStudio.Workload.VCTools') + $components | ForEach-Object { "--add $_" }
     $override = "--wait --passive --norestart --includeRecommended " + ($add -join ' ')
     $p = Start-Process -FilePath winget -ArgumentList @('install', '--id', 'Microsoft.VisualStudio.2022.BuildTools', '-e',
       '--accept-package-agreements', '--accept-source-agreements', '--override', "`"$override`"") -Wait -PassThru -NoNewWindow
