@@ -114,7 +114,7 @@ The target is also the **coverage gate**: it fails when `src/`'s line coverage i
 0 reports without gating). What is measured is `src/`: the engine and its UCI front end, every header and
 `main.cpp`. The developer tools in `tools/` (`stamp_net`, `filter_book`, `nnue_quant_study`, `dump_magics`), which
 no release ships and no ctest runs, and the tests themselves are not counted. The suites cover 98.0 % of `src/`'s
-lines on Windows; what is left is unreachable (the fallbacks for a corrupt embedded book or net, switch defaults,
+lines on Windows (clang 22) and 95.8 % in CI on Linux (clang 18); what is left is unreachable (the fallbacks for a corrupt embedded book or net, switch defaults,
 the max-ply guards), machine-dependent (the AVX-VNNI kernel on a CPU without it) or timing-dependent.
 
 The wrapper reconfigures on each invocation, so branch/knob changes are picked up automatically; if a build
