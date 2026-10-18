@@ -77,7 +77,7 @@ sudo_cmd() { if [ "$(id -u)" = 0 ]; then "$@"; else sudo "$@"; fi; }
 apt_packages() {
     local need=()
     for p in "$@"; do
-        dpkg-query -W -f='${Status}' "$p" 2>/dev/null | grep -q 'install ok installed' || need+=("$p")
+        grep -q 'install ok installed' <<<"$(dpkg-query -W -f='${Status}' "$p" 2>/dev/null || true)" || need+=("$p")
     done
     if [ ${#need[@]} = 0 ]; then ok 'apt packages' "$*"; return; fi
     if [ "$check" = 1 ]; then miss 'apt packages' "${need[*]}"; return; fi
@@ -173,7 +173,7 @@ install_vscode_extensions() {
     local installed
     installed=$(code --list-extensions 2>/dev/null || true)
     for ext in $(sed -e 's://.*$::' .vscode/extensions.json | tr -d '\n' | sed -e 's/.*"recommendations"[^[]*\[//' -e 's/\].*//' | tr -d '" ' | tr ',' ' '); do
-        if printf '%s\n' "$installed" | grep -qixF "$ext"; then ok 'VS Code extension' "$ext"
+        if grep -qixF "$ext" <<<"$installed"; then ok 'VS Code extension' "$ext"
         elif [ "$check" = 1 ]; then miss 'VS Code extension' "$ext"
         else installing 'VS Code extension' "$ext"; code --install-extension "$ext" --force >/dev/null; fi
     done
@@ -268,7 +268,7 @@ if [ "$training" = 1 ]; then
     fi
     if have rustup; then
         # bullet's manifest is edition 2024, which needs a recent cargo: rustup's stable, never apt's cargo.
-        if rustup toolchain list 2>/dev/null | grep -q '^stable'; then ok 'Rust stable' "$(rustc +stable --version)"
+        if grep -q '^stable' <<<"$(rustup toolchain list 2>/dev/null || true)"; then ok 'Rust stable' "$(rustc +stable --version)"
         elif [ "$check" = 1 ]; then miss 'Rust stable' 'rustup toolchain install stable'
         else
             installing 'Rust stable' 'rustup toolchain install stable --profile minimal'
