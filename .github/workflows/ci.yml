@@ -66,6 +66,52 @@ jobs:
           clang-format --version
           clang-format --dry-run -Werror src/*.h src/*.cpp test/*.cpp tools/*.cpp
 
+  # Coverage gate: every ctest on a build instrumented with clang's source-based coverage (the `coverage` target,
+  # cmake/run_coverage.cmake), failing when src/'s line coverage is under PAWNSTAR_COVERAGE_MIN_LINES - one number,
+  # set in CMakeLists.txt and read by `make coverage` / `tools\build.ps1 coverage` on a developer's machine too.
+  # src/ is the engine and its UCI front end (every header and main.cpp); the developer tools under tools/ and the
+  # tests are not measured. The LLVM tools must match the compiler that instrumented the build (a profile is
+  # versioned), so this job looks for clang-18's own llvm-profdata-18 and llvm-cov-18 and fails naming what is
+  # missing rather than installing packages on the runner.
+  coverage:
+    name: coverage (src/ lines >= gate)
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Find clang 18 and its LLVM tools
+        run: |
+          missing=""
+          for tool in clang++-18 llvm-profdata-18 llvm-cov-18 cmake; do
+            command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::runner $(hostname) lacks:$missing - install clang-18, llvm-18 and cmake (apt) on it"
+            exit 1
+          fi
+          clang++-18 --version | head -1
+          llvm-cov-18 --version | grep -i version
+      - name: Check runner has AVX2 + BMI2
+        run: |
+          grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
+            || { echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1; }
+      - name: Coverage (instrumented build, every ctest, the gate)
+        run: |
+          set -o pipefail
+          make -j"$(nproc)" WERROR=1 CXX=clang++-18 coverage 2>&1 | tee coverage.log
+      - name: Coverage table in the job summary
+        if: always()
+        run: |
+          [ -f coverage.log ] || exit 0
+          {
+            echo '### src/ coverage'
+            echo '```'
+            sed -n '/^Filename /,/^TOTAL /p' coverage.log
+            grep -E 'coverage: src/ lines|under the gate' coverage.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # ---------------------------------------------------------------------------------------------------------
   # Build artifacts: a native engine executable for Linux and Windows, uploaded only after that platform's
   # build AND test suite pass (the upload is a later step, so a failed build/test ends the job before it

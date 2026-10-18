@@ -10,6 +10,8 @@
 #   DEBUG=1     Debug build with AddressSanitizer + UBSan         -> -DCMAKE_BUILD_TYPE=Debug -DPAWNSTAR_SANITIZE=ON
 #   WERROR=1    warnings-as-errors (CI)                           -> -DWERROR=ON
 #   COVERAGE=1  instrument for source-based coverage (clang)      -> -DPAWNSTAR_COVERAGE=ON (`make coverage` sets it)
+#   COVERAGE_MIN_LINES=<n>  the coverage gate, src/'s minimum line % -> -DPAWNSTAR_COVERAGE_MIN_LINES=<n> (default 90,
+#               set in CMakeLists.txt; 0 reports without gating)
 #   CXX=<cc>    C++ compiler (default clang++, which the engine requires). Changing it for an existing build
 #               tree needs `make clean` first, since CMake caches the compiler.
 #   BASH=<sh>   bash used for the UCI ctest. macOS /bin/bash is 3.2 (no `coproc`); point at a >= 4 bash,
@@ -70,9 +72,13 @@ ifdef BASH
   CMAKE_ARGS += -DBASH_EXE=$(BASH)
 endif
 
+ifdef COVERAGE_MIN_LINES
+  CMAKE_ARGS += -DPAWNSTAR_COVERAGE_MIN_LINES=$(COVERAGE_MIN_LINES)
+endif
+
 TOOL_TARGETS := stamp_net filter_book nnue_quant_study dump_magics
 TEST_TARGETS := test_perft test_see test_bratko_kopec_nnue test_nnue test_nnue_incremental \
-                test_opening_book test_chess_clock test_bench_golden
+                test_opening_book test_chess_clock test_bench_golden test_uci_commands test_primitives
 
 .PHONY: all tools tests check coverage doc clean configure
 
@@ -92,7 +98,8 @@ check: configure
 	$(CTEST) --test-dir $(BUILD_DIR) $(CTEST_ARGS)
 
 # Build everything instrumented for coverage, run every ctest and report src/'s coverage (llvm-cov; the lcov export
-# and the HTML report land in $(BUILD_DIR)/coverage). Configures with COVERAGE=1 whatever the command line says, so
+# and the HTML report land in $(BUILD_DIR)/coverage), failing under the gate (COVERAGE_MIN_LINES, default 90 %).
+# Configures with COVERAGE=1 whatever the command line says, so
 # a later plain `make` configures the tree back without it.
 coverage:
 	@$(CMAKE) -S . -B $(BUILD_DIR) -G "$(GENERATOR)" $(filter-out -DPAWNSTAR_COVERAGE=%,$(CMAKE_ARGS)) \

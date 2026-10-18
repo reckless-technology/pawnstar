@@ -101,8 +101,51 @@ else
     fail "bench nondeterministic: run1='$b1' run2='$b2'"
 fi
 
+# 7) Startup: where the engine finds its net and book, and the copies embedded in the binary when it finds neither.
+#    Each run answers `isready` and quits; the lines before `ready` say which copies were loaded.
+engine_dir=$(cd "$(dirname "$ENGINE")" && pwd)
+engine_abs="$engine_dir/$(basename "$ENGINE")"
+scratch=$(mktemp -d)
+trap 'rm -rf "$scratch"' EXIT
+
+# From a directory holding neither: both are found beside the executable's directory (the repository root, for
+# build/pawnstar), so neither embedded copy is needed.
+out=$(cd "$scratch" && printf 'isready\nquit\n' | "$engine_abs" 2>/dev/null)
+if echo "$out" | grep -q '^readyok' && ! echo "$out" | grep -q 'embedded'; then
+    pass "startup elsewhere: net and book found relative to the executable"
+else
+    fail "startup elsewhere: expected readyok with no embedded fallback, got: $out"
+fi
+
+# A copy of the executable alone in an empty directory: the embedded book and the embedded net. (A sanitized Windows
+# build loads its runtime DLL from beside the executable, so any DLLs there go with it.)
+case "$ENGINE" in *.exe) copy="$scratch/engine_copy.exe" ;; *) copy="$scratch/engine_copy" ;; esac
+cp -L "$ENGINE" "$copy"
+cp "$engine_dir"/*.dll "$scratch"/ 2>/dev/null || true
+out=$(cd "$scratch" && printf 'bookmoves\neval\nisready\nquit\n' | "$copy" 2>/dev/null)
+echo "$out" | grep -q 'using the embedded book' && pass "startup alone: falls back to the embedded book" ||
+    fail "startup alone: no embedded-book message in: $out"
+echo "$out" | grep -q 'falling back to the embedded net' && pass "startup alone: falls back to the embedded net" ||
+    fail "startup alone: no embedded-net message in: $out"
+echo "$out" | grep -q '^MOVE   COUNT' && echo "$out" | grep -q '^evaluation ' && echo "$out" | grep -q '^readyok' &&
+    pass "startup alone: the embedded book and net both work" || fail "startup alone: book/eval/readyok missing: $out"
+
+# PAWNSTAR_EVALFILE names the net: a missing file falls back to the embedded net, the shipped file loads directly.
+out=$(printf 'isready\nquit\n' | PAWNSTAR_EVALFILE=no/such/net.bin "$ENGINE" 2>/dev/null)
+echo "$out" | grep -q 'falling back to the embedded net' && echo "$out" | grep -q '^readyok' &&
+    pass "PAWNSTAR_EVALFILE=<missing>: the embedded net" || fail "PAWNSTAR_EVALFILE=<missing>: got: $out"
+out=$(printf 'eval\nquit\n' | PAWNSTAR_EVALFILE=nnue/pawnstar-v12.bin "$ENGINE" 2>/dev/null)
+echo "$out" | grep -q '^evaluation ' && ! echo "$out" | grep -q 'embedded' &&
+    pass "PAWNSTAR_EVALFILE=<the shipped net>: loaded from the file" || fail "PAWNSTAR_EVALFILE=<net>: got: $out"
+
+# The end of input without `quit` ends the engine cleanly.
+out=$(printf 'isready\n' | "$ENGINE" 2>/dev/null)
+status=$?
+[ "$status" -eq 0 ] && echo "$out" | grep -q '^readyok' && pass "end of input: exits 0 without quit" ||
+    fail "end of input: exit $status, output: $out"
+
 if [ "$fails" -eq 0 ]; then
-    echo "[PASS] UCI: protocol handshakes, seldepth, searchmoves, currmove, bench determinism"
+    echo "[PASS] UCI: protocol handshakes, seldepth, searchmoves, currmove, bench determinism, startup resources"
     exit 0
 fi
 echo "[FAIL] UCI: $fails check(s) failed"

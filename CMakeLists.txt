@@ -74,6 +74,10 @@ endif()
 # <build>/prof, merges the raw profiles with llvm-profdata and reports src/'s line coverage with llvm-cov. The
 # instrumented binaries are slower and their counters are not the release build's: never ship or bench one.
 option(PAWNSTAR_COVERAGE "Instrument for source-based code coverage (clang)" OFF)
+# The coverage gate: the `coverage` target fails when src/'s line coverage is under this percentage. One number, read
+# by CI's coverage job and by a developer's `make coverage` / `tools\build.ps1 coverage` alike (override it with
+# -DPAWNSTAR_COVERAGE_MIN_LINES=..., `make coverage COVERAGE_MIN_LINES=...` or -CoverageMinLines; 0 reports only).
+set(PAWNSTAR_COVERAGE_MIN_LINES 90 CACHE STRING "Minimum src/ line coverage, in percent, for the coverage target")
 if(PAWNSTAR_COVERAGE)
   add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
   add_link_options(-fprofile-instr-generate)
@@ -145,7 +149,8 @@ add_executable(dump_magics      tools/dump_magics.cpp)
 
 # --- Tests (each a standalone TU with its own main()). ---
 enable_testing()
-set(PAWNSTAR_TESTS perft see bratko_kopec_nnue nnue nnue_incremental opening_book chess_clock bench_golden)
+set(PAWNSTAR_TESTS perft see bratko_kopec_nnue nnue nnue_incremental opening_book chess_clock bench_golden
+                   uci_commands primitives)
 foreach(t IN LISTS PAWNSTAR_TESTS)
   add_executable(test_${t} test/${t}_test.cpp)
 endforeach()
@@ -153,7 +158,7 @@ endforeach()
 # ctest registration mirrors `make check`. Resource-free suites first; run from the source tree so any
 # cwd-relative resource (e.g. the opening book) resolves.
 set(NNUE_REF "${CMAKE_CURRENT_SOURCE_DIR}/test/nnue_reference.txt")
-foreach(t perft see opening_book chess_clock)
+foreach(t perft see opening_book chess_clock primitives)
   add_test(NAME ${t} COMMAND test_${t} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 # NNUE suites take the net (and reference) explicitly; only register them if the shipped net is present
@@ -170,6 +175,10 @@ if(EXISTS "${EMBED_NET}")
   add_test(NAME bench_golden COMMAND test_bench_golden "${EMBED_NET}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   set_tests_properties(bratko_kopec_nnue bench_golden PROPERTIES ENVIRONMENT "PAWNSTAR_THREADS=1")
+  # The UCI command table and Game driven in process (test/uci_commands_test.cpp): every setoption, position form
+  # and go parameter, the diagnostics and the root search's short cuts. Run from the repository root for the book.
+  add_test(NAME uci_commands COMMAND test_uci_commands "${EMBED_NET}"
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 # The UCI integration test is a bash script — register it only where a shell is available (skipped on a
 # bash-less Windows host). HINTS point at Git for Windows' bash and are searched before the system PATH, so
@@ -227,8 +236,11 @@ endif()
 # --- Code coverage. `cmake --build build --target coverage` (`make coverage`, `tools\build.ps1 coverage`) runs every
 #     ctest on the instrumented build (PAWNSTAR_COVERAGE), each process writing <build>/prof/%p-%m.profraw, merges
 #     them with llvm-profdata and has llvm-cov report the engine's (src/) line, function and region coverage over
-#     the engine and every test binary, with an lcov export and an HTML report under <build>/coverage. The LLVM tools
-#     are looked for beside the compiler first (Visual Studio's clang, /usr/lib/llvm-18/bin), so they match it.
+#     the engine and every test binary, with an lcov export and an HTML report under <build>/coverage, and fails when
+#     src/'s line coverage is under PAWNSTAR_COVERAGE_MIN_LINES (above). src/ is the engine and its UCI front end; the
+#     developer tools under tools/ (no release ships them, no ctest runs them) and the tests are not measured. The
+#     LLVM tools are looked for beside the compiler first (Visual Studio's clang, /usr/lib/llvm-18/bin), so they
+#     match it.
 if(PAWNSTAR_COVERAGE)
   get_filename_component(_cxx_real "${CMAKE_CXX_COMPILER}" REALPATH)
   get_filename_component(_cxx_dir "${_cxx_real}" DIRECTORY)
@@ -251,6 +263,7 @@ if(PAWNSTAR_COVERAGE)
       -DLLVM_PROFDATA=${LLVM_PROFDATA_EXE}
       -DLLVM_COV=${LLVM_COV_EXE}
       "-DOBJECTS=${_coverage_objects}"
+      -DMIN_LINE_PERCENT=${PAWNSTAR_COVERAGE_MIN_LINES}
       -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/run_coverage.cmake
     DEPENDS ${PAWNSTAR_EXECUTABLES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

@@ -108,6 +108,15 @@ engine and the test binaries, writing `build/coverage/coverage.lcov` and an HTML
 [cmake/run_coverage.cmake](cmake/run_coverage.cmake). An instrumented tree is not for benchmarking: a later plain
 `make` configures it back without the instrumentation.
 
+The target is also the **coverage gate**: it fails when `src/`'s line coverage is under
+`PAWNSTAR_COVERAGE_MIN_LINES`, 90 % - one number in `CMakeLists.txt`, which CI's coverage job and a developer's
+`make coverage` both read (`make coverage COVERAGE_MIN_LINES=95`, `tools\build.ps1 coverage -CoverageMinLines 95`;
+0 reports without gating). What is measured is `src/`: the engine and its UCI front end, every header and
+`main.cpp`. The developer tools in `tools/` (`stamp_net`, `filter_book`, `nnue_quant_study`, `dump_magics`), which
+no release ships and no ctest runs, and the tests themselves are not counted. The suites cover 98.0 % of `src/`'s
+lines on Windows; what is left is unreachable (the fallbacks for a corrupt embedded book or net, switch defaults,
+the max-ply guards), machine-dependent (the AVX-VNNI kernel on a CPU without it) or timing-dependent.
+
 The wrapper reconfigures on each invocation, so branch/knob changes are picked up automatically; if a build
 ever looks stale, `make clean` and rebuild. Switching `CXX` for an existing tree needs `make clean` first
 (CMake caches the compiler).
@@ -171,12 +180,16 @@ Every push to `main`, every pull request to `main`, and manual dispatch runs
 its latest result on `main`). The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
-  build through the wrapper and runs all nine suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  build through the wrapper and runs all eleven suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
   PyPI wheel in a venv kept on the runner; apt has no `clang-format-22`). This is independent of the
   compiler, which stays clang-18 — a clang-format of a different major restyles code that is already
   correct, so the two are pinned separately and deliberately.
+- **coverage (src/ lines >= gate)** — `make WERROR=1 CXX=clang++-18 coverage`: every suite on a build
+  instrumented with clang's source-based coverage, red when `src/`'s line coverage is under
+  `PAWNSTAR_COVERAGE_MIN_LINES` (90 %), with the per-file table in the job summary. It needs clang-18's own
+  `llvm-profdata-18` and `llvm-cov-18` on the runner and fails naming whatever is missing.
 - **artifact (linux x86_64 / windows x86_64)** — two per-OS jobs that build a release binary, run the full
   test suite on that platform, and — only on success — upload the version-named executable
   (`pawnstar_<major>_<minor>_<build>`, `.exe` on Windows) as a downloadable build artifact for that run. The
@@ -696,8 +709,10 @@ prints the available book moves and their frequencies for the current position.
 make check
 ```
 
-builds and runs eight standalone test executables (plus a shell-driven UCI integration test,
-`test/uci_test.sh`, run against `build/pawnstar` — nine suites in all):
+builds and runs ten standalone test executables (plus a shell-driven UCI integration test,
+`test/uci_test.sh`, run against `build/pawnstar` — eleven suites in all; the script also checks where the engine
+finds its net and book at startup, the embedded copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the
+end of input):
 
 | Executable | Description |
 |---|---|
@@ -706,9 +721,11 @@ builds and runs eight standalone test executables (plus a shell-driven UCI integ
 | `build/test_bratko_kopec_nnue` | 24 Bratko-Kopec positions searched with the NNUE net; reports moves solved |
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
-| `build/test_opening_book` | Opening-book parse/lookup regression |
+| `build/test_opening_book` | Opening book: loading (file, memory, comments, an illegal move), weighting, display, `?` moves |
 | `build/test_chess_clock` | `ChessClock` `std::chrono` timing logic (deadline / elapsed / ponderhit / reset) |
 | `build/test_bench_golden` | The `bench` signature: each of the 16 positions' best move and node count, and the 6,601,454 total |
+| `build/test_primitives` | Bitboards, the attack tables' generators rebuilt at run time, castling text, material draws, the TT |
+| `build/test_uci_commands` | Every UCI command, option and `go` parameter through `ProcessInput`, in process, with the net |
 
 `test_bench_golden` runs the `bench` recipe (`RunBench` in `src/input_handling.h`, the code the `bench` command
 runs: depth 13, single-threaded, book off, hash cleared) with the shipped net and checks it against the golden

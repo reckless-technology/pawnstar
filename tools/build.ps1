@@ -28,7 +28,11 @@
 .PARAMETER Coverage
   Instrument for source-based code coverage (the Makefile's COVERAGE=1, -DPAWNSTAR_COVERAGE=ON). The coverage target
   runs every ctest and reports src/'s coverage with llvm-cov, with build\coverage\coverage.lcov and an HTML report
-  in build\coverage\html.
+  in build\coverage\html, and fails when src/'s line coverage is under the gate (PAWNSTAR_COVERAGE_MIN_LINES, 90).
+
+.PARAMETER CoverageMinLines
+  Override the coverage gate, src/'s minimum line coverage in percent (the Makefile's COVERAGE_MIN_LINES,
+  -DPAWNSTAR_COVERAGE_MIN_LINES); 0 reports without gating. Left out, the tree keeps its value (90 when new).
 
 .EXAMPLE
   tools\build.ps1             # make
@@ -46,6 +50,7 @@ param(
   [switch]$Debug,
   [switch]$Werror,
   [switch]$Coverage,
+  [string]$CoverageMinLines = '',
   [string]$BuildDir = 'build',
   [string]$CtestArgs = '-V'
 )
@@ -94,6 +99,7 @@ else { $cmakeArgs += '-DCMAKE_BUILD_TYPE=Release', '-DPAWNSTAR_SANITIZE=OFF' }
 $cmakeArgs += $(if ($Release) { '-DPAWNSTAR_DEBUGX=OFF' } else { '-DPAWNSTAR_DEBUGX=ON' })
 $cmakeArgs += $(if ($Werror) { '-DWERROR=ON' } else { '-DWERROR=OFF' })
 $cmakeArgs += $(if ($Coverage) { '-DPAWNSTAR_COVERAGE=ON' } else { '-DPAWNSTAR_COVERAGE=OFF' })
+if ($CoverageMinLines -ne '') { $cmakeArgs += "-DPAWNSTAR_COVERAGE_MIN_LINES=$CoverageMinLines" }
 
 function Invoke-Checked([string]$exe, [string[]]$arguments) {
   & $exe @arguments
@@ -103,7 +109,7 @@ function Invoke-Checked([string]$exe, [string[]]$arguments) {
 Invoke-Checked cmake $cmakeArgs
 $tools = 'stamp_net', 'filter_book', 'nnue_quant_study', 'dump_magics'
 $tests = 'test_perft', 'test_see', 'test_bratko_kopec_nnue', 'test_nnue', 'test_nnue_incremental',
-  'test_opening_book', 'test_chess_clock', 'test_bench_golden'
+  'test_opening_book', 'test_chess_clock', 'test_bench_golden', 'test_uci_commands', 'test_primitives'
 switch ($Target) {
   'all'   { Invoke-Checked cmake @('--build', $BuildDir, '--parallel', '--target', 'pawnstar') }
   'tools' { Invoke-Checked cmake (@('--build', $BuildDir, '--parallel', '--target') + $tools) }
