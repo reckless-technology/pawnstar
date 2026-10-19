@@ -315,6 +315,7 @@ inline std::vector<BenchResult> RunBench(Game &game, int depth, bool debug)
 /// it standalone).
 inline void handle_bench(Game &game, std::span<std::string> args)
 {
+    game.StopThinking(); // bench searches on this thread, over the position and tables a running search uses
     // `bench <depth>` overrides the default; a missing, malformed or non-positive depth keeps it.
     const std::optional<long long> requested = args.size() > 1 ? ParseInteger(args[1]) : std::nullopt;
     const int                      depth     = requested && *requested > 0 ? SaturateToInt(*requested) : kBenchDepth;
@@ -354,6 +355,10 @@ inline void handle_go(Game &game, std::span<std::string> args)
     State            state = State::kAwaitKeyword;
     std::string_view pending; // the value-taking keyword whose argument is expected next
 
+    // Stop any running search before touching the clock and the root-move list it reads: a `go` that arrives while
+    // one runs would otherwise rewrite them under it (a data race; the Go engine's race detector caught `go infinite`
+    // + `go depth 1`). The Rust engine stops first for the same reason; StartThinking's own stop is then a no-op.
+    game.StopThinking();
     game.is_pondering_.store(false, std::memory_order_relaxed);   // set true below if this is a `go ponder`
     game.time_control_.increment_ = ChessClock::Duration::zero(); // cleared up front; set below if winc/binc present
     game.time_control_.max_nodes_ = 0;                            // cleared up front; set below if `nodes` present
@@ -500,6 +505,7 @@ inline void handle_position(Game &game, std::span<std::string> args)
     std::string fen;
     int         fen_fields = 0;
 
+    game.StopThinking(); // a search still running reads the position stack this rewrites (as in the Go and Rust)
     for (std::size_t i = 1; i < args.size(); ++i)
     {
         const std::string &token = args[i];

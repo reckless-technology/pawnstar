@@ -532,7 +532,7 @@ void StopRaces(Game &game)
     }};
 
     constexpr int kIterations = 300;
-    int           stopped = 0, ponders_stopped = 0, restarted = 0, new_games = 0, helpers_stopped = 0;
+    int stopped = 0, ponders_stopped = 0, restarted = 0, new_games = 0, new_positions = 0, helpers_stopped = 0;
     for (int i = 0; i < kIterations; ++i)
     {
         {
@@ -564,6 +564,17 @@ void StopRaces(Game &game)
             ProcessInput(game, "ucinewgame");
             new_games += LinesStartingWith(output.Text(), "bestmove ").size() == 1 ? 1 : 0;
         }
+        {
+            CapturedOutput output;
+            ProcessInput(game, "position startpos");
+            ProcessInput(game, "go infinite");
+            ProcessInput(game, "position startpos moves e2e4"); // stops the search before it rewrites the stack
+            new_positions += LinesStartingWith(output.Text(), "bestmove ").size() == 1 &&
+                                     game.CurrentPosition().ToString() ==
+                                         "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1"
+                                 ? 1
+                                 : 0;
+        }
     }
     // Lazy SMP: a stop that lands before the main thread has launched its helpers, or while they run.
     Run(game, {"setoption name Threads value 3"});
@@ -587,6 +598,8 @@ void StopRaces(Game &game)
           std::format("go infinite + go depth 1 at once: {}/{} answered twice", restarted, kIterations));
     Check(new_games == kIterations,
           std::format("go infinite + ucinewgame at once: {}/{} answered", new_games, kIterations));
+    Check(new_positions == kIterations,
+          std::format("go infinite + position at once: {}/{} answered", new_positions, kIterations));
     Check(helpers_stopped == kHelperIterations,
           std::format("Threads 3, go infinite + stop at once: {}/{} answered", helpers_stopped, kHelperIterations));
 }
