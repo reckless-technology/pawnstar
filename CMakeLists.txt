@@ -50,8 +50,13 @@ add_compile_options($<$<CONFIG:Debug>:-Og>)
 add_compile_options($<$<CONFIG:Debug>:-g>)
 add_compile_definitions($<$<CONFIG:Debug>:DEBUG>)
 # clang targeting the MSVC ABI writes a .pdb only when -g reaches the link too, so a debugger has symbols there.
+# The C and C++ runtimes are linked statically (/MT, the debug one in a Debug build), so the engine imports system DLLs
+# alone - KERNEL32 - and runs on a Windows with no Visual C++ redistributable: no VCRUNTIME140.dll, MSVCP140.dll or
+# UCRT api-ms-win-crt-*.dll (tools/windows-dependents.ps1 holds the shipped binary to that). A sanitizer build moves
+# to the DLL runtime below, the only one AddressSanitizer supports there.
 if(WIN32)
   add_link_options($<$<CONFIG:Release,RelWithDebInfo,Debug>:-g>)
+  set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
 # Optional AddressSanitizer + UndefinedBehaviorSanitizer (the Makefile's DEBUG=1), applied to compile and

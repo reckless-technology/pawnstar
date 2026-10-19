@@ -261,6 +261,14 @@ jobs:
           if [ "$RUNNER_OS" = Windows ]; then binary="$binary.exe"; fi
           [ -f "$binary" ] || { echo "::error::$binary was not built"; exit 1; }
           cp "$binary" "${SHIPPED%.zip}"
+      # What ships imports system DLLs alone (the runtimes linked statically), so it starts on a Windows with no Visual
+      # C++ redistributable; a C or C++ runtime DLL among its imports fails the release before anything is signed.
+      - name: Windows DLLs the engine imports
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          pwsh -NoProfile -File tools/windows-dependents.ps1 $env:SHIPPED
+          if ($LASTEXITCODE -ne 0) { throw "the engine imports a DLL outside the allowlist" }
       - name: Sign (Windows, a publishing run)
         if: runner.os == 'Windows' && env.PUBLISH == 'true'
         shell: pwsh

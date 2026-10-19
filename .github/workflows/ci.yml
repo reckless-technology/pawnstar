@@ -174,6 +174,15 @@ jobs:
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAWNSTAR_DEBUGX=OFF -DCMAKE_CXX_COMPILER=clang++
       - name: Build
         run: cmake --build build
+      # The engine imports system DLLs alone: the runtimes are linked statically, so it starts on a Windows with no
+      # Visual C++ redistributable. A C or C++ runtime DLL among its imports fails the job.
+      - name: Windows DLLs the engine imports
+        shell: pwsh
+        run: |
+          $binary = Get-ChildItem build\pawnstar_*.exe | Select-Object -First 1
+          if (-not $binary) { throw "the engine was not built" }
+          pwsh -NoProfile -File tools/windows-dependents.ps1 $binary.FullName
+          if ($LASTEXITCODE -ne 0) { throw "the engine imports a DLL outside the allowlist" }
       - name: Test
         run: ctest --test-dir build --output-on-failure
       - name: Upload engine binary
