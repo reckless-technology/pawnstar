@@ -317,7 +317,9 @@ See [NNUE evaluation](#nnue-evaluation) below for how it works and how to train 
 per-piece-type bitboards in `pieces_` and per-colour bitboards in `colors_` (public members), a 64-entry square→piece
 array for O(1) lookup, the incrementally-maintained Zobrist hash, castling rights, the en passant
 square, the half-move clock, and a `checkers_` bitboard. `MakeMove` and `MakeNullMove` return a brand
-new `Position` by value (copy-make); there is no unmake.
+new `Position` by value (copy-make); there is no unmake. The half-move clock is the fifty-move rule's (FIDE
+9.3) and FEN's: plies since the last pawn move or capture, so castling counts like any other piece move and
+does not reset it.
 
 `pieces_` is a `std::array<Bitboard, 7>` indexed by piece type, but `pieces_[0]` (the `kNone` slot)
 holds the occupied-squares set — the union of all pieces of both colours — rather than a piece

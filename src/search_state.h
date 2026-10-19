@@ -35,7 +35,7 @@ class Game;
 struct HashEntry
 {
     zobrist_t hash_;                  ///< Zobrist hash of the position.
-    uint8_t   reversible_move_count_; ///< Half-move clock at this position.
+    uint8_t   reversible_move_count_; ///< Fifty-move clock at this position.
 };
 
 /// @brief A variation (typically principal variation) is a line of play or series of moves.
@@ -389,7 +389,9 @@ inline bool SearchState::IsDrawByFiftyMoves() const
 
 /// @brief Check for three-fold repetition using the compact hash history.
 /// Walks backwards through hash_stack_ two entries at a time (same side to move),
-/// starting four half-moves before the current position.
+/// starting four half-moves before the current position, and stops at a position the fifty-move clock was
+/// reset in (a pawn move or a capture: nothing before it can recur). Castling does not reset the clock, so
+/// the walk goes on past it, but finds no match there: the castling rights it gave up are in the hash.
 /// @return true if drawn by repetition.
 inline bool SearchState::IsDrawByRepetition() const
 {

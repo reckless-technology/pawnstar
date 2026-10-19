@@ -27,7 +27,7 @@ class Position
     zobrist_t               hash_;                  ///< Zobrist hash of this position, maintained incrementally.
     std::array<Square, 2>   king_location_;         ///< Square index of white and black kings.
     Square                  en_passant_square_;     ///< En passant capture availability square.
-    uint8_t                 reversible_move_count_; ///< Number of consecutive reversible half-moves (plies).
+    uint8_t                 reversible_move_count_; ///< Fifty-move clock: plies since the last pawn move or capture.
     uint8_t                 full_move_count_;       ///< Number of full moves (zero indexed).
     CastlingRights          castling_rights_;       ///< Castling rights flags.
     bool                    is_null_move_;          ///< Whether the last move was a null (pass) move.
@@ -494,7 +494,8 @@ constexpr Position Position::MakeMove(const Move &move) const
     {
     case Move::Type::kNonCapture:
         // A single pawn push is encoded as kNonCapture (no dedicated type); like any pawn move it resets the
-        // fifty-move / reversible-move clock. Every other kNonCapture is a reversible piece move and increments.
+        // fifty-move / reversible-move clock. Every other kNonCapture is a piece move and increments, as castling
+        // does: only a pawn move or a capture resets the clock.
         if (piece == kPawn)
         {
             position.reversible_move_count_ = 0;
@@ -540,7 +541,10 @@ constexpr Position Position::MakeMove(const Move &move) const
         break;
 
     case Move::Type::kCastling:
-        position.reversible_move_count_ = 0;
+        // Castling moves no pawn and captures nothing, so the fifty-move clock (FIDE 9.3, FEN's halfmove
+        // clock) counts it like any other piece move. It is irreversible for repetition, but that needs no
+        // reset here: the castling rights it gives up change the hash, so no earlier position can recur.
+        ++position.reversible_move_count_;
         switch (to)
         {
         case G1:

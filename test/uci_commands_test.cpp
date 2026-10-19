@@ -318,10 +318,10 @@ void Positions(Game &game)
     }
 
     Check(Run(game, {"position fen 4k3/8/8/8/8/8/8/R3K3 w Q - 0 1 moves e1c1", "getboard"}) ==
-              "4k3/8/8/8/8/8/8/2KR4 b - - 0 1\n",
+              "4k3/8/8/8/8/8/8/2KR4 b - - 1 1\n",
           "position fen <six fields> moves ...: castles queenside");
     Check(Run(game, {"position fen 4k3/8/8/8/8/8/8/4K2R w K moves e1g1", "getboard"}) ==
-              "4k3/8/8/8/8/8/8/5RK1 b - - 0 1\n",
+              "4k3/8/8/8/8/8/8/5RK1 b - - 1 1\n",
           "position fen <three fields> moves ...: a short FEN ended by the moves keyword");
     Check(Run(game, {"position fen 4k3/8/8/8/8/8/8/4K2R w K", "getboard"}) == "4k3/8/8/8/8/8/8/4K2R w K - 0 1\n",
           "position fen <three fields>: a short FEN at the end of the line is still applied");
@@ -355,6 +355,55 @@ void Positions(Game &game)
     Check(game.positions_.size() == depth_before && const_game.CurrentPosition().ToString() == kStart,
           "Game::UndoMove restores the previous position");
     Check(game.PlayMove(std::string_view{"e2e5"}) == Move::None(), "Game::PlayMove(\"e2e5\") refuses an illegal move");
+}
+
+/// @brief The fifty-move clock (FIDE 9.3, FEN's halfmove clock) counts plies since the last pawn move or capture,
+/// so castling - neither - counts like any other piece move and never resets it.
+void FiftyMoveClock(Game &game)
+{
+    struct Case
+    {
+        const char *position_; ///< The `position` command's argument.
+        const char *fen_;      ///< What getboard must print after it.
+        const char *what_;     ///< The case, for the report.
+    };
+
+    constexpr Case kCases[] = {
+        {"fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 12 40 moves e1g1", "r3k2r/8/8/8/8/8/8/R4RK1 b kq - 13 40",
+         "white castles kingside"},
+        {"fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 12 40 moves e1c1", "r3k2r/8/8/8/8/8/8/2KR3R b kq - 13 40",
+         "white castles queenside"},
+        {"fen r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 12 40 moves e8g8", "r4rk1/8/8/8/8/8/8/R3K2R w KQ - 13 41",
+         "black castles kingside"},
+        {"fen r3k2r/8/8/8/8/8/8/R3K2R b KQkq - 12 40 moves e8c8", "2kr3r/8/8/8/8/8/8/R3K2R w KQ - 13 41",
+         "black castles queenside"},
+        {"fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 12 40 moves e1g1 e8c8 a1a2", "2kr3r/8/8/8/8/8/R7/5RK1 b - - 15 41",
+         "both castle, then a rook move: the clock runs on"},
+        {"fen r3k2r/p7/8/8/8/8/8/R3K2R w KQkq - 12 40 moves e1g1 a7a6", "r3k2r/8/p7/8/8/8/8/R4RK1 w kq - 0 41",
+         "a pawn move after castling resets the clock"},
+        {"fen r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 12 40 moves e1g1 a8a1", "4k2r/8/8/8/8/8/8/r4RK1 w k - 0 41",
+         "a capture after castling resets the clock"},
+    };
+    for (const Case &c : kCases)
+    {
+        const std::string board = Run(game, {std::format("position {}", c.position_), "getboard"});
+        Check(board == std::format("{}\n", c.fen_), std::format("fifty-move clock: {}", c.what_), board);
+        // The FEN after castling reads back as itself.
+        Check(Run(game, {std::format("position fen {}", c.fen_), "getboard"}) == board,
+              std::format("fifty-move clock: the FEN after '{}' round-trips", c.what_));
+    }
+
+    // At 99 plies with no pawn to move and nothing to capture, every move - castling included - reaches the
+    // hundredth ply and draws, so two rooks up is scored as a draw.
+    bool is_complete = false;
+    Run(game, {"position fen 4k3/8/8/8/8/8/8/R3K2R w KQ - 99 80"});
+    std::string out = SearchToBestMove(game, "go depth 4", is_complete);
+    Check(is_complete && Contains(out, "score cp    0"),
+          "fifty-move clock at 99: every move draws, castling too, so the score is 0", out);
+    // Castling as the hundredth ply draws the position it reaches.
+    out = Run(game, {"position fen 4k3/8/8/8/8/8/8/R3K2R w KQ - 99 80 moves e1g1", "getboard", "eval"});
+    Check(Contains(out, "4k3/8/8/8/8/8/8/R4RK1 b - - 100 80\n") && Contains(out, "evaluation 0 (nnue)"),
+          "fifty-move clock: castling on the 100th ply draws the position it reaches", out);
 }
 
 void Options(Game &game)
@@ -805,6 +854,7 @@ int main(int argc, char **argv)
 
     HandshakesAndDiagnostics(game);
     Positions(game);
+    FiftyMoveClock(game);
     Options(game);
     NetLoading(game, net_path);
     StopRaces(game); // first: its watchdog turns a lost stop into a failure, where a later search would just hang
