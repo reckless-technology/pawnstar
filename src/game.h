@@ -33,7 +33,7 @@ class Game
     EvalCache               eval_cache_;             ///< Lockless NNUE evaluation cache (shared by all threads).
     ChessClock              time_control_;           ///< Clock controls for the current game.
     OpeningBook             book_;                   ///< The opening book.
-    std::atomic<bool>       is_cancel_pending_;      ///< Shared abort flag: set on timeout, UCI stop, AND by the main thread at the end of every search (helpers wind up). Written by the search threads.
+    std::atomic<bool>       is_cancel_pending_;      ///< Shared abort flag: set on timeout, UCI stop, AND by the main thread at the end of every search (helpers wind up). Cleared only before a search starts, by the thread that starts it - never by a search thread.
     std::atomic<bool>       is_stop_requested_;      ///< "The GUI asked us to stop" (`stop` / `quit`). Written ONLY by the UCI thread; never by a search thread. Releases the ponder-wait.
     int                     thread_count_;           ///< Lazy SMP search threads; default from PAWNSTAR_THREADS / hardware, set by UCI `Threads`.
     ChessClock::Duration    move_overhead_;          ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
@@ -202,7 +202,10 @@ inline void Game::StartThinking()
 {
     StopThinking(); // joins any previous search (and leaves is_stop_requested set)
     // A fresh search: the previous stop is resolved, so clear both flags before the worker starts. Ordering
-    // matters — these must land before the thread launches, which the std::thread constructor guarantees.
+    // matters — these must land before the thread launches, which the std::thread constructor guarantees. This is
+    // the only place a worker's search has its cancel flag cleared: no search thread ever clears it, so a `stop`
+    // that arrives at any moment after this line — before the worker has begun, during the search, or after it
+    // has finished — is seen by the search or finds it already over.
     is_stop_requested_.store(false, std::memory_order_relaxed);
     is_cancel_pending_.store(false, std::memory_order_relaxed);
     worker_thread_ = std::thread([this] { this->SearchThreadEntry(); });
@@ -244,9 +247,11 @@ inline Move Game::SearchRootNode()
 {
     Game &game        = *this;        // local alias so the search body reads uniformly through `game`
     game.ponder_move_ = Move::None(); // set by the main thread's IterativeDeepen if the PV has a reply move
-    // Clear the abort flag up front so the search does not start already cancelled. StartThinking clears it
-    // too; this also covers the callers that invoke SearchRootNode directly on the UCI thread (`bench`).
-    game.is_cancel_pending_.store(false, std::memory_order_relaxed);
+    // is_cancel_pending is NOT cleared here: whoever starts a search clears it before the search begins —
+    // StartThinking before it launches the worker, SetPosition for the callers that run SearchRootNode directly
+    // (`bench`, the tests and tools, which set the position first). Clearing it here, on the worker, lost any
+    // `stop` or `quit` that reached StopThinking before the worker got this far: the search then started with
+    // no cancel, a `go infinite` never ended, and StopThinking blocked in join() for ever.
     game.last_search_node_count_ = 0; // set below once a real search runs (stays 0 for book/forced returns)
     // If there is a book move for this position, do not bother with search (unless OwnBook is disabled).
     // Skip the book when `go searchmoves` restricts the root (the caller wants those moves searched, not a

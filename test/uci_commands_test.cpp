@@ -4,7 +4,8 @@
 /// (input_handling.h) and Game (game.h) inside one process, where it can read every line the engine writes and
 /// reach the paths a short GUI session never takes: every `setoption`, every form of `position`, `go` with each
 /// of its parameters (depth, nodes, movetime, the clock and increments for either side, movestogo, infinite,
-/// ponder with ponderhit and stop, searchmoves), the diagnostic commands (eval, nnue, getboard, bookmoves,
+/// ponder with ponderhit and stop, searchmoves, malformed values), every command that stops a search sent the
+/// instant after `go` (the lost-stop race), the diagnostic commands (eval, nnue, getboard, bookmoves,
 /// freebook, dbg, dbgclear, help, bench), malformed and unknown input, the root search's short cuts (a book
 /// move, a forced move, no legal move) and the net loader's refusals (a missing file, an unstamped one, a
 /// different architecture, a truncated one).
@@ -22,6 +23,7 @@
 #include "input_handling.h"
 #include "test_report.h"
 
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -30,6 +32,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -456,8 +459,8 @@ void Searches(Game &game)
     Check(is_complete && IsLegal(game, BestMove(out)), "go wtime/btime/winc/binc (black to move, sudden death)", out);
 
     Run(game, {"position startpos"});
-    out = SearchThenSend(game, "go infinite", 300ms, "stop", is_complete);
-    Check(is_complete && IsLegal(game, BestMove(out)), "go infinite + stop: stop ends it with a bestmove", out);
+    out = SearchThenSend(game, "go infinite", 0ms, "stop", is_complete);
+    Check(is_complete && IsLegal(game, BestMove(out)), "go infinite + stop at once: stop ends it with a bestmove", out);
 
     Run(game, {"position startpos"});
     out = SearchThenSend(game, "go ponder wtime 4000 btime 4000", 300ms, "ponderhit", is_complete);
@@ -502,6 +505,170 @@ void Searches(Game &game)
     Run(game, {"position startpos moves g1f3 g8f6 f3g1 f6g8 g1f3"});
     out = SearchToBestMove(game, "go depth 4", is_complete);
     Check(is_complete && IsLegal(game, BestMove(out)), "go after a move history with a repetition", out);
+}
+
+/// @brief Every command that stops a search, sent the instant after `go` with no pause, ends it with a bestmove.
+/// The root search once cleared the cancel flag as it began, so a `stop` (or `quit`, a new `go`, `ucinewgame`) that
+/// reached StopThinking before the worker got that far was lost: the search ran on and StopThinking waited in join()
+/// for ever. Every iteration here hung before the fix. A watchdog turns such a hang into a failure and an exit, since
+/// the blocked join cannot be abandoned.
+void StopRaces(Game &game)
+{
+    Run(game, {"setoption name OwnBook value false", "setoption name Threads value 1"});
+    std::atomic<bool> is_finished{false};
+    std::thread       watchdog{[&is_finished] {
+        const auto deadline = std::chrono::steady_clock::now() + kSearchTimeout;
+        while (!is_finished.load())
+        {
+            if (std::chrono::steady_clock::now() > deadline)
+            {
+                // std::cout may be captured; the C stream is not.
+                std::printf("[FAIL] a stop sent at once after go was lost: the search never ended\n");
+                std::fflush(stdout);
+                std::_Exit(1);
+            }
+            std::this_thread::sleep_for(10ms);
+        }
+    }};
+
+    constexpr int kIterations = 300;
+    int           stopped = 0, ponders_stopped = 0, restarted = 0, new_games = 0, helpers_stopped = 0;
+    for (int i = 0; i < kIterations; ++i)
+    {
+        {
+            CapturedOutput output;
+            ProcessInput(game, "position startpos");
+            ProcessInput(game, "go infinite");
+            ProcessInput(game, "stop"); // joins the search, which prints its bestmove first
+            stopped += LinesStartingWith(output.Text(), "bestmove ").size() == 1 ? 1 : 0;
+        }
+        {
+            CapturedOutput output;
+            ProcessInput(game, "position startpos");
+            ProcessInput(game, "go ponder");
+            ProcessInput(game, "stop"); // releases the ponder-wait too
+            ponders_stopped += LinesStartingWith(output.Text(), "bestmove ").size() == 1 ? 1 : 0;
+        }
+        {
+            CapturedOutput output;
+            ProcessInput(game, "position startpos");
+            ProcessInput(game, "go infinite");
+            ProcessInput(game, "go depth 1"); // stops the first search, then starts a short one
+            game.StopThinking();
+            restarted += LinesStartingWith(output.Text(), "bestmove ").size() == 2 ? 1 : 0;
+        }
+        {
+            CapturedOutput output;
+            ProcessInput(game, "position startpos");
+            ProcessInput(game, "go infinite");
+            ProcessInput(game, "ucinewgame");
+            new_games += LinesStartingWith(output.Text(), "bestmove ").size() == 1 ? 1 : 0;
+        }
+    }
+    // Lazy SMP: a stop that lands before the main thread has launched its helpers, or while they run.
+    Run(game, {"setoption name Threads value 3"});
+    constexpr int kHelperIterations = 100;
+    for (int i = 0; i < kHelperIterations; ++i)
+    {
+        CapturedOutput output;
+        ProcessInput(game, "position startpos");
+        ProcessInput(game, "go infinite");
+        ProcessInput(game, "stop");
+        helpers_stopped += LinesStartingWith(output.Text(), "bestmove ").size() == 1 ? 1 : 0;
+    }
+    Run(game, {"setoption name Threads value 1"});
+    is_finished.store(true);
+    watchdog.join();
+
+    Check(stopped == kIterations, std::format("go infinite + stop at once: {}/{} answered", stopped, kIterations));
+    Check(ponders_stopped == kIterations,
+          std::format("go ponder + stop at once: {}/{} answered", ponders_stopped, kIterations));
+    Check(restarted == kIterations,
+          std::format("go infinite + go depth 1 at once: {}/{} answered twice", restarted, kIterations));
+    Check(new_games == kIterations,
+          std::format("go infinite + ucinewgame at once: {}/{} answered", new_games, kIterations));
+    Check(helpers_stopped == kHelperIterations,
+          std::format("Threads 3, go infinite + stop at once: {}/{} answered", helpers_stopped, kHelperIterations));
+}
+
+/// @brief A `go` value that is not an integer, or missing, is ignored with its keyword: the engine neither throws
+/// (std::stoi once ended it on `go depth abc`) nor takes a value from it, and the rest of the line still counts.
+void MalformedGoValues(Game &game)
+{
+    Run(game, {"setoption name OwnBook value false", "setoption name Threads value 1"});
+
+    struct Case
+    {
+        const char *line_; ///< The go command.
+        ChessClock::ClockType
+                  clock_type_; ///< The clock it must leave (a fresh position's: kStandard, 5 min, depth 10).
+        int       depth_;      ///< The depth it must leave.
+        long long remaining_;  ///< The remaining time (ms) it must leave.
+        uint64_t  max_nodes_;  ///< The node budget it must leave.
+    };
+
+    constexpr long long kFiveMinutes = 300000;
+    const Case          cases[]      = {
+        {"go depth abc", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go depth 3x", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go depth +-3", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go depth", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go movetime", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go movetime soon", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go wtime x", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go wtime 99999999999999999999", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go nodes abc", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go movestogo x winc y", ChessClock::kStandard, 10, kFiveMinutes, 0},
+        {"go movetime x depth 3", ChessClock::kFixedDepth, 3, kFiveMinutes, 0},
+        {"go depth +4", ChessClock::kFixedDepth, 4, kFiveMinutes, 0},
+        {"go wtime 1500 btime oops", ChessClock::kStandard, 10, 1500, 0},
+    };
+    for (const Case &test_case : cases)
+    {
+        bool        is_ignored = false;
+        std::string out;
+        {
+            CapturedOutput output; // released before Check prints, or the result line would be captured too
+            ProcessInput(game, "position startpos");
+            ProcessInput(game, test_case.line_); // must not throw
+            const ChessClock &clock = game.time_control_;
+            is_ignored              = clock.clock_type_ == test_case.clock_type_ && clock.depth_ == test_case.depth_ &&
+                                      clock.remaining_time_.count() == test_case.remaining_ &&
+                                      clock.max_nodes_ == test_case.max_nodes_;
+            ProcessInput(game, "stop");
+            out = output.Text();
+        }
+        Check(is_ignored && IsLegal(game, BestMove(out)),
+              std::format("{}: a malformed or missing value is ignored with its keyword, and stop answers",
+                          test_case.line_),
+              out);
+    }
+
+    // Numeric options and bench take the same rule: a malformed value changes nothing.
+    Run(game,
+        {"setoption name Threads value 2", "setoption name Threads value lots", "setoption name Threads value 3x"});
+    Check(game.thread_count_ == 2, "setoption Threads <not a number>: the thread count is left as it was");
+    Run(game, {"setoption name Threads value +1"});
+    Check(game.thread_count_ == 1, "setoption Threads +1: a leading plus is read");
+    Run(game, {"setoption name Move Overhead value 120", "setoption name Move Overhead value soon"});
+    Check(game.move_overhead_ == ChessClock::Duration{120}, "setoption Move Overhead <not a number>: left as it was");
+    Run(game, {"setoption name Move Overhead value 30"});
+    // Resize empties the table, so a filled table that stays filled was not resized.
+    Run(game, {"position startpos"});
+    bool is_complete = false;
+    SearchToBestMove(game, "go depth 4", is_complete);
+    Run(game, {"setoption name Hash value big"});
+    Check(is_complete && game.transposition_table_.UsageStats().first > 0,
+          "setoption Hash <not a number>: the table is not resized (it keeps its entries)");
+
+    Check(ParseInteger("12") == 12 && ParseInteger("-7") == -7 && ParseInteger("+5") == 5 && ParseInteger("0") == 0,
+          "ParseInteger reads a whole signed integer");
+    Check(!ParseInteger("") && !ParseInteger("+") && !ParseInteger("-") && !ParseInteger("+-1") &&
+              !ParseInteger("1 2") && !ParseInteger(" 1") && !ParseInteger("9223372036854775808"),
+          "ParseInteger refuses anything else, and an overflow");
+    Check(SaturateToInt(5'000'000'000LL) == std::numeric_limits<int>::max() &&
+              SaturateToInt(-5'000'000'000LL) == std::numeric_limits<int>::min() && SaturateToInt(-3) == -3,
+          "SaturateToInt saturates rather than wraps");
 }
 
 void RootShortcuts(Game &game, const std::string &book_path)
@@ -627,7 +794,9 @@ int main(int argc, char **argv)
     Positions(game);
     Options(game);
     NetLoading(game, net_path);
+    StopRaces(game); // first: its watchdog turns a lost stop into a failure, where a later search would just hang
     Searches(game);
+    MalformedGoValues(game);
     RootShortcuts(game, "pawnstar.book");
     BookCommands(game);
     Bench(game);

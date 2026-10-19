@@ -2,6 +2,7 @@
 /// @file input_handling.h UCI command parsing + dispatch (header-only).
 
 #include <algorithm>
+#include <charconv>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -9,6 +10,8 @@
 #include <format>
 #include <iostream>
 #include <iterator>
+#include <limits>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <sstream>
@@ -25,6 +28,37 @@
 #include "search_state.h"
 #include "transposition_table.h"
 #include "version.h"
+
+/// @brief Read a numeric UCI value strictly: the whole of @p text must be an optional sign and decimal digits that fit
+/// a 64-bit integer. The same rule as the Go and Rust engines (strconv.Atoi, str::parse::<i64>).
+/// @param text The token (or, for setoption, the joined value).
+/// @return The value, or nothing for anything else ("abc", "12x", "", "+-3", an overflow): the caller then treats
+/// the value, and the keyword or option it belongs to, as absent. Never throws, unlike std::stoi, which ended the
+/// engine on `go depth abc`.
+inline std::optional<long long> ParseInteger(std::string_view text)
+{
+    if (text.starts_with('+'))
+    {
+        text.remove_prefix(1); // from_chars takes a minus sign but not a plus
+        if (text.starts_with('-'))
+        {
+            return std::nullopt;
+        }
+    }
+    long long value                = 0;
+    const auto [end, error_code]   = std::from_chars(text.data(), text.data() + text.size(), value);
+    const bool is_whole_token_read = error_code == std::errc{} && end == text.data() + text.size();
+    return is_whole_token_read ? std::optional<long long>{value} : std::nullopt;
+}
+
+/// @brief A parsed value narrowed to an int field (a depth, a move count), saturating rather than wrapping.
+/// @param value The parsed value.
+/// @return @p value clamped to the range of int.
+inline int SaturateToInt(long long value)
+{
+    return static_cast<int>(
+        std::clamp<long long>(value, std::numeric_limits<int>::min(), std::numeric_limits<int>::max()));
+}
 
 /// @brief Pointer to a command handler taking the game and the command's argument list.
 using HandlerFn = void (*)(Game &game, std::span<std::string> args);
@@ -124,7 +158,8 @@ inline void handle_uci(Game &game, std::span<std::string>)
 /// Recognises EvalFile (load a different NNUE net file; NNUE is the only evaluator), Hash (transposition
 /// table size in MB, 1..4096), Threads (Lazy SMP search threads, 1..kMaxSearchThreads), Clear Hash (a
 /// button that empties the transposition table), Move Overhead (ms reserved from each deadline, 0..5000) and
-/// OwnBook (whether to consult the built-in opening book).
+/// OwnBook (whether to consult the built-in opening book). A numeric option whose value is not an integer
+/// (ParseInteger) is left as it is.
 /// @param args Command arguments.
 inline void handle_setoption(Game &game, std::span<std::string> args)
 {
@@ -157,12 +192,17 @@ inline void handle_setoption(Game &game, std::span<std::string> args)
     }
     else if (name == "Hash")
     {
-        const int mb = std::clamp(std::atoi(value.c_str()), 1, 4096);
-        game.transposition_table_.Resize(static_cast<std::size_t>(mb));
+        if (const std::optional<long long> mb = ParseInteger(value)) // a malformed value leaves the table as it is
+        {
+            game.transposition_table_.Resize(static_cast<std::size_t>(std::clamp<long long>(*mb, 1, 4096)));
+        }
     }
     else if (name == "Threads")
     {
-        game.thread_count_ = std::clamp(std::atoi(value.c_str()), 1, kMaxSearchThreads);
+        if (const std::optional<long long> threads = ParseInteger(value))
+        {
+            game.thread_count_ = static_cast<int>(std::clamp<long long>(*threads, 1, kMaxSearchThreads));
+        }
     }
     else if (name == "Clear Hash") // a button: no value, just empty the transposition table
     {
@@ -170,7 +210,10 @@ inline void handle_setoption(Game &game, std::span<std::string> args)
     }
     else if (name == "Move Overhead")
     {
-        game.move_overhead_ = ChessClock::Duration{std::clamp(std::atoi(value.c_str()), 0, 5000)};
+        if (const std::optional<long long> overhead = ParseInteger(value))
+        {
+            game.move_overhead_ = ChessClock::Duration{std::clamp<long long>(*overhead, 0, 5000)};
+        }
     }
     else if (name == "OwnBook")
     {
@@ -244,7 +287,7 @@ inline std::vector<BenchResult> RunBench(Game &game, int depth, bool debug)
     std::vector<BenchResult> results;
     for (const char *fen : kBenchFens)
     {
-        game.SetPosition(fen);
+        game.SetPosition(fen); // also clears the cancel flag the previous search left set (SearchRootNode never does)
         game.time_control_.clock_type_ = ChessClock::kFixedDepth; // SetPosition reset the clock; set fixed depth after
         game.time_control_.depth_      = depth;
         if (debug)
@@ -272,7 +315,9 @@ inline std::vector<BenchResult> RunBench(Game &game, int depth, bool debug)
 /// it standalone).
 inline void handle_bench(Game &game, std::span<std::string> args)
 {
-    const int depth = args.size() > 1 ? std::atoi(args[1].c_str()) : kBenchDepth;
+    // `bench <depth>` overrides the default; a missing, malformed or non-positive depth keeps it.
+    const std::optional<long long> requested = args.size() > 1 ? ParseInteger(args[1]) : std::nullopt;
+    const int                      depth     = requested && *requested > 0 ? SaturateToInt(*requested) : kBenchDepth;
     // PAWNSTAR_BENCH_DEBUG dumps each position's bestmove and diagnostic counters after its search, for
     // cross-engine comparison against the Go and Rust benches. Off by default, so normal bench output is unchanged.
     const bool debug       = std::getenv("PAWNSTAR_BENCH_DEBUG") != nullptr;
@@ -292,8 +337,8 @@ inline void handle_bench(Game &game, std::span<std::string> args)
 /// Parsed as a small state machine alternating between a keyword and its integer argument, rather than
 /// scanning with `args[++i]` look-ahead (which also read out of bounds when a value keyword ended the
 /// input). Recognised keywords: the flags `infinite`/`ponder`, and the value-taking `wtime`/`btime`/
-/// `winc`/`binc`/`movetime`/`depth`/`movestogo`; any other token (e.g. `nodes`, `searchmoves` and its
-/// moves) is ignored.
+/// `winc`/`binc`/`movetime`/`depth`/`movestogo`/`nodes`, and `searchmoves` with its moves; any other token is
+/// ignored. A value-taking keyword whose value is missing or not an integer (ParseInteger) is ignored with it.
 /// @param game Game to act on.
 /// @param args Command arguments (time controls, depth, etc.).
 inline void handle_go(Game &game, std::span<std::string> args)
@@ -356,7 +401,15 @@ inline void handle_go(Game &game, std::span<std::string> args)
         }
         else // kAwaitValue: token is the integer argument for `pending`
         {
-            const int value = stoi(token);
+            // A value that is not an integer (`go depth abc`) is consumed and ignored, and so is its keyword, exactly
+            // as a keyword with no value at the end of the line is: the line reads as though neither were there.
+            const std::optional<long long> parsed = ParseInteger(token);
+            state                                 = State::kAwaitKeyword;
+            if (!parsed)
+            {
+                continue;
+            }
+            const long long value = *parsed;
             if ((pending == "wtime" && game.CurrentPosition().color_to_move_ == kWhite) ||
                 (pending == "btime" && game.CurrentPosition().color_to_move_ == kBlack))
             {
@@ -376,11 +429,11 @@ inline void handle_go(Game &game, std::span<std::string> args)
             else if (pending == "depth")
             {
                 game.time_control_.clock_type_ = ChessClock::kFixedDepth;
-                game.time_control_.depth_      = value;
+                game.time_control_.depth_      = SaturateToInt(value);
             }
             else if (pending == "movestogo")
             {
-                game.time_control_.moves_to_go_ = value;
+                game.time_control_.moves_to_go_ = SaturateToInt(value);
             }
             else if (pending == "nodes")
             {
@@ -390,7 +443,6 @@ inline void handle_go(Game &game, std::span<std::string> args)
                 game.time_control_.max_nodes_  = static_cast<uint64_t>(value);
             }
             // (wtime/btime for the side *not* to move falls through here and is intentionally ignored.)
-            state = State::kAwaitKeyword;
         }
     }
     game.StartThinking();
