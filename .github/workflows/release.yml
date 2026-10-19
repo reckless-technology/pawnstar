@@ -252,10 +252,15 @@ jobs:
           esac
           grep -q -- "-- Pawnstar $VERSION\$" "$RUNNER_TEMP/logs/build.log" ||
             { echo "::error::the configure does not report Pawnstar $VERSION"; exit 1; }
+      # The engine alone, by its exact name: a Windows Release link also writes pawnstar_<v>.pdb beside the .exe (the
+      # -g link option, for a debugger's symbols), which a glob on the name would stage too.
       - name: Stage
         run: |
           mkdir -p out
-          cp build/pawnstar_"${VERSION//./_}"* "${SHIPPED%.zip}"
+          binary=build/pawnstar_"${VERSION//./_}"
+          if [ "$RUNNER_OS" = Windows ]; then binary="$binary.exe"; fi
+          [ -f "$binary" ] || { echo "::error::$binary was not built"; exit 1; }
+          cp "$binary" "${SHIPPED%.zip}"
       - name: Sign (Windows, a publishing run)
         if: runner.os == 'Windows' && env.PUBLISH == 'true'
         shell: pwsh
