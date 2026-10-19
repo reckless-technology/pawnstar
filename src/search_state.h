@@ -380,8 +380,11 @@ inline void SearchState::ScoreAndSortMoves(MoveList &moves, int ply, Move prev_m
     SortMoves(moves);
 }
 
-/// @brief Check for draw by the 50-move rule.
-/// @return true if drawn by the fifty-move rule.
+/// @brief Check the fifty-move clock: 100 plies or more since the last pawn move or capture.
+/// The clock alone - a checkmate on the hundredth ply still stands, which Search tests for before it draws. The
+/// static eval's own use of it decides no mate: in the search every position it scores has passed Search's tests
+/// first, or is a capture's child with the clock at 0, and it scores a quiet position not in check.
+/// @return true if the fifty-move rule's clock has run out.
 inline bool SearchState::IsDrawByFiftyMoves() const
 {
     return CurrentPosition().reversible_move_count_ >= 100;
@@ -535,7 +538,24 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         game_.is_cancel_pending_.store(true, std::memory_order_relaxed);
         return kSearchCancelledScore;
     }
-    if (CurrentPosition().IsDrawByMaterial() || IsDrawByFiftyMoves() || IsDrawByRepetition())
+    if (CurrentPosition().IsDrawByMaterial())
+    {
+        return kDrawScore;
+    }
+    if (IsDrawByFiftyMoves())
+    {
+        // Checkmate takes precedence over the fifty-move draw (FIDE 5.1.1; 9.6.2 says so of the 75-move rule):
+        // a mate delivered on the move that completes the fifty stands. So in check the clock draws only when
+        // the side to move has a legal move; with none it is mated, scored here at this ply as the move loop's
+        // own checkmate is. Out of check there can be no mate, and the clock draws whatever the moves.
+        if (CurrentPosition().IsInCheck() && CurrentPosition().GenerateLegalMoves().size() == 0)
+        {
+            INCREMENT("checkmates");
+            return kCheckmatedScore + ply;
+        }
+        return kDrawScore;
+    }
+    if (IsDrawByRepetition())
     {
         return kDrawScore;
     }

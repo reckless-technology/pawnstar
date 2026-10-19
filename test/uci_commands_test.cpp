@@ -404,6 +404,23 @@ void FiftyMoveClock(Game &game)
     out = Run(game, {"position fen 4k3/8/8/8/8/8/8/R3K2R w KQ - 99 80 moves e1g1", "getboard", "eval"});
     Check(Contains(out, "4k3/8/8/8/8/8/8/R4RK1 b - - 100 80\n") && Contains(out, "evaluation 0 (nnue)"),
           "fifty-move clock: castling on the 100th ply draws the position it reaches", out);
+
+    // Checkmate takes precedence over the fifty-move draw (FIDE 5.1.1): at 99 plies Ra8 is the hundredth and
+    // mates, so it is scored as mate in one and played, where every other move draws.
+    Run(game, {"position fen 6k1/5ppp/8/8/8/8/8/R5K1 w - - 99 80"});
+    out = SearchToBestMove(game, "go depth 4", is_complete);
+    Check(is_complete && Contains(out, "score mate  1") && Contains(out, "bestmove a1a8"),
+          "fifty-move clock: a mate on the 100th ply is mate, not a draw, and is played", out);
+    // The reverse: at 100 plies the clock still draws a position in check with a move to make (with the f7 pawn
+    // gone, Ra8+ leaves the king f7) and one not in check (Ra2, the one move searched).
+    Run(game, {"position fen 6k1/6pp/8/8/8/8/8/R5K1 w - - 99 80"});
+    out = SearchToBestMove(game, "go depth 4", is_complete);
+    Check(is_complete && Contains(out, "score cp    0"),
+          "fifty-move clock: a check on the 100th ply that leaves a legal move draws", out);
+    Run(game, {"position fen 6k1/5ppp/8/8/8/8/8/R5K1 w - - 99 80"});
+    out = SearchToBestMove(game, "go depth 4 searchmoves a1a2", is_complete);
+    Check(is_complete && Contains(out, "score cp    0") && Contains(out, "bestmove a1a2"),
+          "fifty-move clock: a quiet move on the 100th ply draws, though another mates", out);
 }
 
 void Options(Game &game)
