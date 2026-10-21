@@ -13,10 +13,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The Linux jobs below run on the org's self-hosted runners ([self-hosted, Linux, X64]: reckless-ci-lin-0
-  # and reckless-ci-lin-1), not hosted ubuntu-latest. They apt-install their own toolchain, so both runners
-  # need a sudo that asks for no password. The two machines are not identical hardware - lin-1 is an older
-  # 2-core Haswell - which is what the AVX2/BMI2 gate in the build jobs is for.
+  # Every job runs on a GitHub-hosted runner, free for a public repository, on an image named by its version
+  # (ubuntu-24.04, windows-2025) rather than a -latest label that moves on its own. Each job installs what it needs
+  # with pinned versions: the Linux jobs apt-install clang-18 and its tools, the format job the clang-format wheel.
+  # A hosted runner is a virtual machine whose CPU model varies from run to run, which is what the AVX2/BMI2 gate
+  # in the build jobs is for.
 
   # Primary build + test on Linux, driven through the `make` wrapper — which invokes the CMake build, the
   # single build system of record. Builds the engine, tools and all eight test suites with warnings-as-errors
@@ -24,7 +25,7 @@ jobs:
   # the plain CMake path, so there is no separate cmake job; the Windows artifact job below runs CMake directly.)
   build-test:
     name: build + test (make wrapper)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     steps:
       # Full history and the tags (not a shallow clone): cmake/version.cmake derives the version from them.
       - uses: actions/checkout@v5
@@ -34,8 +35,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang-18 cmake ninja-build
       - name: Check runner has AVX2 + BMI2
         # The engine emits AVX2 (NNUE) and BMI1/2 bit-scan instructions, so the test binaries need a CPU
-        # that supports them. The self-hosted Linux runners are not identical hardware, so this gate is what
-        # stops a runner that lacks them from reporting a green build it never actually ran.
+        # that supports them. A hosted runner's CPU model is not fixed, so this gate is what stops a runner that
+        # lacks them from reporting a green build it never actually ran.
         run: |
           grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
             || { echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1; }
@@ -47,18 +48,16 @@ jobs:
   # to the same 22.1.8 across the whole organisation (see reckless-technology/claude-skills, skill
   # reckless-working-practice). It was 18 here until that day. Not apt: Ubuntu 24.04 carries no
   # clang-format-22, and the PyPI wheel is what the development machines run, so CI and a developer's
-  # pre-commit hook agree. The venv is kept in the runner's tool cache, like the gcovr and face-plate venvs,
-  # so a later run only re-checks the install.
+  # pre-commit hook agree. The wheel goes into a venv of the job's own, under the image's python3.
   format:
     name: clang-format
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - name: clang-format 22.1.8, from the kept venv
+      - name: clang-format 22.1.8, from the PyPI wheel
         run: |
-          venv="$RUNNER_TOOL_CACHE/reckless-clang-format-venv"
-          [ -x "$venv/bin/clang-format" ] || python3 -m venv "$venv"
-          "$venv/bin/pip" install --quiet --upgrade pip
+          venv="$RUNNER_TEMP/clang-format-venv"
+          python3 -m venv "$venv"
           "$venv/bin/pip" install --quiet 'clang-format==22.1.8'
           echo "$venv/bin" >> "$GITHUB_PATH"
       - name: Check formatting
@@ -71,25 +70,18 @@ jobs:
   # set in CMakeLists.txt and read by `make coverage` / `tools\build.ps1 coverage` on a developer's machine too.
   # src/ is the engine and its UCI front end (every header and main.cpp); the developer tools under tools/ and the
   # tests are not measured. The LLVM tools must match the compiler that instrumented the build (a profile is
-  # versioned), so this job looks for clang-18's own llvm-profdata-18 and llvm-cov-18 and fails naming what is
-  # missing rather than installing packages on the runner.
+  # versioned), so this job installs clang-18 with llvm-18 from apt, whose llvm-profdata-18 and llvm-cov-18 the
+  # coverage script finds beside clang++-18.
   coverage:
     name: coverage (src/ lines >= gate)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Find clang 18 and its LLVM tools
+      - name: Install toolchain
         run: |
-          missing=""
-          for tool in clang++-18 llvm-profdata-18 llvm-cov-18 cmake; do
-            command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::runner $(hostname) lacks:$missing - install clang-18, llvm-18 and cmake (apt) on it"
-            exit 1
-          fi
+          sudo apt-get update && sudo apt-get install -y clang-18 llvm-18 cmake ninja-build
           clang++-18 --version | head -1
           llvm-cov-18 --version | grep -i version
       - name: Check runner has AVX2 + BMI2
@@ -126,7 +118,7 @@ jobs:
   # Linux x86-64 (clang, via the make wrapper → CMake).
   artifact-linux:
     name: artifact (linux x86_64)
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
@@ -147,10 +139,11 @@ jobs:
           if-no-files-found: error
 
   # Windows x86-64 (CMake + Ninja + clang, the CI-validated Windows path). The vcvars64 environment supplies
-  # the MSVC STL/SDK that the VS-targeting clang links against; Git Bash (preinstalled) runs the ctest `uci` test.
+  # the MSVC STL/SDK that the MSVC-targeting clang links against, and Visual Studio's CMake and Ninja; the clang
+  # is the image's standalone LLVM (C:\Program Files\LLVM, on its PATH), and its Git Bash runs the ctest `uci` test.
   artifact-windows:
     name: artifact (windows x86_64)
-    runs-on: [self-hosted, Windows, X64]
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v5
         with:
@@ -158,7 +151,7 @@ jobs:
       # MSVC developer environment without the third-party msvc-dev-cmd action (whose latest release
       # still targets the deprecated Node 20): locate Visual Studio with vswhere, run vcvars64.bat,
       # and export the resulting environment to GITHUB_ENV — exactly what that action does internally.
-      # Ninja needs no setup step either: it is preinstalled on the self-hosted runner reckless-ci-win-0.
+      # Ninja needs no setup step either: the developer environment puts Visual Studio's on the PATH.
       - name: MSVC developer environment
         shell: pwsh
         run: |
@@ -171,7 +164,9 @@ jobs:
             }
           }
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAWNSTAR_DEBUGX=OFF -DCMAKE_CXX_COMPILER=clang++
+        run: |
+          clang++ --version
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DPAWNSTAR_DEBUGX=OFF -DCMAKE_CXX_COMPILER=clang++
       - name: Build
         run: cmake --build build
       # The engine imports system DLLs alone: the runtimes are linked statically, so it starts on a Windows with no

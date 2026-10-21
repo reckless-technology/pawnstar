@@ -13,8 +13,8 @@
 #
 # The organisation's other apps (vst-plugins, ir-capture) are released the same way, with the same organisation secrets
 # for signing:
-#   - Windows: the engine is Authenticode-signed through SSL.com's eSigner (CodeSignTool pinned by version and hash, in
-#     the runner's tool cache; tools/sign-windows.ps1), the account checked before the build, which spends no signing.
+#   - Windows: the engine is Authenticode-signed through SSL.com's eSigner (CodeSignTool pinned by version and hash,
+#     fetched by the job; tools/sign-windows.ps1), the account checked before the build, which spends no signing.
 #     Only a publishing run signs, and only the one file it ships.
 #   - macOS: the engine is signed with the Developer ID Application identity, the hardened runtime and a secure
 #     timestamp on a keychain of the job's own (tools/sign-macos.sh), and notarised by Apple. A bare binary can carry no
@@ -29,7 +29,8 @@
 # pushes the tag and takes the draft public. A failed job can be run again; a run that fails before it publishes leaves
 # only a draft, which the next run replaces.
 #
-# Every job runs on the organisation's self-hosted runners, never a hosted image, and never for a pull request: this
+# Every job runs on a GitHub-hosted runner, on an image named by its version (ubuntu-24.04, windows-2025, macos-15 for
+# Apple silicon), each starting from a clean machine and installing what it needs; never for a pull request: this
 # workflow holds the signing secrets.
 #
 # The x86-64 binaries need AVX2 and BMI2 (CMakeLists.txt's -mavx2 -mbmi2); the Linux job checks its runner has them
@@ -58,7 +59,7 @@ concurrency:
 jobs:
   verify:
     name: version and commit
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -156,13 +157,13 @@ jobs:
       matrix:
         include:
           - name: linux x86_64
-            runner: [self-hosted, Linux, X64]
+            runner: ubuntu-24.04
             asset: linux-x86_64
           - name: windows x86_64
-            runner: [self-hosted, Windows, X64]
+            runner: windows-2025
             asset: windows-x86_64.exe
           - name: macos arm64
-            runner: [self-hosted, macOS, ARM64]
+            runner: macos-15
             asset: macos-arm64.zip
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240 # the macOS job waits on Apple's notary service
@@ -179,8 +180,6 @@ jobs:
         with:
           fetch-depth: 0 # cmake/version.cmake reads the version from the tags
           fetch-tags: true
-      - name: Start from nothing
-        run: rm -rf build out
       - name: Toolchain (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -205,8 +204,8 @@ jobs:
               Add-Content -Path $env:GITHUB_ENV -Value "$($Matches[1])=$($Matches[2])"
             }
           }
-      # SSL.com's CodeSignTool, pinned by version and hash and kept in the tool cache, and the account signed in to and
-      # its certificate listed - which spends no signing - before the build rides on it.
+      # SSL.com's CodeSignTool, pinned by version and hash, and the account signed in to and its certificate listed -
+      # which spends no signing - before the build rides on it.
       - name: eSigner's signing tool, and the account checked
         if: runner.os == 'Windows' && env.PUBLISH == 'true'
         shell: pwsh
@@ -218,17 +217,14 @@ jobs:
           if (-not $env:ESIGNER_USERNAME) { throw "no eSigner secrets: a release's Windows binary is signed" }
           $version = 'v1.3.2'
           $sha256 = '4afc32e8b7f79bbe1de7e4e7049aaad4e0f754357613b9bbec0e3052f06fd36b'
-          $dir = Join-Path $env:RUNNER_TOOL_CACHE "codesigntool\$version"
-          if (-not (Test-Path (Join-Path $dir 'CodeSignTool.bat'))) {
-            $zip = Join-Path $env:RUNNER_TEMP 'codesigntool.zip'
-            Invoke-WebRequest -UseBasicParsing -OutFile $zip `
-              -Uri "https://github.com/SSLcom/CodeSignTool/releases/download/$version/CodeSignTool-$version-windows.zip"
-            $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
-            if ($hash -ne $sha256) { throw "CodeSignTool $version is $hash, not the pinned $sha256" }
-            Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $dir
-            Expand-Archive -Path $zip -DestinationPath $dir
-            Remove-Item -Force $zip
-          }
+          $dir = Join-Path $env:RUNNER_TEMP "codesigntool\$version"
+          $zip = Join-Path $env:RUNNER_TEMP 'codesigntool.zip'
+          Invoke-WebRequest -UseBasicParsing -OutFile $zip `
+            -Uri "https://github.com/SSLcom/CodeSignTool/releases/download/$version/CodeSignTool-$version-windows.zip"
+          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
+          if ($hash -ne $sha256) { throw "CodeSignTool $version is $hash, not the pinned $sha256" }
+          Expand-Archive -Path $zip -DestinationPath $dir
+          Remove-Item -Force $zip
           "RECKLESS_CODESIGNTOOL=$dir" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
           $env:RECKLESS_CODESIGNTOOL = $dir
           pwsh -NoProfile -File tools/sign-windows.ps1 -Check
@@ -333,10 +329,8 @@ jobs:
         run: |
           set -o pipefail
           name=$(basename "$SHIPPED")
-          # A file of the same name an earlier attempt left on the draft is replaced, so the job can run again (where the
-          # runner has gh; a first attempt needs no removal).
-          command -v gh > /dev/null || echo "no gh here: a file an earlier attempt left would stop this upload"
-          for stale in $(command -v gh > /dev/null && gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets" --jq ".[] | select(.name == \"$name\") | .id"); do
+          # A file of the same name an earlier attempt left on the draft is replaced, so the job can run again.
+          for stale in $(gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID/assets" --jq ".[] | select(.name == \"$name\") | .id"); do
             gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$stale"
           done
           curl --fail-with-body --silent --show-error -X POST \
@@ -354,9 +348,6 @@ jobs:
       - name: Close the signing keychain (macOS)
         if: always() && runner.os == 'macOS'
         run: tools/sign-macos.sh close
-      - name: The workspace left clean
-        if: always()
-        run: rm -rf out "$RUNNER_TEMP/unzipped" "$RUNNER_TEMP/logs"
 
   # The source and the documentation, made in a dry run too, so a release's first run of this job is not its first run
   # at all; then, in a publishing run, the draft checked and published. Every step is safe to run again: an upload
@@ -365,7 +356,7 @@ jobs:
   publish:
     name: source, documentation, publish
     needs: [verify, build]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       GH_TOKEN: ${{ github.token }}
@@ -427,7 +418,7 @@ jobs:
           done
           [ -z "$missing" ] || exit 1
           # The release's own tag on the commit built, made with git and pushed. The tagger is named on the command
-          # alone: the runner keeps this clone, and an identity written into its config would outlive the job.
+          # alone, so the clone's config is left as the checkout wrote it.
           git tag -d "$TAG" > /dev/null 2>&1 || true
           if git fetch --quiet origin "refs/tags/$TAG:refs/tags/$TAG" 2> /dev/null; then
             [ "$(git rev-parse "$TAG^{commit}")" = "$GITHUB_SHA" ] ||
@@ -440,6 +431,3 @@ jobs:
           gh api -X PATCH "$release" -F draft=false -f make_latest=true --jq .html_url
           gh api "$release" --jq '.assets[] | "  \(.name)  \(.size) bytes"'
           echo "### Released [$TAG]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG)" >> "$GITHUB_STEP_SUMMARY"
-      - name: The workspace left clean
-        if: always()
-        run: rm -rf assets doc build
