@@ -80,14 +80,17 @@ out=$(read_until '^bestmove' 120)
 bm=$(echo "$out" | grep '^bestmove')
 echo "$bm" | grep -q '^bestmove a2a3' && pass "go searchmoves restricts root (forced a2a3)" || fail "searchmoves: expected 'bestmove a2a3', got '$bm'"
 
-# 5) info currmove / currmovenumber: emitted once a search runs past the ~3s reporting gate. Use a movetime
-#    well beyond the gate (6s) so there is a comfortable ~3s window of root iterations emitting currmove — a
-#    tight window can be straddled by a single deep root move and emit nothing.
+# 5) info currmove / currmovenumber: emitted as each root move begins, once a search has run past the ~3s reporting
+#    gate. The search runs until the first such line (or the timeout), then stops. No fixed movetime: a single root
+#    move can grow its node count several times over from one iteration to the next, so on a slow machine - a small
+#    shared runner, an instrumented coverage build - it can straddle the whole of any fixed window past the gate and
+#    leave nothing to report inside it.
 send "position startpos"
-send "go movetime 6000"
-out=$(read_until '^bestmove' 120)
-echo "$out" | grep -q 'currmove [a-h][1-8][a-h][1-8].* currmovenumber [0-9]' &&
+send "go infinite"
+read_until 'currmove [a-h][1-8][a-h][1-8].* currmovenumber [0-9]' 120 >/dev/null &&
     pass "info currmove/currmovenumber emitted on a long search" || fail "currmove/currmovenumber not emitted"
+send "stop"
+read_until '^bestmove' 30 >/dev/null || fail "currmove: no bestmove after stop"
 
 # 5b) A `stop` written straight after `go`, with no pause, ends the search every time. The root search once
 #     cleared the cancel flag as it began, so a stop that reached the engine before its worker got that far was
