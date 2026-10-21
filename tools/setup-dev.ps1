@@ -222,7 +222,7 @@ else {
 # Visual Studio: tools\build.ps1 takes the latest instance with the x64 C++ tools, for the MSVC STL, the Windows SDK and
 # CMake with Ninja, which its developer environment puts on the PATH. The engine is built with clang (cl cannot
 # assemble the .incbin embeds): that instance's own when it has the Clang component, else a standalone LLVM that
-# targets the MSVC ABI - C:\Program Files\LLVM, or clang++ on the PATH - as CI's Windows runners have. Either does; the
+# targets the MSVC ABI - C:\Program Files\LLVM, or clang++ on the PATH - as CI's Windows job uses. Either does; the
 # component is installed only when there is neither.
 function Find-StandaloneClang {
   $candidates = @(Join-Path $env:ProgramFiles 'LLVM\bin\clang++.exe') +

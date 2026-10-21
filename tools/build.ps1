@@ -7,7 +7,7 @@
   wraps it for Windows, target for target and knob for knob. It finds Visual Studio with vswhere, loads the x64
   developer environment (vcvars64.bat) into this process for the MSVC STL, the Windows SDK, CMake and Ninja, picks
   the clang to build with - Visual Studio's own when it has the Clang component, else a standalone LLVM that targets
-  the MSVC ABI (C:\Program Files\LLVM, or clang++ on the PATH), as CI's Windows runners have; the engine needs clang,
+  the MSVC ABI (C:\Program Files\LLVM, or clang++ on the PATH), as CI's Windows job uses; the engine needs clang,
   and cl cannot assemble the .incbin embeds - puts it first on the PATH and configures the build tree with Ninja, as
   CI's Windows job does. VS Code's tasks run it on Windows.
 
@@ -76,7 +76,7 @@ if (-not $env:VSINSTALLDIR) {
 # The clang to build with: Visual Studio's own (its 'C++ Clang tools for Windows' component) when it has one, else a
 # standalone LLVM - its installer's C:\Program Files\LLVM, or the first clang++ on the PATH - as long as it targets the
 # MSVC ABI (x86_64-pc-windows-msvc), which links against the STL and SDK the developer environment provides. CI's
-# Windows runners have Build Tools without the Clang component and build with a standalone LLVM.
+# Windows job builds with the hosted image's standalone LLVM.
 function Find-Clang {
   $vsClang = Join-Path $env:VSINSTALLDIR 'VC\Tools\Llvm\x64\bin\clang++.exe'
   if (Test-Path $vsClang) { return $vsClang }

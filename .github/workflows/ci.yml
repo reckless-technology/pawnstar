@@ -139,7 +139,7 @@ jobs:
           if-no-files-found: error
 
   # Windows x86-64 (CMake + Ninja + clang, the CI-validated Windows path). The vcvars64 environment supplies
-  # the MSVC STL/SDK that the MSVC-targeting clang links against, and Visual Studio's CMake and Ninja; the clang
+  # the MSVC STL/SDK that the MSVC-targeting clang links against, and Visual Studio's Ninja; the clang
   # is the image's standalone LLVM (C:\Program Files\LLVM, on its PATH), and its Git Bash runs the ctest `uci` test.
   artifact-windows:
     name: artifact (windows x86_64)

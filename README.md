@@ -128,8 +128,8 @@ CMake builds the same engine, tools, and tests on Linux, macOS and Windows. On W
 `tools\build.ps1 check`, `-Release` (`RELEASE=1`), `-Debug` (`DEBUG=1`), `-Coverage` / `coverage`
 (`COVERAGE=1`, `make coverage`), `clean`. It finds Visual Studio with `vswhere`, enters its x64 developer
 environment and puts a clang first on the PATH - Visual Studio's own when it has the Clang component, else a
-standalone LLVM that targets the MSVC ABI (`C:\Program Files\LLVM`, or `clang++` on the PATH; CI's Windows
-runners have Build Tools without the component and build that way) - so it runs from any shell, VS Code's tasks
+standalone LLVM that targets the MSVC ABI (`C:\Program Files\LLVM`, or `clang++` on the PATH; CI's Windows job
+builds with the hosted image's standalone LLVM) - so it runs from any shell, VS Code's tasks
 among them. Underneath it is the CI-validated path, a **clang** toolchain
 targeting the MSVC ABI with Ninja:
 
@@ -177,25 +177,26 @@ The few platform-specific bits live in `src/platform.h` (CPU feature detection) 
 
 Every push to `main`, every pull request to `main`, and manual dispatch runs
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (the status badge at the top of this README reflects
-its latest result on `main`). The jobs:
+its latest result on `main`). Every job runs on a GitHub-hosted runner, on an image named by its version
+(`ubuntu-24.04`, `windows-2025`), and installs what it needs with pinned versions. The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
   build through the wrapper and runs all eleven suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
-  PyPI wheel in a venv kept on the runner; apt has no `clang-format-22`). This is independent of the
+  PyPI wheel in a venv of the job's own; apt has no `clang-format-22`). This is independent of the
   compiler, which stays clang-18 — a clang-format of a different major restyles code that is already
   correct, so the two are pinned separately and deliberately.
 - **coverage (src/ lines >= gate)** — `make WERROR=1 CXX=clang++-18 coverage`: every suite on a build
   instrumented with clang's source-based coverage, red when `src/`'s line coverage is under
-  `PAWNSTAR_COVERAGE_MIN_LINES` (90 %), with the per-file table in the job summary. It needs clang-18's own
-  `llvm-profdata-18` and `llvm-cov-18` on the runner and fails naming whatever is missing.
+  `PAWNSTAR_COVERAGE_MIN_LINES` (90 %), with the per-file table in the job summary. It installs clang-18 with
+  llvm-18 from apt, so `llvm-profdata-18` and `llvm-cov-18` match the compiler that instrumented the build.
 - **artifact (linux x86_64 / windows x86_64)** — two per-OS jobs that build a release binary, run the full
   test suite on that platform, and — only on success — upload the version-named executable
   (`pawnstar_<major>_<minor>_<build>`, `.exe` on Windows) as a downloadable build artifact for that run. The
   upload is the job's last step, so a failed build or test ends the job before anything is published. There
-  is no macOS job in CI: hosted macOS runners bill ten times a Linux minute on a private repository, so the
-  macOS arm64 binary is built and tested once per release instead (below).
+  is no macOS job in CI: the macOS arm64 binary is built and tested by the release workflow (below), in a dry
+  run too.
 
 CI checks out full git history and the tags (`fetch-depth: 0`), from which the version is derived. `main` is not
 branch-protected, so CI reports but does not block direct pushes. The artifacts are for a look at a commit's build;
@@ -225,10 +226,10 @@ shallow clone, a fork without the tags) builds as `0.0.0`, with a warning. After
   nothing.
 
 It refuses a mark that isn't `vMAJOR.MINOR`, a commit not on `main`, and a version already released. Each platform is
-built from nothing and runs the full suite, including the bench determinism signature, on the organisation's
-self-hosted runners: Linux through the `make` wrapper (clang-18, warnings as errors), Windows through CMake and clang,
-macOS (Apple silicon) through the wrapper. Each shipped binary must report the version. The workflow creates the
-release `vMAJOR.MINOR.BUILD` and its tag itself. It never runs for a pull request.
+built from nothing and runs the full suite, including the bench determinism signature, on GitHub-hosted runners:
+Linux (`ubuntu-24.04`) through the `make` wrapper (clang-18, warnings as errors), Windows (`windows-2025`) through CMake
+and clang, macOS (Apple silicon, `macos-15`) through the wrapper. Each shipped binary must report the version. The
+workflow creates the release `vMAJOR.MINOR.BUILD` and its tag itself. It never runs for a pull request.
 
 | File | What it is |
 |---|---|
