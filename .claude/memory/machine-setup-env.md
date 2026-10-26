@@ -31,7 +31,7 @@ The dev/training/testing stack was rebuilt from scratch on a NEW machine (2026-0
 - **openings.epd**: `~/pawnstar_nnue/openings.epd` = UHO_Lichess_4852_v1 (2.63M lines, the engine-testing
   standard), downloaded fresh (the user's old curated openings file was not backed up).
 - **One small data shard** for smoke tests: `~/pawnstar_nnue/smoke.data` (61 MB). It came from the
-  external dataset that is no longer used, so it is for smoke tests only — never for training a net.
+  PlentyChess dataset that is no longer used, so it is for smoke tests only — never for training a net.
 
 **Still MISSING / needs the user (no reliable auto-source):**
 - **Anchor engines** for `tools/rate.sh` (the curated CCRL set in `~/.local/bin/Engines` — gaviota~2650,

@@ -9,7 +9,7 @@
 #     trained directly, skipping the combine/convert/shuffle steps.
 #
 # The shipped net (nnue/pawnstar-v12.bin) and its predecessors from v2 on were trained the second way,
-# on a public bulletformat dataset — strong-engine label quality, not self-play volume, is what
+# on the public PlentyChess bulletformat dataset — strong-engine label quality, not self-play volume, is what
 # made NNUE beat the handcrafted eval. Self-play text was only the original bootstrap source.
 #
 # Usage: train_pipeline.sh <data_dir | shuffled.data> <out_net.bin> [end_superbatch]

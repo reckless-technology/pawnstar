@@ -636,9 +636,18 @@ engine **requires**: an unstamped (raw bullet) net or one whose header doesn't m
 architecture is rejected rather than misread. Stamp a freshly trained raw net with `tools/stamp_net` before loading
 (see [nnue/README.md](nnue/README.md)).
 
+**Training data — credit, and where it stands.** Every shipped net up to and including `pawnstar-v12.bin` was
+trained on **the PlentyChess bulletformat dataset**, generated and published by **Patrick Leonhardt
+([Yoshie2000](https://github.com/Yoshie2000/PlentyChess))**. The strength of those nets owes a great deal to the
+quality of that data, and it is credited here with thanks.
+
+He has since asked that Pawnstar not use it, and **it is no longer used**: the dataset is deleted from this
+project's training and validation sets and no future net will be trained on it. This section records where the
+existing nets came from rather than how to obtain the data, and the retrieval details have deliberately not
+been restored. A further scale-up needs a data source of its own — self-play, or an openly licensed set.
+
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
-[nnue/README.md](nnue/README.md). The shipped nets are trained on **a public bulletformat dataset**
-(strong-engine labels), using the bullet trainer (GPU or CPU). The minimal flow:
+[nnue/README.md](nnue/README.md). The minimal flow, with a dataset of your own:
 
 ```bash
 tools/setup_bullet.sh                                       # clone + register the bullet trainer (pinned commit)
@@ -656,7 +665,7 @@ game play (SPRT — now always net-vs-net, since the hand-crafted baseline was r
 Bratko-Kopec suite.
 
 **Shipped net.** [nnue/pawnstar-v12.bin](nnue/pawnstar-v12.bin) is a **1024-wide net with 8 king buckets
-(file-pair × board-half)** trained on **~6B** positions of **a public bulletformat dataset**. Lineage, all SPRT-measured
+(file-pair × board-half)** trained on **~6B** positions of **the public PlentyChess bulletformat dataset**. Lineage, all SPRT-measured
 (against the since-removed hand-crafted eval, "HCE", in the early steps): Pawnstar self-play *lost* to the
 HCE (label quality, not quantity, was the lever); scaling that data ~12× gave nothing (capacity-limited);
 **doubling the width 256→512 added +55 Elo (fixed depth) / +71 (time control)** — that is v4; doubling
@@ -671,7 +680,7 @@ holding the width at 1024 and the data at ~2.31B, **adding 4 king buckets (file-
 6.75 Elo at 8+0.08 — the v9 net**; the bucket gain shrinks with data (+29 at 750M → +11 at
 2.31B) but stays positive, and the earlier "width beats buckets" call was really width-vs-buckets
 confounded (it compared 512+buckets v7 to 1024-no-buckets v8). Then, holding that v9 arch fixed,
-**scaling the data ~2.31B→~3.82B (four more dataset shards) beat v9 by +16.3 ± 10.8 Elo at 8+0.08 — the
+**scaling the data ~2.31B→~3.82B (four more PlentyChess shards) beat v9 by +16.3 ± 10.8 Elo at 8+0.08 — the
 v10 net**; then, holding that same arch, **scaling ~3.82B→~6.05B (six more shards) beat v10 by +9.28 ± 6.58
 Elo at 8+0.08 (LOS 99.7%) — the v11 net**. Then, holding that same ~6B data fixed and **doubling the king
 buckets 4→8 (file-pair × board-half — bank `file/2`, plus 4 when the king is in its own advanced half,

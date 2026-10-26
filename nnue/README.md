@@ -203,7 +203,7 @@ openings from, so supply your own SPRT opening book with `OPENINGS=…`.
 
 ### Data
 
-The shipped nets are trained on **a public bulletformat dataset** — a pre-converted, shuffled
+The shipped nets are trained on **the public PlentyChess bulletformat dataset** — a pre-converted, shuffled
 `.data` file (bullet `ChessBoard` records, 32 bytes each). That file is the input to training below.
 
 `train_pipeline.sh` also accepts a directory of text shards (`data_*.txt` / `seed*.txt`) in bullet's
@@ -315,7 +315,7 @@ file-pair × board-half; stamped file **12,589,152 bytes ≈ 12.6 MB**) — load
 setoption name EvalFile value /path/to/other-net.bin
 ```
 
-**`pawnstar-v12.bin`** is trained on the **same ~6B** positions of **a public bulletformat dataset**
+**`pawnstar-v12.bin`** is trained on the **same ~6B** positions of **the public PlentyChess bulletformat dataset**
 (strong-engine labels) **as v11**, with a 1024-wide transformer and **8 king buckets selected
 by king file-pair × board-half** (`kKingBucketMap`, §1). The **only** change from the previous shipped net
 **v11** is the **bucket count**, doubled 4→8 (the rank split puts a king in its own advanced half, ranks
@@ -331,7 +331,7 @@ is the opposite of the old "bucket advantage shrinks with data" expectation: the
 | step | change | result |
 |---|---|---|
 | v1 (256) | Pawnstar's own **HCE self-play** (~3.6M) | **loses** to HCE (−67 Elo; a 1.0M predecessor was −151) |
-| v2 (256) | **a public bulletformat dataset** (~60M) | **beats** HCE ≈ +330 Elo — *label quality*, not quantity, was the lever |
+| v2 (256) | **the public PlentyChess bulletformat dataset** (~60M) | **beats** HCE ≈ +330 Elo — *label quality*, not quantity, was the lever |
 | v3 (256) | ~12× more of the same data (~750M) | **no gain** over v2 (+9.5 ± 13.6, inconclusive) — 256 net is *capacity-limited* |
 | v4 (512) | **double the width**, same 60M as v2 | **+55 ± 20 Elo fixed-depth, +71 ± 25 at time control** over v2 — once data saturates, *net size* is the lever (shipped, now retired) |
 | v5 (1024) | **double width again**, same 60M | **rejected**: +2 ± 16 fixed-depth (dead even), **−74 ± 25 on the clock** — 60M *saturates* the 512 net; width only pays off with more data. Branch `bignet-1024`, not shipped |
@@ -340,11 +340,11 @@ is the opposite of the old "bucket advantage shrinks with data" expectation: the
 | v7 (512 + 4 king buckets) | **~2.31B** (v6's 818M + 4 more big shards), same arch, SBS 40→120 (~3 epochs) | **+29.96 ± 14.05 fixed-depth, +20.73 ± 12.73 on the clock** over v6 — *still more data*; same arch/speed, so the eval-quality gain carries straight to the clock (later retired) |
 | **v8 (1024, no king buckets)** | **double the width, drop king buckets**, same 2.31B as v7 | **+31.9 ± 16.6 Elo at 40/20** over v7 (LLR 2.95, H1; 972 games) — at the full data scale width beats buckets, **at half the file size** (fewer feature rows, wider hidden). Reverses v5's 60M result now that data no longer saturates 1024. (later retired) |
 | v9 (1024 + 4 king buckets, file-pair) | add king buckets to the v8 arch, same ~2.31B scale/schedule | **+11.4 ± 6.75 Elo at 8+0.08** over v8 (LLR 2.96, H1; 5520 games). Holding width fixed, buckets win at scale — the gain shrinks with data (+29 at 750M → +11 at 2.31B) but stays positive; the v8 'width beats buckets' call was width-vs-buckets confounded. **File-pair bucketing beats quadrant/rank-based** (king safety is file-dependent; back-rank kings use all 4 file banks). 4× the FT rows (1.58→6.3 MB). (later retired) |
-| v10 (1024 + 4 king buckets, file-pair) | **more data**: scale the pool 2.31B→3.82B (four more dataset shards), same v9 arch, SBS 120→190 (~3 epochs) | **+16.3 ± 10.8 Elo at 8+0.08** over v9 (LLR 2.95, H1; 1944 games, 52.3%). More data again the single biggest lever. (later retired) |
-| **v11 (1024 + 4 king buckets, file-pair)** | **more data**: scale the pool 3.82B→6.05B (six more dataset shards), same v10 arch, SBS 190→300 (~3 epochs) | **+9.28 ± 6.58 Elo at 8+0.08** over v10 (LOS 99.7%, LLR 2.48; 6102 games, 51.3%). More data again the single biggest lever — the per-step gain is shrinking (+16 for +1.5B → +9 for +2.2B) but stays clearly positive; v11's 6.05B was still a fraction of the pool available then. (later retired) |
+| v10 (1024 + 4 king buckets, file-pair) | **more data**: scale the pool 2.31B→3.82B (four more PlentyChess shards), same v9 arch, SBS 120→190 (~3 epochs) | **+16.3 ± 10.8 Elo at 8+0.08** over v9 (LLR 2.95, H1; 1944 games, 52.3%). More data again the single biggest lever. (later retired) |
+| **v11 (1024 + 4 king buckets, file-pair)** | **more data**: scale the pool 3.82B→6.05B (six more PlentyChess shards), same v10 arch, SBS 190→300 (~3 epochs) | **+9.28 ± 6.58 Elo at 8+0.08** over v10 (LOS 99.7%, LLR 2.48; 6102 games, 51.3%). More data again the single biggest lever — the per-step gain is shrinking (+16 for +1.5B → +9 for +2.2B) but stays clearly positive; v11's 6.05B was still a fraction of the pool available then. (later retired) |
 | **v12 (1024 + 8 king buckets, file-pair × board-half)** | **double the king buckets 4→8** at fixed data (same ~6B pool as v11): bank = `file/2`, plus 4 when the king is in its own advanced half (ranks 5–8, per-perspective oriented); SBS=300, final loss 0.0226 (v11 0.0228) | **+17.29 ± 8.68 Elo at 8+0.08** (3520 games, H1, LLR 2.96) and **+10.97 ± 6.57 at 12+0.12** (5610 games, H1, LLR 2.95) over v11 — single variable vs v11 = bucket count. **King buckets are NOT at diminishing returns**: the 4→8 step (+17/+11) is *bigger* than the 0→4 step (+11.4), the rank split capturing real own-half-vs-advanced king-safety signal. 8× the FT rows (1.58→12.6 MB, so the owning `Game` is heap-allocated). **shipped** |
 
-The data is a public bulletformat dataset: `bullet-utils validate` each shard first (a corrupt shard
+The data is the public PlentyChess bulletformat dataset: `bullet-utils validate` each shard first (a corrupt shard
 trains silently wrong), `cat` a few clean ones together, `shuffle`, then train per §6 — the
 text-`convert` step is skipped, the shards being bulletformat already.
 

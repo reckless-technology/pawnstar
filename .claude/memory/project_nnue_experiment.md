@@ -25,7 +25,7 @@ working anchors are stronger than Pawnstar, so the estimate extrapolates from lo
 and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastchess (errors out).
 
 **Update (later 2026-06-14) — NNUE now beats HCE, all merged to main:**
-- **v2** net trained on ~60M positions of a public bulletformat dataset **beats HCE by ~+345 Elo**
+- **v2** net trained on ~60M positions of the public PlentyChess bulletformat dataset **beats HCE by ~+345 Elo**
   at fixed depth 8. Lesson: **label quality** (strong-engine data) was the lever, not self-play volume.
   Shipped as `nnue/pawnstar-v2.bin`. (v1 = our own self-play, lost -67.)
 - **Incremental accumulator** (maintained across make/undo): **+80 Elo** equal-time SPRT vs full-refresh.
@@ -59,7 +59,7 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   bullet `ChessBuckets` (4 buckets, file/rank quadrant map; refresh-on-king-bucket-crossing). All verified
   clean (test_nnue 0/250 0cp; incremental 0 mismatches incl. crossings). SPRT vs v4(512):
   - on **60M** data: **flat** (~-8 ± 22 fixed depth) — data-starved (4x feature params).
-  - on **~818M** pool (2 big dataset shards + the 60M, shuffled; same v4 compute = 40 SB
+  - on **~818M** pool (2 big PlentyChess shards + the 60M, shuffled; same v4 compute = 40 SB
     x 3688 BPS = 2.4B samples seen, ~3 epochs): **fixed depth +47.3 ± 18.2 Elo, H1 accepted** (decisive
     eval-quality win!) BUT **tc 8+0.08 -74.1 ± 25.2, H0 accepted** (loses on the clock). Confirms the
     hypothesis: **more data WAS the lever** for the higher-capacity arch (flatness was starvation).
@@ -120,7 +120,7 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
 
 **Update (2026-06-16) — v7: MORE DATA wins again (~+30 depth / +21 clock over v6). NOT yet shipped.**
 - Scaled the **same 512×4 arch** from v6's 818M to **2.31B positions** (v6's kbbig/shuffled.data + 4 new
-  big dataset shards; a clean SUPERSET), trained **SBS=120 / BPS=3688 (~7.25B
+  big PlentyChess shards; a clean SUPERSET), trained **SBS=120 / BPS=3688 (~7.25B
   samples, ~3 epochs)** vs v6's SBS=40. Orchestrator: `~/pawnstar_nnue/run_v7.sh`; net
   `~/pawnstar_nnue/v7/pawnstar-v7.bin` (stamped, 3148896 bytes) + raw `quantised-raw.bin`.
 - **SPRT v7 vs v6 (same binary, EvalFile differs): fixed depth 8 = +29.96 ± 14.05 (1174 games, H1
@@ -212,7 +212,7 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
 
 **Update (2026-06-20) — v10: MORE DATA again. Scaled v9 arch 2.31B→3.82B, beat v9 by +16.3 Elo. SHIPPED (commit 4431461, pushed to main).**
 - **Single variable = data.** Kept the v9 arch EXACTLY (1024-wide, 4 file-pair king buckets), added **four
-  more dataset shards** (~378M each, ~1.51B new) on top of v9's ~2.31B pool →
+  more PlentyChess shards** (~378M each, ~1.51B new) on top of v9's ~2.31B pool →
   **~3.82B** (3,824,674,998 positions). Trained SBS 120→190 (~3 epochs, ~11.5B samples), BPS=3688, on a
   **GTX 1050 Ti** (~9h19m, ~330K pos/s). Data/checkpoints in `~/pawnstar_nnue/v10/`.
 - **SPRT v10 vs v9 (same binary, EvalFile differs, same arch so NO cand-wrapper needed) @ 8+0.08:
@@ -230,7 +230,7 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
 
 **Update (2026-06-22) — v11: MORE DATA again. Scaled v10 arch 3.82B→6.05B, beat v10 by +9.28 Elo. SHIPPED (pushed to main).**
 - **Single variable = data.** Kept the v10 arch EXACTLY (1024-wide, 4 file-pair king buckets), added **six
-  more dataset shards** (~2.22B new) on top of v10's ~3.82B pool →
+  more PlentyChess shards** (~2.22B new) on top of v10's ~3.82B pool →
   **~6.05B** (6,048,642,450 positions). Built the pool by concatenating v10's `shuffled.data` + the 6 raw
   shards and re-shuffling (saved re-downloading v10's 10). Trained SBS 190→300 (~3 epochs, ~18.1B samples),
   BPS=3688, on the **GTX 1050 Ti** (14h31m, ~345K pos/s, final loss 0.0228). Data/checkpoints in `~/pawnstar_nnue/v11/`.
