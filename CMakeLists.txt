@@ -148,6 +148,7 @@ endif()
 
 # --- Helper tools. ---
 add_executable(gen_data         tools/gen_data.cpp)
+add_executable(gen_openings     tools/gen_openings.cpp)
 add_executable(stamp_net        tools/stamp_net.cpp)
 add_executable(filter_book      tools/filter_book.cpp)
 add_executable(nnue_quant_study tools/nnue_quant_study.cpp)
@@ -157,6 +158,11 @@ add_executable(dump_magics      tools/dump_magics.cpp)
 # version header force-included the way the engine's own translation unit does (without it VersionString()
 # falls back to version.h's 0.0.0 placeholder, which would make the provenance useless).
 set_source_files_properties(tools/gen_data.cpp PROPERTIES
+  COMPILE_OPTIONS "-include;${PAWNSTAR_VERSION_HEADER}" OBJECT_DEPENDS "${PAWNSTAR_VERSION_HEADER}")
+
+# gen_openings stamps the engine version into the provenance header of the opening set it writes, so it needs
+# the generated version header force-included the same way.
+set_source_files_properties(tools/gen_openings.cpp PROPERTIES
   COMPILE_OPTIONS "-include;${PAWNSTAR_VERSION_HEADER}" OBJECT_DEPENDS "${PAWNSTAR_VERSION_HEADER}")
 
 # --- Tests (each a standalone TU with its own main()). ---
@@ -223,7 +229,7 @@ endif()
 
 set(PAWNSTAR_TEST_TARGETS ${PAWNSTAR_TESTS})
 list(TRANSFORM PAWNSTAR_TEST_TARGETS PREPEND test_)
-set(PAWNSTAR_TOOLS gen_data stamp_net filter_book nnue_quant_study dump_magics)
+set(PAWNSTAR_TOOLS gen_data gen_openings stamp_net filter_book nnue_quant_study dump_magics)
 set(PAWNSTAR_EXECUTABLES pawnstar ${PAWNSTAR_TOOLS} ${PAWNSTAR_TEST_TARGETS})
 
 # --- The sanitizer runtime beside the executables. Clang targeting the MSVC ABI links AddressSanitizer dynamically:
