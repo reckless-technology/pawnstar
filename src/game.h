@@ -39,6 +39,7 @@ class Game
     ChessClock::Duration    move_overhead_;          ///< Reserved from each hard deadline for GUI/network lag (UCI `Move Overhead`, ms).
     std::atomic<bool>       is_pondering_;           ///< True while a `go ponder` search runs (until `ponderhit` / `stop`); suppresses time stops. Written only by the UCI thread.
     Move                    ponder_move_;            ///< Predicted opponent reply (PV[1]); emitted as `bestmove <m> ponder <ponder_move>`.
+    std::vector<Move>       principal_variation_;    ///< The main thread's principal variation (a `Variation`, see search_state.h), published by IterativeDeepen as the root best move improves, alongside ponder_move_ (which is its second move). Cleared at the start of every search, so it is empty for a book move or a forced move. Read by tools/gen_data.cpp, which harvests the search line as extra training positions.
     bool                    use_own_book_;           ///< Whether to consult the built-in opening book (UCI `OwnBook`).
     uint64_t                last_search_node_count_; ///< Node count of the most recent search's main thread (for `bench`).
     std::vector<std::string> search_moves_;          ///< UCI `go searchmoves`: restrict the root search to these (empty = all).
@@ -247,6 +248,9 @@ inline Move Game::SearchRootNode()
 {
     Game &game        = *this;        // local alias so the search body reads uniformly through `game`
     game.ponder_move_ = Move::None(); // set by the main thread's IterativeDeepen if the PV has a reply move
+    // The published principal variation belongs to the search about to run, so drop the previous search's.
+    // A book move or a forced move returns below without searching, which leaves it empty rather than stale.
+    game.principal_variation_.clear();
     // is_cancel_pending is NOT cleared here: whoever starts a search clears it before the search begins —
     // StartThinking before it launches the worker, SetPosition for the callers that run SearchRootNode directly
     // (`bench`, the tests and tools, which set the position first). Clearing it here, on the worker, lost any

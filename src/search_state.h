@@ -954,6 +954,10 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
                     // Publish the predicted reply (PV[1]) as it improves, so `bestmove <m> ponder <reply>` has
                     // it on every exit path — including a hard-timeout/stop cancellation, which returns early.
                     game_.ponder_move_ = principal_variation.size() >= 2 ? principal_variation[1] : Move::None();
+                    // Publish the whole line too, for callers that want more than the reply move (the
+                    // self-play generator harvests its first few plies as training positions). Only the main
+                    // thread writes it, and only here, so it always holds the authoritative search's PV.
+                    game_.principal_variation_ = principal_variation;
                     std::string pv_string;
                     for (const auto &m : principal_variation)
                     {

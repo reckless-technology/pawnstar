@@ -12,6 +12,11 @@
 .githooks/* text eol=lf
 Makefile   text eol=lf
 
+# Opening sets are read line by line by tools that split on whitespace (tools/gen_data.cpp --openings,
+# tools/run_sprt.sh, fastchess), where a CRLF checkout leaves a "\r" stuck to the last field of every FEN
+# and the position no longer parses. Keep them LF whatever core.autocrlf says.
+*.epd      text eol=lf
+
 # Data the engine embeds or a test reads byte for byte is checked out exactly as committed, with no line-ending
 # conversion: the build .incbin's pawnstar.book into the binary, so under autocrlf=true a Windows build would embed a
 # CRLF book where Linux and macOS embed LF - a byte-different binary for the same commit.

@@ -35,6 +35,24 @@ BIN_B="${BIN_B:-$PS}"
 ELO0="${ELO0:-0}"
 ELO1="${ELO1:-10}"
 
+# Scratch files this run creates, removed on the way out however it ends. One trap for the lot: a second
+# `trap ... EXIT` replaces the first rather than adding to it, which would silently leak whichever file was
+# registered earlier.
+SCRATCH_FILES=()
+trap 'if [ ${#SCRATCH_FILES[@]} -gt 0 ]; then rm -f "${SCRATCH_FILES[@]}"; fi' EXIT
+
+# fastchess hands every non-empty line of an EPD file to its FEN parser, so a '#' provenance header - which
+# nnue/openings.epd carries, saying where its positions came from and that their source is public domain -
+# would be read as a position. Strip comments and blank lines into a scratch copy and give fastchess that.
+# A file with no comments is passed straight through, so this is invisible to any other opening set.
+if grep -q '^[[:space:]]*#' "$OPENINGS"; then
+    STRIPPED_OPENINGS="$(mktemp "${TMPDIR:-/tmp}/sprt_openings.XXXXXX.epd")"
+    SCRATCH_FILES+=("$STRIPPED_OPENINGS")
+    grep -v '^[[:space:]]*#' "$OPENINGS" | grep -v '^[[:space:]]*$' > "$STRIPPED_OPENINGS"
+    echo "run_sprt.sh: stripped the comment header from $OPENINGS ($(wc -l < "$STRIPPED_OPENINGS") openings)"
+    OPENINGS="$STRIPPED_OPENINGS"
+fi
+
 # Single-threaded engines: faster per node, avoids Lazy SMP non-determinism, frees cores for concurrency.
 export PAWNSTAR_THREADS=1
 # The net distinction must come ONLY from the per-engine EvalFile options below; make sure neither side
@@ -49,9 +67,9 @@ unset PAWNSTAR_NNUE PAWNSTAR_EVALFILE
 CAND_CMD="$BIN_A"
 if [ -n "${CAND_STARTUP_NET:-}" ]; then
     CAND_CMD="$(mktemp "${TMPDIR:-/tmp}/sprt_cand_wrapper.XXXXXX.sh")"
+    SCRATCH_FILES+=("$CAND_CMD")
     printf '#!/bin/sh\nexec env PAWNSTAR_EVALFILE=%q %q "$@"\n' "$CAND_STARTUP_NET" "$BIN_A" > "$CAND_CMD"
     chmod +x "$CAND_CMD"
-    trap 'rm -f "$CAND_CMD"' EXIT
 fi
 
 # Per-engine clock spec: a fixed search depth (isolates eval quality) unless TC is set (measures real
