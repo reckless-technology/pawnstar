@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
-# Build an EPD opening set from Pawnstar's own opening book, for SPRT matches (tools/run_sprt.sh OPENINGS=)
-# and for self-play data generation (tools/gen_data.cpp --openings).
+# Build an EPD opening set from Pawnstar's own opening book, for SPRT matches (tools/run_sprt.sh OPENINGS=).
+#
+# FOR SELF-PLAY DATA GENERATION, USE tools/gen_openings.cpp INSTEAD. This source has a hard ceiling of about
+# 420 distinct positions (see SIZE below), and the engine is deterministic at a fixed budget with its book
+# off, so a data campaign started from this set could not produce many more distinct games than it has
+# openings - a 500M-position pool would be 306 games' worth of positions over and over. gen_openings plays
+# short randomised lines of our own instead and filters them the same way, so its count is a parameter rather
+# than a ceiling; nnue/openings-selfplay.epd is the committed 30,000-position set it wrote. This set remains
+# the MATCH set: its positions are book lines, which is what an SPRT wants.
 #
 # The source is pawnstar.book, the public-domain TSCP book.txt in coordinate notation, so the result carries
 # no licence restriction of its own and no third party's data. Every book line is replayed from the start

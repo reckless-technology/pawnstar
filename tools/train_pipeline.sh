@@ -3,7 +3,8 @@
 #
 # Two input modes (auto-detected from the first argument):
 #   * a DIRECTORY of text shards (data_*.txt / seed*.txt in bullet's "FEN | eval | wdl" text format)
-#     -> combined,
+#     -> combined, CHECKED FOR DUPLICATE POSITIONS (tools/check_duplicates.sh: a pool that is mostly copies
+#     of the same games is refused here rather than trained on, see [2/4]),
 #     converted to bulletformat, and shuffled before training; or
 #   * an already-converted bulletformat .data FILE (e.g. a public dataset, already shuffled) ->
 #     trained directly, skipping the combine/convert/shuffle steps.
@@ -72,6 +73,21 @@ else
     echo "[2/4] combining self-play shards -> $ALL_TXT"
     cat "$WORK"/data_*.txt "$WORK"/seed*.txt 2>/dev/null > "$ALL_TXT"
     wc -l "$ALL_TXT"
+    # The duplicate gate. gen_data deduplicates positions PER SHARD, so a campaign that generated the same
+    # games in several workers produces shards that each look healthy and a pool that is mostly copies -
+    # which trains to nothing and is invisible in the shard sizes. Measure it here, where the pool first
+    # exists, rather than after a week of CPU and a GPU run. ALLOW_DUPLICATE_POOL=1 trains anyway (for a
+    # deliberately narrow experiment); MIN_UNIQUE_FRACTION moves the gate.
+    # Measured over the shard DIRECTORY rather than over all.txt: on a pool too large to read exactly the
+    # check samples per shard, which keeps every worker in scope (one concatenated file would sample only
+    # whichever shards happen to be at the front of it), and the shards' .meta sidecars give it the game count.
+    if ! bash "$REPO/tools/check_duplicates.sh" "$WORK" "${MIN_UNIQUE_FRACTION:-0.80}"; then
+        if [ "${ALLOW_DUPLICATE_POOL:-0}" != "1" ]; then
+            echo "[2/4] refusing to train on this pool; set ALLOW_DUPLICATE_POOL=1 to override" >&2
+            exit 1
+        fi
+        echo "[2/4] ALLOW_DUPLICATE_POOL=1: training on it anyway" >&2
+    fi
     echo "[2b/4] convert text -> bulletformat, then shuffle (self-play data is highly correlated)"
     "$UTILS" convert --from text --input "$ALL_TXT" --output "$ALL_DATA" --threads 8
     ( cd "$WORK" && "$UTILS" shuffle --input "$ALL_DATA" --output "$SHUF_DATA" --mem-used-mb 4096 )

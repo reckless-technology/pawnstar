@@ -19,12 +19,38 @@
 /// the lesson recorded then was that label quality, not volume, is the lever. Every option here spends more
 /// search per position rather than producing more positions per second.
 ///
+/// **Where the diversity comes from.** The engine is deterministic at a fixed budget, single-threaded, with
+/// its book off, so a game is decided by the position it starts from - and only by that, across processes,
+/// because the transposition table starts empty. (Within one process the table carries over from the
+/// previous games, so a worker that starts twice from the same opening plays a near-copy rather than a
+/// bit-identical game: ten games from one opening in one process still wrote 676 records with the dedup on,
+/// not fifty and then nothing. That is not a diversity mechanism to lean on - the lines overlap heavily, and
+/// two workers whose first game is from the same opening write the same game exactly.) So three things have
+/// to compose, and a campaign that leans on only the first is capped near as many distinct games as it has
+/// openings:
+///
+///  1. **The opening pool** (`--openings`): tens of thousands of balanced positions of our own play from
+///     tools/gen_openings.cpp, or millions generated to a path of its own. The 306-position set that
+///     tools/make_openings.sh can wring out of the TSCP book is a ceiling of that source, not a choice.
+///  2. **A few random plies on top of it** (`--random-plies`), which multiply each opening by the number of
+///     short legal lines out of it - about thirty to the power of the ply count. This is what makes the
+///     number of distinct games unbounded rather than merely large: an opening pool alone cannot cover a
+///     campaign, which at the ~71 records a game these defaults measure needs millions of games for 500M.
+///  3. **A disjoint slice of the pool per worker** (`--worker-index` / `--worker-count`), so that two
+///     workers cannot start from the same opening - which makes a cross-worker duplicate game impossible
+///     by construction rather than merely unlikely. Within one worker the openings are handed out without
+///     replacement, in a seeded shuffle, so a pass over the slice uses each of them once.
+///
+/// Determinism per seed survives all three: the shuffle, the slice and the random plies are all functions of
+/// the seed, the worker index and the worker count, so a shard is reproducible and auditable. Nothing here
+/// reads a clock or any other entropy. tools/check_duplicates.sh measures what the pool actually came out at.
+///
 /// Usage:  gen_data <out_file> <num_games> <seed> [options]
 ///
 /// Positional arguments:
 ///   out_file   the shard to write (name it `data_<i>.txt` so tools/train_pipeline.sh's glob finds it).
 ///   num_games  self-play games this process plays.
-///   seed       RNG seed, for the opening choice and the random opening plies; distinct seeds give
+///   seed       RNG seed, for the opening order and the random opening plies; distinct seeds give
 ///              distinct shards, and the same seed replays the same games.
 ///
 /// Labelling options (each independently switchable, so they can be A/B tested one at a time):
@@ -50,13 +76,19 @@
 ///                         mild reweighting toward positions the net gets wrong. No position is ever
 ///                         dropped for agreeing - filtering on disagreement would skew the distribution the
 ///                         net is calibrated against.
-///   --openings FILE       start each game from a random position of this EPD / FEN opening set, instead of
-///                         from the start position (nnue/openings.epd is the committed one). This also sets
-///                         --random-plies to 0 unless --random-plies is given explicitly: a balanced
-///                         opening is a far better source of diversity than random plies, which often reach
-///                         a position one side is already lost in - the resign adjudication then ends the
-///                         game four plies later and the whole game yields almost nothing.
-///   --random-plies N      uniformly random opening plies per game, for diversity (default 8; not recorded).
+///   --openings FILE       start each game from a position of this EPD / FEN opening set, instead of from the
+///                         start position (nnue/openings-selfplay.epd is the committed one, 30,000 positions
+///                         of our own play from tools/gen_openings.cpp). This also drops --random-plies to
+///                         kDefaultRandomPliesWithOpenings unless --random-plies is given explicitly: eight
+///                         random plies from the start position reach a position one side is already lost
+///                         in, and the resign adjudication then ends the game four plies later.
+///   --random-plies N      uniformly random opening plies per game, for diversity (default 8 from the start
+///                         position, kDefaultRandomPliesWithOpenings on top of an opening; not recorded).
+///   --worker-index I      this worker's index in a fan of --worker-count workers (default 0).
+///   --worker-count N      how many workers the fan has (default 1). The opening pool is partitioned across
+///                         them - worker I takes the openings whose index is congruent to I modulo N - so no
+///                         two workers can ever start a game from the same position, and therefore cannot
+///                         generate the same game. tools/run_gendata.sh passes both.
 ///   --no-dedup            keep repeated positions. By default a position whose Zobrist hash was already
 ///                         written to this shard is dropped: self-play repeats openings heavily.
 ///   --hash MB             transposition-table size per process (default: the engine's own 64 MB).
@@ -126,6 +158,19 @@ constexpr int kMaxPrincipalVariationPlies = 8;
 /// @brief Default node budget for the second-stage re-label: about depth 12 on this engine (measured
 /// single-threaded: depth 9 is 48.4k nodes/position, extrapolating to ~220k at depth 12).
 constexpr uint64_t kDefaultLabelNodes = 220000;
+/// @brief Random opening plies played on top of an opening-set position, unless --random-plies says
+/// otherwise.
+///
+/// Two, measured over 480 games a setting at the campaign budgets (nnue/README.md §6 has the table). It
+/// costs 15 % of the records a game yields against no random plies at all (70.8 against 83.8) and 5 % of the
+/// throughput, and doubles the share of games already decided at their first label (12.3 % against 6.5 %) -
+/// and it buys the thing the opening pool cannot: each opening becomes the ~900 two-ply legal lines out of
+/// it, so the campaign's distinct-game count is no longer bounded by the pool's size. Three and four cost
+/// 24 % and 27 % of the records for no measurable improvement in anything, and an even count keeps the
+/// random line symmetric - each side moves the same number of times, rather than one getting a free move.
+/// Eight, the default from the start position, is far past the knee: it reaches positions a side is already
+/// lost in, and such a game yields about one record.
+constexpr int kDefaultRandomPliesWithOpenings = 2;
 
 /// @brief One search budget: either a fixed depth or a node limit, as the UCI `go depth` / `go nodes` forms.
 struct SearchBudget
@@ -140,7 +185,7 @@ struct Options
 {
     std::string              out_file;                         ///< Shard path.
     int                      num_games = 0;                    ///< Self-play games to play.
-    uint64_t                 seed      = 0;                    ///< RNG seed for the random opening plies.
+    uint64_t                 seed      = 0;                    ///< Seed for the opening order and the random plies.
     SearchBudget             play_budget;                      ///< Budget for the game-playing search.
     SearchBudget             label_budget;                     ///< Budget for the second-stage re-label.
     int                      label_interval            = 0;    ///< 0 = single-stage; else re-label every Nth.
@@ -153,8 +198,101 @@ struct Options
     std::string              net_path;                         ///< Labelling net.
     std::string              openings_file;                    ///< EPD opening set, or empty for the start position.
     std::vector<std::string> openings;                         ///< The parsed opening FENs.
+    std::size_t              worker_index   = 0;               ///< This worker's index in the fan.
+    std::size_t              worker_count   = 1;               ///< How many workers the fan has.
     int                      progress_games = 50;              ///< Games between stderr progress lines.
 };
+
+/// @brief What the run counted, reported on stderr and in the .meta sidecar.
+///
+/// The three failure counts are the degeneracy instruments. A campaign that generates millions of games
+/// cannot be read game by game, so the shard has to say for itself how many of its games were worth playing:
+/// one that abandoned or immediately decided most of them, or that wrote records for hardly any, has settings
+/// wrong and the shard sizes alone would not show it.
+struct Statistics
+{
+    uint64_t records_written              = 0; ///< Records written to the shard (copies counted separately).
+    uint64_t games_completed              = 0; ///< Games that reached a result.
+    uint64_t games_abandoned              = 0; ///< Games whose opening line left no legal move.
+    uint64_t games_decided_at_first_label = 0; ///< Games whose first searched ply was already past resigning.
+    uint64_t games_without_records        = 0; ///< Games that contributed no record at all (see the note).
+};
+
+/// @brief Hands this worker its openings without replacement.
+///
+/// Two jobs, and they are the whole answer to a campaign generating the same game twice:
+///
+///  * **Across workers**: the pool is partitioned, worker I taking the openings whose index is congruent to
+///    I modulo the worker count. The slices are disjoint, so two workers cannot start a game from the same
+///    position - and since the engine is deterministic, a game is decided by where it starts. A duplicate
+///    game across workers is therefore impossible by construction, not merely unlikely. (Folding the worker
+///    index into the RNG stream instead would have made a collision improbable, which is a weaker promise
+///    for a 1-2 week campaign and much harder to argue.)
+///  * **Within a worker**: the slice is handed out in a seeded shuffle and reshuffled at the end of each
+///    pass, so a worker playing fewer games than its slice holds never repeats an opening at all, and one
+///    playing more spreads the repeats evenly instead of drawing them from a uniform distribution with
+///    replacement - which starts repeating after about the square root of the pool.
+///
+/// The shuffle is seeded from the run's seed and the worker index together, so each worker walks its own
+/// slice in its own order, and the whole thing is still a function of the seed: the shard replays exactly.
+class OpeningSchedule
+{
+  public:
+    OpeningSchedule(const std::vector<std::string> &openings, std::size_t worker_index, std::size_t worker_count,
+                    uint64_t seed);
+    bool               IsEmpty() const;
+    std::size_t        Size() const;
+    const std::string &Next();
+
+  private:
+    const std::vector<std::string> *openings_;    ///< The whole pool (not owned).
+    std::vector<std::size_t>        order_;       ///< This worker's slice, in the current pass's order.
+    std::size_t                     next_ = 0;    ///< Position in order_ the next game takes.
+    std::mt19937_64                 shuffle_rng_; ///< Reshuffles each pass; separate from the game RNG.
+};
+
+/// @brief Build the schedule for one worker.
+/// @param openings The whole opening pool, which must outlive the schedule.
+/// @param worker_index This worker's index, below worker_count.
+/// @param worker_count How many workers share the pool.
+/// @param seed The run's seed; mixed with the worker index so each worker orders its slice differently.
+inline OpeningSchedule::OpeningSchedule(const std::vector<std::string> &openings, std::size_t worker_index,
+                                        std::size_t worker_count, uint64_t seed)
+    : openings_{&openings}
+{
+    for (std::size_t index = worker_index; index < openings.size(); index += worker_count)
+    {
+        order_.push_back(index);
+    }
+    // The golden-ratio odd constant is the usual way to turn two numbers into one well-spread seed; what
+    // matters here is only that two workers of one run get different orders and that the mapping is fixed.
+    shuffle_rng_.seed(seed + 0x9e3779b97f4a7c15ull * (uint64_t)(worker_index + 1));
+    std::shuffle(order_.begin(), order_.end(), shuffle_rng_);
+}
+
+/// @brief Whether this worker has no openings at all (an empty pool, or more workers than openings).
+inline bool OpeningSchedule::IsEmpty() const
+{
+    return order_.empty();
+}
+
+/// @brief How many openings this worker's slice holds.
+inline std::size_t OpeningSchedule::Size() const
+{
+    return order_.size();
+}
+
+/// @brief The next game's opening, reshuffling when a pass over the slice is complete.
+/// @return The FEN to start from.
+inline const std::string &OpeningSchedule::Next()
+{
+    if (next_ >= order_.size())
+    {
+        std::shuffle(order_.begin(), order_.end(), shuffle_rng_);
+        next_ = 0;
+    }
+    return (*openings_)[order_[next_++]];
+}
 
 /// @brief One text record, ready to write once the game's result is known.
 struct Record
@@ -477,24 +615,23 @@ void AppendLabelledLine(const Options &options, const nnue::Network &network, co
 /// @brief Play one self-play game and write its records, with the final result baked into every one.
 /// @param options The run's options.
 /// @param game A Game with the labelling net loaded; reset to the start position here and reused.
+/// @param openings This worker's opening schedule, advanced by this call; empty for the start position.
 /// @param rng Opening-ply RNG, advanced by this call.
 /// @param seen Zobrist hashes already written to this shard (updated).
 /// @param out The shard stream.
-/// @param records_written Incremented by the number of records written.
-/// @param games_completed Incremented when the game produced a result (not when the opening died).
-void PlayGame(const Options &options, Game &game, std::mt19937_64 &rng, std::unordered_set<zobrist_t> &seen,
-              std::ofstream &out, uint64_t &records_written, uint64_t &games_completed)
+/// @param statistics The run's counters, updated by this call.
+void PlayGame(const Options &options, Game &game, OpeningSchedule &openings, std::mt19937_64 &rng,
+              std::unordered_set<zobrist_t> &seen, std::ofstream &out, Statistics &statistics)
 {
-    // Start from an opening position if one was supplied, else from the standard start position. A balanced
-    // opening set is the better source of diversity: eight uniformly random plies reach positions a side is
-    // often already lost in, which the resign adjudication then ends in four more plies.
-    if (options.openings.empty())
+    // Start from an opening position if one was supplied, else from the standard start position. The opening
+    // set is the first source of diversity and the random plies below are the second; see the file header.
+    if (openings.IsEmpty())
     {
         game.SetPosition();
     }
     else
     {
-        game.SetPosition(options.openings[rng() % options.openings.size()]);
+        game.SetPosition(openings.Next());
     }
     game.use_own_book_ = false; // the engine's own judgement only, and the book's pick is random
 
@@ -504,15 +641,17 @@ void PlayGame(const Options &options, Game &game, std::mt19937_64 &rng, std::uno
         MoveList moves = game.CurrentPosition().GenerateLegalMoves();
         if (moves.size() == 0)
         {
+            ++statistics.games_abandoned;
             return; // dead opening line; abandon this game
         }
         game.PlayMove(moves[rng() % moves.size()]);
     }
 
     std::vector<Candidate> candidates;
-    double                 white_result   = 0.5;
-    int                    decisive_plies = 0;
-    int                    decisive_sign  = 0;
+    double                 white_result     = 0.5;
+    int                    decisive_plies   = 0;
+    int                    decisive_sign    = 0;
+    bool                   has_first_search = false; // the first ply this game actually searched
 
     for (int ply = 0;; ++ply)
     {
@@ -532,6 +671,18 @@ void PlayGame(const Options &options, Game &game, std::mt19937_64 &rng, std::uno
         // A root that returned without searching - a forced move, or a book move - carries no score (the
         // node count is the engine's own marker for that), so it is played but never labelled.
         const bool was_searched = game.last_search_node_count_ != 0;
+
+        // Was the game already decided before it was played? A random opening line can reach a position one
+        // side is lost in, and the resign adjudication then ends the game a few plies later having learnt
+        // almost nothing. The count of those is how the random-ply setting is judged (the file header).
+        if (was_searched && !has_first_search)
+        {
+            has_first_search = true;
+            if (std::abs(white_score) > kResignThreshold)
+            {
+                ++statistics.games_decided_at_first_label;
+            }
+        }
 
         // Keep only quiet, in-bounds, not-in-check positions (clean eval targets for NNUE).
         if (was_searched && !position.IsInCheck() && best.IsQuiet() && std::abs(white_score) < kEvalCap)
@@ -604,10 +755,17 @@ void PlayGame(const Options &options, Game &game, std::mt19937_64 &rng, std::uno
         for (int copy = 0; copy < record.copies; ++copy)
         {
             out << record.fen << " | " << record.white_score << " | " << result_text << '\n';
-            ++records_written;
+            ++statistics.records_written;
         }
     }
-    ++games_completed;
+    ++statistics.games_completed;
+    if (records.empty())
+    {
+        // Nothing at all from a completed game. A handful are ordinary (a game decided in four plies), but a
+        // large share means the shard is replaying games it has already written, since the dedup drops every
+        // position of a repeat - which is exactly the degeneracy the opening pool and the partition prevent.
+        ++statistics.games_without_records;
+    }
 }
 
 /// @brief Describe a budget for the .meta sidecar. @param budget The budget. @return "depth 8" / "nodes 220000".
@@ -750,11 +908,11 @@ int main(int argc, char **argv)
         if (flag == "--openings")
         {
             options.openings_file = argv[++i];
-            // An opening set replaces the random plies rather than adding to them, unless the caller asks
-            // for both: eight random plies on top of a balanced opening would undo the point of the set.
+            // A few random plies on top of an opening, not the eight a start-position run takes: enough to
+            // make the number of distinct games unbounded, few enough that the game is still worth playing.
             if (!is_random_plies_set)
             {
-                options.random_plies = 0;
+                options.random_plies = kDefaultRandomPliesWithOpenings;
             }
             continue;
         }
@@ -805,6 +963,14 @@ int main(int argc, char **argv)
             options.random_plies = (int)value;
             is_random_plies_set  = true;
         }
+        else if (flag == "--worker-index")
+        {
+            options.worker_index = (std::size_t)value;
+        }
+        else if (flag == "--worker-count")
+        {
+            options.worker_count = (std::size_t)value;
+        }
         else if (flag == "--hash")
         {
             options.hash_megabytes = (std::size_t)value;
@@ -834,6 +1000,12 @@ int main(int argc, char **argv)
         options.net_path      = eval_file != nullptr ? eval_file : "nnue/pawnstar-v12.bin";
     }
 
+    if (options.worker_count == 0 || options.worker_index >= options.worker_count)
+    {
+        std::cerr << "gen_data: --worker-index must be below --worker-count, and --worker-count at least 1\n";
+        return 1;
+    }
+
     if (!options.openings_file.empty())
     {
         if (!LoadOpenings(options.openings_file, options.openings) || options.openings.empty())
@@ -842,6 +1014,22 @@ int main(int argc, char **argv)
             return 1;
         }
         std::cerr << "gen_data: " << options.openings.size() << " openings from " << options.openings_file << '\n';
+    }
+    // Built even for a start-position run, where it is empty and PlayGame takes the other branch.
+    OpeningSchedule openings{options.openings, options.worker_index, options.worker_count, options.seed};
+    if (!options.openings.empty() && openings.IsEmpty())
+    {
+        // More workers than openings. Refusing is right: a worker with no slice would silently self-play the
+        // start position for a week, and the shard would look like any other.
+        std::cerr << "gen_data: FATAL: worker " << options.worker_index << " of " << options.worker_count
+                  << " got no openings from a pool of " << options.openings.size()
+                  << "; generate a bigger pool (tools/gen_openings.cpp) or fan out fewer workers\n";
+        return 1;
+    }
+    if (!openings.IsEmpty())
+    {
+        std::cerr << "gen_data: worker " << options.worker_index << '/' << options.worker_count << " takes "
+                  << openings.Size() << " of them\n";
     }
 
     // NNUE is the only evaluator, so self-play needs a loaded net. Load once and reuse across games. The
@@ -874,19 +1062,17 @@ int main(int argc, char **argv)
     const auto                    started = std::chrono::steady_clock::now();
     std::unordered_set<zobrist_t> seen;
     std::mt19937_64               rng{options.seed};
-    uint64_t                      records_written = 0;
-    uint64_t                      games_completed = 0;
+    Statistics                    statistics;
     for (int g = 0; g < options.num_games; ++g)
     {
-        PlayGame(options, *game, rng, seen, out, records_written, games_completed);
+        PlayGame(options, *game, openings, rng, seen, out, statistics);
         if (options.progress_games > 0 && ((g + 1) % options.progress_games) == 0)
         {
             const double elapsed_seconds =
                 std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
             std::cerr << "info string gen_data seed=" << options.seed << " game " << (g + 1) << '/' << options.num_games
-                      << " records=" << records_written
-                      << " records/s=" << (elapsed_seconds > 0.0 ? (double)records_written / elapsed_seconds : 0.0)
-                      << '\n';
+                      << " records=" << statistics.records_written << " records/s="
+                      << (elapsed_seconds > 0.0 ? (double)statistics.records_written / elapsed_seconds : 0.0) << '\n';
         }
     }
     out.flush();
@@ -918,17 +1104,27 @@ int main(int argc, char **argv)
          << "random_plies " << options.random_plies << '\n'
          << "openings " << (options.openings_file.empty() ? "none" : options.openings_file) << '\n'
          << "openings_count " << options.openings.size() << '\n'
+         << "openings_in_slice " << openings.Size() << '\n'
+         << "worker_index " << options.worker_index << '\n'
+         << "worker_count " << options.worker_count << '\n'
          << "deduplicated " << (options.does_deduplicate ? "yes" : "no") << '\n'
          << "seed " << options.seed << '\n'
          << "games_requested " << options.num_games << '\n'
-         << "games_completed " << games_completed << '\n'
-         << "records " << records_written << '\n'
+         << "games_completed " << statistics.games_completed << '\n'
+         << "games_abandoned " << statistics.games_abandoned << '\n'
+         << "games_decided_at_first_label " << statistics.games_decided_at_first_label << '\n'
+         << "games_without_records " << statistics.games_without_records << '\n'
+         << "records " << statistics.records_written << '\n'
          << "elapsed_seconds " << elapsed_seconds << '\n'
          << "generated_utc " << UtcTimestamp() << '\n';
     meta.flush();
 
-    std::cerr << "gen_data: wrote " << records_written << " records from " << games_completed << " games in "
-              << elapsed_seconds << "s (" << (elapsed_seconds > 0.0 ? (double)records_written / elapsed_seconds : 0.0)
+    std::cerr << "gen_data: wrote " << statistics.records_written << " records from " << statistics.games_completed
+              << " games in " << elapsed_seconds << "s ("
+              << (elapsed_seconds > 0.0 ? (double)statistics.records_written / elapsed_seconds : 0.0)
               << " records/s) -> " << options.out_file << '\n';
+    std::cerr << "gen_data: " << statistics.games_abandoned << " games abandoned in the opening, "
+              << statistics.games_decided_at_first_label << " already decided at the first label, "
+              << statistics.games_without_records << " with no records\n";
     return 0;
 }
