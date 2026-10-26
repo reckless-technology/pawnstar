@@ -164,8 +164,10 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 | file | purpose |
 |------|---------|
 | `gen_data.cpp`            | self-play training-data generator: the engine plays itself and writes `<fen> \| <eval_cp> \| <wdl>` text shards plus a `.meta` provenance sidecar (`make tools` → `build/gen_data`) — see §6 |
-| `run_gendata.sh`          | fan `gen_data` across cores, one shard per worker, resumable |
-| `make_openings.sh`        | build `openings.epd` from the public-domain TSCP opening book: replay each line, keep the roughly balanced positions, dedup |
+| `gen_openings.cpp`        | balanced opening generator from **our own play**: short randomised lines from the start position, filtered on the net's static evaluation and deduplicated on the Zobrist key, written as EPD with its provenance header (`make tools` → `build/gen_openings`) — the data campaign's opening source, see §6 |
+| `run_gendata.sh`          | fan `gen_data` across cores, one shard per worker (each with a disjoint slice of the opening pool), resumable, reporting the pool's duplicate rate at the end |
+| `check_duplicates.sh`     | measure what fraction of an assembled pool is distinct positions — the gate `train_pipeline.sh` runs before converting a directory of shards, and the cheap way to catch a degenerate campaign in minutes |
+| `make_openings.sh`        | build `openings.epd`, the **match** set, from the public-domain TSCP opening book: replay each line, keep the roughly balanced positions, dedup (capped at ~420 positions by that source, which is why data generation uses `gen_openings` instead) |
 | `stamp_net.cpp`           | prepend the self-describing `NetHeader` to a raw bullet net (`make tools` → `build/stamp_net`) |
 | `setup_bullet.sh`         | clone bullet at the pinned commit + install/register our trainer examples |
 | `bullet/pawnstar.rs`      | the trainer (arch `768×8 king-bucketed → 1024×2 → 1`, SCReLU, QA/QB/SCALE) |
@@ -229,7 +231,8 @@ written `| 123 | 1.0`: the two 32-byte records came out `score=123 result=2` and
 ```bash
 make tools      # -> build/gen_data
 tools/run_gendata.sh ~/pawnstar_nnue/selfplay 24 400 \
-    --openings nnue/openings.epd --play-nodes 12000 --label-nodes 220000 --label-interval 4 --pv-plies 4
+    --openings nnue/openings-selfplay.epd --play-nodes 12000 --label-nodes 220000 --label-interval 4 \
+    --pv-plies 4
 tools/train_pipeline.sh ~/pawnstar_nnue/selfplay net.bin        # the directory mode above
 ```
 
@@ -251,7 +254,10 @@ is ever *dropped* for agreeing — that would skew the distribution the eval is 
 single-threaded, so a shard is reproducible from its seed. Every shard gets a `<shard>.meta` sidecar (a
 separate file, because `convert --from text` would try to parse a comment line as a position) recording
 the engine version, the labelling net **and its SHA-256**, every budget, the seed, the PV cap, the
-disagreement settings and the record count — which is what makes a net's data lineage auditable.
+disagreement settings, the opening set with the worker's slice of it (`openings_count`,
+`openings_in_slice`, `worker_index`, `worker_count`) and the record and game counts, the last of these
+including `games_abandoned`, `games_decided_at_first_label` and `games_without_records` — which is what
+makes a net's data lineage auditable and a shard's own health readable.
 
 **Measured throughput**, one worker on one core of an i9-13900HX (~2.0M nps) with net v12 and
 `nnue/openings.epd`, every other option at its default, each run about 4½ minutes:
@@ -281,6 +287,118 @@ treat that as the optimistic bound, not the plan).
 standard position plus `--random-plies` (8) uniformly random plies, which often reaches a position one
 side is already lost in; the resign adjudication then ends the game four plies later and the whole game
 yields about one record. Supplying the opening set raises that by two orders of magnitude.
+
+#### Data diversity (what a campaign is actually limited by)
+
+**The engine is deterministic at a fixed budget**, single-threaded, with its book off, so across processes a
+self-play game is decided by the position it starts from — which makes the *opening set*, not the game count,
+the limit on how many distinct games a campaign can produce. Measured: two different seeds, one opening and
+`--random-plies 0` write **byte-identical shards**, because with no random plies the seed never enters the
+game. Within one process it is not quite that stark — the transposition table carries over between games, so
+a worker starting twice from the same opening plays a near-copy rather than a copy (ten games from one
+opening in one process still wrote 676 records with the dedup on, not fifty and then nothing) — but the lines
+overlap heavily and it is not a mechanism to rely on. And since `gen_data` deduplicates positions **per
+shard**, every shard looks healthy from the outside while the assembled pool is mostly copies: shard sizes
+never show this. A 500M-position campaign on the 306-position book-derived set would therefore have been a
+few hundred games' worth of genuinely distinct play, replicated thousands of times.
+
+Three things compose, and all three keep a shard reproducible from its seed (no clock, no entropy):
+
+1. **A large opening pool of our own play** — `--openings nnue/openings-selfplay.epd` (30,000 positions, and
+   `gen_openings` writes millions in seconds: *The data campaign's openings* below).
+2. **A couple of random plies on top of each opening** — `--random-plies`, which defaults to **2** when
+   `--openings` is given (it was 0, and is still 8 from the start position). Each opening becomes the ~900
+   two-ply legal lines out of it, which is what makes the distinct-game count unbounded rather than merely
+   large.
+3. **A disjoint slice of the pool per worker** — `--worker-index` / `--worker-count`, which
+   `run_gendata.sh` passes automatically: worker *I* takes the openings whose index is congruent to *I*
+   modulo the worker count. **Two workers cannot start a game from the same position**, so a cross-worker
+   duplicate game is impossible by construction rather than merely unlikely. Within a worker the slice is
+   handed out in a seeded shuffle and reshuffled each pass — without replacement, rather than the uniform
+   draws with replacement that start repeating after about the square root of the pool (20 games into a
+   306-position set).
+
+**Measured, `--random-plies` on top of the committed pool.** 480 games per setting (8 workers × 60 games,
+each worker on its own slice, the same openings and seeds for every setting), `--play-nodes 20000
+--label-nodes 220000 --label-interval 4 --pv-plies 4`, all 32 processes resident at once so every setting saw
+the same loaded machine (i9-13900HX):
+
+| `--random-plies` | records/game | records/s/core | decided at the first label | games with no records |
+|---|---|---|---|---|
+| 0 | 83.8 | 11.70 | 31/480 (6.5 %) | 4/480 |
+| **2 — the default** | **70.8** | **11.10** | **59/480 (12.3 %)** | 11/480 |
+| 3 | 63.8 | 10.43 | 72/480 (15.0 %) | 19/480 |
+| 4 | 61.6 | 10.21 | 66/480 (13.8 %) | 13/480 |
+
+*Decided at the first label* means the game's first searched position was already past the 1500 cp resign
+threshold: the random line walked into a position one side has lost, and the game ends a few plies later
+having taught little. Each shard counts it in its own `.meta`, with `games_abandoned` and
+`games_without_records` beside it, so a campaign reports its own health per shard.
+
+**Why 2 is the default.** Zero is not an option: it caps the campaign at the pool's size, which is the defect
+this design exists to remove. Two is the cheapest setting that is not zero — 15 % fewer records a game and
+5 % less throughput than zero, and twice as many games decided before they start (12.3 % against 6.5 %), all
+of which buys ~900× the distinct starts per opening. Three and four cost 24 % and 27 % of the records a game
+and improve nothing measurably; an even count also keeps the random line symmetric, each side moving the same
+number of times rather than one of them getting a free move.
+
+**Size the pool, not the random plies.** At 70.8 records a game, a 500M-position pool is about 7.1M games.
+Two random plies on the committed 30,000-position pool give ~27M distinct starts — enough that a
+development-scale run never repeats one, but only ~4× the games a full campaign plays, so about 12 % of its
+games would share a start with another. **Generate a bigger pool for a real campaign** (`build/gen_openings
+~/pawnstar_nnue/openings-1m.epd 1000000 1` — 1M positions from 3.83M random lines, measured at 52 s with the
+machine fully loaded by a data run, 62 MB, which is why it belongs on a path of its own, not in the repo):
+1M openings × ~900 two-ply lines is ~900M distinct starts, under 1 % of 7.1M games sharing one. Raising `--random-plies` to 3 is the alternative if the pool
+must stay at 30,000, at the cost in the table.
+
+**Check the pool before training on it** — `tools/check_duplicates.sh <pool.txt | shard_dir>
+[min_unique_fraction] [records_per_shard]`:
+
+```
+check_duplicates.sh: 16 shard(s), 14 MiB in /…/selfplay
+check_duplicates.sh: reading every record (exact)
+check_duplicates.sh: records                              225285
+check_duplicates.sh: after collapsing weighting copies    170846
+check_duplicates.sh: distinct positions                   170846
+check_duplicates.sh: unique fraction                      1.0000 (0.00 % duplicate)
+check_duplicates.sh: games played (from the .meta)        3039 -> about 3039 distinct
+check_duplicates.sh: OK (gate 0.80)
+```
+
+It counts records, records after collapsing the adjacent copies the disagreement weighting writes on purpose
+(`--disagreement-copies`), and distinct positions, and fails below the `min_unique_fraction` gate (0.80 by
+default; `0` reports only). A pool larger than 2 GB is sampled at 200,000 records per shard rather than read
+whole — a duplicate here is a repeated *game*, which is a contiguous run of records in a shard, so a
+contiguous block from every shard keeps whole games intact and still sees every worker; that sampled fraction
+is an upper bound on how unique the whole pool is, which is the safe direction for a gate.
+`run_gendata.sh` reports it when a run finishes, and **`train_pipeline.sh` runs it as a gate** before
+converting a shard directory (`ALLOW_DUPLICATE_POOL=1` to train anyway, `MIN_UNIQUE_FRACTION` to move the
+gate).
+
+**The before and after, measured at the same size.** Two 16-worker runs of 190 games each (3,040 games,
+~30 minutes apiece), side by side on the same machine, same budgets, differing only in the diversity
+settings:
+
+| settings | records | records/game | after collapsing | distinct positions | unique | implied distinct games |
+|---|---|---|---|---|---|---|
+| the book-derived set, `--random-plies 0`, no partition | 320,833 | 105.5 | 259,117 | 243,930 | **0.9414** | ~2,861 / 3,040 |
+| these defaults: the 30,000 self-play pool, `--random-plies 2`, partitioned | 225,285 | 74.1 | 170,846 | 170,846 | **1.0000** | 3,039 / 3,039 |
+
+**Not one duplicate position in 170,846** at the new defaults: 16 workers, disjoint opening slices, every
+game distinct. The first row lost 5.86 % of its records to duplication **after only 3,040 games** — a
+ten-fold reuse of a 306-position set — and that figure was still climbing (4.08 % a third of the way into the
+same run), because the degeneracy grows as the pool is exhausted. A 500M campaign is ~7.1M games, which is
+23,000 plays of each of those 306 openings: 5.86 % is the start of that curve, not its plateau.
+
+**What it costs: 30 % of the records a game yields** (105.5 → 74.1), and it is worth naming where that goes,
+because only half of it is the random plies. The book's openings are sound — **none of the 3,040 games from
+them was already decided at its first label** — while 6.5 % of games from the randomly generated pool are
+(9.5 % in this run, with the two random plies on top), since the balance filter is a static evaluation and a
+position can be level by material and lost to a tactic. Those games still produce records, just fewer of
+them. Duplicate records are worth nothing to train on, so 74 distinct records a game beats 105 records a
+game that are 6 % — and climbing — copies; the obvious next improvement is a cheap tactical filter in
+`gen_openings` (a shallow search, or rejecting a position whose mover has a winning capture by static
+exchange evaluation) rather than more random plies.
 
 ### Training
 
@@ -323,6 +441,35 @@ SPRT with more rounds than openings replays some of them (`order=random`), which
 Any standard EPD set works instead. The file carries a `#` provenance header; `run_sprt.sh` strips comment
 lines into a scratch copy before handing the file to fastchess, whose EPD reader would try to parse one as
 a position.
+
+#### The data campaign's openings (`gen_openings`) — a pool, not a book
+
+That 420-position ceiling is fine for a match and fatal for a data campaign (see *Data diversity* above), so
+the campaign's openings come from **our own play** instead. **[openings-selfplay.epd](openings-selfplay.epd)
+is committed**: 30,000 positions written by `build/gen_openings`, which plays short randomised lines from the
+start position and keeps the position a line ends at when it is not in check and the net's static evaluation
+of it is within 125 cp of its evaluation of the start position — the same balance filter as the book set, so
+a game from one of these is decided by the engines and not by the opening. Duplicates are dropped on the
+Zobrist key, and **one position is kept per line played**, so no two openings in the file share a line (the
+book script harvests a whole window from each line, which emits prefixes of one another).
+
+```bash
+make tools                                                  # -> build/gen_openings
+build/gen_openings nnue/openings-selfplay.epd 30000 1        # the committed set, 0.4 s, 1.9 MB
+build/gen_openings ~/pawnstar_nnue/openings-1m.epd 1000000 1 # a campaign's own pool, under a minute, 62 MB
+```
+
+`gen_openings <out.epd> <num_positions> <seed> [--min-ply 8] [--max-ply 12] [--margin-cp 125] [--max-lines N]
+[--net PATH] [--progress N]`. **The count is a parameter, not a property of the source** — the committed
+30,000 (1.9 MB) is a convenience, and a campaign should generate a bigger pool to a path of its own rather
+than commit one. The acceptance rate is about one line in four (114,419 lines for the committed 30,000), and
+the generator is deterministic: the same seed, options and net reproduce the file byte for byte, which is the
+audit trail for a set with no external source. The output carries the same kind of `#` provenance header as
+the book set, stating how it was produced; the engine version is stamped into it.
+
+The positions are not book lines and do not look like them — that is the point for training data, where a
+wider distribution of labelled positions is worth more than opening theory, and the balance filter is what
+keeps them playable. For an SPRT, keep using `openings.epd`.
 
 ### Validate inference (cross-check)
 
