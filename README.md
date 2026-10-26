@@ -637,8 +637,8 @@ architecture is rejected rather than misread. Stamp a freshly trained raw net wi
 (see [nnue/README.md](nnue/README.md)).
 
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
-[nnue/README.md](nnue/README.md). The shipped nets are trained on **public PlentyChess** bulletformat
-data (strong-engine labels), using the bullet trainer (GPU or CPU). The minimal flow:
+[nnue/README.md](nnue/README.md). The shipped nets are trained on **a public bulletformat dataset**
+(strong-engine labels), using the bullet trainer (GPU or CPU). The minimal flow:
 
 ```bash
 tools/setup_bullet.sh                                       # clone + register the bullet trainer (pinned commit)
@@ -656,7 +656,7 @@ game play (SPRT — now always net-vs-net, since the hand-crafted baseline was r
 Bratko-Kopec suite.
 
 **Shipped net.** [nnue/pawnstar-v12.bin](nnue/pawnstar-v12.bin) is a **1024-wide net with 8 king buckets
-(file-pair × board-half)** trained on **~6B** positions of **public PlentyChess** data. Lineage, all SPRT-measured
+(file-pair × board-half)** trained on **~6B** positions of **a public bulletformat dataset**. Lineage, all SPRT-measured
 (against the since-removed hand-crafted eval, "HCE", in the early steps): Pawnstar self-play *lost* to the
 HCE (label quality, not quantity, was the lever); scaling that data ~12× gave nothing (capacity-limited);
 **doubling the width 256→512 added +55 Elo (fixed depth) / +71 (time control)** — that is v4; doubling
@@ -671,7 +671,7 @@ holding the width at 1024 and the data at ~2.31B, **adding 4 king buckets (file-
 6.75 Elo at 8+0.08 — the v9 net**; the bucket gain shrinks with data (+29 at 750M → +11 at
 2.31B) but stays positive, and the earlier "width beats buckets" call was really width-vs-buckets
 confounded (it compared 512+buckets v7 to 1024-no-buckets v8). Then, holding that v9 arch fixed,
-**scaling the data ~2.31B→~3.82B (four more PlentyChess shards) beat v9 by +16.3 ± 10.8 Elo at 8+0.08 — the
+**scaling the data ~2.31B→~3.82B (four more dataset shards) beat v9 by +16.3 ± 10.8 Elo at 8+0.08 — the
 v10 net**; then, holding that same arch, **scaling ~3.82B→~6.05B (six more shards) beat v10 by +9.28 ± 6.58
 Elo at 8+0.08 (LOS 99.7%) — the v11 net**. Then, holding that same ~6B data fixed and **doubling the king
 buckets 4→8 (file-pair × board-half — bank `file/2`, plus 4 when the king is in its own advanced half,
@@ -679,7 +679,7 @@ ranks 5–8), beat v11 by +17.29 ± 8.68 Elo at 8+0.08 (3520 games) and +10.97 �
 — the v12 net (shipped)**; the only variable vs v11 was the bucket count. Each shipped net retires its predecessor
 (v4 at v6, v6 at v7, v7 at v8, v8 at v9, v9 at v10, v10 at v11, v11 at v12). The recurring lesson is **more data is the
 lever** — though the per-step *data* gain is shrinking (+16 for +1.5B → +9 for +2.2B) and v12's ~6B is still only
-~29% of the ~21B available — **but king buckets are *not* at diminishing returns: the 4→8 step (+17/+11) is
+a fraction of what a larger pool would give — **but king buckets are *not* at diminishing returns: the 4→8 step (+17/+11) is
 bigger than the 0→4 step (+11.4)**, because the rank split captures real own-half-vs-advanced king-safety
 signal. See [nnue/README.md §7](nnue/README.md)
 for the full lineage and exact recreation steps.

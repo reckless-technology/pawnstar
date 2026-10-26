@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-shot NNUE experiment: train the net, VERIFY it, then run an SPRT.
 #
-# The data source is an already-converted bulletformat .data file (e.g. public PlentyChess data, which is
+# The data source is an already-converted bulletformat .data file (e.g. a public dataset, which is
 # how the shipped nets were trained). NNUE is the only evaluator, so the SPRT is net-vs-net: set
 # BASELINE_NET=<baseline net.bin> to choose the opponent (see run_sprt.sh for TC / cross-width options).
 #

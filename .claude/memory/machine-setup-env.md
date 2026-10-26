@@ -30,8 +30,8 @@ The dev/training/testing stack was rebuilt from scratch on a NEW machine (2026-0
   (`reckless-technology/claude-skills`, skill `reckless-working-practice`); it was 18.1.8 before.
 - **openings.epd**: `~/pawnstar_nnue/openings.epd` = UHO_Lichess_4852_v1 (2.63M lines, the engine-testing
   standard), downloaded fresh (the user's old curated openings file was not backed up).
-- **One small data shard** for smoke tests: `~/pawnstar_nnue/smoke.data` (PlentyChess 12892.data, 61 MB,
-  the smallest of the 168 shards). The full ~21 B / ~122 GB PlentyChess pool is NOT downloaded.
+- **One small data shard** for smoke tests: `~/pawnstar_nnue/smoke.data` (61 MB). It came from the
+  external dataset that is no longer used, so it is for smoke tests only — never for training a net.
 
 **Still MISSING / needs the user (no reliable auto-source):**
 - **Anchor engines** for `tools/rate.sh` (the curated CCRL set in `~/.local/bin/Engines` — gaviota~2650,
@@ -41,7 +41,7 @@ The dev/training/testing stack was rebuilt from scratch on a NEW machine (2026-0
 - **Anchor engines still missing** (for absolute-Elo `rate.sh`; not needed for net-vs-net SPRT).
 
 **2026-06-26 RE-BOOTSTRAP (this is a fresh/bare machine again; the 2026-06-23 stack above was wiped).** Full
-toolchain re-created from scratch this session and the **v11 16-shard PlentyChess pool (~179 GB / 5.99B
+toolchain re-created from scratch this session and the **v11 16-shard pool (~179 GB / 5.99B
 positions) IS now downloaded** at `~/pawnstar_nnue/data/` (the 16 shards in nnue/README §7) + reshuffled to
 `~/pawnstar_nnue/exp_nobucket_6b/shuffled.data`. Present now: rustup `cargo 1.96` (NOT the apt 1.75 — see
 [[machine-cargo-version-gotcha]]), bullet at `~/pawnstar_nnue/bullet` (CUDA 13.2, RTX 4070 sm_89, ~2.4–2.9M

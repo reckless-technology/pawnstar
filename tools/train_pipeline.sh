@@ -5,11 +5,11 @@
 #   * a DIRECTORY of text shards (data_*.txt / seed*.txt in bullet's "FEN | eval | wdl" text format)
 #     -> combined,
 #     converted to bulletformat, and shuffled before training; or
-#   * an already-converted bulletformat .data FILE (e.g. public PlentyChess data, already shuffled) ->
+#   * an already-converted bulletformat .data FILE (e.g. a public dataset, already shuffled) ->
 #     trained directly, skipping the combine/convert/shuffle steps.
 #
 # The shipped net (nnue/pawnstar-v12.bin) and its predecessors from v2 on were trained the second way,
-# on public PlentyChess bulletformat data — strong-engine label quality, not self-play volume, is what
+# on a public bulletformat dataset — strong-engine label quality, not self-play volume, is what
 # made NNUE beat the handcrafted eval. Self-play text was only the original bootstrap source.
 #
 # Usage: train_pipeline.sh <data_dir | shuffled.data> <out_net.bin> [end_superbatch]
@@ -58,7 +58,7 @@ UTILS="$BULLET/target/release/bullet-utils"
 # [2/4] Produce a single shuffled bulletformat file (SHUF_DATA) for the trainer, by whichever route fits the
 # input. WORK is the scratch/output directory (checkpoints land under it).
 if [ -f "$DATA_IN" ] && [[ "$DATA_IN" == *.data ]]; then
-    # Already bulletformat (e.g. public PlentyChess data, pre-shuffled). Train on it directly.
+    # Already bulletformat (e.g. a public dataset, pre-shuffled). Train on it directly.
     echo "[2/4] using pre-converted bulletformat data: $DATA_IN"
     SHUF_DATA="$DATA_IN"
     WORK="$(dirname "$DATA_IN")"

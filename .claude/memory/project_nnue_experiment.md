@@ -25,8 +25,7 @@ working anchors are stronger than Pawnstar, so the estimate extrapolates from lo
 and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastchess (errors out).
 
 **Update (later 2026-06-14) — NNUE now beats HCE, all merged to main:**
-- **v2** net trained on ~60M positions of public **PlentyChess** bulletformat data
-  (<https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat>) **beats HCE by ~+345 Elo**
+- **v2** net trained on ~60M positions of a public bulletformat dataset **beats HCE by ~+345 Elo**
   at fixed depth 8. Lesson: **label quality** (strong-engine data) was the lever, not self-play volume.
   Shipped as `nnue/pawnstar-v2.bin`. (v1 = our own self-play, lost -67.)
 - **Incremental accumulator** (maintained across make/undo): **+80 Elo** equal-time SPRT vs full-refresh.
@@ -60,7 +59,7 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   bullet `ChessBuckets` (4 buckets, file/rank quadrant map; refresh-on-king-bucket-crossing). All verified
   clean (test_nnue 0/250 0cp; incremental 0 mismatches incl. crossings). SPRT vs v4(512):
   - on **60M** data: **flat** (~-8 ± 22 fixed depth) — data-starved (4x feature params).
-  - on **~818M** pool (2 big PlentyChess shards 11008+13349 + the 60M, shuffled; same v4 compute = 40 SB
+  - on **~818M** pool (2 big dataset shards + the 60M, shuffled; same v4 compute = 40 SB
     x 3688 BPS = 2.4B samples seen, ~3 epochs): **fixed depth +47.3 ± 18.2 Elo, H1 accepted** (decisive
     eval-quality win!) BUT **tc 8+0.08 -74.1 ± 25.2, H0 accepted** (loses on the clock). Confirms the
     hypothesis: **more data WAS the lever** for the higher-capacity arch (flatness was starvation).
@@ -94,7 +93,7 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   width (it only rebuilds the bullet trainer/eval). Same trap would hide a real bug, so consider an
   exact-size loader check.
 - NNUE is object-oriented now (`nnue::Network` owned by `Game`).
-  Bad PlentyChess shard seen: `11496.data` fails `bullet-utils validate`; 11008/11128 are clean.
+  A corrupt dataset shard was seen: it fails `bullet-utils validate`; the shards in use are clean.
 
 **Update (2026-06-15, later) — HCE REMOVED; NNUE is the only evaluator (all pushed to origin/main):**
 - **Handcrafted eval deleted entirely** (material/PST/pawn-structure/king-safety/mobility/tapering, their
@@ -121,13 +120,13 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
 
 **Update (2026-06-16) — v7: MORE DATA wins again (~+30 depth / +21 clock over v6). NOT yet shipped.**
 - Scaled the **same 512×4 arch** from v6's 818M to **2.31B positions** (v6's kbbig/shuffled.data + 4 new
-  big PlentyChess shards 11128+12128+12932+13227; a clean SUPERSET), trained **SBS=120 / BPS=3688 (~7.25B
+  big dataset shards; a clean SUPERSET), trained **SBS=120 / BPS=3688 (~7.25B
   samples, ~3 epochs)** vs v6's SBS=40. Orchestrator: `~/pawnstar_nnue/run_v7.sh`; net
   `~/pawnstar_nnue/v7/pawnstar-v7.bin` (stamped, 3148896 bytes) + raw `quantised-raw.bin`.
 - **SPRT v7 vs v6 (same binary, EvalFile differs): fixed depth 8 = +29.96 ± 14.05 (1174 games, H1
   accepted); tc 8+0.08 = +20.73 ± 12.73 (1762 games, H1 accepted).** Decisive on BOTH axes — same
   arch/speed, so the eval gain carries to the clock (no speed cost to recover, unlike width/buckets).
-  **Confirms v6 was data-limited; more data is still the lever** (v6 used only ~4% of the 21B available).
+  **Confirms v6 was data-limited; more data is still the lever** (v6's pool was a small fraction of what was available).
 - **GOTCHA (cost a verify cycle, now fixed in run_v7.sh):** `pawnstar_eval` (bullet example) is NOT
   header-aware, so the cross-check must use the **RAW** (unstamped) net; I stamped before verifying and it
   misread the 32-byte header -> 248/250 false fails. Re-checked on the raw net: 0/250 0cp; incremental 0
@@ -137,7 +136,7 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   moves regenerated for v7 (union over depths 8-11, verified 24/24 at each of 8,9,10,11); docs updated
   incl. full step-by-step v7 recreation in nnue/README §7. `make check` green. **BK test is now a HARD
   24/24 gate** (regenerate its accepted moves per shipped net — see nnue/README §7 step 7).
-- Next lever: even more data (2.31B is only ~11% of 21B), then revisit 1024-wide or 8 king buckets now
+- Next lever: even more data (2.31B was a small fraction of the pool), then revisit 1024-wide or 8 king buckets now
   that more data clearly helps the higher-capacity arch.
 - **v7 measured strength at 40/60 (2026-06-16): ~2900-2950 CCRL-ballpark.** 200-game gauntlet (fastchess,
   1 thread, 64MB hash, anchors in ~/.local/bin/Engines): gaviota2650→2711, arminius2750→2839,
@@ -159,7 +158,7 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   size (768×1×1024 = 786K feature rows vs v7's 768×4×512 = 1.57M; wider hidden, no bucket banks): stronger
   AND lighter (less memory bandwidth helps the clock). **Reverses the v5 "1024-on-60M loses −74 on the clock"
   result** — 60M was the binding constraint; at full data the extra width finally pays. More data is the lever
-  (again). Open: 1024 *with* king buckets on full data? 8 buckets? even more data (still ~11% of 21B)?
+  (again). Open: 1024 *with* king buckets on full data? 8 buckets? even more data (the pool was barely tapped)?
 - **GOTCHA 1 (eval cross-check):** `pawnstar_eval.rs` still had `NUM_BUCKETS=4` (from v7) while KING_BUCKETS
   was all-zero → it expected a 4-bank net and `Net::load` would panic on the 1-bank net → verify fails (or
   passes vacuously on an empty ref). Fixed to `NUM_BUCKETS=1`; **the prebuilt `$EVAL` binary was also stale
@@ -182,7 +181,7 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   redundant (its arch shipped to main). **GOTCHA confirmed: `make check` does NOT build `build/pawnstar`
   (only tests+tools); build the engine separately to test the embedded fallback.**
 - Next lever to try: **1024 *with* king buckets** on the same 2.31B (combine the two winning levers), and/or
-  yet more data (2.31B is ~11% of 21B).
+  yet more data (2.31B was a small fraction of the pool).
 
 **Update (2026-06-18) — 1536-wide REJECTED (loses −17 Elo @ 40/20 to v8). NOT shipped. Width sweet spot at 2.31B is 1024.**
 - Branch `bignet-1536-fulldata` (commit 75e1fac): `kHiddenSize=1024→1536`, same single-bank/no-king-bucket
@@ -213,12 +212,12 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
 
 **Update (2026-06-20) — v10: MORE DATA again. Scaled v9 arch 2.31B→3.82B, beat v9 by +16.3 Elo. SHIPPED (commit 4431461, pushed to main).**
 - **Single variable = data.** Kept the v9 arch EXACTLY (1024-wide, 4 file-pair king buckets), added **four
-  more PlentyChess shards** (`13247 13399 13364 13381`, ~378M each, ~1.51B new) on top of v9's ~2.31B pool →
+  more dataset shards** (~378M each, ~1.51B new) on top of v9's ~2.31B pool →
   **~3.82B** (3,824,674,998 positions). Trained SBS 120→190 (~3 epochs, ~11.5B samples), BPS=3688, on a
   **GTX 1050 Ti** (~9h19m, ~330K pos/s). Data/checkpoints in `~/pawnstar_nnue/v10/`.
 - **SPRT v10 vs v9 (same binary, EvalFile differs, same arch so NO cand-wrapper needed) @ 8+0.08:
   +16.3 ± 10.8 Elo, LLR 2.95 H1 accepted, 1944 games (52.3%), 46 min.** Larger than the v8→v9 bucket gain.
-  **More data is the recurring lever** — v10's 3.82B is still only ~18% of the ~21B PlentyChess pool.
+  **More data is the recurring lever** — v10's 3.82B was still a fraction of the pool available then.
 - Verify clean (raw net: 0/250 0cp; incremental 0 mismatches); make check green; BK regenerated 24/24
   (9 positions changed). v9 retired from repo (preserved as `~/pawnstar_nnue/pawnstar-v9-baseline.bin` for
   future SPRT baselines — same arch as v10 so still cross-loadable). Docs (CLAUDE/README/nnue-README §7
@@ -231,14 +230,14 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
 
 **Update (2026-06-22) — v11: MORE DATA again. Scaled v10 arch 3.82B→6.05B, beat v10 by +9.28 Elo. SHIPPED (pushed to main).**
 - **Single variable = data.** Kept the v10 arch EXACTLY (1024-wide, 4 file-pair king buckets), added **six
-  more PlentyChess shards** (`11756 12450 12862 13128 13148 13419`, ~2.22B new) on top of v10's ~3.82B pool →
+  more dataset shards** (~2.22B new) on top of v10's ~3.82B pool →
   **~6.05B** (6,048,642,450 positions). Built the pool by concatenating v10's `shuffled.data` + the 6 raw
   shards and re-shuffling (saved re-downloading v10's 10). Trained SBS 190→300 (~3 epochs, ~18.1B samples),
   BPS=3688, on the **GTX 1050 Ti** (14h31m, ~345K pos/s, final loss 0.0228). Data/checkpoints in `~/pawnstar_nnue/v11/`.
 - **SPRT v11 vs v10 (same binary, EvalFile differs, same arch so NO cand-wrapper) @ 8+0.08: +9.28 ± 6.58 Elo,
   LOS 99.7%, LLR 2.48, 6102 games (51.3%), 0 forfeits** — stopped at clear-H1 (user call) rather than run to formal H1.
 - **The gain is diminishing as the base grows**: v9→v10 was +16.3 for +1.5B; v10→v11 +9.3 for +2.2B. Still
-  clearly positive and the cheapest lever (no code/arch change). v11's 6.05B is still only ~29% of the ~21B pool.
+  clearly positive and the cheapest lever (no code/arch change). v11's 6.05B was still a fraction of the pool.
 - Verify clean (raw net: 0/250 0cp; incremental 36807/0 mismatches); make check green; BK regenerated 24/24
   at depths 8-11. v10 retired from repo. Docs (CLAUDE/README/nnue-README §7 lineage+recipe) updated to v11.
 - **CUDA env gotcha (SUPERSEDED — was the pre-migration box):** at the time of the v11 run this machine had

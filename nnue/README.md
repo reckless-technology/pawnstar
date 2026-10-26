@@ -203,7 +203,7 @@ openings from, so supply your own SPRT opening book with `OPENINGS=…`.
 
 ### Data
 
-The shipped nets are trained on **public PlentyChess** bulletformat data — a pre-converted, shuffled
+The shipped nets are trained on **a public bulletformat dataset** — a pre-converted, shuffled
 `.data` file (bullet `ChessBoard` records, 32 bytes each). That file is the input to training below.
 
 `train_pipeline.sh` also accepts a directory of text shards (`data_*.txt` / `seed*.txt`) in bullet's
@@ -219,7 +219,7 @@ from the first argument:
 
 1. ensures bullet is set up, builds `bullet-utils` and the trainer (`$BULLET_FEATURES`, default
    `--features cuda`);
-2. **if the argument is a `.data` file** (already bulletformat — e.g. public PlentyChess data, the way
+2. **if the argument is a `.data` file** (already bulletformat — e.g. a public dataset, the way
    the shipped nets were trained), it is used directly and steps 3–4 are skipped; **if it is a
    directory**, the text shards `data_*.txt` + `seed*.txt` are combined → `all.txt`,
    `bullet-utils convert --from text` → `all.data` (bullet `ChessBoard`, 32 bytes/record), then
@@ -315,8 +315,8 @@ file-pair × board-half; stamped file **12,589,152 bytes ≈ 12.6 MB**) — load
 setoption name EvalFile value /path/to/other-net.bin
 ```
 
-**`pawnstar-v12.bin`** is trained on the **same ~6B** positions of **public PlentyChess** data
-(bulletformat, strong-engine labels) **as v11**, with a 1024-wide transformer and **8 king buckets selected
+**`pawnstar-v12.bin`** is trained on the **same ~6B** positions of **a public bulletformat dataset**
+(strong-engine labels) **as v11**, with a 1024-wide transformer and **8 king buckets selected
 by king file-pair × board-half** (`kKingBucketMap`, §1). The **only** change from the previous shipped net
 **v11** is the **bucket count**, doubled 4→8 (the rank split puts a king in its own advanced half, ranks
 5–8, into banks 4–7). It beats v11 by **+17.29 ± 8.68 Elo at 8+0.08** (3520 games, H1, LLR 2.96) and
@@ -331,8 +331,8 @@ is the opposite of the old "bucket advantage shrinks with data" expectation: the
 | step | change | result |
 |---|---|---|
 | v1 (256) | Pawnstar's own **HCE self-play** (~3.6M) | **loses** to HCE (−67 Elo; a 1.0M predecessor was −151) |
-| v2 (256) | **public PlentyChess** data (~60M) | **beats** HCE ≈ +330 Elo — *label quality*, not quantity, was the lever |
-| v3 (256) | ~12× more PlentyChess data (~750M) | **no gain** over v2 (+9.5 ± 13.6, inconclusive) — 256 net is *capacity-limited* |
+| v2 (256) | **a public bulletformat dataset** (~60M) | **beats** HCE ≈ +330 Elo — *label quality*, not quantity, was the lever |
+| v3 (256) | ~12× more of the same data (~750M) | **no gain** over v2 (+9.5 ± 13.6, inconclusive) — 256 net is *capacity-limited* |
 | v4 (512) | **double the width**, same 60M as v2 | **+55 ± 20 Elo fixed-depth, +71 ± 25 at time control** over v2 — once data saturates, *net size* is the lever (shipped, now retired) |
 | v5 (1024) | **double width again**, same 60M | **rejected**: +2 ± 16 fixed-depth (dead even), **−74 ± 25 on the clock** — 60M *saturates* the 512 net; width only pays off with more data. Branch `bignet-1024`, not shipped |
 | kb (512 + 4 king buckets) | king buckets, **same 60M** | **flat** (~−8 fixed depth) — the higher-capacity feature set is *data-starved* on 60M |
@@ -340,13 +340,13 @@ is the opposite of the old "bucket advantage shrinks with data" expectation: the
 | v7 (512 + 4 king buckets) | **~2.31B** (v6's 818M + 4 more big shards), same arch, SBS 40→120 (~3 epochs) | **+29.96 ± 14.05 fixed-depth, +20.73 ± 12.73 on the clock** over v6 — *still more data*; same arch/speed, so the eval-quality gain carries straight to the clock (later retired) |
 | **v8 (1024, no king buckets)** | **double the width, drop king buckets**, same 2.31B as v7 | **+31.9 ± 16.6 Elo at 40/20** over v7 (LLR 2.95, H1; 972 games) — at the full data scale width beats buckets, **at half the file size** (fewer feature rows, wider hidden). Reverses v5's 60M result now that data no longer saturates 1024. (later retired) |
 | v9 (1024 + 4 king buckets, file-pair) | add king buckets to the v8 arch, same ~2.31B scale/schedule | **+11.4 ± 6.75 Elo at 8+0.08** over v8 (LLR 2.96, H1; 5520 games). Holding width fixed, buckets win at scale — the gain shrinks with data (+29 at 750M → +11 at 2.31B) but stays positive; the v8 'width beats buckets' call was width-vs-buckets confounded. **File-pair bucketing beats quadrant/rank-based** (king safety is file-dependent; back-rank kings use all 4 file banks). 4× the FT rows (1.58→6.3 MB). (later retired) |
-| v10 (1024 + 4 king buckets, file-pair) | **more data**: scale the pool 2.31B→3.82B (four more PlentyChess shards: `13247`, `13399`, `13364`, `13381`), same v9 arch, SBS 120→190 (~3 epochs) | **+16.3 ± 10.8 Elo at 8+0.08** over v9 (LLR 2.95, H1; 1944 games, 52.3%). More data again the single biggest lever. (later retired) |
-| **v11 (1024 + 4 king buckets, file-pair)** | **more data**: scale the pool 3.82B→6.05B (six more PlentyChess shards: `11756`, `12450`, `12862`, `13128`, `13148`, `13419`), same v10 arch, SBS 190→300 (~3 epochs) | **+9.28 ± 6.58 Elo at 8+0.08** over v10 (LOS 99.7%, LLR 2.48; 6102 games, 51.3%). More data again the single biggest lever — the per-step gain is shrinking (+16 for +1.5B → +9 for +2.2B) but stays clearly positive; v11's 6.05B is still only ~29% of the ~21B pool. (later retired) |
+| v10 (1024 + 4 king buckets, file-pair) | **more data**: scale the pool 2.31B→3.82B (four more dataset shards), same v9 arch, SBS 120→190 (~3 epochs) | **+16.3 ± 10.8 Elo at 8+0.08** over v9 (LLR 2.95, H1; 1944 games, 52.3%). More data again the single biggest lever. (later retired) |
+| **v11 (1024 + 4 king buckets, file-pair)** | **more data**: scale the pool 3.82B→6.05B (six more dataset shards), same v10 arch, SBS 190→300 (~3 epochs) | **+9.28 ± 6.58 Elo at 8+0.08** over v10 (LOS 99.7%, LLR 2.48; 6102 games, 51.3%). More data again the single biggest lever — the per-step gain is shrinking (+16 for +1.5B → +9 for +2.2B) but stays clearly positive; v11's 6.05B was still a fraction of the pool available then. (later retired) |
 | **v12 (1024 + 8 king buckets, file-pair × board-half)** | **double the king buckets 4→8** at fixed data (same ~6B pool as v11): bank = `file/2`, plus 4 when the king is in its own advanced half (ranks 5–8, per-perspective oriented); SBS=300, final loss 0.0226 (v11 0.0228) | **+17.29 ± 8.68 Elo at 8+0.08** (3520 games, H1, LLR 2.96) and **+10.97 ± 6.57 at 12+0.12** (5610 games, H1, LLR 2.95) over v11 — single variable vs v11 = bucket count. **King buckets are NOT at diminishing returns**: the 4→8 step (+17/+11) is *bigger* than the 0→4 step (+11.4), the rank split capturing real own-half-vs-advanced king-safety signal. 8× the FT rows (1.58→12.6 MB, so the owning `Game` is heap-allocated). **shipped** |
 
-PlentyChess data: <https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat> (public,
-already bulletformat — `bullet-utils validate` a shard first (some are corrupt, e.g. `11496.data`),
-`cat` a few clean ones together, `shuffle`, then train per §6, skipping the text-`convert` step).
+The data is a public bulletformat dataset: `bullet-utils validate` each shard first (a corrupt shard
+trains silently wrong), `cat` a few clean ones together, `shuffle`, then train per §6 — the
+text-`convert` step is skipped, the shards being bulletformat already.
 
 The eval is also fast on the clock: the **incremental accumulator** (~+80 Elo equal-time vs full
 refresh), **lazy/deferred accumulator updates** (skip the update for nodes that cut off before evaluating —
@@ -354,8 +354,8 @@ refresh), **lazy/deferred accumulator updates** (skip the update for nodes that 
 **int8 output layer** (+31.8 Elo), and the **eval cache** mean NNUE wins on time as well as depth. v12's 8-bucket table is 8× the feature rows of a single-bank net (12.6 MB vs 1.58 MB)
 and slightly heavier per eval (and needs the owning `Game` heap-allocated, since the inline weight array would
 overflow the default stack), but every shipping SPRT (v8→v9→v10→v11→v12) was at a time control, so that cost is
-already priced in. **The lessons: more data is the lever** (v12's ~6B is still only ~29% of the ~21B PlentyChess
-pool), **and king buckets are not yet saturated** (the 4→8 double won at fixed data).
+already priced in. **The lessons: more data is the lever** (v12's ~6B pool was never scaled to its limit),
+**and king buckets are not yet saturated** (the 4→8 double won at fixed data).
 Next levers: yet more data; a finer or mirrored bucket map (file+rank, or mirrored to halve the input
 space); or a wider transformer still.
 
@@ -389,12 +389,11 @@ space); or a wider transformer still.
 ### Recreating `pawnstar-v12.bin` (step by step)
 
 `pawnstar-v12.bin` is a **1024-wide net with 8 king buckets (file-pair × board-half)** trained on the
-**same ~6 billion** PlentyChess positions as v11 — sixteen big shards: v10's ten (`11008`, `11128`, `13349`, `12128`, `12932`, `13227`, `13247`, `13399`, `13364`, `13381`)
-plus six added for v11 (`11756`, `12450`, `12862`, `13128`, `13148`, `13419`) (~370–379M positions each, 32-byte
-`bullet::ChessBoard` records, already bulletformat so the text→`convert` step is skipped). The **only** change
-from v11 is the architecture — bucket count 4→8 — so the *data* steps (1–3) are identical to v11; only the arch
-and the spot-check size differ. GPU training is nondeterministic, so this reproduces a *functionally equivalent*
-net, not a byte-identical one.
+**same ~6 billion** positions as v11 — sixteen big shards: v10's ten plus the six added for v11 (~370–379M
+positions each, 32-byte `bullet::ChessBoard` records, already bulletformat so the text→`convert` step is
+skipped). The **only** change from v11 is the architecture — bucket count 4→8 — so the *data* steps (1–3)
+are identical to v11; only the arch and the spot-check size differ. GPU training is nondeterministic, so
+this reproduces a *functionally equivalent* net, not a byte-identical one.
 
 **The defining requirement: the architecture (especially the king-bucket map) must match everywhere.**
 `kHiddenSize=1024`, `kNumKingBuckets=8`, and the **file-pair × board-half `kKingBucketMap`** in
@@ -434,19 +433,19 @@ export CUDA_PATH=/usr/local/cuda-13.3 PATH="$CUDA_PATH/bin:$PATH" LD_LIBRARY_PAT
 UTILS="$BULLET/target/release/bullet-utils"
 EVAL="$BULLET/target/release/examples/pawnstar_eval"
 mkdir -p ~/pawnstar_nnue/v12 && cd ~/pawnstar_nnue/v12
-SHARDS="11008 11128 13349 12128 12932 13227 13247 13399 13364 13381 11756 12450 12862 13128 13148 13419"   # v10's ten + v11's six
 
-# 1. Download the sixteen big PlentyChess shards (~11–12 GB each, ~190 GB total).
-BASE=https://huggingface.co/datasets/Yoshie2000/plentychess_data_bulletformat/resolve/main
-for sh in $SHARDS; do curl -L --fail -C - -o "$sh.data" "$BASE/$sh.data"; done
+# 1. Assemble the pool: put sixteen big bulletformat shards (~11–12 GB each, ~190 GB total, ~370–379M
+#    positions apiece) in this directory as <name>.data files, from whichever public bulletformat
+#    dataset you train on.
+SHARDS=( *.data )
 
-# 2. Validate each (size % 32 == 0, no invalid records). Some shards are corrupt (e.g. 11496.data),
+# 2. Validate each (size % 32 == 0, no invalid records). A corrupt shard trains silently wrong,
 #    so ALWAYS validate before training; drop and replace any that fail.
-for sh in $SHARDS; do "$UTILS" validate --input "$sh.data"; done
+for sh in "${SHARDS[@]}"; do "$UTILS" validate --input "$sh"; done
 
 # 3. Concatenate the sixteen shards (flat 32-byte records) and re-shuffle (concatenated shards are correlated).
 #    --mem-used-mb: size to free RAM (16384 if you have it; 8192 on a 16 GB box).
-cat $(for sh in $SHARDS; do printf '%s.data ' "$sh"; done) > all.data
+cat "${SHARDS[@]}" > all.data
 "$UTILS" shuffle --input all.data --output shuffled.data --mem-used-mb 16384
 echo "pool: $(( $(stat -c%s shuffled.data) / 32 )) positions"   # ~6.05e9
 rm -f all.data                                                   # reclaim disk
@@ -497,8 +496,8 @@ CAND_STARTUP_NET=nnue/pawnstar-v12.bin BIN_A=/path/to/pawnstar-v12-engine BIN_B=
   tools/run_sprt.sh nnue/pawnstar-v12.bin /path/to/openings.epd 20000
 ```
 
-To train a **stronger** net, add yet more clean PlentyChess shards at steps 1–3 (the dataset has ~168
-shards ≈ 21B positions; `validate` each first) and scale `SBS` to keep ~3 epochs. To change the
+To train a **stronger** net, add yet more clean shards at steps 1–3 (`validate` each first, and use a
+data source you hold the rights to) and scale `SBS` to keep ~3 epochs. To change the
 **architecture** — width (`kHiddenSize`), bucket count (`kNumKingBuckets`) or the `kKingBucketMap` —
 change it identically in `nnue.h`, `pawnstar.rs` and `pawnstar_eval.rs` (and `NUM_BUCKETS` in
 `pawnstar_eval.rs`), re-sync + rebuild the bullet examples, rebuild the engine, and retrain. A different

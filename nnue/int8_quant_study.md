@@ -238,7 +238,7 @@ committed (off by default, `INT8_FT=1`) so a future quantisation-aware net can b
 ### Quantisation-aware retrain — DONE, definitive **REJECT** (−8 Elo)
 
 Closed the open question. Trained a quantisation-aware net (bullet `set_params_for_weight("l0w",
-AdamWParams{ min_weight: -127/QA, max_weight: 127/QA })`, 1024-wide single-bank, ~750M PlentyChess), which
+AdamWParams{ min_weight: -127/QA, max_weight: 127/QA })`, 1024-wide single-bank, ~750M dataset positions), which
 clips the exported FT weights to **`max|w| = 127` → `scale = 1`** — verified on the net (0 weights > 127).
 At scale 1 the int8-FT column-add is just widen+add (no `mullo`; the engine has a hoisted `scale==1` fast
 path), and the `INT8_FT` and standard engines evaluate **bit-identically** (confirmed on test positions),
