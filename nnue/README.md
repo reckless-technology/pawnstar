@@ -163,6 +163,9 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 
 | file | purpose |
 |------|---------|
+| `gen_data.cpp`            | self-play training-data generator: the engine plays itself and writes `<fen> \| <eval_cp> \| <wdl>` text shards plus a `.meta` provenance sidecar (`make tools` → `build/gen_data`) — see §6 |
+| `run_gendata.sh`          | fan `gen_data` across cores, one shard per worker, resumable |
+| `make_openings.sh`        | build `openings.epd` from the public-domain TSCP opening book: replay each line, keep the roughly balanced positions, dedup |
 | `stamp_net.cpp`           | prepend the self-describing `NetHeader` to a raw bullet net (`make tools` → `build/stamp_net`) |
 | `setup_bullet.sh`         | clone bullet at the pinned commit + install/register our trainer examples |
 | `bullet/pawnstar.rs`      | the trainer (arch `768×8 king-bucketed → 1024×2 → 1`, SCReLU, QA/QB/SCALE) |
@@ -189,7 +192,7 @@ On Windows `setup_bullet.sh` runs under Git's bash and `train_pipeline.sh` under
 
 ```bash
 tools/setup_bullet.sh                                          # once: clone + register bullet (pinned commit)
-OPENINGS=~/openings.epd \
+OPENINGS=nnue/openings.epd \
   tools/run_experiment.sh ~/pawnstar_nnue/shuffled.data net.bin   # train + verify + SPRT  ->  net.bin
 ```
 
@@ -197,7 +200,8 @@ Then load `net.bin` in the engine (§3). To train on CPU: `BULLET_FEATURES="" �
 `run_experiment.sh <shuffled.data> <net.bin> [superbatches=40] [sprt_rounds=500] [depth=8]` chains
 `train_pipeline.sh` → `verify_net.sh` → `run_sprt.sh`. The data argument is an already-converted
 bulletformat `.data` file (how the shipped nets were trained — see §7); it carries no FENs to sample
-openings from, so supply your own SPRT opening book with `OPENINGS=…`.
+openings from, so the SPRT's opening book comes from `OPENINGS=…` — the committed
+[openings.epd](openings.epd) (§6, Openings), or one of your own.
 
 ## 6. Step-by-step
 
@@ -208,9 +212,75 @@ The shipped nets are trained on **the public PlentyChess bulletformat dataset** 
 
 `train_pipeline.sh` also accepts a directory of text shards (`data_*.txt` / `seed*.txt`) in bullet's
 `convert --from text` format — one record per line, `<fen> | <white_relative_eval_cp> | <wdl>` (wdl:
-1.0 win / 0.5 draw / 0.0 loss, White's POV) — which it combines, converts, and shuffles. (Pawnstar's
-own self-play generator, which produced such shards, was the original bootstrap source and has been
-removed; bring text shards from any source in this format, or use a `.data` file directly.)
+1.0 win / 0.5 draw / 0.0 loss, White's POV) — which it combines, converts, and shuffles. Bring such
+shards from any source in this format, use a `.data` file directly, or generate them from self-play with
+`gen_data` below.
+
+**Both the score and the result are White-relative, not side-to-move relative.** bullet's text parser
+mirrors the board for a black-to-move FEN and negates the score and the result itself (`ChessBoard::from_str`
+in `bulletformat`), so writing side-to-move-relative values inverts the label of every black-to-move
+position. Verified by converting a white-to-move and a black-to-move copy of the start position, both
+written `| 123 | 1.0`: the two 32-byte records came out `score=123 result=2` and `score=-123 result=0`.
+
+#### Self-play generation (`gen_data`)
+
+`gen_data` has the engine play itself with the loaded net and writes one record per kept position:
+
+```bash
+make tools      # -> build/gen_data
+tools/run_gendata.sh ~/pawnstar_nnue/selfplay 24 400 \
+    --openings nnue/openings.epd --play-nodes 12000 --label-nodes 220000 --label-interval 4 --pv-plies 4
+tools/train_pipeline.sh ~/pawnstar_nnue/selfplay net.bin        # the directory mode above
+```
+
+**The search is the teacher, not the net** — the net only has to play a coherent game, while the label is
+what the search backs up. That is why the generator is two-stage: it plays on a cheap budget
+(`--play-nodes` / `--play-depth`) and re-labels only every Nth kept quiet position (`--label-interval`)
+with a much larger budget (`--label-nodes` / `--label-depth`), which decouples the cost of playing from
+the cost of the label. `--pv-plies` then harvests the first few plies of each deep label's principal
+variation as further records; they all carry the same White-relative root score, since a White-relative
+score does not depend on whose turn it is. That harvest is what makes a deep label affordable — 3.82×
+the records at the same cost, measured below.
+
+Each feature is switchable on its own so it can be A/B tested: `--label-interval 0` is single-stage,
+`--pv-plies 0` turns the harvest off, `--disagreement-copies 1` turns off the mild reweighting that writes
+a record twice when the search and the static eval disagree by more than `--disagreement-cp` (no position
+is ever *dropped* for agreeing — that would skew the distribution the eval is calibrated against), and
+`--no-dedup` keeps positions repeated within a shard. Kept positions are quiet, not in check and under
+3000 cp; games are adjudicated at 1500 cp held for four plies and capped at 200 plies. The search runs
+single-threaded, so a shard is reproducible from its seed. Every shard gets a `<shard>.meta` sidecar (a
+separate file, because `convert --from text` would try to parse a comment line as a position) recording
+the engine version, the labelling net **and its SHA-256**, every budget, the seed, the PV cap, the
+disagreement settings and the record count — which is what makes a net's data lineage auditable.
+
+**Measured throughput**, one worker on one core of an i9-13900HX (~2.0M nps) with net v12 and
+`nnue/openings.epd`, every other option at its default, each run about 4½ minutes:
+
+| configuration | records/s/core | records/game | bytes/record |
+|---|---|---|---|
+| single-stage (`--label-interval 0`), `--play-depth 8`, `--pv-plies 0` | 41.6 | 116 | 66.5 |
+| `--play-depth 8 --label-interval 4 --label-nodes 220000 --pv-plies 0` | 6.45 | 33 | 65.4 |
+| the same with `--pv-plies 4` | 24.6 | 129 | 65.1 |
+| `--play-nodes 12000 --label-interval 4 --label-nodes 220000 --pv-plies 4` | 30.7 | 75 | 70.4 |
+
+The deep label costs what it looks like it costs: a 220k-node label on every fourth position drops the
+rate 6.5×, from 41.6 records/s to 6.45. **The PV harvest pays that back almost four times over** — the
+same run with `--pv-plies 4` yields 3.82× the records, because one deep search then labels up to five
+positions instead of one. Playing the game cheaply (the last row) recovers the rest. At ~70 bytes a
+record, a 500M-position pool is ~35 GB of text and ~16 GB once converted to bulletformat.
+
+**Size a campaign from a loaded machine, not from one worker.** The last configuration run across 24
+workers on the same machine produced 74,960 records in 260 s — **288 records/s in total, but only 12.0
+records/s per core**, 2.55× less than the 30.7 one worker managed with the machine to itself. This CPU has
+8 performance and 16 efficiency cores, so most of those workers are on the slow ones and the fast ones
+lose their turbo headroom; a machine of uniform cores will land between the two figures. On that measured
+loaded rate a **500M-position pool needs about 13 days on 38 cores** (5 days at the single-worker rate —
+treat that as the optimistic bound, not the plan).
+
+**Openings matter more than they look.** With no `--openings` the generator starts each game from the
+standard position plus `--random-plies` (8) uniformly random plies, which often reaches a position one
+side is already lost in; the resign adjudication then ends the game four plies later and the whole game
+yields about one record. Supplying the opening set raises that by two orders of magnitude.
 
 ### Training
 
@@ -239,8 +309,20 @@ gamma=0.3, step=SBS/3}`, `eval_scale=400`. Overridable via env: `PAWNSTAR_DATA`,
 ### Openings
 
 The SPRT needs an EPD opening book (`OPENINGS=…`) of varied, roughly balanced early-game positions so
-matches don't all start from the same spot. Supply your own — any standard EPD opening set works. Use at
-least `sprt_rounds` positions to avoid repeats.
+matches don't all start from the same spot. **[openings.epd](openings.epd) is committed**: 306 positions
+built by `tools/make_openings.sh` from `pawnstar.book`, which is the **public-domain** TSCP book, so the
+set carries no licence restriction of its own and no third party's data. Each book line is replayed from
+the start position and every position it reaches between ply 4 and ply 24 is kept when the engine's static
+evaluation of it is within 125 cp of its evaluation of the start position (which this net puts at +158 cp,
+so a zero-centred filter would keep only the openings it mildly dislikes); then duplicates are dropped.
+
+Regenerate it with `tools/make_openings.sh [out.epd] [min_ply] [max_ply] [margin_cp]` — worth doing when
+the net changes, since the balance filter is the net's own judgement. **Its size is capped by the source:**
+the TSCP book's 385 lines overlap heavily and hold only about 420 distinct positions in that window, so an
+SPRT with more rounds than openings replays some of them (`order=random`), which is fine but worth knowing.
+Any standard EPD set works instead. The file carries a `#` provenance header; `run_sprt.sh` strips comment
+lines into a scratch copy before handing the file to fastchess, whose EPD reader would try to parse one as
+a position.
 
 ### Validate inference (cross-check)
 
