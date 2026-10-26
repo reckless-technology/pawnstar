@@ -54,7 +54,7 @@ wrapper falls back to Unix Makefiles if Ninja is absent). Use whichever you pref
 make           # engine → build/pawnstar_<major>_<minor>_<build> (+ the build/pawnstar alias)
 make check     # build everything and run all test suites (ctest)
 make tests     # build the test executables without running them
-make tools     # build helper tools (gen_data, stamp_net, filter_book, nnue_quant_study, dump_magics)
+make tools     # build helper tools (gen_data, gen_openings, stamp_net, filter_book, nnue_quant_study, dump_magics)
 make doc       # generate Doxygen HTML into doc/html
 make clean     # remove the build/ tree
 ```
@@ -676,6 +676,15 @@ label's principal variation as further positions (they share the same White-rela
 gets a `.meta` provenance sidecar naming the engine version, the labelling net and its SHA-256, and every
 budget used. `tools/run_gendata.sh <out_dir> <workers> <games> [options…]` fans the work across cores and is
 resumable. See [nnue/README.md](nnue/README.md) §6 for the options and the measured throughput.
+
+**Where the diversity comes from.** The engine is deterministic at a fixed budget with its book off, so a
+self-play game is decided by the position it starts from — which makes the opening set, not the game count,
+the limit on how many distinct games a campaign can produce. Three things compose to lift it: a large
+opening pool of the engine's own play (`tools/gen_openings.cpp` → the committed
+[nnue/openings-selfplay.epd](nnue/openings-selfplay.epd), 30,000 positions, and the count is a parameter),
+a couple of random plies on top of each one, and a disjoint slice of the pool per worker, so two workers
+cannot start a game from the same position. `tools/check_duplicates.sh` measures what a pool actually came
+out at, and `tools/train_pipeline.sh` runs it as a gate before training on one.
 
 **Shipped net.** [nnue/pawnstar-v12.bin](nnue/pawnstar-v12.bin) is a **1024-wide net with 8 king buckets
 (file-pair × board-half)** trained on **~6B** positions of **the public PlentyChess bulletformat dataset**. Lineage, all SPRT-measured
