@@ -147,15 +147,22 @@ else()
 endif()
 
 # --- Helper tools. ---
+add_executable(gen_data         tools/gen_data.cpp)
 add_executable(stamp_net        tools/stamp_net.cpp)
 add_executable(filter_book      tools/filter_book.cpp)
 add_executable(nnue_quant_study tools/nnue_quant_study.cpp)
 add_executable(dump_magics      tools/dump_magics.cpp)
 
+# gen_data stamps the engine version into each shard's .meta provenance sidecar, so it needs the generated
+# version header force-included the way the engine's own translation unit does (without it VersionString()
+# falls back to version.h's 0.0.0 placeholder, which would make the provenance useless).
+set_source_files_properties(tools/gen_data.cpp PROPERTIES
+  COMPILE_OPTIONS "-include;${PAWNSTAR_VERSION_HEADER}" OBJECT_DEPENDS "${PAWNSTAR_VERSION_HEADER}")
+
 # --- Tests (each a standalone TU with its own main()). ---
 enable_testing()
 set(PAWNSTAR_TESTS perft see bratko_kopec_nnue nnue nnue_incremental opening_book chess_clock bench_golden
-                   uci_commands primitives)
+                   uci_commands primitives principal_variation)
 foreach(t IN LISTS PAWNSTAR_TESTS)
   add_executable(test_${t} test/${t}_test.cpp)
 endforeach()
@@ -175,11 +182,16 @@ if(EXISTS "${EMBED_NET}")
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   add_test(NAME nnue_incremental COMMAND test_nnue_incremental "${EMBED_NET}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  # The principal variation Game publishes, which tools/gen_data.cpp harvests: every ply legal, replayable
+  # without touching the game history, and evaluating from its FEN exactly as it does from the position.
+  add_test(NAME principal_variation COMMAND test_principal_variation "${EMBED_NET}"
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   # The bench signature - every position's best move and node count and the 6,601,454 total, which the Go and Rust
   # ports pin too (test/bench_golden_test.cpp). RunBench forces one thread itself; the environment says so as well.
   add_test(NAME bench_golden COMMAND test_bench_golden "${EMBED_NET}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-  set_tests_properties(bratko_kopec_nnue bench_golden PROPERTIES ENVIRONMENT "PAWNSTAR_THREADS=1")
+  set_tests_properties(bratko_kopec_nnue bench_golden principal_variation PROPERTIES ENVIRONMENT
+                       "PAWNSTAR_THREADS=1")
   # The UCI command table and Game driven in process (test/uci_commands_test.cpp): every setoption, position form
   # and go parameter, the diagnostics and the root search's short cuts. Run from the repository root for the book.
   add_test(NAME uci_commands COMMAND test_uci_commands "${EMBED_NET}"
@@ -211,7 +223,7 @@ endif()
 
 set(PAWNSTAR_TEST_TARGETS ${PAWNSTAR_TESTS})
 list(TRANSFORM PAWNSTAR_TEST_TARGETS PREPEND test_)
-set(PAWNSTAR_TOOLS stamp_net filter_book nnue_quant_study dump_magics)
+set(PAWNSTAR_TOOLS gen_data stamp_net filter_book nnue_quant_study dump_magics)
 set(PAWNSTAR_EXECUTABLES pawnstar ${PAWNSTAR_TOOLS} ${PAWNSTAR_TEST_TARGETS})
 
 # --- The sanitizer runtime beside the executables. Clang targeting the MSVC ABI links AddressSanitizer dynamically:

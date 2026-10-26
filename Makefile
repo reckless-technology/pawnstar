@@ -76,9 +76,10 @@ ifdef COVERAGE_MIN_LINES
   CMAKE_ARGS += -DPAWNSTAR_COVERAGE_MIN_LINES=$(COVERAGE_MIN_LINES)
 endif
 
-TOOL_TARGETS := stamp_net filter_book nnue_quant_study dump_magics
+TOOL_TARGETS := gen_data stamp_net filter_book nnue_quant_study dump_magics
 TEST_TARGETS := test_perft test_see test_bratko_kopec_nnue test_nnue test_nnue_incremental \
-                test_opening_book test_chess_clock test_bench_golden test_uci_commands test_primitives
+                test_opening_book test_chess_clock test_bench_golden test_uci_commands test_primitives \
+                test_principal_variation
 
 .PHONY: all tools tests check coverage doc clean configure
 

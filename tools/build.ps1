@@ -107,9 +107,10 @@ function Invoke-Checked([string]$exe, [string[]]$arguments) {
 }
 
 Invoke-Checked cmake $cmakeArgs
-$tools = 'stamp_net', 'filter_book', 'nnue_quant_study', 'dump_magics'
+$tools = 'gen_data', 'stamp_net', 'filter_book', 'nnue_quant_study', 'dump_magics'
 $tests = 'test_perft', 'test_see', 'test_bratko_kopec_nnue', 'test_nnue', 'test_nnue_incremental',
-  'test_opening_book', 'test_chess_clock', 'test_bench_golden', 'test_uci_commands', 'test_primitives'
+  'test_opening_book', 'test_chess_clock', 'test_bench_golden', 'test_uci_commands', 'test_primitives',
+  'test_principal_variation'
 switch ($Target) {
   'all'   { Invoke-Checked cmake @('--build', $BuildDir, '--parallel', '--target', 'pawnstar') }
   'tools' { Invoke-Checked cmake (@('--build', $BuildDir, '--parallel', '--target') + $tools) }
