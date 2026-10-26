@@ -186,3 +186,29 @@ jobs:
           name: pawnstar-windows-x86_64
           path: build/pawnstar_*.exe
           if-no-files-found: error
+
+  # The single required check for the branch ruleset. `main` takes pull requests and requires this one context,
+  # so the jobs above can be renamed, split or added to without editing the ruleset on the server. `if: always()`
+  # runs it even when a dependency failed, was skipped or was cancelled, and it is green only when every one of
+  # them succeeded — anything other than success fails it, naming the jobs that were not green.
+  ci:
+    name: CI
+    needs: [build-test, format, coverage, artifact-linux, artifact-windows]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every job passed
+        env:
+          RESULTS: >-
+            build-test=${{ needs.build-test.result }} format=${{ needs.format.result }}
+            coverage=${{ needs.coverage.result }} artifact-linux=${{ needs.artifact-linux.result }}
+            artifact-windows=${{ needs.artifact-windows.result }}
+        run: |
+          failed=""
+          for result in $RESULTS; do
+            echo "$result"
+            [ "${result#*=}" = success ] || failed="$failed ${result%%=*}"
+          done
+          [ -z "$failed" ] || { echo "::error::not green:$failed"; exit 1; }
+          echo "Green."
