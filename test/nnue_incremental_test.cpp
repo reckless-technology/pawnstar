@@ -330,6 +330,33 @@ void CaptureWalkThroughOutputHeads(const nnue::Network &net)
 
 int main(int argc, char **argv)
 {
+    // `--write-synthetic-net <path>` writes the synthetic net out and stops, which is what gives a shape
+    // nothing has been trained for a **bench signature** before it has a net.
+    //
+    // At a new shape the engine rightly refuses the shipped net and exits, so `bench` cannot run and there
+    // is no node count to compare between platforms or between the three bit-exact ports. The synthetic net
+    // closes that gap: it comes from a fixed seed through fixed arithmetic, so its bytes are identical on
+    // every platform, and `PAWNSTAR_EVALFILE=<it> pawnstar` then benches a real search over a real net.
+    // The node count that comes out is a parity signature for the new shape, available the moment the shape
+    // compiles rather than only once a training run has finished.
+    if (argc == 3 && std::string(argv[1]) == "--write-synthetic-net")
+    {
+        const std::vector<std::uint8_t> image = SyntheticNetImage();
+        std::ofstream                   out(argv[2], std::ios::binary);
+        out.write(reinterpret_cast<const char *>(image.data()), static_cast<std::streamsize>(image.size()));
+        if (!out)
+        {
+            std::cerr << std::format("cannot write '{}'\n", argv[2]);
+            return 1;
+        }
+        std::cout << std::format("wrote '{}': {} bytes — {} king buckets, {} output head(s), mirroring {}, "
+                                 "format_version {}, map crc {:#018x}\n",
+                                 argv[2], image.size(), nnue::kNumKingBuckets, nnue::kNumOutputBuckets,
+                                 nnue::kIsKingMirroringEnabled ? "on" : "off", nnue::kNetFormatVersion,
+                                 nnue::KingBucketMapCrc());
+        return 0;
+    }
+
     // The synthetic net first, and unconditionally: it is at this build's shape, so it runs in a checkout
     // with no .bin and it is the only way to exercise a shape no net has been trained for yet.
     {
