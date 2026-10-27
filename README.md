@@ -54,7 +54,7 @@ wrapper falls back to Unix Makefiles if Ninja is absent). Use whichever you pref
 make           # engine → build/pawnstar_<major>_<minor>_<build> (+ the build/pawnstar alias)
 make check     # build everything and run all test suites (ctest)
 make tests     # build the test executables without running them
-make tools     # build helper tools (gen_data, gen_openings, stamp_net, filter_book, nnue_quant_study, dump_magics)
+make tools     # build helper tools (gen_data, gen_openings, lichess_extract, lc0_extract, stamp_net, filter_book, nnue_quant_study, dump_magics)
 make doc       # generate Doxygen HTML into doc/html
 make clean     # remove the build/ tree
 ```
@@ -181,7 +181,7 @@ its latest result on `main`). Every job runs on a GitHub-hosted runner, on an im
 (`ubuntu-24.04`, `windows-2025`), and installs what it needs with pinned versions. The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
-  build through the wrapper and runs all twelve suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  build through the wrapper and runs all fourteen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
   PyPI wheel in a venv of the job's own; apt has no `clang-format-22`). This is independent of the
@@ -743,8 +743,8 @@ prints the available book moves and their frequencies for the current position.
 make check
 ```
 
-builds and runs eleven standalone test executables (plus a shell-driven UCI integration test,
-`test/uci_test.sh`, run against `build/pawnstar` — twelve suites in all; the script also checks where the engine
+builds and runs thirteen standalone test executables (plus a shell-driven UCI integration test,
+`test/uci_test.sh`, run against `build/pawnstar` — fourteen suites in all; the script also checks where the engine
 finds its net and book at startup, the embedded copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the
 end of input):
 
@@ -761,6 +761,8 @@ end of input):
 | `build/test_primitives` | Bitboards, the attack tables' generators rebuilt at run time, castling text, material draws, the TT |
 | `build/test_uci_commands` | Every UCI command, option and `go` parameter through `ProcessInput`, in process, with the net |
 | `build/test_principal_variation` | The principal variation the search publishes: every ply legal, replayable without touching the game history, and evaluating from its FEN exactly as from the position |
+| `build/test_lichess_extract` | `tools/lichess_extract.h`'s extraction rules, driven against PGN written by hand |
+| `build/test_lc0_extract` | `tools/lc0_extract.h`'s extraction rules, driven against Lc0 v6 records built from plane words copied out of a real `test80` tar |
 
 `test_bench_golden` runs the `bench` recipe (`RunBench` in `src/input_handling.h`, the code the `bench` command
 runs: depth 13, single-threaded, book off, hash cleared) with the shipped net and checks it against the golden
@@ -802,7 +804,7 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 |---|---|
 | `src/` | Engine source and headers |
 | `test/` | Standalone test programs |
-| `tools/` | Bullet trainer sources, training/verify/SPRT scripts, and helper tools (`stamp_net`, `filter_book`, `nnue_quant_study`, `dump_magics`) |
+| `tools/` | Bullet trainer sources, training/verify/SPRT scripts, the training-data generator (`gen_data`) and extractors (`lichess_extract`, `lc0_extract`), and helper tools (`gen_openings`, `stamp_net`, `filter_book`, `nnue_quant_study`, `dump_magics`) |
 | `nnue/` | The shipped NNUE net (`pawnstar-v12.bin`) plus training-pipeline documentation |
 | `Doxyfile` | Doxygen configuration |
 | `LICENSE` | GNU General Public License v3 |
