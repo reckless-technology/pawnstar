@@ -2,8 +2,8 @@
 ///
 /// Writes an EPD opening set for self-play data generation (tools/gen_data.cpp `--openings`), built from
 /// nothing but this engine's own move generation and its own network: short randomised lines are played from
-/// the start position, and a position is kept when the static NNUE evaluation says it is roughly level. No
-/// book, no third party's data, no provenance to carry.
+/// the start position, and a position is kept when the static NNUE evaluation says it is roughly level and
+/// no cheap tactic says otherwise. No book, no third party's data, no provenance to carry.
 ///
 /// The file is a valid SPRT opening file too (tools/run_sprt.sh `OPENINGS=`), but the book-derived set from
 /// tools/make_openings.sh stays the match set: its positions are opening-book lines, and a match wants
@@ -30,13 +30,23 @@
 /// when the net changes. The static evaluation is used rather than a search: it costs microseconds instead
 /// of milliseconds, and "is this roughly level" does not need search depth.
 ///
-/// What that filter cannot see is a tactic. Measured against the book-derived set, whose openings are sound:
-/// 6.5 % of self-play games from this pool are already past the resign threshold at their first labelling
-/// search, where none of 3,040 games from the book set were (nnue/README.md §6). Such a game still yields
-/// records, just fewer, and it costs about half of the 30 % drop in records a game the diversity design
-/// pays for. A cheap tactical filter here - a shallow search, or rejecting a position whose mover has a
-/// winning capture by static exchange evaluation - is the obvious next improvement, and would be a change
-/// to this file alone.
+/// **What the static filter cannot see is a tactic, so a second filter looks for one.** A position level by
+/// material can be lost to a one-move tactic, and a self-play game started from such a position is over
+/// before it teaches anything: 6.5 % of games from the first version of this pool were already past the
+/// resign threshold at their first labelling search, against none of 3,040 games from the sound
+/// book-derived set (nnue/README.md §6). `--tactical-see-cp` closes that: a candidate is rejected when
+/// **either side** has a capture that wins at least that many centipawns by static exchange evaluation.
+/// Either side, not just the mover - a piece hanging to the side to move makes the position winning for
+/// them, and a piece hanging to the other side makes it losing for them one move later, and both ruin the
+/// game equally. SEE costs a move generation and a swap-off per capture, which is microseconds, so this is
+/// nearly free.
+///
+/// `--shallow-nodes` is the deeper, slower alternative, off by default: search the candidate on a small node
+/// budget and reject it when the search disagrees with the static evaluation by more than
+/// `--shallow-margin-cp`. It sees tactics SEE cannot (a mating net, a fork, a trapped piece) and it costs
+/// milliseconds per candidate rather than microseconds. Measured settings and what each buys are in
+/// nnue/README.md §6; the pool is generated once per campaign, so even the slow filter is cheap against the
+/// week of self-play that follows.
 ///
 /// Usage:  gen_openings <out_file> <num_positions> <seed> [options]
 ///
@@ -53,24 +63,36 @@
 ///                  lines to diverge and still an opening rather than a random middlegame.
 ///   --margin-cp N  keep a position only when its White-relative static evaluation is within this many
 ///                  centipawns of the start position's (default 125, as tools/make_openings.sh).
+///   --tactical-see-cp N    reject a candidate when either side has a capture whose static exchange
+///                  evaluation is at least this many centipawns (default 100, a clean pawn on SEE's
+///                  1-3-3-5-9 scale; 0 switches the check off).
+///   --shallow-nodes N      node budget for an optional shallow search of each surviving candidate
+///                  (default 0, which is off). A candidate whose shallow score disagrees with its static
+///                  evaluation by more than --shallow-margin-cp is rejected.
+///   --shallow-margin-cp N  the disagreement a shallow search may show before a candidate is rejected
+///                  (default 150). Ignored when --shallow-nodes is 0.
 ///   --max-lines N  stop after this many lines however few positions were kept (default: 64 per requested
-///                  position, which is ample - the measured acceptance rate is about one line in four).
+///                  position, which is ample - the measured acceptance rate is about one line in six).
 ///   --net PATH     the net whose evaluation filters (default: $PAWNSTAR_EVALFILE, else
 ///                  nnue/pawnstar-v12.bin).
 ///   --progress N   positions between progress lines on stderr (default 5000, 0 = silent).
 ///
 /// The output carries its provenance in '#' comment lines, as nnue/openings.epd does: the generator, the
-/// engine version, the net and its baseline, the window, the margin, the seed and what was rejected.
+/// engine version, the net and its baseline, the window, the margins, the seed and what was rejected.
 /// tools/gen_data.cpp skips those lines and tools/run_sprt.sh strips them before fastchess sees the file.
 ///
 /// Build:  make tools   ->   build/gen_openings
 
+#include "chess_clock.h"
 #include "constants.h"
+#include "game.h"
 #include "move.h"
 #include "nnue.h"
 #include "position.h"
+#include "static_exchange_evaluation.h"
 #include "version.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
@@ -84,31 +106,59 @@
 
 namespace
 {
+/// @brief A streambuf that discards everything, used to silence the engine's UCI info output.
+class NullBuffer : public std::streambuf
+{
+  public:
+    int overflow(int c) override
+    {
+        return c;
+    }
+};
+
 /// @brief First ply of the default harvest window: deep enough that the lines have diverged.
 constexpr int kDefaultMinimumPly = 8;
 /// @brief Last ply of the default harvest window: still an opening rather than a random middlegame.
 constexpr int kDefaultMaximumPly = 12;
 /// @brief Default balance margin (cp) around the start position's own evaluation, as make_openings.sh uses.
 constexpr int kDefaultMarginCentipawns = 125;
+/// @brief Default tactical threshold (cp): a capture winning at least this much by static exchange
+/// evaluation rejects the candidate. 100 is a clean pawn on SEE's nominal 1-3-3-5-9 scale, so the filter
+/// reads as "neither side may have a free pawn or better sitting on the board".
+constexpr int kDefaultTacticalSeeCentipawns = 100;
+/// @brief Default disagreement (cp) a shallow search may show before a candidate is rejected. Only read
+/// when --shallow-nodes is non-zero; 150 is the margin tools/gen_data.cpp already reweights records at.
+constexpr int kDefaultShallowMarginCentipawns = 150;
 /// @brief Hard upper bound on --max-ply. Beyond this a "random opening" is a random middlegame, and the
 /// static evaluation of one says little about whether a game from it is worth playing.
 constexpr int kMaximumPlyLimit = 40;
 /// @brief Lines played per requested position before giving up, when --max-lines is not given. The measured
-/// acceptance rate is about one line in four, so this is ample headroom for a narrow margin or window.
+/// acceptance rate is about one line in six, so this is ample headroom for a narrow margin or window.
 constexpr uint64_t kDefaultLinesPerPosition = 64;
 /// @brief Positions between stderr progress lines, unless --progress says otherwise.
 constexpr int kDefaultProgressPositions = 5000;
+/// @brief Transposition table (MB) the optional shallow search runs with.
+///
+/// Small on purpose. The table is cleared before every candidate so that each verdict is an independent
+/// search of that position rather than a search coloured by the previous candidates' entries, and clearing
+/// the engine's default 64 MB thirty thousand times would cost more than the searches do. One megabyte
+/// clears in tens of microseconds against a search of several milliseconds, and a few thousand nodes have
+/// nothing like 64 MB of distinct positions to store anyway.
+constexpr std::size_t kShallowSearchHashMegabytes = 1;
 
 /// @brief Everything the run was asked to do; also what the output's provenance header reports.
 struct Options
 {
-    std::string out_file;                                       ///< EPD path to write.
-    int         position_count    = 0;                          ///< Balanced positions wanted.
-    uint64_t    seed              = 0;                          ///< RNG seed for the random lines.
-    int         minimum_ply       = kDefaultMinimumPly;         ///< First ply of the harvest window.
-    int         maximum_ply       = kDefaultMaximumPly;         ///< Last ply of the harvest window.
-    int         margin_centipawns = kDefaultMarginCentipawns;   ///< Balance margin around the baseline.
-    uint64_t    line_limit        = 0;                          ///< 0 = kDefaultLinesPerPosition per position.
+    std::string out_file;                                                    ///< EPD path to write.
+    int         position_count            = 0;                               ///< Balanced positions wanted.
+    uint64_t    seed                      = 0;                               ///< RNG seed for the random lines.
+    int         minimum_ply               = kDefaultMinimumPly;              ///< First ply of the harvest window.
+    int         maximum_ply               = kDefaultMaximumPly;              ///< Last ply of the harvest window.
+    int         margin_centipawns         = kDefaultMarginCentipawns;        ///< Balance margin around the baseline.
+    int         tactical_see_centipawns   = kDefaultTacticalSeeCentipawns;   ///< Winning-capture threshold; 0 = off.
+    uint64_t    shallow_search_nodes      = 0;                               ///< Shallow-search budget; 0 = off.
+    int         shallow_margin_centipawns = kDefaultShallowMarginCentipawns; ///< Shallow-vs-static disagreement cap.
+    uint64_t    line_limit                = 0;                  ///< 0 = kDefaultLinesPerPosition per position.
     std::string net_path;                                       ///< Net whose evaluation filters.
     int         progress_positions = kDefaultProgressPositions; ///< Positions between progress lines.
 };
@@ -117,11 +167,13 @@ struct Options
 /// than it was asked for should say which filter ate them rather than leaving it to be guessed.
 struct Statistics
 {
-    uint64_t lines_played        = 0; ///< Random lines played from the start position.
-    uint64_t lines_died          = 0; ///< Lines that reached a mate or stalemate before the target ply.
-    uint64_t rejected_terminal   = 0; ///< Positions in check, or with no legal move, at the target ply.
-    uint64_t rejected_unbalanced = 0; ///< Positions outside the balance margin.
-    uint64_t rejected_duplicate  = 0; ///< Positions whose Zobrist key had already been kept.
+    uint64_t lines_played                  = 0; ///< Random lines played from the start position.
+    uint64_t lines_died                    = 0; ///< Lines that reached a mate or stalemate before the target ply.
+    uint64_t rejected_terminal             = 0; ///< Positions in check, or with no legal move, at the target ply.
+    uint64_t rejected_unbalanced           = 0; ///< Positions outside the balance margin.
+    uint64_t rejected_duplicate            = 0; ///< Positions whose Zobrist key had already been seen.
+    uint64_t rejected_winning_capture      = 0; ///< Positions where either side had a winning SEE capture.
+    uint64_t rejected_shallow_disagreement = 0; ///< Positions a shallow search disagreed with the net about.
 };
 
 /// @brief Convert a side-to-move-relative score to White's perspective, which the balance filter works in.
@@ -154,6 +206,84 @@ std::string FourFieldFen(const Position &position)
         cursor = space + 1;
     }
     return fen.substr(0, cursor - 1);
+}
+
+/// @brief The best static exchange evaluation among the side to move's legal captures.
+///
+/// Quiet moves, castlings and non-capturing promotions are skipped: SEE is defined for a capture here, and
+/// the engine never calls it on a castling. A position with no capture at all scores 0, which is also the
+/// score of a capture the mover would not initiate, so the two need no distinguishing.
+///
+/// @param position The position to examine.
+/// @return The largest SEE score of any legal capture, or 0 when none wins material.
+int BestCaptureStaticExchange(const Position &position)
+{
+    int best_score = 0;
+    for (const Move &move : position.GenerateLegalMoves())
+    {
+        if (move.captured() == Piece::kNone)
+        {
+            continue;
+        }
+        best_score = std::max(best_score, EvaluateStaticExchange(position, move).first);
+    }
+    return best_score;
+}
+
+/// @brief Whether either side has a capture winning at least @p threshold_centipawns by SEE.
+///
+/// The side not to move is examined through Position::MakeNullMove, which is only sound because a candidate
+/// in check has already been rejected: a null move from a position that is not in check cannot leave the
+/// new mover in check either (that would mean the previous mover had left their own king attacked), so the
+/// null position's legal moves are the moves that side really has, minus an en passant capture the null
+/// clears - which is not theirs to make in any case.
+///
+/// Both sides matter. A piece hanging to the mover makes the position winning for them; a piece hanging to
+/// the other side makes it losing for them one move later. Either way the game is decided before it starts,
+/// which is what this filter exists to prevent.
+///
+/// @param position The candidate, known not to be in check.
+/// @param threshold_centipawns Winning material, in centipawns, that disqualifies the candidate.
+/// @return true when the candidate should be rejected as tactically unsound.
+bool HasWinningCaptureForEitherSide(const Position &position, int threshold_centipawns)
+{
+    if (BestCaptureStaticExchange(position) >= threshold_centipawns)
+    {
+        return true;
+    }
+    return BestCaptureStaticExchange(position.MakeNullMove()) >= threshold_centipawns;
+}
+
+/// @brief Whether a shallow search of a candidate disagrees with the net's static opinion of it.
+///
+/// The search runs single-threaded on a node budget, so it is exact and deterministic, and the
+/// transposition table is cleared first so that the verdict depends on this candidate alone - two runs that
+/// reach the same position by different routes judge it identically, and the whole run stays a pure function
+/// of the seed and the options. A root that returned without searching (a forced move) carries no score, and
+/// such a candidate is passed rather than judged on nothing.
+///
+/// @param game A Game with the filtering net loaded, repositioned by this call.
+/// @param position The candidate.
+/// @param static_white_score The net's static evaluation of it, White's perspective.
+/// @param node_budget Nodes the shallow search may spend.
+/// @param margin_centipawns Disagreement, in centipawns, that disqualifies the candidate.
+/// @return true when the candidate should be rejected as tactically unsound.
+bool IsShallowScoreDisagreeing(Game &game, const Position &position, int static_white_score, uint64_t node_budget,
+                               int margin_centipawns)
+{
+    game.SetPosition(position.ToString());
+    game.transposition_table_.Clear();
+    game.use_own_book_ = false; // the engine's own judgement only, and the book's pick is random
+    game.is_cancel_pending_.store(false, std::memory_order_relaxed);
+    game.time_control_.clock_type_ = ChessClock::kInfinite;
+    game.time_control_.max_nodes_  = node_budget;
+    const Move best                = game.SearchRootNode();
+    if (game.last_search_node_count_ == 0)
+    {
+        return false; // nothing was searched, so there is no second opinion to disagree with
+    }
+    const int shallow_white_score = WhiteRelativeScore(best.score(), position.color_to_move_);
+    return std::abs(shallow_white_score - static_white_score) > margin_centipawns;
 }
 
 /// @brief Play one uniformly random legal line from the start position and report where it ended.
@@ -243,6 +373,18 @@ int main(int argc, char **argv)
         {
             options.margin_centipawns = (int)value;
         }
+        else if (flag == "--tactical-see-cp")
+        {
+            options.tactical_see_centipawns = (int)value;
+        }
+        else if (flag == "--shallow-nodes")
+        {
+            options.shallow_search_nodes = (uint64_t)value;
+        }
+        else if (flag == "--shallow-margin-cp")
+        {
+            options.shallow_margin_centipawns = (int)value;
+        }
         else if (flag == "--max-lines")
         {
             options.line_limit = (uint64_t)value;
@@ -268,21 +410,53 @@ int main(int argc, char **argv)
         const char *eval_file = std::getenv("PAWNSTAR_EVALFILE");
         options.net_path      = eval_file != nullptr ? eval_file : "nnue/pawnstar-v12.bin";
     }
-    // NNUE is the only evaluator, and the balance filter is the net's own opinion. The Network is
-    // heap-allocated: at eight king buckets its inline feature-weight array is ~12.6 MB and would overflow
-    // the default stack as a local.
-    auto network = std::make_unique<nnue::Network>();
-    if (!network->Load(options.net_path))
+
+    // Force a deterministic single-threaded search for the optional shallow check, as tools/gen_data.cpp
+    // does. Set before the Game is constructed, which is when the default thread count is read.
+#if defined(_WIN32)
+    _putenv_s("PAWNSTAR_THREADS", "1");
+#else
+    setenv("PAWNSTAR_THREADS", "1", 1);
+#endif
+
+    // NNUE is the only evaluator, and the balance filter is the net's own opinion. A whole Game is held
+    // rather than a bare Network because the optional shallow filter searches, and the Game owns the net
+    // the static filter reads too - one net loaded, not two. It is heap-allocated: at eight king buckets
+    // its inline feature-weight array is ~12.6 MB and would overflow the default stack as a local.
+    auto game = std::make_unique<Game>();
+    if (!game->nnue_network_.Load(options.net_path))
     {
         std::cerr << "gen_openings: FATAL: could not load NNUE net '" << options.net_path
                   << "' (set PAWNSTAR_EVALFILE or pass --net). NNUE is the only evaluator.\n";
         return 1;
     }
+    const nnue::Network &network = game->nnue_network_;
+    if (options.shallow_search_nodes > 0)
+    {
+        game->transposition_table_.Resize(kShallowSearchHashMegabytes);
+    }
+
+    // The search prints UCI info lines on std::cout, and the optional shallow filter runs one per candidate;
+    // this tool reports on std::cerr, which is left alone. std::cout is swapped for the whole run rather than
+    // around each search, so the stream is in one state throughout.
+    NullBuffer      null_buffer;
+    std::streambuf *old_cout = std::cout.rdbuf(&null_buffer);
 
     const Position start    = Position::FromString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
-    const int      baseline = WhiteRelativeScore(network->Evaluate(start), start.color_to_move_);
+    const int      baseline = WhiteRelativeScore(network.Evaluate(start), start.color_to_move_);
     std::cerr << "gen_openings: start-position baseline " << baseline << " cp; keeping positions within +/-"
               << options.margin_centipawns << " cp of it\n";
+    if (options.tactical_see_centipawns > 0)
+    {
+        std::cerr << "gen_openings: rejecting a candidate where either side wins " << options.tactical_see_centipawns
+                  << " cp or more by static exchange evaluation\n";
+    }
+    if (options.shallow_search_nodes > 0)
+    {
+        std::cerr << "gen_openings: rejecting a candidate whose " << options.shallow_search_nodes
+                  << "-node search disagrees with the net by more than " << options.shallow_margin_centipawns
+                  << " cp\n";
+    }
 
     const uint64_t line_limit =
         options.line_limit != 0 ? options.line_limit : (uint64_t)options.position_count * kDefaultLinesPerPosition;
@@ -312,17 +486,32 @@ int main(int argc, char **argv)
             ++statistics.rejected_terminal;
             continue;
         }
-        const int white_score = WhiteRelativeScore(network->Evaluate(ended), ended.color_to_move_);
+        const int white_score = WhiteRelativeScore(network.Evaluate(ended), ended.color_to_move_);
         if (std::abs(white_score - baseline) > options.margin_centipawns)
         {
             ++statistics.rejected_unbalanced;
             continue;
         }
         // Dedup on the Zobrist key rather than on the FEN text: it is the position's identity, and it
-        // excludes the clock fields the output drops anyway.
+        // excludes the clock fields the output drops anyway. The tactical filters come after it so that a
+        // position they reject is tested once and then recognised as already seen, rather than being
+        // searched again every time a line reaches it.
         if (!seen.insert(ended.hash_).second)
         {
             ++statistics.rejected_duplicate;
+            continue;
+        }
+        if (options.tactical_see_centipawns > 0 &&
+            HasWinningCaptureForEitherSide(ended, options.tactical_see_centipawns))
+        {
+            ++statistics.rejected_winning_capture;
+            continue;
+        }
+        if (options.shallow_search_nodes > 0 &&
+            IsShallowScoreDisagreeing(*game, ended, white_score, options.shallow_search_nodes,
+                                      options.shallow_margin_centipawns))
+        {
+            ++statistics.rejected_shallow_disagreement;
             continue;
         }
         kept.push_back(FourFieldFen(ended));
@@ -358,13 +547,22 @@ int main(int argc, char **argv)
         << "# position per line played, so no two openings here share a line - and the count is a parameter,\n"
         << "# not a ceiling of the source.\n"
         << "#\n"
+        << "# IT IS TACTICALLY FILTERED TOO, which a static evaluation cannot be. A candidate was rejected\n"
+        << "# when either side had a capture winning " << options.tactical_see_centipawns
+        << " centipawns or more by static exchange evaluation\n"
+        << "# (0 would mean that check was off), and the shallow-search check ran at " << options.shallow_search_nodes
+        << " nodes\n"
+        << "# (0 means it was off) with a " << options.shallow_margin_centipawns
+        << " centipawn disagreement margin. Without them, 6.5 % of\n"
+        << "# self-play games from this pool were decided before their first label (nnue/README.md §6).\n"
+        << "#\n"
         << "# seed " << options.seed << "; kept " << kept.size() << " of " << statistics.lines_played << " lines ("
         << statistics.lines_died << " died, " << statistics.rejected_terminal << " in check or terminal, "
         << statistics.rejected_unbalanced << "\n"
-        << "# unbalanced, " << statistics.rejected_duplicate
-        << " duplicate). The generator is deterministic: the same seed,\n"
-        << "# options and net reproduce this file exactly, which is the audit trail for a set with no\n"
-        << "# external source.\n"
+        << "# unbalanced, " << statistics.rejected_duplicate << " duplicate, " << statistics.rejected_winning_capture
+        << " with a winning capture, " << statistics.rejected_shallow_disagreement << " on a\n"
+        << "# shallow search). The generator is deterministic: the same seed, options and net reproduce this\n"
+        << "# file exactly, which is the audit trail for a set with no external source.\n"
         << "#\n"
         << "# A CAMPAIGN WANTS A BIGGER POOL THAN THIS. Generate one to a path of its own rather than\n"
         << "# committing it, and point gen_data at it:\n"
@@ -378,6 +576,7 @@ int main(int argc, char **argv)
         out << fen << '\n';
     }
     out.flush();
+    std::cout.rdbuf(old_cout);
     if (!out)
     {
         std::cerr << "gen_openings: failed writing '" << options.out_file << "'\n";
@@ -386,6 +585,10 @@ int main(int argc, char **argv)
 
     std::cerr << "gen_openings: wrote " << kept.size() << " openings from " << statistics.lines_played << " lines in "
               << elapsed_seconds << "s -> " << options.out_file << '\n';
+    std::cerr << "gen_openings: rejected " << statistics.rejected_terminal << " in check or terminal, "
+              << statistics.rejected_unbalanced << " unbalanced, " << statistics.rejected_duplicate << " duplicate, "
+              << statistics.rejected_winning_capture << " with a winning capture, "
+              << statistics.rejected_shallow_disagreement << " on a shallow search\n";
     if ((int)kept.size() < options.position_count)
     {
         std::cerr << "gen_openings: WARNING: wanted " << options.position_count << " positions but the line budget ("
