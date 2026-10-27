@@ -60,6 +60,20 @@ else
   CMAKE_ARGS += -DPAWNSTAR_COVERAGE=OFF
 endif
 
+# The NNUE network shape. The defaults are the v12 shape the shipped net was trained for; the shared
+# architecture is KING_MIRRORING=1 with OUTPUT_BUCKETS=8. A shape change is an evaluation change, so give it
+# a build tree of its own and expect the shipped net to be refused there:
+#   make check BUILD_DIR=build-newshape KING_MIRRORING=1 OUTPUT_BUCKETS=8
+ifeq ($(KING_MIRRORING),1)
+  CMAKE_ARGS += -DPAWNSTAR_NNUE_KING_MIRRORING=ON
+else
+  CMAKE_ARGS += -DPAWNSTAR_NNUE_KING_MIRRORING=OFF
+endif
+
+ifdef OUTPUT_BUCKETS
+  CMAKE_ARGS += -DPAWNSTAR_NNUE_OUTPUT_BUCKETS=$(OUTPUT_BUCKETS)
+endif
+
 # Default the compiler to clang++ (the engine requires clang) unless the user set CXX explicitly (command
 # line / environment); `origin` is "default" only for make's built-in value.
 ifeq ($(origin CXX),default)

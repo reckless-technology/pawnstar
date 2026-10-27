@@ -41,6 +41,7 @@
   tools\build.ps1 -Debug      # make DEBUG=1
   tools\build.ps1 coverage    # make coverage
   tools\build.ps1 clean       # make clean
+  tools\build.ps1 check -BuildDir build-newshape -KingMirroring -OutputBuckets 8   # the shared NNUE shape
 #>
 # No [CmdletBinding()]: it would add PowerShell's common -Debug switch, which this script's own -Debug mirrors make's.
 param(
@@ -52,7 +53,14 @@ param(
   [switch]$Coverage,
   [string]$CoverageMinLines = '',
   [string]$BuildDir = 'build',
-  [string]$CtestArgs = '-V'
+  [string]$CtestArgs = '-V',
+  # The NNUE network shape (CMakeLists.txt): -KingMirroring and -OutputBuckets 8 build the shared
+  # architecture rather than the v12 shape the shipped net was trained for. A shape change is an evaluation
+  # change, so give it a BuildDir of its own and expect the shipped net to be refused there.
+  [switch]$KingMirroring,
+  [string]$OutputBuckets = '',
+  # Anything else to hand straight to the configure step, e.g. -CMakeArgs '-DFOO=ON','-DBAR=OFF'.
+  [string[]]$CMakeArgs = @()
 )
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path -Parent $PSScriptRoot)
@@ -100,6 +108,9 @@ $cmakeArgs += $(if ($Release) { '-DPAWNSTAR_DEBUGX=OFF' } else { '-DPAWNSTAR_DEB
 $cmakeArgs += $(if ($Werror) { '-DWERROR=ON' } else { '-DWERROR=OFF' })
 $cmakeArgs += $(if ($Coverage) { '-DPAWNSTAR_COVERAGE=ON' } else { '-DPAWNSTAR_COVERAGE=OFF' })
 if ($CoverageMinLines -ne '') { $cmakeArgs += "-DPAWNSTAR_COVERAGE_MIN_LINES=$CoverageMinLines" }
+$cmakeArgs += $(if ($KingMirroring) { '-DPAWNSTAR_NNUE_KING_MIRRORING=ON' } else { '-DPAWNSTAR_NNUE_KING_MIRRORING=OFF' })
+if ($OutputBuckets -ne '') { $cmakeArgs += "-DPAWNSTAR_NNUE_OUTPUT_BUCKETS=$OutputBuckets" }
+if ($CMakeArgs.Count -gt 0) { $cmakeArgs += $CMakeArgs }
 
 function Invoke-Checked([string]$exe, [string[]]$arguments) {
   & $exe @arguments

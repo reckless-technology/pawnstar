@@ -97,6 +97,65 @@ refreshes per update); `Network::Refresh` rebuilds both at the root.
 `-mavx2`, with scalar fallbacks behind `#if defined(__AVX2__)`; the vectorised path is bit-identical to
 the scalar one (verified by `test_nnue`).
 
+### The two network shapes, and the build knob that picks one
+
+Five engines are being unified onto one NNUE evaluator (skill `reckless-nnue`), and the shared
+architecture adds two things to the shape the shipped v12 net was trained for. Both were measured in
+zenith on this hardware, SPRT-gated, and both only paid past ~1.4B training positions - at 190M they
+were neutral or negative, which is why v12 has neither:
+
+| | v12's shape | the shared shape | measured |
+|---|---|---|---|
+| horizontal king mirroring | off | **on** - a perspective whose own king is on files e-h is mirrored (`square ^ 7`) before indexing | **+14.3 Elo** fixed depth |
+| material output heads | 1 | **8**, selected by `(piece_count - 2) / 4` | **+14.7 Elo** fixed depth |
+| king bucket map | `half * 4 + file / 2` (file-*pairs*) | `half * 4 + min(file, 7 - file)` (per-*file*) | |
+| `format_version` | 1 | **2** | |
+| payload bytes | 12,589,060 | 12,617,760 | |
+
+Mirroring is worth more than its Elo suggests: halving the king-placement space gives **twice the
+effective data per bucket at the same file size**, so it is a data multiplier as much as an Elo add.
+
+**Either shape builds from this one tree**, so the three bit-exact ports can be brought across one at a
+time. Two knobs, defaulting to v12's shape:
+
+```bash
+make check BUILD_DIR=build-newshape KING_MIRRORING=1 OUTPUT_BUCKETS=8          # Unix
+tools\build.ps1 check -BuildDir build-newshape -KingMirroring -OutputBuckets 8  # Windows
+```
+
+Give the new shape a **build tree of its own**, and expect it to refuse `nnue/pawnstar-v12.bin` -
+`refusing net '...': format_version is 0x1 in the file, 0x2 in this engine`. That is the container
+working, not a fault: nothing has been trained at the new shape yet. `test_nnue_incremental` builds its
+own synthetic net at whatever shape the build was configured for, which is how the new shape is tested
+before a net exists.
+
+**A shape change is an evaluation change.** It moves the bench signature and breaks parity with
+`pawnstar-rs` and `pawnstar-go` until all three are ported together, so the defaults are not to be
+flipped for one engine alone. The mirrored map also changes what a bucket *means* rather than only how
+many there are, which by the container's own rule makes it a format change - hence `format_version` 2.
+
+**Why mirroring needs its own refresh rule, and why getting it wrong is silent.** A perspective can be
+updated incrementally only while its weight bank, its square flip and its colour flip all stay put; if
+any changes, every feature row it reads moves. Before mirroring there was one way for that to happen, a
+king crossing a bucket boundary, and the code compared bucket indices. Mirroring adds a second, and the
+two are not the same: on the mirrored map a king stepping **d1 -> e1 keeps bucket 3** (file 3 and file 4
+both mirror to file 3) while its square flip gains the file flip. A comparison of buckets alone would
+diff an accumulator whose whole basis had just changed - no crash, no assertion, just a wrong
+evaluation. So the three live together in one `nnue::Perspective`, compared whole, and
+`test_nnue_incremental` crosses each boundary on purpose and reports how many plies forced a refresh, so
+a case that quietly stopped crossing anything cannot pass. Breaking the comparison back to the bucket
+alone makes that suite fail on the first ply of the first line, which is how the test was checked.
+
+**The bucket map is written down once, for both the engine and the trainer.**
+`tools/bullet/pawnstar.rs`'s `KING_BUCKETS_HALF` and `src/nnue.h`'s `kKingBucketMapHalf` hold the same 32
+numbers - half a board, indexed `rank * 4 + mirrored_file` - and the engine *generates* its 64-entry map
+from them with bullet's own expansion arithmetic
+(`expanded[sq] = half[(sq / 8) * 4 + [0,1,2,3,3,2,1,0][sq % 8]]`). `test_primitives` reads the array out
+of the `.rs` file and compares it number for number with the engine's, because `king_bucket_map_crc`
+binds the map to the engine build that stamped a net and can say nothing about the trainer - that was the
+digest's honest limitation, and this closes it. A map that drifts trains one network and runs another,
+and the digest reports it only after the training run has been spent.
+
 ## 2. File format — the shared `RNNUE1` container
 
 Pawnstar's nets are in **`RNNUE1`**, the one container every reckless-technology chess engine reads —
@@ -111,20 +170,20 @@ Little-endian throughout: a **64-byte header**, then the weight payload, and not
 | offset | size | field | this build |
 |---|---|---|---|
 | 0 | 8 | `magic` | `"RNNUE1\0\0"` |
-| 8 | 2 | `format_version` | 1 |
+| 8 | 2 | `format_version` | 1 at v12's shape, **2** with king mirroring on (section 1) |
 | 10 | 2 | `header_bytes` | 64 — lets a later version extend the header without breaking this reader |
 | 12 | 2 | `features_per_bucket` | 768 |
 | 14 | 2 | `king_buckets` | 8 |
 | 16 | 2 | `hidden_size` | 1024 |
-| 18 | 2 | `output_buckets` | 1 |
-| 20 | 1 | `flags` | bit 0 = horizontal king mirroring; 0 here. All other bits zero |
+| 18 | 2 | `output_buckets` | 1, or 8 at the shared shape |
+| 20 | 1 | `flags` | bit 0 = horizontal king mirroring; 0 at v12's shape, 1 at the shared shape. All other bits zero, and a non-zero `reserved` is refused |
 | 21 | 1 | `activation` | 0 = SCReLU |
 | 22 | 2 | `qa` | 255 |
 | 24 | 2 | `qb` | 64 |
 | 26 | 2 | `eval_scale` | 400 |
 | 28 | 4 | `reserved` | zero |
-| 32 | 8 | `king_bucket_map_crc` | CRC-64 of the 64 map entries, one `uint8` each — `0xCC6DDB5DAF0AB18D` |
-| 40 | 8 | `payload_bytes` | 12589060 |
+| 32 | 8 | `king_bucket_map_crc` | CRC-64 of the 64 map entries, one `uint8` each. `0xCC6DDB5DAF0AB18D` for v12's file-pair map, `0x0A20060D4E9586E0` for the mirrored one |
+| 40 | 8 | `payload_bytes` | 12589060, or 12617760 at the shared shape |
 | 48 | 8 | `payload_crc` | CRC-64 over the payload |
 | 56 | 8 | `header_crc` | CRC-64 over bytes 0–55 |
 

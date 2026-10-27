@@ -107,6 +107,29 @@ if(PAWNSTAR_DEBUGX)
   add_compile_definitions(DEBUGX=1)
 endif()
 
+# --- The NNUE network shape. Two knobs, so either shape can be built from one tree while the three
+#     bit-exact ports (C++, Rust, Go) are brought across one at a time. The defaults are the v12 shape the
+#     shipped net was trained for; the shared architecture is mirroring ON with 8 output heads:
+#
+#       cmake -S . -B build-new-shape -G Ninja -DCMAKE_CXX_COMPILER=clang++ \
+#             -DPAWNSTAR_NNUE_KING_MIRRORING=ON -DPAWNSTAR_NNUE_OUTPUT_BUCKETS=8
+#
+#     Both are stamped into every net's header (`flags` bit 0, `output_buckets`, and the bucket map's
+#     CRC-64), and the loader checks all three, so a net can only ever load into a build of its own shape —
+#     a new-shape build refuses pawnstar-v12.bin, which is correct, not a fault. A shape change is also an
+#     evaluation change, so it moves the bench signature and breaks parity with the Rust and Go ports until
+#     all three are ported together: do not flip these defaults for one engine alone.
+option(PAWNSTAR_NNUE_KING_MIRRORING
+       "NNUE: mirror a perspective whose own king is on files e-h (the shared architecture; +14.3 Elo)" OFF)
+set(PAWNSTAR_NNUE_OUTPUT_BUCKETS "1" CACHE STRING
+    "NNUE: material output heads, selected by (piece_count - 2) / ceil(32 / N). 8 in the shared architecture (+14.7 Elo)")
+if(PAWNSTAR_NNUE_KING_MIRRORING)
+  add_compile_definitions(PAWNSTAR_NNUE_KING_MIRRORING=1)
+endif()
+add_compile_definitions(PAWNSTAR_NNUE_OUTPUT_BUCKETS=${PAWNSTAR_NNUE_OUTPUT_BUCKETS})
+message(STATUS "Pawnstar NNUE shape: king mirroring ${PAWNSTAR_NNUE_KING_MIRRORING}, "
+               "${PAWNSTAR_NNUE_OUTPUT_BUCKETS} output head(s)")
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Shipped resources embedded into the engine binary via .incbin (runtime-load fallback). Absolute paths
