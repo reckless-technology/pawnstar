@@ -209,14 +209,21 @@ openings from, so the SPRT's opening book comes from `OPENINGS=…` — the comm
 
 ### Data
 
-The shipped nets are trained on **the public PlentyChess bulletformat dataset** — a pre-converted, shuffled
-`.data` file (bullet `ChessBoard` records, 32 bytes each). That file is the input to training below.
+The shipped nets were trained on **the public PlentyChess bulletformat dataset** — a pre-converted, shuffled
+`.data` file (bullet `ChessBoard` records, 32 bytes each). **That dataset is no longer used and is not to be
+re-downloaded**; it stays named here, and credited in the repository README, because v12 was trained on it.
+Training still takes a shuffled `.data` file as its input, and for a new net that file is built from the
+sources below.
 
 `train_pipeline.sh` also accepts a directory of text shards (`data_*.txt` / `seed*.txt`) in bullet's
 `convert --from text` format — one record per line, `<fen> | <white_relative_eval_cp> | <wdl>` (wdl:
 1.0 win / 0.5 draw / 0.0 loss, White's POV) — which it combines, converts, and shuffles. Bring such
-shards from any source in this format, use a `.data` file directly, or generate them from self-play with
-`gen_data` below.
+shards from any source in this format, use a `.data` file directly, or write them with one of the three
+sources in `tools/`: **`gen_data`** (this engine's own self-play, below), **`lichess_extract`** (the Lichess
+open database, CC0 — human games, about a tenth of them carrying inline Stockfish `[%eval]` comments) or
+**`lc0_extract`** (Leela's `test80` v6 archive, ODbL — engine self-play with engine results and an MCTS value
+estimate from a far stronger net). The three are not on one numeric scale, so read `tools/lc0_extract.h`
+before blending them.
 
 **Both the score and the result are White-relative, not side-to-move relative.** bullet's text parser
 mirrors the board for a black-to-move FEN and negates the score and the result itself (`ChessBoard::from_str`
@@ -600,9 +607,14 @@ is the opposite of the old "bucket advantage shrinks with data" expectation: the
 | **v11 (1024 + 4 king buckets, file-pair)** | **more data**: scale the pool 3.82B→6.05B (six more PlentyChess shards), same v10 arch, SBS 190→300 (~3 epochs) | **+9.28 ± 6.58 Elo at 8+0.08** over v10 (LOS 99.7%, LLR 2.48; 6102 games, 51.3%). More data again the single biggest lever — the per-step gain is shrinking (+16 for +1.5B → +9 for +2.2B) but stays clearly positive; v11's 6.05B was still a fraction of the pool available then. (later retired) |
 | **v12 (1024 + 8 king buckets, file-pair × board-half)** | **double the king buckets 4→8** at fixed data (same ~6B pool as v11): bank = `file/2`, plus 4 when the king is in its own advanced half (ranks 5–8, per-perspective oriented); SBS=300, final loss 0.0226 (v11 0.0228) | **+17.29 ± 8.68 Elo at 8+0.08** (3520 games, H1, LLR 2.96) and **+10.97 ± 6.57 at 12+0.12** (5610 games, H1, LLR 2.95) over v11 — single variable vs v11 = bucket count. **King buckets are NOT at diminishing returns**: the 4→8 step (+17/+11) is *bigger* than the 0→4 step (+11.4), the rank split capturing real own-half-vs-advanced king-safety signal. 8× the FT rows (1.58→12.6 MB, so the owning `Game` is heap-allocated). **shipped** |
 
-The data is the public PlentyChess bulletformat dataset: `bullet-utils validate` each shard first (a corrupt shard
-trains silently wrong), `cat` a few clean ones together, `shuffle`, then train per §6 — the
-text-`convert` step is skipped, the shards being bulletformat already.
+The data behind every net in that table was the public PlentyChess bulletformat dataset, and the recipe was:
+`bullet-utils validate` each shard first (a corrupt shard trains silently wrong), `cat` a few clean ones
+together, `shuffle`, then train per §6 — the text-`convert` step skipped, the shards being bulletformat
+already. **That dataset is no longer used and is not to be re-downloaded.** A new net's pool comes from the
+three sources in `tools/` instead — `gen_data`, `lichess_extract`, `lc0_extract` (§6, Data) — which write text
+shards, so `train_pipeline.sh`'s directory mode concatenates, converts and shuffles them itself and there is no
+`validate` step to run: that one is for shards that are bulletformat already. Shuffling before training still
+matters just as much.
 
 The eval is also fast on the clock: the **incremental accumulator** (~+80 Elo equal-time vs full
 refresh), **lazy/deferred accumulator updates** (skip the update for nodes that cut off before evaluating —
