@@ -255,9 +255,10 @@ single-threaded, so a shard is reproducible from its seed. Every shard gets a `<
 separate file, because `convert --from text` would try to parse a comment line as a position) recording
 the engine version, the labelling net **and its SHA-256**, every budget, the seed, the PV cap, the
 disagreement settings, the opening set with the worker's slice of it (`openings_count`,
-`openings_in_slice`, `worker_index`, `worker_count`) and the record and game counts, the last of these
-including `games_abandoned`, `games_decided_at_first_label` and `games_without_records` — which is what
-makes a net's data lineage auditable and a shard's own health readable.
+`openings_in_slice`, `worker_index`, `worker_count`) **and the worker's campaign-wide identity**
+(`global_worker_offset`, `global_worker_index`, `global_worker_count`), and the record and game counts, the
+last of these including `games_abandoned`, `games_decided_at_first_label` and `games_without_records` —
+which is what makes a net's data lineage auditable and a shard's own health readable.
 
 **Measured throughput**, one worker on one core of an i9-13900HX (~2.0M nps) with net v12 and
 `nnue/openings.epd`, every other option at its default, each run about 4½ minutes:
@@ -310,13 +311,24 @@ Three things compose, and all three keep a shard reproducible from its seed (no 
    `--openings` is given (it was 0, and is still 8 from the start position). Each opening becomes the ~900
    two-ply legal lines out of it, which is what makes the distinct-game count unbounded rather than merely
    large.
-3. **A disjoint slice of the pool per worker** — `--worker-index` / `--worker-count`, which
-   `run_gendata.sh` passes automatically: worker *I* takes the openings whose index is congruent to *I*
-   modulo the worker count. **Two workers cannot start a game from the same position**, so a cross-worker
-   duplicate game is impossible by construction rather than merely unlikely. Within a worker the slice is
-   handed out in a seeded shuffle and reshuffled each pass — without replacement, rather than the uniform
-   draws with replacement that start repeating after about the square root of the pool (20 games into a
-   306-position set).
+3. **A disjoint slice of the pool per worker, across the whole campaign** — `--worker-index` /
+   `--worker-count` for this machine's fan and `--global-worker-offset` / `--global-worker-count` for the
+   campaign, all four of which `run_gendata.sh` passes: the worker whose **global** identity is *G* takes
+   the openings whose index is congruent to *G* modulo the **campaign's** worker count. **No two workers
+   anywhere can start a game from the same position**, so a duplicate game is impossible by construction
+   rather than merely unlikely. Within a worker the slice is handed out in a seeded shuffle and reshuffled
+   each pass — without replacement, rather than the uniform draws with replacement that start repeating
+   after about the square root of the pool (20 games into a 306-position set).
+
+   **Modulo the machine's own worker count, this would not hold across machines**, and that was a real hole
+   until 2026-10-26: a box running 24 workers and a box running 12 both have a worker whose slice contains
+   index 0, so their slices overlap and only their differing seeds keep the two workers' games apart —
+   "unlikely", not "impossible by construction", which is not a promise worth a week of rented CPU. The
+   global identity closes it. `gen_data` refuses an offset that overlaps or overruns the campaign's fan
+   before it plays a game, and `check_duplicates.sh` audits the identities in the assembled pool's `.meta`
+   sidecars afterwards — the second check matters because the unique fraction does **not** catch this: a
+   deliberately colliding six-shard pool (two machines both defaulting to offset 0) still measured
+   **1.0000 unique**, while the identity audit named both colliding pairs at once.
 
 **Measured, `--random-plies` on top of the committed pool.** 480 games per setting (8 workers × 60 games,
 each worker on its own slice, the same openings and seeds for every setting), `--play-nodes 20000
@@ -374,6 +386,21 @@ is an upper bound on how unique the whole pool is, which is the safe direction f
 `run_gendata.sh` reports it when a run finishes, and **`train_pipeline.sh` runs it as a gate** before
 converting a shard directory (`ALLOW_DUPLICATE_POOL=1` to train anyway, `MIN_UNIQUE_FRACTION` to move the
 gate).
+
+For a shard directory it **also audits the campaign identities** in the `.meta` sidecars: no two shards may
+claim the same `global_worker_index`, every shard must name the same `global_worker_count`, and every shard
+must name the same opening pool and `openings_count`. That is the check that catches two machines given
+overlapping offsets, and it fails the script on its own — see the caveat below for why the unique fraction
+cannot be relied on to notice.
+
+**What the 0.80 gate is and is not.** It catches gross replication — a campaign whose workers are replaying
+each other's games, or one exhausting a pool far too small for it. It does **not** catch subtle degeneracy:
+a pool of millions of near-identical games from near-identical openings would pass it comfortably. And
+**the unique fraction will fall below 1.0 at scale for entirely legitimate reasons**: distinct games
+transpose into one another, and the more games a pool holds the more often two of them pass through the same
+position. So the number to watch is **its trend as the pool grows**, not a single reading — measure it at a
+few points through the campaign and expect a slow, shallow decline from 1.0000. A step change, or a decline
+that keeps steepening, is the signal; one reading of 0.97 is not.
 
 **The before and after, measured at the same size.** Two 16-worker runs of 190 games each (3,040 games,
 ~30 minutes apiece), side by side on the same machine, same budgets, differing only in the diversity

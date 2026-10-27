@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Measure what fraction of an assembled NNUE training pool is distinct positions - the cheap check that a
-# data campaign is not generating the same games over and over.
+# data campaign is not generating the same games over and over - and audit the campaign identities the
+# shards' .meta sidecars record.
 #
 # WHY THIS EXISTS. The engine is deterministic at a fixed budget with its book off, so a self-play game is
 # decided by the position it starts from. A campaign whose openings are too few, or whose workers draw from
@@ -27,10 +28,20 @@
 #   distinct positions   distinct FEN (everything before the first " | "). The same position labelled by two
 #                        different games counts once: it is one training input either way.
 #
-# The headline is distinct / collapsed. A healthy pool from the current defaults measures about 0.98; a
-# campaign whose workers were replaying each other's games would land far below it. The 0.80 default gate
-# sits well under the healthy value and far above any real degeneracy, so it fires on a broken campaign and
-# not on an unlucky one.
+# The headline is distinct / collapsed. A healthy pool from the current defaults measures about 0.98 (1.0000
+# at development scale); a campaign whose workers were replaying each other's games would land far below it.
+# The 0.80 default gate sits well under the healthy value and far above any real degeneracy, so it fires on a
+# broken campaign and not on an unlucky one. WATCH THE TREND, NOT ONE READING: distinct games transpose into
+# each other, so a growing pool's unique fraction falls below 1.0 for entirely legitimate reasons, and the
+# question is whether it is drifting down steadily as the pool grows or holding near its value.
+#
+# WHAT IT AUDITS. For a directory, the .meta sidecars are read too, and the campaign identities in them
+# (global_worker_index / global_worker_count, which tools/run_gendata.sh passes) must be consistent: no two
+# shards may share a global worker index, every shard must name the same campaign worker count, and every
+# shard must name the same opening pool and pool size. Two machines given overlapping offsets is the one
+# campaign mistake that silently produces duplicate games across the whole run, and the sidecars are where
+# it is visible once the shards come home. A problem here fails the script however good the unique fraction
+# looks - the fraction is measured over whatever records are read, and a sampled read can miss the overlap.
 #
 # SAMPLING. A duplicate here is a repeated GAME, which is a contiguous run of records inside each shard, so
 # reading the first N records of EVERY shard keeps whole games intact and still sees every worker - which is
@@ -46,6 +57,7 @@ RECORDS_PER_SHARD="${3:-}"
 
 # The shards to read, and the games they say they played (the .meta sidecars gen_data writes).
 shards=()
+metas=()
 games_completed=0
 if [ -d "$POOL" ]; then
     while IFS= read -r shard; do
@@ -57,6 +69,7 @@ if [ -d "$POOL" ]; then
     fi
     for meta in "$POOL"/*.txt.meta; do
         [ -f "$meta" ] || continue
+        metas+=("$meta")
         played="$(awk '/^games_completed /{print $2; exit}' "$meta")"
         games_completed=$((games_completed + ${played:-0}))
     done
@@ -65,6 +78,84 @@ elif [ -f "$POOL" ]; then
 else
     echo "check_duplicates.sh: '$POOL' is neither a file nor a directory" >&2
     exit 1
+fi
+
+# The campaign-identity audit, from the sidecars. One line per shard: the sidecar's name, the worker's
+# global index and the campaign's worker count, the opening pool it used and how many positions that held.
+# A field the sidecar does not carry comes through as "-" (a shard from before these were recorded).
+partition_problems=0
+if [ "${#metas[@]}" -gt 0 ]; then
+    identities="$(
+        for meta in "${metas[@]}"; do
+            awk -v file="$(basename "$meta")" '
+                /^global_worker_index /  { global_index = $2 }
+                /^global_worker_count /  { global_count = $2 }
+                /^openings /             { pool_file    = $2 }
+                /^openings_count /       { pool_size    = $2 }
+                END {
+                    printf "%s %s %s %s %s\n", file,
+                           (global_index == "" ? "-" : global_index), (global_count == "" ? "-" : global_count),
+                           (pool_file == "" ? "-" : pool_file),       (pool_size == "" ? "-" : pool_size)
+                }
+            ' "$meta"
+        done
+    )"
+    if ! printf '%s\n' "$identities" | awk '
+        NF == 0 { next }
+        {
+            ++shards
+            shard_file = $1; global_index = $2; global_count = $3; pool_file = $4; pool_size = $5
+            if (global_index == "-" || global_count == "-") {
+                ++unrecorded
+                unrecorded_names = unrecorded_names " " shard_file
+                next
+            }
+            if (global_index in owner_of_index) {
+                printf "check_duplicates.sh: FAIL: %s and %s both claim campaign worker %s - their slices of\n",
+                       owner_of_index[global_index], shard_file, global_index > "/dev/stderr"
+                printf "check_duplicates.sh: the opening pool are the same, so they played the same games.\n" \
+                       > "/dev/stderr"
+                ++problems
+            } else {
+                owner_of_index[global_index] = shard_file
+            }
+            if (!(global_count in count_seen)) { count_seen[global_count] = shard_file; ++distinct_counts }
+            if (!(pool_file " " pool_size in pool_seen)) {
+                pool_seen[pool_file " " pool_size] = shard_file
+                ++distinct_pools
+            }
+        }
+        END {
+            if (distinct_counts > 1) {
+                printf "check_duplicates.sh: FAIL: the shards disagree about the campaign worker count, so the\n" \
+                       > "/dev/stderr"
+                printf "check_duplicates.sh: partition means nothing: " > "/dev/stderr"
+                for (value in count_seen) { printf "%s (%s) ", value, count_seen[value] > "/dev/stderr" }
+                printf "\n" > "/dev/stderr"
+                ++problems
+            }
+            if (distinct_pools > 1) {
+                printf "check_duplicates.sh: FAIL: the shards used different opening pools, so one index is not\n" \
+                       > "/dev/stderr"
+                printf "check_duplicates.sh: one position across them: " > "/dev/stderr"
+                for (value in pool_seen) { printf "%s (%s) ", value, pool_seen[value] > "/dev/stderr" }
+                printf "\n" > "/dev/stderr"
+                ++problems
+            }
+            if (unrecorded > 0) {
+                printf "check_duplicates.sh: WARNING: %d sidecar(s) record no campaign identity, so their\n",
+                       unrecorded > "/dev/stderr"
+                printf "check_duplicates.sh: partition cannot be audited:%s\n", unrecorded_names > "/dev/stderr"
+            }
+            if (problems == 0) {
+                printf "check_duplicates.sh: %-36s %d shard(s), %d distinct campaign worker(s)\n",
+                       "campaign identities", shards, shards - unrecorded
+            }
+            exit problems > 0 ? 1 : 0
+        }
+    '; then
+        partition_problems=1
+    fi
 fi
 
 # Bytes in the inputs, for the automatic sampling decision (a size, not a line count: reading every line
@@ -131,9 +222,17 @@ fi
 if awk -v u="$unique_fraction" -v m="$MIN_UNIQUE" 'BEGIN{exit !(m > 0 && u < m)}'; then
     echo "check_duplicates.sh: FAIL: unique fraction $unique_fraction is under the $MIN_UNIQUE gate." >&2
     echo "check_duplicates.sh: the campaign is generating the same games repeatedly. Check that every worker" >&2
-    echo "check_duplicates.sh: got --worker-index/--worker-count (tools/run_gendata.sh passes them), that the" >&2
-    echo "check_duplicates.sh: opening pool is large enough for the games asked of it (tools/gen_openings.cpp)," >&2
-    echo "check_duplicates.sh: and that --random-plies is not 0. Do not train on this pool." >&2
+    echo "check_duplicates.sh: got --worker-index/--worker-count and --global-worker-offset/--global-worker-count" >&2
+    echo "check_duplicates.sh: (tools/run_gendata.sh passes them), that the opening pool is large enough for the" >&2
+    echo "check_duplicates.sh: games asked of it (tools/gen_openings.cpp), and that --random-plies is not 0. Do" >&2
+    echo "check_duplicates.sh: not train on this pool." >&2
+    exit 1
+fi
+if [ "$partition_problems" -ne 0 ]; then
+    echo "check_duplicates.sh: FAIL: the campaign identities above collide or disagree, so this pool holds" >&2
+    echo "check_duplicates.sh: duplicate games however its unique fraction reads. Fix the offsets (every" >&2
+    echo "check_duplicates.sh: machine a distinct GLOBAL_WORKER_OFFSET into one GLOBAL_WORKER_COUNT, and the" >&2
+    echo "check_duplicates.sh: identical pool file everywhere) and regenerate the colliding shards." >&2
     exit 1
 fi
 echo "check_duplicates.sh: OK (gate $MIN_UNIQUE)"

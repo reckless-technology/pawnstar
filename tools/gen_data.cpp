@@ -36,14 +36,25 @@
 ///     short legal lines out of it - about thirty to the power of the ply count. This is what makes the
 ///     number of distinct games unbounded rather than merely large: an opening pool alone cannot cover a
 ///     campaign, which at the ~71 records a game these defaults measure needs millions of games for 500M.
-///  3. **A disjoint slice of the pool per worker** (`--worker-index` / `--worker-count`), so that two
-///     workers cannot start from the same opening - which makes a cross-worker duplicate game impossible
-///     by construction rather than merely unlikely. Within one worker the openings are handed out without
-///     replacement, in a seeded shuffle, so a pass over the slice uses each of them once.
+///  3. **A disjoint slice of the pool per worker, campaign-wide** (`--worker-index` / `--worker-count`
+///     within one machine, `--global-worker-offset` / `--global-worker-count` across the whole campaign),
+///     so that no two workers anywhere start from the same opening - which makes a duplicate game
+///     impossible by construction rather than merely unlikely. Within one worker the openings are handed
+///     out without replacement, in a seeded shuffle, so a pass over the slice uses each of them once.
+///
+/// **The partition is campaign-wide, not machine-wide, and that distinction is the whole of its value.** A
+/// slice is the pool indices congruent to the worker's GLOBAL identity modulo the campaign's TOTAL worker
+/// count. Taken modulo a machine's own worker count instead, a 24-worker box and a 12-worker box each have
+/// a worker whose slice holds index 0, and only their differing seeds keep those two workers' games apart -
+/// "unlikely" rather than "impossible", which is not a promise worth a week of rented CPU. Give every
+/// machine the same pool file and a distinct, non-overlapping offset into one campaign-wide fan and the
+/// slices are disjoint across the entire campaign. The arguments are checked for overlap and range before a
+/// game is played, and the identity lands in the shard's .meta so that the assembled pool can be audited
+/// afterwards too (tools/check_duplicates.sh does exactly that).
 ///
 /// Determinism per seed survives all three: the shuffle, the slice and the random plies are all functions of
-/// the seed, the worker index and the worker count, so a shard is reproducible and auditable. Nothing here
-/// reads a clock or any other entropy. tools/check_duplicates.sh measures what the pool actually came out at.
+/// the seed and the worker's global identity, so a shard is reproducible and auditable. Nothing here reads a
+/// clock or any other entropy. tools/check_duplicates.sh measures what the pool actually came out at.
 ///
 /// Usage:  gen_data <out_file> <num_games> <seed> [options]
 ///
@@ -84,11 +95,20 @@
 ///                         in, and the resign adjudication then ends the game four plies later.
 ///   --random-plies N      uniformly random opening plies per game, for diversity (default 8 from the start
 ///                         position, kDefaultRandomPliesWithOpenings on top of an opening; not recorded).
-///   --worker-index I      this worker's index in a fan of --worker-count workers (default 0).
-///   --worker-count N      how many workers the fan has (default 1). The opening pool is partitioned across
-///                         them - worker I takes the openings whose index is congruent to I modulo N - so no
-///                         two workers can ever start a game from the same position, and therefore cannot
-///                         generate the same game. tools/run_gendata.sh passes both.
+///   --worker-index I      this worker's index in its own machine's fan of --worker-count workers
+///                         (default 0).
+///   --worker-count N      how many workers this machine's fan has (default 1).
+///   --global-worker-offset K  the campaign-wide index of this machine's first worker (default 0), so this
+///                         worker's global identity is K plus its --worker-index. Every machine in one
+///                         campaign needs a distinct, non-overlapping offset.
+///   --global-worker-count N  how many workers the WHOLE campaign has, across every machine (default: the
+///                         same as --worker-count, which is what a single-machine run wants). The opening
+///                         pool is partitioned across the campaign - the worker whose global identity is G
+///                         takes the openings whose index is congruent to G modulo this count - so no two
+///                         workers anywhere can start a game from the same position, and therefore cannot
+///                         generate the same game. A machine whose offset plus worker count would run past
+///                         this count is refused rather than wrapping onto another machine's slices.
+///                         tools/run_gendata.sh passes all four.
 ///   --no-dedup            keep repeated positions. By default a position whose Zobrist hash was already
 ///                         written to this shard is dropped: self-play repeats openings heavily.
 ///   --hash MB             transposition-table size per process (default: the engine's own 64 MB).
@@ -171,6 +191,11 @@ constexpr uint64_t kDefaultLabelNodes = 220000;
 /// Eight, the default from the start position, is far past the knee: it reaches positions a side is already
 /// lost in, and such a game yields about one record.
 constexpr int kDefaultRandomPliesWithOpenings = 2;
+/// @brief Sanity cap on a campaign's worker count, on a machine's fan and on its offset into the campaign.
+/// A campaign of a million single-threaded workers is not a thing that exists, and the cap is also what
+/// keeps the overlap arithmetic (offset + worker count) below the range of std::size_t rather than wrapping
+/// to a small number and passing a check it should fail.
+constexpr std::size_t kMaximumCampaignWorkers = 1000000;
 
 /// @brief One search budget: either a fixed depth or a node limit, as the UCI `go depth` / `go nodes` forms.
 struct SearchBudget
@@ -198,9 +223,11 @@ struct Options
     std::string              net_path;                         ///< Labelling net.
     std::string              openings_file;                    ///< EPD opening set, or empty for the start position.
     std::vector<std::string> openings;                         ///< The parsed opening FENs.
-    std::size_t              worker_index   = 0;               ///< This worker's index in the fan.
-    std::size_t              worker_count   = 1;               ///< How many workers the fan has.
-    int                      progress_games = 50;              ///< Games between stderr progress lines.
+    std::size_t              worker_index         = 0;         ///< Index in this machine's own fan.
+    std::size_t              worker_count         = 1;         ///< Workers in this machine's own fan.
+    std::size_t              global_worker_offset = 0;         ///< Campaign-wide index of this machine's first worker.
+    std::size_t              global_worker_count  = 0;  ///< Campaign-wide worker total; 0 = the same as worker_count.
+    int                      progress_games       = 50; ///< Games between stderr progress lines.
 };
 
 /// @brief What the run counted, reported on stderr and in the .meta sidecar.
@@ -222,24 +249,27 @@ struct Statistics
 ///
 /// Two jobs, and they are the whole answer to a campaign generating the same game twice:
 ///
-///  * **Across workers**: the pool is partitioned, worker I taking the openings whose index is congruent to
-///    I modulo the worker count. The slices are disjoint, so two workers cannot start a game from the same
-///    position - and since the engine is deterministic, a game is decided by where it starts. A duplicate
-///    game across workers is therefore impossible by construction, not merely unlikely. (Folding the worker
-///    index into the RNG stream instead would have made a collision improbable, which is a weaker promise
-///    for a 1-2 week campaign and much harder to argue.)
+///  * **Across every worker in the campaign**: the pool is partitioned, the worker whose global identity is
+///    G taking the openings whose index is congruent to G modulo the campaign's worker count. The slices are
+///    disjoint, so two workers cannot start a game from the same position - and since the engine is
+///    deterministic, a game is decided by where it starts. A duplicate game across workers is therefore
+///    impossible by construction, not merely unlikely. (Folding the worker index into the RNG stream instead
+///    would have made a collision improbable, which is a weaker promise for a 1-2 week campaign and much
+///    harder to argue.) The identity is global rather than an index within one machine's fan precisely so
+///    that this holds across machines of different core counts: see the file header.
 ///  * **Within a worker**: the slice is handed out in a seeded shuffle and reshuffled at the end of each
 ///    pass, so a worker playing fewer games than its slice holds never repeats an opening at all, and one
 ///    playing more spreads the repeats evenly instead of drawing them from a uniform distribution with
 ///    replacement - which starts repeating after about the square root of the pool.
 ///
-/// The shuffle is seeded from the run's seed and the worker index together, so each worker walks its own
-/// slice in its own order, and the whole thing is still a function of the seed: the shard replays exactly.
+/// The shuffle is seeded from the run's seed and the worker's global identity together, so each worker walks
+/// its own slice in its own order, and the whole thing is still a function of the seed: the shard replays
+/// exactly.
 class OpeningSchedule
 {
   public:
-    OpeningSchedule(const std::vector<std::string> &openings, std::size_t worker_index, std::size_t worker_count,
-                    uint64_t seed);
+    OpeningSchedule(const std::vector<std::string> &openings, std::size_t global_worker_index,
+                    std::size_t global_worker_count, uint64_t seed);
     bool               IsEmpty() const;
     std::size_t        Size() const;
     const std::string &Next();
@@ -253,20 +283,22 @@ class OpeningSchedule
 
 /// @brief Build the schedule for one worker.
 /// @param openings The whole opening pool, which must outlive the schedule.
-/// @param worker_index This worker's index, below worker_count.
-/// @param worker_count How many workers share the pool.
-/// @param seed The run's seed; mixed with the worker index so each worker orders its slice differently.
-inline OpeningSchedule::OpeningSchedule(const std::vector<std::string> &openings, std::size_t worker_index,
-                                        std::size_t worker_count, uint64_t seed)
+/// @param global_worker_index This worker's campaign-wide identity, below global_worker_count.
+/// @param global_worker_count How many workers the whole campaign shares the pool between.
+/// @param seed The run's seed; mixed with the global identity so each worker orders its slice differently.
+inline OpeningSchedule::OpeningSchedule(const std::vector<std::string> &openings, std::size_t global_worker_index,
+                                        std::size_t global_worker_count, uint64_t seed)
     : openings_{&openings}
 {
-    for (std::size_t index = worker_index; index < openings.size(); index += worker_count)
+    for (std::size_t index = global_worker_index; index < openings.size(); index += global_worker_count)
     {
         order_.push_back(index);
     }
     // The golden-ratio odd constant is the usual way to turn two numbers into one well-spread seed; what
-    // matters here is only that two workers of one run get different orders and that the mapping is fixed.
-    shuffle_rng_.seed(seed + 0x9e3779b97f4a7c15ull * (uint64_t)(worker_index + 1));
+    // matters here is only that two workers of one campaign get different orders and that the mapping is
+    // fixed. The global identity goes in rather than the machine-local index, so that worker 0 of two
+    // machines does not walk one order twice.
+    shuffle_rng_.seed(seed + 0x9e3779b97f4a7c15ull * (uint64_t)(global_worker_index + 1));
     std::shuffle(order_.begin(), order_.end(), shuffle_rng_);
 }
 
@@ -971,6 +1003,14 @@ int main(int argc, char **argv)
         {
             options.worker_count = (std::size_t)value;
         }
+        else if (flag == "--global-worker-offset")
+        {
+            options.global_worker_offset = (std::size_t)value;
+        }
+        else if (flag == "--global-worker-count")
+        {
+            options.global_worker_count = (std::size_t)value;
+        }
         else if (flag == "--hash")
         {
             options.hash_megabytes = (std::size_t)value;
@@ -1005,6 +1045,35 @@ int main(int argc, char **argv)
         std::cerr << "gen_data: --worker-index must be below --worker-count, and --worker-count at least 1\n";
         return 1;
     }
+    if (options.worker_count > kMaximumCampaignWorkers || options.global_worker_count > kMaximumCampaignWorkers ||
+        options.global_worker_offset > kMaximumCampaignWorkers)
+    {
+        std::cerr << "gen_data: --worker-count, --global-worker-count and --global-worker-offset must each be at "
+                  << "most " << kMaximumCampaignWorkers << '\n';
+        return 1;
+    }
+    // The campaign-wide fan. Left unset, it is this machine's own fan - which is what a single-machine run
+    // wants, and keeps every command line written before the campaign arguments existed meaning exactly
+    // what it meant then.
+    const std::size_t global_worker_count =
+        options.global_worker_count != 0 ? options.global_worker_count : options.worker_count;
+    const std::size_t global_worker_index = options.global_worker_offset + options.worker_index;
+    // THE GUARD THAT PROTECTS A WEEK OF RENTED CPU. An overlapping or out-of-range offset would silently
+    // generate colliding data - two machines' workers sharing slices of the pool, and so playing the same
+    // games - and every shard would look healthy until the assembled pool was measured at the end. Refuse it
+    // loudly instead, before a single game is played.
+    if (options.global_worker_offset + options.worker_count > global_worker_count)
+    {
+        std::cerr << "gen_data: FATAL: --global-worker-offset " << options.global_worker_offset
+                  << " plus --worker-count " << options.worker_count << " runs past --global-worker-count "
+                  << global_worker_count << ", so this\n"
+                  << "gen_data: machine's workers would wrap onto another machine's slices of the opening pool "
+                  << "and play the same games. Set\n"
+                  << "gen_data: --global-worker-count to the campaign's total worker count and give every machine "
+                  << "a distinct offset (the first\n"
+                  << "gen_data: machine 0, each next one the previous machine's offset plus its worker count).\n";
+        return 1;
+    }
 
     if (!options.openings_file.empty())
     {
@@ -1016,19 +1085,20 @@ int main(int argc, char **argv)
         std::cerr << "gen_data: " << options.openings.size() << " openings from " << options.openings_file << '\n';
     }
     // Built even for a start-position run, where it is empty and PlayGame takes the other branch.
-    OpeningSchedule openings{options.openings, options.worker_index, options.worker_count, options.seed};
+    OpeningSchedule openings{options.openings, global_worker_index, global_worker_count, options.seed};
     if (!options.openings.empty() && openings.IsEmpty())
     {
-        // More workers than openings. Refusing is right: a worker with no slice would silently self-play the
-        // start position for a week, and the shard would look like any other.
-        std::cerr << "gen_data: FATAL: worker " << options.worker_index << " of " << options.worker_count
+        // More campaign workers than openings. Refusing is right: a worker with no slice would silently
+        // self-play the start position for a week, and the shard would look like any other.
+        std::cerr << "gen_data: FATAL: campaign worker " << global_worker_index << " of " << global_worker_count
                   << " got no openings from a pool of " << options.openings.size()
                   << "; generate a bigger pool (tools/gen_openings.cpp) or fan out fewer workers\n";
         return 1;
     }
     if (!openings.IsEmpty())
     {
-        std::cerr << "gen_data: worker " << options.worker_index << '/' << options.worker_count << " takes "
+        std::cerr << "gen_data: machine worker " << options.worker_index << '/' << options.worker_count
+                  << ", campaign worker " << global_worker_index << '/' << global_worker_count << ", takes "
                   << openings.Size() << " of them\n";
     }
 
@@ -1107,6 +1177,9 @@ int main(int argc, char **argv)
          << "openings_in_slice " << openings.Size() << '\n'
          << "worker_index " << options.worker_index << '\n'
          << "worker_count " << options.worker_count << '\n'
+         << "global_worker_offset " << options.global_worker_offset << '\n'
+         << "global_worker_index " << global_worker_index << '\n'
+         << "global_worker_count " << global_worker_count << '\n'
          << "deduplicated " << (options.does_deduplicate ? "yes" : "no") << '\n'
          << "seed " << options.seed << '\n'
          << "games_requested " << options.num_games << '\n'
