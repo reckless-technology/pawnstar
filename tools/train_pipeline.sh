@@ -71,7 +71,21 @@ else
     ALL_DATA="$WORK/all.data"
     SHUF_DATA="$WORK/shuffled.data"
     echo "[2/4] combining self-play shards -> $ALL_TXT"
-    cat "$WORK"/data_*.txt "$WORK"/seed*.txt 2>/dev/null > "$ALL_TXT"
+    # Gather whichever shard names are actually there. The two globs are both optional - tools/run_gendata.sh
+    # writes data_<i>.txt and the original bootstrap wrote seed*.txt - and `cat` exits 1 on an operand that
+    # does not exist, so passing an unmatched glob straight to it aborted the whole script under `set -e`,
+    # after all.txt had been written and with the message swallowed by 2>/dev/null: the run just stopped.
+    # Collect the files first and say so plainly when there are none.
+    SHARDS=()
+    for shard in "$WORK"/data_*.txt "$WORK"/seed*.txt; do
+        [ -f "$shard" ] && SHARDS+=("$shard")
+    done
+    if [ "${#SHARDS[@]}" -eq 0 ]; then
+        echo "[2/4] no data_*.txt or seed*.txt shards in $WORK" >&2
+        exit 1
+    fi
+    echo "[2/4] ${#SHARDS[@]} shard(s)"
+    cat "${SHARDS[@]}" > "$ALL_TXT"
     wc -l "$ALL_TXT"
     # The duplicate gate. gen_data deduplicates positions PER SHARD, so a campaign that generated the same
     # games in several workers produces shards that each look healthy and a pool that is mostly copies -
@@ -90,6 +104,10 @@ else
     fi
     echo "[2b/4] convert text -> bulletformat, then shuffle (self-play data is highly correlated)"
     "$UTILS" convert --from text --input "$ALL_TXT" --output "$ALL_DATA" --threads 8
+    # bullet-utils shuffle now spills to "<output>.tmp" (it used to be ./tmp under the working directory)
+    # and insists on creating that directory itself, so a killed shuffle leaves a directory behind that
+    # makes every later run fail before it reads a byte. Clear it first - it holds nothing we want.
+    rm -rf "${SHUF_DATA:?}.tmp"
     ( cd "$WORK" && "$UTILS" shuffle --input "$ALL_DATA" --output "$SHUF_DATA" --mem-used-mb 4096 )
 fi
 
