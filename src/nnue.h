@@ -27,39 +27,60 @@
 /// that the banks are numbered from 0 with no gaps, since a map selecting only banks {0, 3} would size the
 /// weights for four and leave two of them untrained.
 ///
-/// The map must also stay **byte-identical to the `KING_BUCKETS` array in tools/bullet/pawnstar.rs that the
-/// net was trained with**: a net trained with one map and evaluated with another loads, plays, and is
-/// silently wrong, because the stamped header records the bank *count* and not the map. Nothing checks that
-/// today - see "Pinning the king-bucket map in the net header" in nnue/README.md §2 for the digest that
-/// would, and why it waits for the next net.
+/// The map must also stay **byte-identical to the map in tools/bullet/pawnstar.rs that the net was trained
+/// with**: a net trained with one map and evaluated with another loads, plays, and is silently wrong,
+/// because a header that records only the bank *count* cannot tell the two apart. **The RNNUE1 header
+/// closes that hole**: it carries `king_bucket_map_crc`, the CRC-64/XZ of this map's 64 entries as one
+/// `uint8` each, and the loader refuses a net whose digest differs from this build's. That was deferred
+/// until the next format change in nnue/README.md §2; this is that change, and the README now records it as
+/// done rather than proposed. What the digest cannot prove is that the *trainer* used this map, since
+/// tools/bullet/pawnstar.rs computes nothing from this header — it narrows the window to "stamped by a
+/// build whose map differs", which is the likelier mistake.
 ///
 /// A net is owned by the Game (one instance, read-only after Network::Load) and shared by all Lazy SMP
 /// threads, which call only its const methods. The accumulator is maintained incrementally and **lazily**
 /// across make/undo (the update is deferred until an eval reads it — see SearchState::CurrentAccumulator);
-/// Network::Refresh rebuilds it from scratch. A shipped net is prepended
-/// with a self-describing NetHeader (see below) that the loader validates against this build; the weight
-/// payload itself is the `bullet` trainer's native quantised output (see nnue/README.md), a tightly
-/// packed little-endian struct in this exact order (bullet save_format):
+/// Network::Refresh rebuilds it from scratch.
+///
+/// **The net container is `RNNUE1`** — the one format every Reckless engine reads (skill `reckless-nnue`).
+/// A 64-byte self-describing NetHeader (see below), then the weight payload: little-endian throughout,
+/// tightly packed, in bullet's save order, bucket-major.
 ///
 ///   feature_weights : int16[kFeatureRows * kHiddenSize]  (column-major: feature * kHiddenSize + i), scale QA
-///   feature_bias    : int16[kHiddenSize]                                                           , scale QA
-///   output_weights  : int16[2 * kHiddenSize]  (first kHiddenSize = stm, next = ntm)                , scale QB
-///   output_bias     : int16 (scalar)                                                               , scale QA*QB
+///   feature_bias    : int16[kHiddenSize]                                                          , scale QA
+///   output_weights  : int16[kNumOutputBuckets][2 * kHiddenSize]  (own perspective first, then the
+///                     opponent's, per bucket)                                                     , scale QB
+///   output_bias     : int32[kNumOutputBuckets]                                                 , scale QA*QB
 ///
 /// where kFeatureRows = 768 * kNumKingBuckets (the bucket banks are laid out bucket-major). The
 /// activation and dequantisation mirror bullet's example exactly so that an engine evaluation reproduces
 /// the trainer's eval (verified by test_nnue).
+///
+/// The loader makes exactly two checks, in this order, and **refuses loudly without falling back** on any
+/// failure: (1) the 64-byte header — magic, then `header_crc` over its first 56 bytes, then every
+/// architecture field against this build's compile-time constants, then `king_bucket_map_crc` against this
+/// build's own map; (2) the payload — `payload_bytes` against the bytes actually there, then `payload_crc`
+/// over them. Each refusal names the field, the file's value and the engine's. A net that fails is not
+/// loaded: silently playing on with a different net is the failure the whole container exists to stop.
+///
+/// RNNUE1 replaced the 32-byte `PSN1` header on 2026-10-27. PSN1 carried the architecture but neither the
+/// bucket map's contents nor any checksum, and stored the output bias as a single int16; RNNUE1 adds the
+/// map digest, the two CRCs, an output-bucket count and an int32 bias array. The two are told apart by
+/// their magic, so a PSN1 net is rejected rather than misread.
 
 #include "constants.h"
+#include "crc64.h"
 #include "platform.h"
 #include "position.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <format>
 #include <fstream>
 #include <string>
 #include <utility>
@@ -136,57 +157,127 @@ constexpr int kNumKingBuckets = MaxKingBucketIndex() + 1;     ///< King-square w
 constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
 constexpr int kHiddenSize     = 1024; ///< Feature-transformer / accumulator width per perspective.
 
+/// @brief Material output heads. One head is the v12 shape; the shared architecture's eight are selected by
+/// OutputBucket() from the piece count. The count is a compile-time constant because it sizes the payload
+/// and is stamped into the header, so a net and a build can never disagree about it silently.
+constexpr int kNumOutputBuckets = 1;
+
+/// @brief Whether a perspective whose own king stands on files e-h is horizontally mirrored before indexing.
+/// Off at the v12 shape. The flag is stamped into the header, so a mirrored net cannot load into an
+/// unmirrored build (or the reverse) — the two read entirely different feature rows for the same position.
+constexpr bool kIsKingMirroringEnabled = false;
+
 // Quantisation constants. These MUST match the bullet trainer configuration that produced the net.
 constexpr int kQA    = 255; ///< Feature-transformer weight/activation scale (SCReLU clamp).
 constexpr int kQB    = 64;  ///< Output-layer weight scale.
 constexpr int kScale = 400; ///< Maps the raw network output to centipawns.
 
-/// @brief Total size of the quantised weight payload: every weight a little-endian int16, tightly packed.
-constexpr std::size_t kNetFileBytes =
-    (static_cast<std::size_t>(kFeatureRows) * kHiddenSize + kHiddenSize + 2 * kHiddenSize + 1) * sizeof(int16_t);
+/// @brief Element counts of the four payload sections, in the order they are stored.
+constexpr std::size_t kFeatureWeightCount = static_cast<std::size_t>(kFeatureRows) * kHiddenSize;
+constexpr std::size_t kFeatureBiasCount   = kHiddenSize;
+constexpr std::size_t kOutputWeightCount  = static_cast<std::size_t>(kNumOutputBuckets) * 2 * kHiddenSize;
+constexpr std::size_t kOutputBiasCount    = kNumOutputBuckets;
 
-/// @brief Magic identifying a Pawnstar-stamped NNUE file ("PSN" + format version byte).
-constexpr char          kNetMagic[4]      = {'P', 'S', 'N', '1'};
-constexpr std::uint16_t kNetFormatVersion = 1; ///< Header format version (bump on incompatible header changes).
+/// @brief Exact size of the quantised weight payload: three int16 sections then an int32 bias per output
+/// bucket, tightly packed and little-endian. This is what the header's payload_bytes must equal, and the
+/// file carries nothing after it — bullet's 64-byte "bullet" tail padding is dropped at stamping time,
+/// because an exact length is what lets a truncated or overlong file be told apart from a sound one.
+constexpr std::size_t kNetPayloadBytes =
+    (kFeatureWeightCount + kFeatureBiasCount + kOutputWeightCount) * sizeof(std::int16_t) +
+    kOutputBiasCount * sizeof(std::int32_t);
 
-/// @brief Self-describing 32-byte header prepended to a shipped net so an incompatible file is rejected
-/// rather than silently misread. The architecture fields must equal the engine's compile-time constants;
-/// the loader checks every one. Raw (headerless) bullet output is rejected — stamp it with tools/stamp_net.
+/// @brief Magic identifying a net in the shared Reckless container: "RNNUE1" and two zero bytes.
+constexpr char kNetMagic[8] = {'R', 'N', 'N', 'U', 'E', '1', '\0', '\0'};
+
+constexpr std::uint16_t kNetFormatVersion = 1;  ///< RNNUE1 format version (bump on any layout change).
+constexpr std::uint16_t kNetHeaderBytes   = 64; ///< Header size, so a later version can extend it safely.
+
+constexpr std::uint8_t kNetFlagKingMirroring = 0x01; ///< flags_ bit 0: horizontal king mirroring is on.
+constexpr std::uint8_t kActivationScreelu    = 0;    ///< activation_ 0: SCReLU, clamp(x, 0, QA) then square.
+
+/// @brief The 64-byte self-describing header every RNNUE1 net carries, little-endian and tightly packed.
+/// Every architecture field must equal this build's compile-time constant and the map digest this build's
+/// own map, or the net is refused; the three CRCs make a corrupt or truncated file refuse too.
 #pragma pack(push, 1)
 
 struct NetHeader
 {
-    char          magic_[4];       ///< kNetMagic.
-    std::uint16_t format_version_; ///< kNetFormatVersion.
-    std::uint16_t input_size_;     ///< kInputSize (features per perspective per bucket).
-    std::uint16_t king_buckets_;   ///< kNumKingBuckets.
-    std::uint16_t hidden_size_;    ///< kHiddenSize.
-    std::int16_t  qa_;             ///< kQA.
-    std::int16_t  qb_;             ///< kQB.
-    std::int16_t  scale_;          ///< kScale.
-    std::uint8_t  reserved_[14];   ///< Zero-padding to a round 32 bytes.
+    char          magic_[8];            ///< kNetMagic, at offset 0.
+    std::uint16_t format_version_;      ///< kNetFormatVersion, at 8.
+    std::uint16_t header_bytes_;        ///< kNetHeaderBytes, at 10.
+    std::uint16_t features_per_bucket_; ///< kInputSize, at 12.
+    std::uint16_t king_buckets_;        ///< kNumKingBuckets, at 14.
+    std::uint16_t hidden_size_;         ///< kHiddenSize, at 16.
+    std::uint16_t output_buckets_;      ///< kNumOutputBuckets, at 18.
+    std::uint8_t  flags_;               ///< kNetFlagKingMirroring, at 20; every other bit zero.
+    std::uint8_t  activation_;          ///< kActivationScreelu, at 21.
+    std::uint16_t qa_;                  ///< kQA, at 22.
+    std::uint16_t qb_;                  ///< kQB, at 24.
+    std::uint16_t eval_scale_;          ///< kScale, at 26.
+    std::uint8_t  reserved_[4];         ///< Zero, at 28.
+    std::uint64_t king_bucket_map_crc_; ///< CRC-64/XZ of kKingBucketMap's 64 entries as uint8, at 32.
+    std::uint64_t payload_bytes_;       ///< kNetPayloadBytes, at 40.
+    std::uint64_t payload_crc_;         ///< CRC-64/XZ over the payload, at 48.
+    std::uint64_t header_crc_;          ///< CRC-64/XZ over this header's first 56 bytes, at 56.
 };
 
 #pragma pack(pop)
-static_assert(sizeof(NetHeader) == 32, "NetHeader must be exactly 32 bytes");
+static_assert(sizeof(NetHeader) == kNetHeaderBytes, "NetHeader must be exactly 64 bytes");
+static_assert(offsetof(NetHeader, king_bucket_map_crc_) == 32, "king_bucket_map_crc must sit at offset 32");
+static_assert(offsetof(NetHeader, header_crc_) == 56, "header_crc must sit at offset 56");
 
-/// @brief The header describing the architecture this engine was compiled for.
+/// @brief Bytes of the header that header_crc_ covers: everything before header_crc_ itself.
+constexpr std::size_t kNetHeaderCrcBytes = offsetof(NetHeader, header_crc_);
+
+/// @brief CRC-64/XZ of kKingBucketMap's 64 entries, one uint8 each — the digest the header carries so that
+/// two maps of the same cardinality can no longer be mistaken for one another.
+/// @return The digest, computed at compile time.
+consteval std::uint64_t KingBucketMapCrc()
+{
+    std::array<std::uint8_t, kKingBucketMap.size()> entries{};
+    for (std::size_t square = 0; square < kKingBucketMap.size(); ++square)
+    {
+        entries[square] = static_cast<std::uint8_t>(kKingBucketMap[square]);
+    }
+    return crc64::Checksum(entries.data(), entries.size());
+}
+
+/// @brief The architecture this engine was compiled for, as a header. payload_crc_ and header_crc_ are left
+/// zero: only a stamping tool, which has the payload in hand, can fill them (see FinaliseNetHeader).
 /// @return A NetHeader populated from the compile-time NNUE constants.
 inline NetHeader ExpectedNetHeader()
 {
-    NetHeader h{};
-    h.magic_[0]       = kNetMagic[0];
-    h.magic_[1]       = kNetMagic[1];
-    h.magic_[2]       = kNetMagic[2];
-    h.magic_[3]       = kNetMagic[3];
-    h.format_version_ = kNetFormatVersion;
-    h.input_size_     = static_cast<std::uint16_t>(kInputSize);
-    h.king_buckets_   = static_cast<std::uint16_t>(kNumKingBuckets);
-    h.hidden_size_    = static_cast<std::uint16_t>(kHiddenSize);
-    h.qa_             = static_cast<std::int16_t>(kQA);
-    h.qb_             = static_cast<std::int16_t>(kQB);
-    h.scale_          = static_cast<std::int16_t>(kScale);
-    return h;
+    NetHeader header{};
+    for (std::size_t index = 0; index < sizeof(kNetMagic); ++index)
+    {
+        header.magic_[index] = kNetMagic[index];
+    }
+    header.format_version_      = kNetFormatVersion;
+    header.header_bytes_        = kNetHeaderBytes;
+    header.features_per_bucket_ = static_cast<std::uint16_t>(kInputSize);
+    header.king_buckets_        = static_cast<std::uint16_t>(kNumKingBuckets);
+    header.hidden_size_         = static_cast<std::uint16_t>(kHiddenSize);
+    header.output_buckets_      = static_cast<std::uint16_t>(kNumOutputBuckets);
+    header.flags_               = kIsKingMirroringEnabled ? kNetFlagKingMirroring : 0U;
+    header.activation_          = kActivationScreelu;
+    header.qa_                  = static_cast<std::uint16_t>(kQA);
+    header.qb_                  = static_cast<std::uint16_t>(kQB);
+    header.eval_scale_          = static_cast<std::uint16_t>(kScale);
+    header.king_bucket_map_crc_ = KingBucketMapCrc();
+    header.payload_bytes_       = kNetPayloadBytes;
+    return header;
+}
+
+/// @brief Fill in a header's two computed checksums, which need the payload and the rest of the header.
+/// This is what a stamping tool calls after ExpectedNetHeader, so the header a net carries is written from
+/// the stamping build's own compiled constants and never by hand.
+/// @param header Header to complete, already populated by ExpectedNetHeader.
+/// @param payload First byte of the weight payload. @param payload_bytes Payload length; must equal
+/// header.payload_bytes_.
+inline void FinaliseNetHeader(NetHeader &header, const std::uint8_t *payload, std::size_t payload_bytes)
+{
+    header.payload_crc_ = crc64::Checksum(payload, payload_bytes);
+    header.header_crc_  = crc64::Checksum(reinterpret_cast<const std::uint8_t *>(&header), kNetHeaderCrcBytes);
 }
 
 /// @brief The two perspective accumulators (each the feature-transformer output, width kHiddenSize).
@@ -261,15 +352,19 @@ class Network
     /// Feature rows are laid out bucket-major: row = bucket * 768 + chess768_index.
     alignas(64) std::array<int16_t, kFeatureRows * kHiddenSize> feature_weights_;
     alignas(64) std::array<int16_t, kHiddenSize> feature_bias_; ///< Feature-transformer biases (always int16).
-    /// @brief Output weights: first kHiddenSize weight the side-to-move accumulator, next kHiddenSize the other.
-    alignas(64) std::array<int16_t, 2 * kHiddenSize> output_weights_;
+    /// @brief Output weights, bucket-major: bucket * 2 * kHiddenSize + i, the first kHiddenSize of each
+    /// bucket weighting the side-to-move accumulator and the next kHiddenSize the other.
+    alignas(64) std::array<int16_t, kOutputWeightCount> output_weights_;
     /// @brief Output weights requantised to int8 for the shipped int8 forward pass (Network::Evaluate).
     /// w8 = round(output_weight / output_w_scale_) clamped to [-127,127]; the scale keeps the largest output
     /// weight in int8 range (1 for nets whose |weight| <= 127, e.g. the shipped net). Populated by Load so the
     /// int8 kernel needs no per-eval setup; the int16 reference (EvaluateExact) uses output_weights_ instead.
-    alignas(64) std::array<int8_t, 2 * kHiddenSize> output_weights_i8_{};
-    int     output_w_scale_ = 1; ///< Divisor mapping the int16 output weights into int8 range.
-    int16_t output_bias_    = 0; ///< Output bias, in QA*QB units.
+    /// One scale across every bucket, not one per bucket, so the dequantisation tail stays bucket-agnostic.
+    alignas(64) std::array<int8_t, kOutputWeightCount> output_weights_i8_{};
+    int output_w_scale_ = 1; ///< Divisor mapping the int16 output weights into int8 range.
+    /// @brief Output bias per output bucket, in QA*QB units. int32 in the container even though the trained
+    /// values comfortably fit int16: the width is part of RNNUE1, shared by all five engines.
+    std::array<std::int32_t, kOutputBiasCount> output_bias_{};
 
   public:
     bool loaded_ = false; ///< Whether Load() has succeeded.
@@ -518,61 +613,106 @@ inline bool Network::Load(const std::string &path)
     return LoadFromMemory(buffer.data(), buffer.size(), path);
 }
 
+/// @brief Report a refused net on stderr. Every refusal goes through here so each one names the net, and
+/// so the one rule that matters is visible in one place: a refused net is **not** loaded and nothing falls
+/// back to another. A stock engine that silently fell back to its embedded net once reported a plausible
+/// Elo for a net that never played a move.
+[[nodiscard]] inline bool RefuseNet(const std::string &origin, const std::string &reason)
+{
+    std::fprintf(stderr, "info string NNUE: refusing net '%s': %s\n", origin.c_str(), reason.c_str());
+    return false;
+}
+
 inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, const std::string &origin)
 {
     loaded_ = false;
 
-    // Only a Pawnstar-stamped image is accepted: a 32-byte NetHeader (magic + architecture) immediately
-    // followed by the payload. Every architecture field is checked against this engine's constants, so an
-    // incompatible — or an unstamped/raw bullet — net is rejected with a clear message instead of being
-    // silently misread. Stamp a raw bullet net with tools/stamp_net (which embeds the building engine's
-    // constants) before loading it.
-    NetHeader header{};
-    if (size < sizeof(NetHeader) || std::memcmp(data, kNetMagic, sizeof(kNetMagic)) != 0)
+    // --- Check 1: the header. 64 bytes; magic, then its own CRC, then every architecture field against
+    // this build's compile-time constants, then the king-bucket map's digest. An unstamped (raw bullet)
+    // net, a net in the retired 32-byte PSN1 container and a net for another architecture all land here.
+    if (size < sizeof(NetHeader))
     {
-        std::fprintf(stderr,
-                     "info string NNUE: net '%s' is not a stamped Pawnstar net (missing '%.4s' header) — "
-                     "stamp it with tools/stamp_net\n",
-                     origin.c_str(), kNetMagic);
-        return false;
+        return RefuseNet(
+            origin, std::format("it is {} bytes, too short for the {}-byte RNNUE1 header", size, sizeof(NetHeader)));
     }
+    if (std::memcmp(data, kNetMagic, sizeof(kNetMagic)) != 0)
+    {
+        return RefuseNet(origin, "it carries no 'RNNUE1' magic, so it is not a net in the shared container — a "
+                                 "raw bullet net must be stamped with tools/stamp_net, and a net in the retired "
+                                 "PSN1 container must be re-stamped");
+    }
+
+    NetHeader header{};
     std::memcpy(&header, data, sizeof(header));
 
-    // Validate the stamped architecture fields against this build.
-    const NetHeader expected = ExpectedNetHeader();
-    if (header.format_version_ != expected.format_version_ || header.input_size_ != expected.input_size_ ||
-        header.king_buckets_ != expected.king_buckets_ || header.hidden_size_ != expected.hidden_size_ ||
-        header.qa_ != expected.qa_ || header.qb_ != expected.qb_ || header.scale_ != expected.scale_)
+    const std::uint64_t header_crc = crc64::Checksum(data, kNetHeaderCrcBytes);
+    if (header.header_crc_ != header_crc)
     {
-        std::fprintf(stderr,
-                     "info string NNUE: net '%s' is incompatible — file is "
-                     "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d, engine expects "
-                     "v%u/in%u/buckets%u/hidden%u/qa%d/qb%d/scale%d\n",
-                     origin.c_str(), header.format_version_, header.input_size_, header.king_buckets_,
-                     header.hidden_size_, header.qa_, header.qb_, header.scale_, expected.format_version_,
-                     expected.input_size_, expected.king_buckets_, expected.hidden_size_, expected.qa_, expected.qb_,
-                     expected.scale_);
-        return false;
+        return RefuseNet(origin,
+                         std::format("its header is corrupt: header_crc is {:#018x}, the bytes checksum to {:#018x}",
+                                     header.header_crc_, header_crc));
     }
-    const std::size_t payload_offset = sizeof(NetHeader);
 
-    // The packed payload (feature_weights, feature_bias, output_weights, output_bias) is exactly
-    // kNetFileBytes; the image may have a header before it and bullet padding after it.
-    if (size < payload_offset + kNetFileBytes)
+    const NetHeader expected = ExpectedNetHeader();
+
+    struct FieldCheck
     {
-        std::fprintf(stderr, "info string NNUE: net '%s' truncated\n", origin.c_str());
-        return false;
+        const char   *name_;
+        std::uint64_t in_file_;
+        std::uint64_t in_engine_;
+    };
+
+    const FieldCheck checks[] = {
+        {"format_version", header.format_version_, expected.format_version_},
+        {"header_bytes", header.header_bytes_, expected.header_bytes_},
+        {"features_per_bucket", header.features_per_bucket_, expected.features_per_bucket_},
+        {"king_buckets", header.king_buckets_, expected.king_buckets_},
+        {"hidden_size", header.hidden_size_, expected.hidden_size_},
+        {"output_buckets", header.output_buckets_, expected.output_buckets_},
+        {"flags", header.flags_, expected.flags_},
+        {"activation", header.activation_, expected.activation_},
+        {"qa", header.qa_, expected.qa_},
+        {"qb", header.qb_, expected.qb_},
+        {"eval_scale", header.eval_scale_, expected.eval_scale_},
+        {"king_bucket_map_crc", header.king_bucket_map_crc_, expected.king_bucket_map_crc_},
+        {"payload_bytes", header.payload_bytes_, expected.payload_bytes_},
+    };
+    for (const FieldCheck &check : checks)
+    {
+        if (check.in_file_ != check.in_engine_)
+        {
+            return RefuseNet(origin, std::format("{} is {:#x} in the file, {:#x} in this engine", check.name_,
+                                                 check.in_file_, check.in_engine_));
+        }
+    }
+
+    // --- Check 2: the payload. Its length must be exactly what the header claims — no bullet tail padding,
+    // nothing appended — and then its checksum must match.
+    const std::size_t payload_bytes = size - sizeof(NetHeader);
+    if (payload_bytes != kNetPayloadBytes)
+    {
+        return RefuseNet(origin,
+                         std::format("it carries {} payload bytes after the header, not the {} its payload_bytes "
+                                     "claims",
+                                     payload_bytes, kNetPayloadBytes));
+    }
+    const std::uint8_t *p           = data + sizeof(NetHeader);
+    const std::uint64_t payload_crc = crc64::Checksum(p, payload_bytes);
+    if (header.payload_crc_ != payload_crc)
+    {
+        return RefuseNet(origin,
+                         std::format("its payload is corrupt: payload_crc is {:#018x}, the bytes checksum to {:#018x}",
+                                     header.payload_crc_, payload_crc));
     }
 
     // Copy in bullet's save order: feature_weights, feature_bias, output_weights, output_bias.
-    const std::uint8_t *p = data + payload_offset;
     std::memcpy(feature_weights_.data(), p, feature_weights_.size() * sizeof(int16_t));
     p += feature_weights_.size() * sizeof(int16_t);
     std::memcpy(feature_bias_.data(), p, feature_bias_.size() * sizeof(int16_t));
     p += feature_bias_.size() * sizeof(int16_t);
     std::memcpy(output_weights_.data(), p, output_weights_.size() * sizeof(int16_t));
     p += output_weights_.size() * sizeof(int16_t);
-    std::memcpy(&output_bias_, p, sizeof(output_bias_));
+    std::memcpy(output_bias_.data(), p, output_bias_.size() * sizeof(std::int32_t));
 
     // Requantise the output weights to int8 for the optional int8 forward pass. The scale keeps the
     // largest-magnitude output weight inside [-127, 127]; for nets whose weights already fit (|w| <= 127,
@@ -665,7 +805,7 @@ inline void Network::Update(Accumulator &acc, const Position &from, const Positi
 /// result is clamped to +/-kMaxEvaluation: pathological max-material positions (e.g. many promoted queens)
 /// can push the raw net output past int16, which would wrap when stored in the int16 eval cache and could
 /// collide with the mate band. Clamping keeps |eval| below kWinThreshold so eval and mate scores never mix.
-inline int Dequant(int64_t output, int16_t bias)
+inline int Dequant(int64_t output, std::int32_t bias)
 {
     output /= kQA;
     output += bias;
@@ -709,7 +849,9 @@ inline int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
     }
     output = dot8 * output_w_scale_ * (1 << kInt8Shift);
 #endif
-    return Dequant(output, output_bias_);
+    // One output head at this shape, so the bias is the only one there is; the material heads add a
+    // per-bucket selection here.
+    return Dequant(output, output_bias_.front());
 }
 
 inline int Network::EvaluateExact(const Accumulator &acc, Color side_to_move) const
@@ -761,7 +903,7 @@ inline int Network::EvaluateExact(const Accumulator &acc, Color side_to_move) co
         output += SCReLU(ntm_acc[i]) * output_weights_[kHiddenSize + i];
     }
 #endif
-    return Dequant(output, output_bias_);
+    return Dequant(output, output_bias_.front());
 }
 
 inline int Network::Evaluate(const Position &position) const

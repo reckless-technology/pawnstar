@@ -96,89 +96,159 @@ refreshes per update); `Network::Refresh` rebuilds both at the root.
 `-mavx2`, with scalar fallbacks behind `#if defined(__AVX2__)`; the vectorised path is bit-identical to
 the scalar one (verified by `test_nnue`).
 
-## 2. File format
+## 2. File format — the shared `RNNUE1` container
 
-The **payload** is bullet's native quantised weights — tightly packed, little-endian `int16`, in this order:
+Pawnstar's nets are in **`RNNUE1`**, the one container every reckless-technology chess engine reads —
+`pawnstar`, `pawnstar-rs`, `pawnstar-go`, `zenith` and `stoopid-chess` (skill `reckless-nnue`). A net
+trained once loads in all five, and a change to the container is a change owed to all five. It replaced
+pawnstar's own 32-byte `PSN1` header on 2026-10-27; `src/nnue.h` is the authority for this build.
 
-| section | count (int16) | scale |
-|---|---|---|
-| `feature_weights` | `768*8 * 1024 = 6291456` (column-major: `row*1024 + i`, rows bucket-major) | QA |
-| `feature_bias` | `1024` | QA |
-| `output_weights` | `2 * 1024 = 2048` (first 1024 = stm, next 1024 = ntm) | QB |
-| `output_bias` | `1` (scalar) | QA·QB |
+Little-endian throughout: a **64-byte header**, then the weight payload, and nothing after it.
 
-Packed payload is `(6291456 + 1024 + 2048 + 1) * 2 = 12589058` bytes; bullet pads the trailing 1-element
-`output_bias` tensor up to a 64-byte boundary, so its raw output is **12589120 bytes** (for the shipped
-8-bucket v12; the retired 4-bucket nets were 6297664, and a single-bank net would be 1579072).
+### The header
 
-**Self-describing header.** A shipped net is prepended with a **32-byte `NetHeader`** (`src/nnue.h`):
-a magic (`"PSN1"`), a format version, and the architecture parameters — `kInputSize`, `kNumKingBuckets`,
-`kHiddenSize`, `kQA`, `kQB`, `kScale`. So `nnue/pawnstar-v12.bin` is **12589152 bytes** (32 + 12589120). The
-loader (`Network::Load`) accepts **only a stamped net**:
+| offset | size | field | this build |
+|---|---|---|---|
+| 0 | 8 | `magic` | `"RNNUE1\0\0"` |
+| 8 | 2 | `format_version` | 1 |
+| 10 | 2 | `header_bytes` | 64 — lets a later version extend the header without breaking this reader |
+| 12 | 2 | `features_per_bucket` | 768 |
+| 14 | 2 | `king_buckets` | 8 |
+| 16 | 2 | `hidden_size` | 1024 |
+| 18 | 2 | `output_buckets` | 1 |
+| 20 | 1 | `flags` | bit 0 = horizontal king mirroring; 0 here. All other bits zero |
+| 21 | 1 | `activation` | 0 = SCReLU |
+| 22 | 2 | `qa` | 255 |
+| 24 | 2 | `qb` | 64 |
+| 26 | 2 | `eval_scale` | 400 |
+| 28 | 4 | `reserved` | zero |
+| 32 | 8 | `king_bucket_map_crc` | CRC-64 of the 64 map entries, one `uint8` each — `0xCC6DDB5DAF0AB18D` |
+| 40 | 8 | `payload_bytes` | 12589060 |
+| 48 | 8 | `payload_crc` | CRC-64 over the payload |
+| 56 | 8 | `header_crc` | CRC-64 over bytes 0–55 |
 
-- **Stamped** (magic present): every architecture field is checked against the engine's compile-time
-  constants; any mismatch is rejected with a descriptive message (e.g. `file is …buckets4…hidden512…,
-  engine expects …buckets8…hidden1024…`) — so an incompatible net can never be silently misread.
-- **Raw** (no magic, e.g. a freshly-exported bullet `quantised.bin`): **rejected** (`not a stamped
-  Pawnstar net (missing 'PSN1' header)`). The old headerless-raw acceptance path was removed; stamp the
-  net before loading it.
+### The payload
 
-Stamp a raw net with `tools/stamp_net` (`make tools`); the header values come from the building engine's
-constants, so it can only stamp a net that matches this build (and it accepts only a *raw*, exact-payload
-net as input — `kNetFileBytes ≤ size < kNetFileBytes+64` — so it can't re-stamp an already-stamped file). The forward-pass math and quantisation are
-kept in lock-step with the trainer ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies
-they agree to within rounding. (The retired nets had different sizes/headers — e.g. the Chess768 512-wide
-v4 a 789506-byte payload, the 512×4 king-bucketed v6/v7 a 3148802-byte payload, the 1024-wide 4-bucket v9/v10/v11
-a 6297664-byte payload — so this 1024-wide 8-bucket build size/header-gates them out.)
+Bucket-major, exactly as bullet's save order emits it:
 
-### Pinning the king-bucket map in the net header (proposed; do it with the next net)
+| section | count | type | scale |
+|---|---|---|---|
+| `feature_weights` | `768*8 * 1024 = 6291456` (column-major `row*1024 + i`, rows bucket-major `bucket*768 + feature`) | int16 | QA |
+| `feature_bias` | `1024` | int16 | QA |
+| `output_weights` | `output_buckets * 2 * 1024 = 2048` (per bucket: own perspective's 1024 first, then the opponent's) | int16 | QB |
+| `output_bias` | `output_buckets = 1` | **int32** | QA·QB |
 
-**What the header does not check.** `NetHeader` records `kNumKingBuckets` — the bank *count* — but nothing
-about `kKingBucketMap`'s *contents*. Two maps of the same cardinality therefore produce a byte-identical file
-size and a header that validates field for field, while selecting different banks for the same king square.
-A net trained with one map and evaluated with another **loads, plays, and reads the wrong bank on every
-evaluation**. `kNetFileBytes` cannot catch it either: the payload size depends only on the row count,
-`768 * kNumKingBuckets`, not on which square maps to which row. The failure mode is a confident wrong number,
-not a crash — the engine simply plays worse, and the natural reading is that the architecture was a bad idea.
+So `12582912 + 2048 + 4096 + 4 = `**`12589060`** payload bytes, and `nnue/pawnstar-v12.bin` is
+**12589124 bytes** (64 + 12589060). The full shared shape — 8 output buckets and mirroring on — is
+`12582912 + 2048 + 32768 + 32 = 12617760`, i.e. 12617824 with the header.
 
-**This is live, not hypothetical.** There is a 4-bucket experimental net whose map is **file-pair only**
-(`0,0,1,1,2,2,3,3` repeated down all eight ranks, no board-half split), and an `h512-b4` build directory on
-one of the CI machines. Those two 4-bucket maps — file-pair-only and the file-pair × board-half pattern with
-the rank split dropped — are both perfectly plausible things to have in a tree at the same time, and both
-stamp and load against a `kNumKingBuckets = 4` build. **If they ever differ, nothing today reports it.** The
-measured result would be attributed to the bucket scheme rather than to the mismatch, which is how a good
-idea gets rejected on a bad measurement.
+Two details that catch a reader of the old format out. The output bias is **int32**, one per output
+bucket, where PSN1 stored a single int16; and the payload length is **exact**, where PSN1 kept bullet's
+tail padding (bullet pads its quantised output up to a 64-byte boundary with repeats of the word
+"bullet"). `stamp_net` drops that padding, because an exact length is what lets a truncated or an
+appended-to file be told apart from a sound one.
 
-**The proposal: carry a digest of the map in the header.** A `consteval` FNV-1a over `kKingBucketMap`'s 64
-entries, stored in two or four of `NetHeader::reserved_[14]` and checked by `Network::Load` beside the other
-architecture fields. The reserved bytes are already zero-padded, so `NetHeader` stays exactly 32 bytes and
-`static_assert(sizeof(NetHeader) == 32)` still holds. Two bytes is ample — this guards against a mistake, not
-an adversary — and four costs nothing if the room is there anyway.
+### CRC-64
 
-**Why it forces a format-version bump.** A zero digest is indistinguishable from "this net was stamped before
-the field existed", so the loader cannot tell an old net from one whose map really hashes to zero, and
-treating zero as "unknown, accept" would leave exactly the hole the field is meant to close. So the field has
-to be mandatory, which means **`kNetFormatVersion` bumped** and every shipped net re-stamped — both
-`nnue/pawnstar-v12.bin` and the embedded copy in `src/embedded_net.S`. That is a shipped-artifact change, and
-it is why this is written down here rather than done: experiments are running against the current format.
+**CRC-64/XZ**, also called CRC-64/GO-ECMA (`src/crc64.h`): polynomial `0x42F0E1EBA9EA3693`, reflected
+(table constant `0xC96C5795D7870F42`), init `0xFFFFFFFFFFFFFFFF`, reflect in and out, final XOR
+`0xFFFFFFFFFFFFFFFF`. A 64-bit CRC because the payload is ~12.6 MB; a CRC and not a cryptographic hash
+because this guards against accidental corruption, not tampering. The 256-entry table is built by a
+`consteval` function, so there is no dependency and nothing generated to keep in step.
 
-**Do it with the next net.** This project exists to ship a replacement trained without the PlentyChess data
-(§7), and shipping a net means re-stamping anyway — so the format bump costs nothing extra at that moment.
-That is the moment to take this.
+**The check value every implementation must reproduce:** CRC-64/XZ of the nine ASCII bytes `123456789` is
+`0x995DC9BBDF1939FA`. `src/crc64.h` asserts it at compile time and `test_primitives` asserts it at run
+time, before anything else that suite does. (Go gets the table free from `hash/crc64` with `crc64.ECMA`,
+but Go's `Checksum` starts at zero: CRC-64/XZ is `crc64.Update(^uint64(0), table, data) ^ ^uint64(0)`.)
 
-**The honest limitation: it binds only the engine side.** The digest proves that the net *in front of this
-build* was stamped by a build with *this* map. It cannot prove the **trainer** used that map, because
-`tools/bullet/pawnstar.rs` has no access to the C++ header and computes nothing from it. Closing that half
-means computing the same FNV-1a over `KING_BUCKETS` in Rust and comparing the two values by eye — or
-accepting that the engine-side check narrows the window to "stamped by the wrong build", which is the
-likelier mistake anyway.
+### The two checks the loader makes, in this order
 
-**The cheap fallback, which may be what we actually do.** Have `tools/stamp_net` **print** the map digest on
-every stamp, and record it in the §7 net table beside each net's size. No format change, no version bump, no
-re-stamping, and nothing can reject a net — but a disagreement becomes *discoverable* after the fact instead
-of invisible, and two experiment nets can be told apart by a number in a table rather than by reading two
-arrays side by side. That is most of the value for none of the format risk. It also composes with the full
-version: the printed digest is the same number the header would carry.
+`Network::LoadFromMemory` (and so `Network::Load`):
+
+1. **Header.** Read 64 bytes. Verify the magic, then `header_crc` over bytes 0–55, then every architecture
+   field against this build's compile-time constants, then `king_bucket_map_crc` against the CRC of this
+   build's own `kKingBucketMap`.
+2. **Payload.** Verify `payload_bytes` against the bytes actually present after the header, then
+   `payload_crc` over them.
+
+**A refusal is loud and does not fall back.** Each one names the field, the file's value and the engine's
+(`refusing net '…': king_buckets is 0x9 in the file, 0x8 in this engine`), and the net is simply not
+loaded. The failures that make this worth the bytes have all been measured on these machines:
+
+- a stock engine handed a mismatched net through an env var **silently fell back to its embedded net** and
+  played on, so a match reported a plausible Elo for a net that never played a move;
+- a mismatched net set through `setoption name EvalFile` left the network unloaded, the engine still
+  answered `readyok`, then crashed on the first `go`;
+- `king_buckets` matching while the **map contents** differed loaded cleanly and played while reading the
+  wrong weight bank. That is what `king_bucket_map_crc` closes.
+
+`test_uci_commands` drives one net per fault through `setoption name EvalFile` — wrong magic, a PSN1 net, a
+corrupt header, a corrupt payload, truncated, appended to, too short, and each architecture field and
+digest changed in turn with `header_crc` recomputed so the field check is what fires — and asserts that
+every one leaves no net loaded.
+
+### Pinning the king-bucket map in the net header — **done** (2026-10-27)
+
+This section used to propose a map digest and defer it to the next format change. **This was that change,
+and the digest shipped with it**: `king_bucket_map_crc`, at offset 32, mandatory, checked beside the other
+architecture fields.
+
+The hole it closes: a header that records `kNumKingBuckets` — the bank *count* — says nothing about
+`kKingBucketMap`'s *contents*. Two maps of the same cardinality produce a byte-identical file size and a
+header that validates field for field, while selecting different banks for the same king square. A net
+trained with one map and evaluated with another **loads, plays, and reads the wrong bank on every
+evaluation**; `payload_bytes` cannot catch it either, since the payload size depends only on the row count
+`768 * king_buckets`. The failure mode is a confident wrong number rather than a crash — the engine simply
+plays worse, and the natural reading is that the architecture was a bad idea.
+
+That was live, not hypothetical: a 4-bucket experimental net whose map is **file-pair only**
+(`0,0,1,1,2,2,3,3` repeated down all eight ranks, no board-half split) and an `h512-b4` build directory on
+one of the CI machines both stamped and loaded against a `kNumKingBuckets = 4` build. Those two maps are
+both plausible things to have in a tree at once, and before the digest nothing reported the difference.
+
+Three things changed from the proposal. It is a **CRC-64, not an FNV-1a**, and it has its own 8-byte field
+rather than living in `reserved_` — the container carries CRC-64 anyway for the header and the payload, so
+reusing it costs no new code. The format version did **not** need bumping to make the field mandatory,
+because the magic changed: a PSN1 net cannot be mistaken for an RNNUE1 one, so there is no "stamped before
+the field existed" case to tell apart from a map that really hashes to zero. And `stamp_net` **prints**
+the digest (and every other stamped value) on every stamp, which was the cheap fallback — it composes, so
+§7's net table can record a number per net and two experiment nets can be told apart by comparing numbers
+rather than reading two arrays side by side.
+
+The honest limitation stands: the digest binds only the engine side. It proves the net in front of this
+build was stamped by a build with *this* map; it cannot prove the **trainer** used that map, because
+`tools/bullet/pawnstar.rs` computes nothing from this header. That narrows the window to "stamped by the
+wrong build", which is the likelier mistake anyway.
+
+### Migrating a PSN1 net
+
+`tools/convert_psn1_payload.py` reads a net in the retired PSN1 container and writes a *raw* RNNUE1
+payload — sign-extending the single int16 output bias to int32 and dropping bullet's tail padding, which
+are the only two differences. `stamp_net` then writes the header from its own compiled constants, so no
+header is ever produced by hand:
+
+```bash
+python3 tools/convert_psn1_payload.py nnue/pawnstar-v12.bin /tmp/v12-raw.bin
+./build/stamp_net /tmp/v12-raw.bin nnue/pawnstar-v12.bin
+```
+
+That is exactly how the shipped `pawnstar-v12.bin` was moved across, and it is **bit-for-bit the same
+trained weights**: widening an int16 to int32 is a sign extension. Which is why the bench signature stayed
+at **6,601,454** across the format bump, and `test_nnue` still matched the trainer's 250 reference evals.
+A moved bench would have meant the loader was wrong, and that gate cost no training at all.
+
+**Stamping.** Stamp a raw bullet net with `tools/stamp_net` (`make tools`); the header values come from the
+*building engine's* constants, so it can only stamp a net that matches that build — a 512-wide net stamped
+by a 1024-wide tool gets a 1024-wide header and is refused on first load, which is the point. It accepts
+only a raw net of the exact payload size (plus at most 63 bytes of bullet padding), so it cannot re-stamp
+an already-stamped file. The forward-pass math and quantisation are kept in lock-step with the trainer
+([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies they agree to within rounding.
+**Never hand-edit a net file** — nets come from the trainer and are stamped by a `stamp_net` built at that
+net's own architecture. A net file's name says nothing about its architecture; the header does.
+
+(The retired nets had different sizes and the PSN1 header — the Chess768 512-wide v4 a 789506-byte
+payload, the 512×4 king-bucketed v6/v7 a 3148802-byte payload, the 1024-wide 4-bucket v9/v10/v11 a
+6297664-byte payload — so this build's size, header and map digest gate all of them out.)
 
 ## 3. Using a net in the engine
 
@@ -217,7 +287,8 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 | `run_gendata.sh`          | fan `gen_data` across cores, one shard per worker (each with a disjoint slice of the opening pool), resumable, reporting the pool's duplicate rate at the end |
 | `check_duplicates.sh`     | measure what fraction of an assembled pool is distinct positions — the gate `train_pipeline.sh` runs before converting a directory of shards, and the cheap way to catch a degenerate campaign in minutes |
 | `make_openings.sh`        | build `openings.epd`, the **match** set, from the public-domain TSCP opening book: replay each line, keep the roughly balanced positions, dedup (capped at ~420 positions by that source, which is why data generation uses `gen_openings` instead) |
-| `stamp_net.cpp`           | prepend the self-describing `NetHeader` to a raw bullet net (`make tools` → `build/stamp_net`) |
+| `stamp_net.cpp`           | wrap a raw bullet net in the shared `RNNUE1` container: the 64-byte header, written from that build's own constants, with the map digest and both CRCs (`make tools` → `build/stamp_net`) |
+| `convert_psn1_payload.py` | one-off: read a net in the retired `PSN1` container and write a raw `RNNUE1` payload for `stamp_net` (§2) |
 | `setup_bullet.sh`         | clone bullet at the pinned commit + install/register our trainer examples |
 | `bullet/pawnstar.rs`      | the trainer (arch `768×8 king-bucketed → 1024×2 → 1`, SCReLU, QA/QB/SCALE) |
 | `bullet/pawnstar_eval.rs` | reference evaluator for the `test_nnue` cross-check |
@@ -778,11 +849,15 @@ rm -f all.data                                                   # reclaim disk
 
 # 4b. SPOT-CHECK at SB1 (~30 s in): confirm the net is genuinely 8-bank before sinking the full run.
 #     An 8-bucket quantised.bin is 12,589,120 bytes (6144 FT rows = 768*8); a 4-bucket one is 6,297,664.
+#     (That is bullet's RAW output, padded to a 64-byte boundary. The RNNUE1 payload a stamped net
+#     carries is 12,589,060 bytes -- the int32 output bias and no padding; see section 2.)
 python3 -c "import os;s=os.path.getsize('checkpoints/pawnstar-1/quantised.bin');print(s, '8-bank' if s>10_000_000 else 'WRONG (not 8-bank)')"
 
 # 5. Stamp the final RAW net into the shipped path (stamp_net embeds this build's arch header, §2).
 RAW=~/pawnstar_nnue/v12/checkpoints/pawnstar-300/quantised.bin
-./build/stamp_net "$RAW" /path/to/pawnstar/nnue/pawnstar-v12.bin   # writes a 12,589,152-byte stamped file
+./build/stamp_net "$RAW" /path/to/pawnstar/nnue/pawnstar-v12.bin   # writes a 12,589,124-byte stamped file
+                                                                   # (64-byte RNNUE1 header + payload)
+#    Note the stamped values it prints -- record king_bucket_map_crc beside the net in the table above.
 
 # 6. Verify. GOTCHA: pawnstar_eval is NOT header-aware -> feed it the RAW net; test_nnue /
 #    test_nnue_incremental load through the engine, which only accepts a STAMPED net (the raw path was
@@ -833,14 +908,23 @@ location with `BULLET=…`.
 - **`undefined symbol: cuFuncLoad` when building bullet with `--features cuda`** — the NVIDIA driver is
   too old (it lacks the CUDA ≥ 12.3 driver API). Upgrade the driver to ≥ 545, or train on CPU with
   `BULLET_FEATURES=""`.
-- **`NNUE: net '…' is not a stamped Pawnstar net (missing 'PSN1' header)`** — you handed the engine a raw
-  (unstamped) bullet net. The engine only loads **stamped** nets now (the headerless-raw path was removed);
-  stamp it first with `tools/stamp_net <raw> <stamped>`.
-- **`NNUE: net '…' is incompatible — file is …, engine expects …`** — a stamped net whose header arch
-  fields don't match this build (wrong `HIDDEN_SIZE`, bucket count, quantisation). The stamped header is
-  validated field-by-field against the engine's compile-time constants, so an incompatible net is never
-  silently misread — including a *larger* (e.g. wider) one. (`stamp_net` itself only accepts a *raw* net of
-  the exact payload size, so it can't even produce a wrong-arch stamped net for this build.)
+- **`NNUE: refusing net '…': it carries no 'RNNUE1' magic …`** — you handed the engine a raw (unstamped)
+  bullet net, or a net in the retired `PSN1` container. Stamp a raw net with `tools/stamp_net <raw>
+  <stamped>`; migrate a PSN1 net with `tools/convert_psn1_payload.py` first (§2).
+- **`NNUE: refusing net '…': <field> is 0x… in the file, 0x… in this engine`** — a stamped net whose
+  header does not match this build. Every architecture field is checked against the compile-time
+  constants, so an incompatible net is never silently misread — including a *larger* (e.g. wider) one.
+  `king_bucket_map_crc` is the one to read twice: the shape matches and only the bucket *map* differs,
+  which before the digest loaded cleanly and played while reading the wrong weight bank.
+- **`NNUE: refusing net '…': its header is corrupt` / `its payload is corrupt`** — the file's own CRC-64
+  does not match its bytes: a truncated or interrupted copy, or a hand-edited net. Re-fetch or re-stamp
+  it; never patch a net file in place.
+- **`NNUE: refusing net '…': it carries N payload bytes after the header, not the M its payload_bytes
+  claims`** — a truncated file, or a raw bullet net that was concatenated rather than stamped. RNNUE1
+  records an exact length and bullet's tail padding is dropped at stamping time.
+- **A refused net leaves the engine with no net loaded, and it never falls back to another.** If a match
+  looks like it is playing a net you replaced, check stderr for a refusal: an engine that quietly fell
+  back to its embedded net once reported a plausible Elo for a net that never played a move.
 - **Engine "disconnects" mid-match** — the old long-game history overflow is fixed (the game history is
   a dynamic `std::vector` now), so this should be rare; if it recurs it is an actual crash worth a debug
   build. Adjudication (`run_sprt.sh`) is still recommended to keep matches short and decisive.

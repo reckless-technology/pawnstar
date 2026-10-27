@@ -6,22 +6,30 @@
 /// checked here against what it is for: the generators, run at run time, rebuild exactly the tables the engine
 /// uses; the text forms read back; the material rules call the classic draws and only those.
 ///
+/// It also owns the two checks the shared NNUE net container rests on, and runs them first: CRC-64/XZ's
+/// published check value, and the RNNUE1 header this build writes. Neither needs a net file, so unlike the
+/// NNUE suites these run in every checkout.
+///
 /// Usage:  test_primitives   (no arguments, no resources)
 
 // position.h first: it brings in bitboard.h, castling_rights.h, generated_data.h and move.h in the order they need.
 #include "position.h"
 
+#include "crc64.h"
 #include "history_table.h"
+#include "nnue.h"
 #include "test_report.h"
 #include "transposition_table.h"
 
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstring>
 #include <format>
 #include <iostream>
 #include <set>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 namespace
@@ -192,15 +200,92 @@ void HistoryAndTable()
     const auto aged = table.FindTransposition(start.hash_ ^ 1);
     Check(aged.has_value() && aged->age() == 1, "an entry recorded after Age carries the new generation");
 }
+
+/// @brief CRC-64/XZ, the checksum the shared NNUE net container is built on. The published check value
+/// comes first, before anything else this suite does: every Reckless engine asserts that same value, so an
+/// implementation that fails it will reject every net the other four accept. crc64.h also asserts it at
+/// compile time, but a `static_assert` proves only the constant-evaluated path — this proves the one the
+/// loader actually runs, over bytes it reads at run time.
+void Crc64()
+{
+    const std::string_view check_input = "123456789";
+    const std::uint64_t    checksum =
+        crc64::Checksum(reinterpret_cast<const std::uint8_t *>(check_input.data()), check_input.size());
+    Check(checksum == 0x995DC9BBDF1939FAULL,
+          std::format("CRC-64/XZ check value: CRC of \"123456789\" is {:#018x}, must be 0x995dc9bbdf1939fa", checksum));
+    Check(crc64::Checksum(nullptr, 0) == 0ULL, "CRC-64/XZ of an empty range is zero");
+
+    // Fed in pieces, a running register must reach the same answer as one call — that is what lets a
+    // stamping tool checksum a 12 MB payload without holding a second copy of it.
+    std::uint64_t running = crc64::kInitialAndFinalXor;
+    for (const char character : check_input)
+    {
+        const auto byte = static_cast<std::uint8_t>(character);
+        running         = crc64::Update(running, &byte, 1);
+    }
+    Check((running ^ crc64::kInitialAndFinalXor) == checksum, "CRC-64/XZ: byte-at-a-time equals all at once");
+
+    // A single changed byte must change the checksum; that is the whole job.
+    const std::string_view altered = "123456780";
+    Check(crc64::Checksum(reinterpret_cast<const std::uint8_t *>(altered.data()), altered.size()) != checksum,
+          "CRC-64/XZ: one differing byte gives a different checksum");
+}
+
+/// @brief The RNNUE1 header this build writes: the exact 64-byte layout, and the architecture fields and
+/// map digest taken from the compile-time constants. A header whose fields moved would be read wrongly by
+/// the other four engines, so the offsets are pinned here as well as by the static_asserts in nnue.h.
+void NetHeaderLayout()
+{
+    const nnue::NetHeader header = nnue::ExpectedNetHeader();
+    Check(sizeof(nnue::NetHeader) == 64, "RNNUE1 header is 64 bytes");
+    Check(std::memcmp(header.magic_, "RNNUE1\0\0", 8) == 0, "RNNUE1 header magic is \"RNNUE1\" and two zero bytes");
+    Check(header.format_version_ == 1 && header.header_bytes_ == 64, "RNNUE1 header: format_version 1, 64 bytes");
+    Check(header.features_per_bucket_ == nnue::kInputSize && header.king_buckets_ == nnue::kNumKingBuckets &&
+              header.hidden_size_ == nnue::kHiddenSize && header.output_buckets_ == nnue::kNumOutputBuckets,
+          "RNNUE1 header: the shape fields are this build's constants");
+    Check(header.qa_ == nnue::kQA && header.qb_ == nnue::kQB && header.eval_scale_ == nnue::kScale,
+          "RNNUE1 header: qa, qb and eval_scale are this build's constants");
+    Check(header.activation_ == nnue::kActivationScreelu, "RNNUE1 header: activation is SCReLU");
+    Check(((header.flags_ & nnue::kNetFlagKingMirroring) != 0) == nnue::kIsKingMirroringEnabled,
+          "RNNUE1 header: the mirroring flag matches this build");
+    Check((header.flags_ & static_cast<std::uint8_t>(~nnue::kNetFlagKingMirroring)) == 0,
+          "RNNUE1 header: no flag bit but bit 0 is ever set");
+    Check(header.payload_bytes_ == nnue::kNetPayloadBytes, "RNNUE1 header: payload_bytes is this build's payload size");
+
+    // The map digest must be the CRC of this build's own 64 map entries as one uint8 each, computed here
+    // from the map rather than taken from the same consteval function the header used.
+    std::array<std::uint8_t, 64> entries{};
+    for (std::size_t square = 0; square < entries.size(); ++square)
+    {
+        entries[square] = static_cast<std::uint8_t>(nnue::kKingBucketMap[square]);
+    }
+    Check(header.king_bucket_map_crc_ == crc64::Checksum(entries.data(), entries.size()),
+          std::format("RNNUE1 header: king_bucket_map_crc {:#018x} is the CRC-64 of the 64 map entries",
+                      header.king_bucket_map_crc_));
+
+    // The two CRCs a stamping tool fills, over a payload short enough to write out here.
+    const std::array<std::uint8_t, 4> payload{1, 2, 3, 4};
+    nnue::NetHeader                   stamped = header;
+    nnue::FinaliseNetHeader(stamped, payload.data(), payload.size());
+    Check(stamped.payload_crc_ == crc64::Checksum(payload.data(), payload.size()),
+          "RNNUE1 header: FinaliseNetHeader writes the payload's CRC");
+    Check(stamped.header_crc_ ==
+              crc64::Checksum(reinterpret_cast<const std::uint8_t *>(&stamped), nnue::kNetHeaderCrcBytes),
+          "RNNUE1 header: FinaliseNetHeader writes the CRC of the header's first 56 bytes");
+}
+
 } // namespace
 
 int main()
 {
+    Crc64();
+    NetHeaderLayout();
     BitboardBasics();
     GeneratedTables();
     CastlingText();
     MaterialDraws();
     MovesAndText();
     HistoryAndTable();
-    return test_report::Summary("PRIMITIVES: bitboards, generated tables, castling, material, moves, tables");
+    return test_report::Summary(
+        "PRIMITIVES: CRC-64, the net header, bitboards, generated tables, castling, material, moves, tables");
 }

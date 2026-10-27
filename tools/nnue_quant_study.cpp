@@ -65,8 +65,12 @@ bool ParseNet(const std::string &path, RawWeights &w)
     std::vector<std::uint8_t> buf(static_cast<std::size_t>(size));
     in.read(reinterpret_cast<char *>(buf.data()), size);
 
-    // Header-aware: a stamped net starts with magic "PSN1"; otherwise the payload starts at byte 0.
-    std::size_t off = (size >= 4 && std::memcmp(buf.data(), "PSN1", 4) == 0) ? 32 : 0;
+    // Header-aware, over three net containers this study has been pointed at: a net in the shared RNNUE1
+    // container (64-byte header, int32 output bias per bucket), one in the retired 32-byte PSN1 container
+    // (a single int16 bias), and a raw bullet payload with no header at all.
+    const bool  is_rnnue1 = size >= 8 && std::memcmp(buf.data(), nnue::kNetMagic, sizeof(nnue::kNetMagic)) == 0;
+    const bool  is_psn1   = size >= 4 && std::memcmp(buf.data(), "PSN1", 4) == 0;
+    std::size_t off       = is_rnnue1 ? sizeof(nnue::NetHeader) : (is_psn1 ? 32 : 0);
 
     const std::size_t nfw = static_cast<std::size_t>(nnue::kFeatureRows) * kHiddenSize;
     w.feature_weights_.resize(nfw);
@@ -79,7 +83,16 @@ bool ParseNet(const std::string &path, RawWeights &w)
     take(w.feature_weights_.data(), nfw);
     take(w.feature_bias_.data(), kHiddenSize);
     take(w.output_weights_.data(), 2 * kHiddenSize);
-    std::memcpy(&w.output_bias_, buf.data() + off, sizeof(int16_t));
+    if (is_rnnue1)
+    {
+        std::int32_t bias = 0;
+        std::memcpy(&bias, buf.data() + off, sizeof(bias));
+        w.output_bias_ = static_cast<std::int16_t>(bias);
+    }
+    else
+    {
+        std::memcpy(&w.output_bias_, buf.data() + off, sizeof(int16_t));
+    }
     return true;
 }
 
