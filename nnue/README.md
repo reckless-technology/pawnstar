@@ -131,6 +131,55 @@ they agree to within rounding. (The retired nets had different sizes/headers —
 v4 a 789506-byte payload, the 512×4 king-bucketed v6/v7 a 3148802-byte payload, the 1024-wide 4-bucket v9/v10/v11
 a 6297664-byte payload — so this 1024-wide 8-bucket build size/header-gates them out.)
 
+### Pinning the king-bucket map in the net header (proposed; do it with the next net)
+
+**What the header does not check.** `NetHeader` records `kNumKingBuckets` — the bank *count* — but nothing
+about `kKingBucketMap`'s *contents*. Two maps of the same cardinality therefore produce a byte-identical file
+size and a header that validates field for field, while selecting different banks for the same king square.
+A net trained with one map and evaluated with another **loads, plays, and reads the wrong bank on every
+evaluation**. `kNetFileBytes` cannot catch it either: the payload size depends only on the row count,
+`768 * kNumKingBuckets`, not on which square maps to which row. The failure mode is a confident wrong number,
+not a crash — the engine simply plays worse, and the natural reading is that the architecture was a bad idea.
+
+**This is live, not hypothetical.** There is a 4-bucket experimental net whose map is **file-pair only**
+(`0,0,1,1,2,2,3,3` repeated down all eight ranks, no board-half split), and an `h512-b4` build directory on
+one of the CI machines. Those two 4-bucket maps — file-pair-only and the file-pair × board-half pattern with
+the rank split dropped — are both perfectly plausible things to have in a tree at the same time, and both
+stamp and load against a `kNumKingBuckets = 4` build. **If they ever differ, nothing today reports it.** The
+measured result would be attributed to the bucket scheme rather than to the mismatch, which is how a good
+idea gets rejected on a bad measurement.
+
+**The proposal: carry a digest of the map in the header.** A `consteval` FNV-1a over `kKingBucketMap`'s 64
+entries, stored in two or four of `NetHeader::reserved_[14]` and checked by `Network::Load` beside the other
+architecture fields. The reserved bytes are already zero-padded, so `NetHeader` stays exactly 32 bytes and
+`static_assert(sizeof(NetHeader) == 32)` still holds. Two bytes is ample — this guards against a mistake, not
+an adversary — and four costs nothing if the room is there anyway.
+
+**Why it forces a format-version bump.** A zero digest is indistinguishable from "this net was stamped before
+the field existed", so the loader cannot tell an old net from one whose map really hashes to zero, and
+treating zero as "unknown, accept" would leave exactly the hole the field is meant to close. So the field has
+to be mandatory, which means **`kNetFormatVersion` bumped** and every shipped net re-stamped — both
+`nnue/pawnstar-v12.bin` and the embedded copy in `src/embedded_net.S`. That is a shipped-artifact change, and
+it is why this is written down here rather than done: experiments are running against the current format.
+
+**Do it with the next net.** This project exists to ship a replacement trained without the PlentyChess data
+(§7), and shipping a net means re-stamping anyway — so the format bump costs nothing extra at that moment.
+That is the moment to take this.
+
+**The honest limitation: it binds only the engine side.** The digest proves that the net *in front of this
+build* was stamped by a build with *this* map. It cannot prove the **trainer** used that map, because
+`tools/bullet/pawnstar.rs` has no access to the C++ header and computes nothing from it. Closing that half
+means computing the same FNV-1a over `KING_BUCKETS` in Rust and comparing the two values by eye — or
+accepting that the engine-side check narrows the window to "stamped by the wrong build", which is the
+likelier mistake anyway.
+
+**The cheap fallback, which may be what we actually do.** Have `tools/stamp_net` **print** the map digest on
+every stamp, and record it in the §7 net table beside each net's size. No format change, no version bump, no
+re-stamping, and nothing can reject a net — but a disagreement becomes *discoverable* after the fact instead
+of invisible, and two experiment nets can be told apart by a number in a table rather than by reading two
+arrays side by side. That is most of the value for none of the format risk. It also composes with the full
+version: the printed digest is the same number the header would carry.
+
 ## 3. Using a net in the engine
 
 A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v12.bin` (cwd-relative) at

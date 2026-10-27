@@ -17,14 +17,21 @@
 /// map; see `kKingBucketMap` below). A king move that crosses a bucket boundary refreshes that whole
 /// perspective's bank rather than diffing it.
 ///
-/// **kNumKingBuckets is not a knob on its own.** `kKingBucketMap` is a fixed 64-entry table that does not
-/// vary with it, so the two must be edited **together**: lower the count alone and WhiteBucket/BlackBucket
-/// keep returning the map's old bank indices, which reach past the end of feature_weights_ (only
-/// 768 * kNumKingBuckets rows) - a buffer overrun, not a smaller net. The static_assert beside the map
-/// checks the map's largest entry against the count, so that mismatch is a compile error rather than a
-/// crash mid-search. The map must also stay **byte-identical to the `KING_BUCKETS` array in
-/// tools/bullet/pawnstar.rs that the net was trained with**: a net trained with one map and evaluated with
-/// another loads, plays, and is silently wrong - the stamped header records the bank count, not the map.
+/// **`kKingBucketMap` is the one place the bucketing is written down.** kNumKingBuckets is *derived* from it,
+/// `MaxKingBucketIndex() + 1`, so the two cannot disagree: change the map and the count follows, and there is
+/// no second constant to forget. It was a hand-set constant until 2026-10-27, and lowering it without editing
+/// the map left WhiteBucket/BlackBucket returning the map's old bank indices, which reach past the end of
+/// feature_weights_ (768 * kNumKingBuckets rows) - a buffer overrun, not a smaller net. This mirrors
+/// tools/bullet/pawnstar.rs, which derives its own NUM_BUCKETS from KING_BUCKETS the same way. A
+/// static_assert beside the map still checks what the derivation cannot see: that no entry is negative and
+/// that the banks are numbered from 0 with no gaps, since a map selecting only banks {0, 3} would size the
+/// weights for four and leave two of them untrained.
+///
+/// The map must also stay **byte-identical to the `KING_BUCKETS` array in tools/bullet/pawnstar.rs that the
+/// net was trained with**: a net trained with one map and evaluated with another loads, plays, and is
+/// silently wrong, because the stamped header records the bank *count* and not the map. Nothing checks that
+/// today - see "Pinning the king-bucket map in the net header" in nnue/README.md §2 for the digest that
+/// would, and why it waits for the next net.
 ///
 /// A net is owned by the Game (one instance, read-only after Network::Load) and shared by all Lazy SMP
 /// threads, which call only its const methods. The accumulator is maintained incrementally and **lazily**
@@ -64,8 +71,68 @@
 namespace nnue
 {
 
+/// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
+/// own* orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map
+/// serves both perspectives. MUST be byte-identical to the array passed to ChessBuckets::new in
+/// tools/bullet/*.rs. It is the one place the bucketing is written down: kNumKingBuckets is derived from it
+/// below, so there is no second constant to keep in step.
+constexpr std::array<int, 64> kKingBucketMap = {
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    0, 0, 1, 1, 2, 2, 3, 3, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+    4, 4, 5, 5, 6, 6, 7, 7, //
+};
+
+/// @brief The highest weight-bank index kKingBucketMap selects, i.e. the bank count it needs, less one.
+consteval int MaxKingBucketIndex()
+{
+    int highest = 0;
+    for (const int bucket : kKingBucketMap)
+    {
+        highest = std::max(highest, bucket);
+    }
+    return highest;
+}
+
+/// @brief Whether kKingBucketMap is a usable bank selector: every entry a bank index in range, and every bank
+/// from 0 up to the highest actually selected by some square. The derivation of kNumKingBuckets cannot see
+/// either fault - a negative entry would index feature_weights_ below its start, and a map selecting only
+/// banks {0, 3} derives four banks while leaving two of them with no square to train them.
+consteval bool IsKingBucketMapWellFormed()
+{
+    std::array<bool, 64> is_selected{};
+    for (const int bucket : kKingBucketMap)
+    {
+        if (bucket < 0 || bucket >= static_cast<int>(is_selected.size()))
+        {
+            return false;
+        }
+        is_selected[static_cast<std::size_t>(bucket)] = true;
+    }
+    for (int bucket = 0; bucket <= MaxKingBucketIndex(); ++bucket)
+    {
+        if (!is_selected[static_cast<std::size_t>(bucket)])
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static_assert(IsKingBucketMapWellFormed(),
+              "kKingBucketMap is not a usable bank selector: every one of its 64 entries must be a bank index "
+              "in [0, 63], and every bank from 0 up to the highest entry must be selected by at least one "
+              "square. A negative entry reads feature_weights_ below its start; a gap (banks {0, 3}, say) "
+              "sizes the weights for four banks and leaves two of them untrained. Number the banks from 0 "
+              "with no gaps, and keep the map byte-identical to KING_BUCKETS in tools/bullet/pawnstar.rs, "
+              "which the net was trained with.");
+
 constexpr int kInputSize      = 768; ///< Features per perspective per bucket: 2 colors * 6 types * 64 squares.
-constexpr int kNumKingBuckets = 8;   ///< King-square weight banks; edit kKingBucketMap to match (asserted).
+constexpr int kNumKingBuckets = MaxKingBucketIndex() + 1;     ///< King-square weight banks, per kKingBucketMap.
 constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
 constexpr int kHiddenSize     = 1024; ///< Feature-transformer / accumulator width per perspective.
 
@@ -361,39 +428,6 @@ inline int32_t HsumI32(__m256i v)
 /// SMP threads share it without synchronisation.
 inline const bool kCpuHasAvxVnni = platform::HasAvxVnni();
 #endif // __AVX2__
-
-/// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
-/// own* orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map
-/// serves both perspectives. MUST be byte-identical to the array passed to ChessBuckets::new in
-/// tools/bullet/*.rs.
-constexpr std::array<int, 64> kKingBucketMap = {
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    0, 0, 1, 1, 2, 2, 3, 3, //
-    4, 4, 5, 5, 6, 6, 7, 7, //
-    4, 4, 5, 5, 6, 6, 7, 7, //
-    4, 4, 5, 5, 6, 6, 7, 7, //
-    4, 4, 5, 5, 6, 6, 7, 7, //
-};
-
-/// @brief The highest weight-bank index kKingBucketMap selects, i.e. the bank count it needs, less one.
-consteval int MaxKingBucketIndex()
-{
-    int highest = 0;
-    for (const int bucket : kKingBucketMap)
-    {
-        highest = std::max(highest, bucket);
-    }
-    return highest;
-}
-
-static_assert(MaxKingBucketIndex() < kNumKingBuckets,
-              "kKingBucketMap selects a weight bank that kNumKingBuckets does not provide: feature_weights_ "
-              "holds 768 * kNumKingBuckets rows, so WhiteBucket/BlackBucket would index past its end. The map "
-              "and the count must be edited TOGETHER - give the 64-entry kKingBucketMap only banks "
-              "0 .. kNumKingBuckets-1, and keep it byte-identical to KING_BUCKETS in tools/bullet/pawnstar.rs, "
-              "which the net was trained with.");
 
 /// @brief Feature row for a piece in one perspective's bucket bank.
 ///   white perspective: bucket*768 + color*384 + (type-1)*64 + square
