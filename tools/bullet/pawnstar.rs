@@ -3,10 +3,22 @@ Pawnstar NNUE trainer: arch (768xNUM_BUCKETS king-bucketed -> HIDDEN_SIZE)x2 -> 
 in-engine inference in src/nnue.h (the KING_BUCKETS map below must stay byte-identical to its
 kKingBucketMap). Based on bullet's `simple` example. Configured via environment variables:
 
-    PAWNSTAR_DATA   path to a BulletFormat .data file        (default: data/pawnstar.data)
-    PAWNSTAR_BPS    batches_per_superbatch (~ dataset/16384)  (default: 1000)
-    PAWNSTAR_SBS    end_superbatch                            (default: 30)
-    PAWNSTAR_OUT    output checkpoint directory               (default: checkpoints)
+    PAWNSTAR_DATA       path to a BulletFormat .data file         (default: data/pawnstar.data)
+    PAWNSTAR_BPS        batches_per_superbatch                    (default: 1000)
+    PAWNSTAR_SBS        end_superbatch                            (default: 30)
+    PAWNSTAR_OUT        output checkpoint directory               (default: checkpoints)
+    PAWNSTAR_SAVE_RATE  checkpoint every this many superbatches    (default: 10)
+    PAWNSTAR_WDL        how much of the target is the game result  (default: 0.5)
+
+A batch is 16,384 positions. The convention these nets are trained on is a superbatch of about 60M of
+them - PAWNSTAR_BPS near 3662 - which leaves PAWNSTAR_SBS to set how many passes are made over a pool
+larger than that. It is NOT one superbatch per pass over the data: this line used to read
+`~ dataset/16384`, which is exactly that, and so makes PAWNSTAR_SBS the epoch count directly. The two
+coincide at a 60M pool, which is how the wrong one survived; past that they diverge by pool / 60M.
+
+PAWNSTAR_WDL weighs the game result against the eval sigmoid in each training target. 0.5 suits engine
+self-play, where the result and the eval agree; human games disagree far more often - a player loses a
+won position - so a human-game pool wants it lower.
 
 The final quantised net is written to <out>/pawnstar-<sbs>/pawnstar-<sbs>.bin in bullet's native
 headerless format, which src/nnue.h loads directly.
