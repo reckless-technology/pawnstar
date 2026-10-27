@@ -149,6 +149,7 @@ endif()
 # --- Helper tools. ---
 add_executable(gen_data         tools/gen_data.cpp)
 add_executable(gen_openings     tools/gen_openings.cpp)
+add_executable(lichess_extract  tools/lichess_extract.cpp)
 add_executable(stamp_net        tools/stamp_net.cpp)
 add_executable(filter_book      tools/filter_book.cpp)
 add_executable(nnue_quant_study tools/nnue_quant_study.cpp)
@@ -165,18 +166,27 @@ set_source_files_properties(tools/gen_data.cpp PROPERTIES
 set_source_files_properties(tools/gen_openings.cpp PROPERTIES
   COMPILE_OPTIONS "-include;${PAWNSTAR_VERSION_HEADER}" OBJECT_DEPENDS "${PAWNSTAR_VERSION_HEADER}")
 
+# lichess_extract stamps the engine version into each shard's .meta provenance sidecar, the same reason
+# gen_data does, so it needs the generated version header force-included too.
+set_source_files_properties(tools/lichess_extract.cpp PROPERTIES
+  COMPILE_OPTIONS "-include;${PAWNSTAR_VERSION_HEADER}" OBJECT_DEPENDS "${PAWNSTAR_VERSION_HEADER}")
+
 # --- Tests (each a standalone TU with its own main()). ---
 enable_testing()
 set(PAWNSTAR_TESTS perft see bratko_kopec_nnue nnue nnue_incremental opening_book chess_clock bench_golden
-                   uci_commands primitives principal_variation)
+                   uci_commands primitives principal_variation lichess_extract)
 foreach(t IN LISTS PAWNSTAR_TESTS)
   add_executable(test_${t} test/${t}_test.cpp)
 endforeach()
 
+# The extraction rules live in a header under tools/ (the only tool header a test drives directly), so that
+# directory goes on this one test's include path. Not added globally: nothing else should reach into tools/.
+target_include_directories(test_lichess_extract PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+
 # ctest registration mirrors `make check`. Resource-free suites first; run from the source tree so any
 # cwd-relative resource (e.g. the opening book) resolves.
 set(NNUE_REF "${CMAKE_CURRENT_SOURCE_DIR}/test/nnue_reference.txt")
-foreach(t perft see opening_book chess_clock primitives)
+foreach(t perft see opening_book chess_clock primitives lichess_extract)
   add_test(NAME ${t} COMMAND test_${t} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 # NNUE suites take the net (and reference) explicitly; only register them if the shipped net is present
@@ -229,7 +239,7 @@ endif()
 
 set(PAWNSTAR_TEST_TARGETS ${PAWNSTAR_TESTS})
 list(TRANSFORM PAWNSTAR_TEST_TARGETS PREPEND test_)
-set(PAWNSTAR_TOOLS gen_data gen_openings stamp_net filter_book nnue_quant_study dump_magics)
+set(PAWNSTAR_TOOLS gen_data gen_openings lichess_extract stamp_net filter_book nnue_quant_study dump_magics)
 set(PAWNSTAR_EXECUTABLES pawnstar ${PAWNSTAR_TOOLS} ${PAWNSTAR_TEST_TARGETS})
 
 # --- The sanitizer runtime beside the executables. Clang targeting the MSVC ABI links AddressSanitizer dynamically:
