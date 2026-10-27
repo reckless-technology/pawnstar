@@ -54,6 +54,10 @@ fn main() {
     let bps: usize = env_or("PAWNSTAR_BPS", 1000);
     let end_sb: usize = env_or("PAWNSTAR_SBS", 30);
     let save_rate: usize = env_or("PAWNSTAR_SAVE_RATE", 10);
+    // How much of each target is the game result rather than the eval sigmoid. 0.5 for the shipped nets,
+    // whose data is engine self-play where result and eval agree. Human games disagree far more often -
+    // a player loses a won position - so a human-game set may want this lower.
+    let wdl_weight: f32 = env_or("PAWNSTAR_WDL", 0.5);
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
@@ -87,7 +91,7 @@ fn main() {
             start_superbatch: 1,
             end_superbatch: end_sb,
         },
-        wdl_scheduler: wdl::ConstantWDL { value: 0.5 },
+        wdl_scheduler: wdl::ConstantWDL { value: wdl_weight },
         lr_scheduler: lr::StepLR { start: 0.001, gamma: 0.3, step: end_sb / 3 },
         save_rate,
     };
