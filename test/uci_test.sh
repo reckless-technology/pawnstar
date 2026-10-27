@@ -191,18 +191,47 @@ cp "$engine_dir"/*.dll "$scratch"/ 2>/dev/null || true
 out=$(cd "$scratch" && printf 'bookmoves\neval\nisready\nquit\n' | "$copy" 2>/dev/null)
 echo "$out" | grep -q 'using the embedded book' && pass "startup alone: falls back to the embedded book" ||
     fail "startup alone: no embedded-book message in: $out"
-echo "$out" | grep -q 'falling back to the embedded net' && pass "startup alone: falls back to the embedded net" ||
+echo "$out" | grep -q 'using the embedded net' && pass "startup alone: falls back to the embedded net" ||
     fail "startup alone: no embedded-net message in: $out"
 echo "$out" | grep -q '^MOVE   COUNT' && echo "$out" | grep -q '^evaluation ' && echo "$out" | grep -q '^readyok' &&
     pass "startup alone: the embedded book and net both work" || fail "startup alone: book/eval/readyok missing: $out"
 
 # PAWNSTAR_EVALFILE names the net: a missing file falls back to the embedded net, the shipped file loads directly.
 out=$(printf 'isready\nquit\n' | PAWNSTAR_EVALFILE=no/such/net.bin "$ENGINE" 2>/dev/null)
-echo "$out" | grep -q 'falling back to the embedded net' && echo "$out" | grep -q '^readyok' &&
+echo "$out" | grep -q 'using the embedded net' && echo "$out" | grep -q '^readyok' &&
     pass "PAWNSTAR_EVALFILE=<missing>: the embedded net" || fail "PAWNSTAR_EVALFILE=<missing>: got: $out"
 out=$(printf 'eval\nquit\n' | PAWNSTAR_EVALFILE=nnue/pawnstar-v12.bin "$ENGINE" 2>/dev/null)
 echo "$out" | grep -q '^evaluation ' && ! echo "$out" | grep -q 'embedded' &&
     pass "PAWNSTAR_EVALFILE=<the shipped net>: loaded from the file" || fail "PAWNSTAR_EVALFILE=<net>: got: $out"
+
+# A net file that EXISTS and is REFUSED is fatal: the engine must not fall back to the embedded net and
+# must not play. This is the trap the fallback used to leave open — a mismatched net through
+# PAWNSTAR_EVALFILE started an engine that played the embedded net instead, so a match reported a plausible
+# Elo for a net that never played a move. The refusal must reach stderr too, because a match harness keeps
+# stderr and routinely drops `info string` lines.
+refused_net="$scratch/refused_net.bin"
+# A readable file that is not a net at all: read, no RNNUE1 magic, refused.
+printf 'this is not a net, it is just some bytes' > "$refused_net"
+out=$(printf 'isready\nquit\n' | PAWNSTAR_EVALFILE="$refused_net" "$ENGINE" 2>"$scratch/refused_net.err")
+status=$?
+err=$(cat "$scratch/refused_net.err")
+[ "$status" -ne 0 ] && pass "PAWNSTAR_EVALFILE=<a refused net>: exits non-zero" ||
+    fail "PAWNSTAR_EVALFILE=<a refused net>: expected a non-zero exit, got $status with: $out"
+! echo "$out" | grep -q 'readyok' && pass "PAWNSTAR_EVALFILE=<a refused net>: never reaches readyok" ||
+    fail "PAWNSTAR_EVALFILE=<a refused net>: answered readyok with no net: $out"
+! echo "$out" | grep -q 'using the embedded net' &&
+    pass "PAWNSTAR_EVALFILE=<a refused net>: does not fall back to the embedded net" ||
+    fail "PAWNSTAR_EVALFILE=<a refused net>: fell back to the embedded net: $out"
+echo "$err" | grep -q 'refusing net' && echo "$err" | grep -q 'FATAL' &&
+    pass "PAWNSTAR_EVALFILE=<a refused net>: the reason and the FATAL are on stderr" ||
+    fail "PAWNSTAR_EVALFILE=<a refused net>: stderr lacks the reason: $err"
+# A truncated copy of the real net: the magic is right, so this is refused by a later check.
+head -c 4096 nnue/pawnstar-v12.bin > "$scratch/truncated_net.bin"
+out=$(printf 'isready\nquit\n' | PAWNSTAR_EVALFILE="$scratch/truncated_net.bin" "$ENGINE" 2>/dev/null)
+status=$?
+[ "$status" -ne 0 ] && ! echo "$out" | grep -q 'readyok' &&
+    pass "PAWNSTAR_EVALFILE=<a truncated net>: fatal, no readyok" ||
+    fail "PAWNSTAR_EVALFILE=<a truncated net>: expected a non-zero exit, got $status with: $out"
 
 # The end of input without `quit` ends the engine cleanly.
 out=$(printf 'isready\n' | "$ENGINE" 2>/dev/null)

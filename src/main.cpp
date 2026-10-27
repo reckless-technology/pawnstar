@@ -9,6 +9,7 @@
 #include <memory>
 
 #include <filesystem>
+#include <format>
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -145,21 +146,44 @@ int main()
     }
     // NNUE is the only evaluator, so a net is required. Load the shipped net from the working directory
     // (like the opening book); PAWNSTAR_EVALFILE=<path> overrides the path, and UCI `setoption name
-    // EvalFile value <path>` loads a different net at runtime. If the on-disk net cannot be loaded (wrong
-    // cwd, missing/renamed file), fall back to the copy embedded in the binary (src/embedded_net.S) so the
-    // engine always has a working evaluator. Only if even that fails — which would mean the build is
-    // corrupt — does the engine give up.
+    // EvalFile value <path>` loads a different net at runtime.
+    //
+    // **The embedded copy is a fallback for a net file that is not there, and for nothing else.** A net
+    // file that was read and then *refused* — wrong architecture, a corrupt payload, the wrong bucket map —
+    // is a fatal error, and the engine exits rather than quietly playing a different net. That distinction
+    // is the whole point: the old code fell back on *any* failure, so pointing PAWNSTAR_EVALFILE at a
+    // mismatched net started an engine that played the embedded net instead and said so only in an `info
+    // string` nobody reads. A match run that way reported a plausible Elo for a net that never played a
+    // move, and the number was taken seriously for as long as it took to find out. An engine that cannot
+    // play the net it was given must not play at all.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
     const std::string net_path  = eval_file ? eval_file : LocateResource("nnue/pawnstar-v12.bin");
     if (!game.nnue_network_.Load(net_path))
     {
+        if (nnue::IsNetFileReadable(net_path))
+        {
+            // Read, and refused. Network::Load has already said why, on stdout and on stderr.
+            const std::string reason =
+                std::format("FATAL: the NNUE net '{}' was read and refused (see the reason above). Not falling back to "
+                            "the embedded net: an engine that cannot play the net it was given must not play at all.",
+                            net_path);
+            std::cout << "info string " << reason << "\n" << std::flush;
+            std::cerr << reason << "\n";
+            return 1;
+        }
+        // Not there at all — a wrong working directory, or a binary copied on its own. The embedded copy
+        // is exactly what that case is for.
         const std::size_t embedded_size = static_cast<std::size_t>(pawnstar_embedded_net_end - pawnstar_embedded_net);
-        std::cout << "info string NNUE: file load failed; falling back to the embedded net (" << embedded_size
-                  << " bytes)\n";
+        std::cout << std::format("info string NNUE: no net file at '{}'; using the embedded net ({} bytes)\n", net_path,
+                                 embedded_size);
         if (!game.nnue_network_.LoadFromMemory(pawnstar_embedded_net, embedded_size, "embedded"))
         {
-            std::cout << "info string FATAL: could not load the NNUE net from '" << net_path
-                      << "' or the embedded fallback. The build may be corrupt.\n";
+            const std::string reason =
+                std::format("FATAL: no NNUE net at '{}', and the copy embedded in this binary was refused "
+                            "too. The build is corrupt.",
+                            net_path);
+            std::cout << "info string " << reason << "\n" << std::flush;
+            std::cerr << reason << "\n";
             return 1;
         }
     }

@@ -82,6 +82,7 @@
 #include <cstring>
 #include <format>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <utility>
 #include <vector>
@@ -589,14 +590,44 @@ inline void Network::DiffSide(std::array<int16_t, kHiddenSize> &side, const Posi
     }
 }
 
+/// @brief Report a refused net. Every refusal goes through here, so each one names the net and the one
+/// rule that matters is visible in one place: **a refused net is not loaded, and nothing falls back to
+/// another net.** A stock engine that silently fell back to its embedded net once reported a plausible Elo
+/// for a net that never played a move — the match looked fine and the number meant nothing.
+/// @param origin Path or label of the net. @param reason Why it was refused, naming the field and both
+/// values where there is a field to name. @return false, always, so a caller can `return RefuseNet(...)`.
+[[nodiscard]] inline bool RefuseNet(const std::string &origin, const std::string &reason)
+{
+    // To **both** streams, on purpose. The `info string` on stdout is what a UCI GUI reads; the plain line
+    // on stderr is what a match harness keeps, and harnesses routinely drop info lines. A refusal only a
+    // GUI can see is a refusal nobody reads when it matters, which is during an unattended match.
+    std::cout << std::format("info string NNUE: refusing net '{}': {}\n", origin, reason) << std::flush;
+    std::fprintf(stderr, "NNUE: refusing net '%s': %s\n", origin.c_str(), reason.c_str());
+    return false;
+}
+
+/// @brief Whether a net file can be opened and read at all — which is a different question from whether
+/// the engine will accept it, and the two need telling apart exactly once: at startup, where a net file
+/// that is simply not there is a deployment situation the embedded copy legitimately covers, while a net
+/// that was read and then **refused** is a mistake nothing should paper over.
+/// @param path Path to test. @return true if it opens and at least one byte reads.
+inline bool IsNetFileReadable(const std::string &path)
+{
+    std::ifstream in(path, std::ios::binary);
+    if (!in)
+    {
+        return false;
+    }
+    char first_byte = 0;
+    return static_cast<bool>(in.read(&first_byte, 1));
+}
+
 inline bool Network::Load(const std::string &path)
 {
-    loaded_ = false;
     std::ifstream in(path, std::ios::binary | std::ios::ate);
     if (!in)
     {
-        std::fprintf(stderr, "info string NNUE: cannot open net file '%s'\n", path.c_str());
-        return false;
+        return RefuseNet(path, "it cannot be opened");
     }
     const std::streamoff size = in.tellg();
     in.seekg(0);
@@ -607,25 +638,19 @@ inline bool Network::Load(const std::string &path)
     }
     if (!in)
     {
-        std::fprintf(stderr, "info string NNUE: error reading net file '%s'\n", path.c_str());
-        return false;
+        return RefuseNet(path, "it opened but could not be read");
     }
     return LoadFromMemory(buffer.data(), buffer.size(), path);
 }
 
-/// @brief Report a refused net on stderr. Every refusal goes through here so each one names the net, and
-/// so the one rule that matters is visible in one place: a refused net is **not** loaded and nothing falls
-/// back to another. A stock engine that silently fell back to its embedded net once reported a plausible
-/// Elo for a net that never played a move.
-[[nodiscard]] inline bool RefuseNet(const std::string &origin, const std::string &reason)
-{
-    std::fprintf(stderr, "info string NNUE: refusing net '%s': %s\n", origin.c_str(), reason.c_str());
-    return false;
-}
-
 inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, const std::string &origin)
 {
-    loaded_ = false;
+    // `loaded_` is deliberately **not** cleared here. Every check below happens before a single weight is
+    // written, so a refused net leaves this Network exactly as it was — if a net was already loaded it is
+    // still loaded and still the one playing. Clearing it up front was its own trap: a mismatched net set
+    // through `setoption name EvalFile` left the network unloaded while the engine still answered `readyok`,
+    // and the first `go` then read weight arrays that Load had never filled. A refused net must change
+    // nothing, not leave the engine in a state it has no defined behaviour for.
 
     // --- Check 1: the header. 64 bytes; magic, then its own CRC, then every architecture field against
     // this build's compile-time constants, then the king-bucket map's digest. An unstamped (raw bullet)
@@ -683,6 +708,21 @@ inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, 
         {
             return RefuseNet(origin, std::format("{} is {:#x} in the file, {:#x} in this engine", check.name_,
                                                  check.in_file_, check.in_engine_));
+        }
+    }
+
+    // `reserved` is refused unless every byte is zero. It is not pedantry: those four bytes are the only
+    // room a later format version has to add a field without moving anything, and that only works if a
+    // reader of *this* version refuses a net that has already used them. Accepting a non-zero reserved
+    // would mean a version-2 net quietly loading into a version-1 build with one field unread.
+    for (const std::uint8_t reserved_byte : header.reserved_)
+    {
+        if (reserved_byte != 0)
+        {
+            return RefuseNet(origin, std::format("its reserved bytes are {:#04x} {:#04x} {:#04x} {:#04x}, and "
+                                                 "every one must be zero",
+                                                 header.reserved_[0], header.reserved_[1], header.reserved_[2],
+                                                 header.reserved_[3]));
         }
     }
 

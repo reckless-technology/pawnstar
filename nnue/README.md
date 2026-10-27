@@ -3,7 +3,8 @@
 Pawnstar evaluates **exclusively** with an **NNUE** (Efficiently Updatable Neural Network) — it is the
 engine's only evaluator (the former hand-crafted evaluation, "HCE", was removed). At startup the engine
 loads the shipped net `nnue/pawnstar-v12.bin` (relative to the working directory) and evaluates with it;
-if that file can't be loaded the engine falls back to a copy of the net embedded in the binary (§3), and
+if there is no such file the engine falls back to a copy of the net embedded in the binary (§3) — but a
+net that is read and *refused* is fatal, never a fallback (§3) — and
 errors out only if both fail. This document is the complete reference for how the net works, how to load a
 net, and how to generate data, train, validate and strength-test a net.
 
@@ -167,13 +168,18 @@ but Go's `Checksum` starts at zero: CRC-64/XZ is `crc64.Update(^uint64(0), table
 
 1. **Header.** Read 64 bytes. Verify the magic, then `header_crc` over bytes 0–55, then every architecture
    field against this build's compile-time constants, then `king_bucket_map_crc` against the CRC of this
-   build's own `kKingBucketMap`.
+   build's own `kKingBucketMap`, then that every `reserved` byte is zero. `reserved` is refused unless it
+   is zero on purpose: those four bytes are the only room a later version has to add a field without
+   moving anything, and that only works if a reader of *this* version refuses a net that has already
+   spent them. `qa`, `qb` and `eval_scale` are read **unsigned**.
 2. **Payload.** Verify `payload_bytes` against the bytes actually present after the header, then
    `payload_crc` over them.
 
 **A refusal is loud and does not fall back.** Each one names the field, the file's value and the engine's
-(`refusing net '…': king_buckets is 0x9 in the file, 0x8 in this engine`), and the net is simply not
-loaded. The failures that make this worth the bytes have all been measured on these machines:
+(`refusing net '…': king_buckets is 0x9 in the file, 0x8 in this engine`), on **stdout as an `info
+string` and on stderr as a plain line** — a GUI reads the first, a match harness keeps the second and
+routinely drops info lines. The net is not loaded, and because every check happens before a weight is
+written, a net that was already loaded is left untouched and still playing. The failures that make this worth the bytes have all been measured on these machines:
 
 - a stock engine handed a mismatched net through an env var **silently fell back to its embedded net** and
   played on, so a match reported a plausible Elo for a net that never played a move;
@@ -257,10 +263,15 @@ startup. **Embedded fallback:** a byte-identical copy of the shipped net is comp
 binary (`src/embedded_net.S` `.incbin`'s the net at the build's `EMBED_NET` path — the Makefile and the
 CMake build both pass it via `-DEMBED_NET_PATH`, the single source of truth, so the embedded copy can't
 drift from the shipped net; the `.S` embeds into ELF `.rodata` or COFF `.rdata`, so the engine binary is
-self-contained on Linux and Windows alike; linked into the engine only, not the test binaries). If the on-disk file can't be loaded — wrong cwd, missing or renamed file, or a stamped net that
-fails architecture validation — the engine loads the embedded copy via `Network::LoadFromMemory` (same
-header detection/validation as `Network::Load`), so it always has a working evaluator; it exits only if
-both the file and the embedded copy fail. To use a *different* net, point the engine at it — at launch:
+self-contained on Linux and Windows alike; linked into the engine only, not the test binaries).
+
+**The embedded copy covers a net file that is not there, and nothing else.** A net that was read and then *refused* — wrong architecture, the wrong bucket map, a corrupt payload — is **fatal**: the engine prints the reason on stdout and on stderr and exits non-zero rather than quietly playing a different net. The old code fell back on *any* failure, which is the measured trap: pointing `PAWNSTAR_EVALFILE` at a mismatched net started an engine that played the embedded net instead and said so only in an `info string`, so a match reported a plausible Elo for a net that never played a move. An engine that cannot play the net it was given must not play at all.
+
+So the embedded copy is loaded when there is no net file to read — a wrong working directory, or a
+binary copied somewhere on its own — via `Network::LoadFromMemory`, which makes the same two checks as
+`Network::Load`. The engine exits only if that copy is refused too, which would mean the build itself is
+corrupt. `nnue::IsNetFileReadable` is what tells the two cases apart, and it is the only place in the
+engine that needs to. To use a *different* net, point the engine at it — at launch:
 
 ```bash
 PAWNSTAR_EVALFILE=/path/to/net.bin ./build/pawnstar
@@ -922,9 +933,12 @@ location with `BULLET=…`.
 - **`NNUE: refusing net '…': it carries N payload bytes after the header, not the M its payload_bytes
   claims`** — a truncated file, or a raw bullet net that was concatenated rather than stamped. RNNUE1
   records an exact length and bullet's tail padding is dropped at stamping time.
-- **A refused net leaves the engine with no net loaded, and it never falls back to another.** If a match
-  looks like it is playing a net you replaced, check stderr for a refusal: an engine that quietly fell
-  back to its embedded net once reported a plausible Elo for a net that never played a move.
+- **A refused net changes nothing, and nothing falls back to another net.** Every check the loader makes
+  happens before a weight is written, so a refused `setoption name EvalFile` leaves the net that was
+  playing still loaded and still playing — the engine is never left in the undefined state of answering
+  `readyok` with weight arrays `Load` never filled. At startup a refused net is **fatal** and the engine
+  exits non-zero. If a match looks like it is playing a net you replaced, read stderr: every refusal
+  goes to stderr as well as to `info string`, because a harness keeps stderr and drops info lines.
 - **Engine "disconnects" mid-match** — the old long-game history overflow is fixed (the game history is
   a dynamic `std::vector` now), so this should be rare; if it recurs it is an actual crash worth a debug
   build. Adjudication (`run_sprt.sh`) is still recommended to keep matches short and decisive.

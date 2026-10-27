@@ -467,11 +467,27 @@ void Options(Game &game)
 
 void NetLoading(Game &game, const std::string &net_path)
 {
+    // The no-net diagnostics, on a Game that never loaded one. They used to be reached by refusing a net
+    // on the loaded Game, which only worked because a refusal cleared `loaded_` — the very behaviour that
+    // left the engine answering readyok with weight arrays Load had never filled. A fresh Game reaches the
+    // same two lines without asking a refusal to break anything.
+    {
+        auto  bare_ptr = std::make_unique<Game>();
+        Game &bare     = *bare_ptr;
+        Check(!bare.nnue_network_.loaded_, "a Game that has loaded no net reports none loaded");
+        const std::string without_net = Run(bare, {"position startpos", "eval", "nnue"});
+        Check(Contains(without_net, "info string no NNUE net loaded"), "eval without a net: says so");
+        Check(Contains(without_net, "info string NNUE: no net loaded"), "nnue without a net: says so");
+    }
+
+    // **A refused net changes nothing.** Not "leaves no net loaded" — that was the trap. Every check the
+    // loader makes happens before a weight is written, so the net that was playing is still playing, and
+    // the engine stays in a state it has defined behaviour for.
+    const int evaluation_before = game.nnue_network_.Evaluate(game.CurrentPosition());
     Run(game, {"setoption name EvalFile value this/file/does/not/exist.bin"});
-    Check(!game.nnue_network_.loaded_, "setoption EvalFile <missing file>: refused, no net loaded");
-    const std::string without_net = Run(game, {"position startpos", "eval", "nnue"});
-    Check(Contains(without_net, "info string no NNUE net loaded"), "eval without a net: says so");
-    Check(Contains(without_net, "info string NNUE: no net loaded"), "nnue without a net: says so");
+    Check(game.nnue_network_.loaded_, "setoption EvalFile <missing file>: refused, the loaded net is untouched");
+    Check(game.nnue_network_.Evaluate(game.CurrentPosition()) == evaluation_before,
+          "setoption EvalFile <missing file>: refused, and the net still evaluates as it did");
 
     const std::string net_bytes = ReadFile(net_path);
     auto              scratch   = std::make_unique<nnue::Network>(); // megabytes of weights: never on the stack
@@ -480,7 +496,7 @@ void NetLoading(Game &game, const std::string &net_path)
 
     const std::string unstamped = WriteTempFile("pawnstar_uci_unstamped.bin", "not a net, just some bytes here....");
     Run(game, {std::format("setoption name EvalFile value {}", unstamped)});
-    Check(!game.nnue_network_.loaded_, "setoption EvalFile <unstamped file>: refused");
+    Check(game.nnue_network_.loaded_, "setoption EvalFile <unstamped file>: refused, the loaded net is untouched");
 
     // Every way an RNNUE1 net can be wrong, each built from the shipped net so nothing but the one fault
     // differs. A refused net must leave no net loaded: the trap this closes is an engine that quietly falls
@@ -513,6 +529,11 @@ void NetLoading(Game &game, const std::string &net_path)
     std::string corrupt_payload = net_bytes;
     corrupt_payload[sizeof(nnue::NetHeader) + 777] ^= 0x01;
     std::string appended_to = net_bytes + std::string(64, 'x');
+    // reserved_[0] non-zero, header_crc recomputed: a reader of this version must refuse a net that has
+    // already spent the bytes a later version would extend the header with.
+    std::string reserved_used = net_bytes;
+    reserved_used[28]         = 0x01;
+    re_crc_header(reserved_used);
 
     const std::pair<std::string, std::string> bad_nets[] = {
         {"pawnstar_uci_wrong_magic.bin", wrong_magic},
@@ -539,14 +560,18 @@ void NetLoading(Game &game, const std::string &net_path)
          with_header_field(&nnue::NetHeader::payload_bytes_, static_cast<std::uint64_t>(nnue::kNetPayloadBytes + 2))},
         {"pawnstar_uci_payload_crc.bin",
          with_header_field(&nnue::NetHeader::payload_crc_, static_cast<std::uint64_t>(0))},
+        {"pawnstar_uci_reserved.bin", reserved_used},
     };
     std::vector<std::string> written;
     for (const auto &[name, image] : bad_nets)
     {
         const std::string path = WriteTempFile(name, image);
         written.push_back(path);
-        Run(game, {std::format("setoption name EvalFile value {}", path)});
-        Check(!game.nnue_network_.loaded_, std::format("setoption EvalFile <{}>: refused, no net loaded", name));
+        const std::string output = Run(game, {std::format("setoption name EvalFile value {}", path)});
+        Check(Contains(output, "info string NNUE: refusing net"),
+              std::format("setoption EvalFile <{}>: says on stdout that it refused it", name));
+        Check(game.nnue_network_.loaded_ && game.nnue_network_.Evaluate(game.CurrentPosition()) == evaluation_before,
+              std::format("setoption EvalFile <{}>: refused, and the loaded net is untouched", name));
     }
 
     Run(game, {std::format("setoption name EvalFile value {}", net_path)});
