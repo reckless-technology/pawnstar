@@ -6,7 +6,8 @@
  * (the single source of truth — no net filename is hard-coded here, so the embedded copy can never drift
  * from the shipped/Makefile net). This is a capital-.S file, so it is run through the C preprocessor.
  * The path is resolved relative to the build working directory (the repo root, where make runs). The image
- * is a stamped net (32-byte NetHeader + payload), so the same header validation applies. 64-byte aligned
+ * is a stamped net (64-byte RNNUE1 NetHeader + payload), so the same two loader checks apply. 64-byte
+ * aligned
  * for clean SIMD-friendly access of the payload.
  */
 #ifndef EMBED_NET_PATH

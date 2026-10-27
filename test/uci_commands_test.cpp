@@ -19,14 +19,17 @@
 /// Usage:  test_uci_commands <net.bin>   (run from the repository root, where pawnstar.book is)
 ///   With no argument the suite is skipped, as the other net-dependent suites are.
 
+#include "crc64.h"
 #include "game.h"
 #include "input_handling.h"
+#include "nnue.h"
 #include "test_report.h"
 
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -40,6 +43,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 namespace
@@ -478,21 +482,79 @@ void NetLoading(Game &game, const std::string &net_path)
     Run(game, {std::format("setoption name EvalFile value {}", unstamped)});
     Check(!game.nnue_network_.loaded_, "setoption EvalFile <unstamped file>: refused");
 
-    std::string other_architecture = net_bytes.substr(0, 4096);
-    other_architecture[6] ^= 0x01; // input_size_, the field after the magic and the format version
-    const std::string incompatible = WriteTempFile("pawnstar_uci_incompatible.bin", other_architecture);
-    Run(game, {std::format("setoption name EvalFile value {}", incompatible)});
-    Check(!game.nnue_network_.loaded_, "setoption EvalFile <another architecture>: refused");
+    // Every way an RNNUE1 net can be wrong, each built from the shipped net so nothing but the one fault
+    // differs. A refused net must leave no net loaded: the trap this closes is an engine that quietly falls
+    // back to another net and plays on, reporting a plausible Elo for a net that never played a move.
+    const auto re_crc_header = [](std::string &image) {
+        // Rewrite header_crc over the first 56 bytes, so a field change is caught as a field change rather
+        // than as a corrupt header (the CRC is checked first, by design).
+        nnue::NetHeader header{};
+        std::memcpy(&header, image.data(), sizeof(header));
+        header.header_crc_ =
+            crc64::Checksum(reinterpret_cast<const std::uint8_t *>(image.data()), nnue::kNetHeaderCrcBytes);
+        std::memcpy(image.data(), &header, sizeof(header));
+    };
+    const auto with_header_field = [&]<typename Field>(Field nnue::NetHeader::*field, Field value) {
+        std::string     image = net_bytes;
+        nnue::NetHeader header{};
+        std::memcpy(&header, image.data(), sizeof(header));
+        header.*field = value;
+        std::memcpy(image.data(), &header, sizeof(header));
+        re_crc_header(image);
+        return image;
+    };
 
-    const std::string truncated = WriteTempFile("pawnstar_uci_truncated.bin", net_bytes.substr(0, 4096));
-    Run(game, {std::format("setoption name EvalFile value {}", truncated)});
-    Check(!game.nnue_network_.loaded_, "setoption EvalFile <truncated file>: refused");
+    std::string wrong_magic    = net_bytes;
+    wrong_magic[2]             = 'X';
+    std::string psn1_container = net_bytes;
+    std::memcpy(psn1_container.data(), "PSN1", 4);
+    std::string corrupt_header = net_bytes;
+    corrupt_header[14] ^= 0x01; // king_buckets, with header_crc deliberately left stale
+    std::string corrupt_payload = net_bytes;
+    corrupt_payload[sizeof(nnue::NetHeader) + 777] ^= 0x01;
+    std::string appended_to = net_bytes + std::string(64, 'x');
+
+    const std::pair<std::string, std::string> bad_nets[] = {
+        {"pawnstar_uci_wrong_magic.bin", wrong_magic},
+        {"pawnstar_uci_psn1.bin", psn1_container},
+        {"pawnstar_uci_corrupt_header.bin", corrupt_header},
+        {"pawnstar_uci_corrupt_payload.bin", corrupt_payload},
+        {"pawnstar_uci_truncated.bin", net_bytes.substr(0, 4096)},
+        {"pawnstar_uci_appended.bin", appended_to},
+        {"pawnstar_uci_short.bin", net_bytes.substr(0, 16)},
+        {"pawnstar_uci_king_buckets.bin",
+         with_header_field(&nnue::NetHeader::king_buckets_, static_cast<std::uint16_t>(nnue::kNumKingBuckets + 1))},
+        {"pawnstar_uci_hidden_size.bin",
+         with_header_field(&nnue::NetHeader::hidden_size_, static_cast<std::uint16_t>(512))},
+        {"pawnstar_uci_output_buckets.bin",
+         with_header_field(&nnue::NetHeader::output_buckets_, static_cast<std::uint16_t>(nnue::kNumOutputBuckets + 1))},
+        {"pawnstar_uci_mirroring.bin",
+         with_header_field(&nnue::NetHeader::flags_,
+                           static_cast<std::uint8_t>(net_bytes[20] ^ nnue::kNetFlagKingMirroring))},
+        {"pawnstar_uci_format_version.bin",
+         with_header_field(&nnue::NetHeader::format_version_, static_cast<std::uint16_t>(2))},
+        {"pawnstar_uci_map_crc.bin",
+         with_header_field(&nnue::NetHeader::king_bucket_map_crc_, static_cast<std::uint64_t>(1))},
+        {"pawnstar_uci_payload_bytes.bin",
+         with_header_field(&nnue::NetHeader::payload_bytes_, static_cast<std::uint64_t>(nnue::kNetPayloadBytes + 2))},
+        {"pawnstar_uci_payload_crc.bin",
+         with_header_field(&nnue::NetHeader::payload_crc_, static_cast<std::uint64_t>(0))},
+    };
+    std::vector<std::string> written;
+    for (const auto &[name, image] : bad_nets)
+    {
+        const std::string path = WriteTempFile(name, image);
+        written.push_back(path);
+        Run(game, {std::format("setoption name EvalFile value {}", path)});
+        Check(!game.nnue_network_.loaded_, std::format("setoption EvalFile <{}>: refused, no net loaded", name));
+    }
 
     Run(game, {std::format("setoption name EvalFile value {}", net_path)});
     Check(game.nnue_network_.loaded_, "setoption EvalFile <the shipped net>: loaded again");
     Check(Contains(Run(game, {"eval"}), "evaluation "), "eval with the net reloaded");
 
-    for (const std::string &path : {unstamped, incompatible, truncated})
+    written.push_back(unstamped);
+    for (const std::string &path : written)
     {
         std::remove(path.c_str());
     }
