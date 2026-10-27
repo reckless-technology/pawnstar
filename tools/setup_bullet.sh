@@ -14,8 +14,10 @@
 # enough for the toolkit (bullet's CUDA backend uses cuFuncLoad -> needs driver for CUDA >= 12.3).
 set -euo pipefail
 
-# Pinned bullet commit that our examples/pawnstar*.rs target (bullet's API changes over time).
-BULLET_COMMIT=8893e4891781f4da2161dfbab0a776c156e22ead
+# Pinned bullet commit that our examples/pawnstar*.rs target (bullet's API changes over time). Always a
+# full commit SHA, never a branch name: a branch would silently retarget the trainer at an API we have not
+# checked, and the net a changed trainer writes has to pass tools/verify_net.sh before it can be believed.
+BULLET_COMMIT=da426a49b2a4b79a55a87031cd51c89bdf1ff030
 BULLET="${BULLET:-${USERPROFILE:-$HOME}/pawnstar_nnue/bullet}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 
@@ -27,9 +29,13 @@ if [ ! -d "$BULLET/.git" ]; then
 fi
 # Pin to the exact commit our examples target. The fetch may already have the commit locally (hence the
 # || true), but we still force a checkout so a stale working tree is brought to the pinned revision.
+# --force is required, not cosmetic: the step below edits a TRACKED file (crates/bullet_lib/Cargo.toml) to
+# register our examples, so a plain checkout of a commit that also changes that file is refused with "your
+# local changes would be overwritten" and the whole pin silently fails to move. Discarding the edit is
+# right - it is re-appended immediately afterwards.
 echo "[setup] checking out pinned commit $BULLET_COMMIT"
 git -C "$BULLET" fetch --quiet origin "$BULLET_COMMIT" 2>/dev/null || true
-git -C "$BULLET" checkout --quiet "$BULLET_COMMIT"
+git -C "$BULLET" checkout --quiet --force "$BULLET_COMMIT"
 
 # Drop our trainer + eval examples into bullet's examples/ dir (overwrite so edits here always win).
 echo "[setup] installing example sources"
