@@ -361,7 +361,7 @@ int main(int argc, char **argv)
     auto       t2         = now();
     for (long i = 0; i < kEvalIters; ++i)
     {
-        sink += net->Evaluate(acc, base.color_to_move_);
+        sink += net->Evaluate(acc, base);
     }
     auto         t3      = now();
     const double eval_ns = (double)ns(t3 - t2) / (double)kEvalIters;

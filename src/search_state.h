@@ -1083,7 +1083,7 @@ inline int EvaluatePosition(const SearchState &state)
         INCREMENT("eval hash hits");
         return ScaleByRule50(raw, position.reversible_move_count_);
     }
-    raw = state.game_.nnue_network_.Evaluate(state.CurrentAccumulator(), position.color_to_move_);
+    raw = state.game_.nnue_network_.Evaluate(state.CurrentAccumulator(), position);
     state.game_.eval_cache_.Store(hash, raw);
     return ScaleByRule50(raw, position.reversible_move_count_);
 }

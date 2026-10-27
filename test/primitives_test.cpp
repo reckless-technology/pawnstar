@@ -26,17 +26,20 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <set>
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <vector>
 
 namespace
 {
-void Check(bool condition, const std::string &message)
+bool Check(bool condition, const std::string &message)
 {
-    test_report::Check(condition, message);
+    return test_report::Check(condition, message);
 }
 
 /// @brief The legal move named @p name in @p position, or Move::None().
@@ -239,7 +242,14 @@ void NetHeaderLayout()
     const nnue::NetHeader header = nnue::ExpectedNetHeader();
     Check(sizeof(nnue::NetHeader) == 64, "RNNUE1 header is 64 bytes");
     Check(std::memcmp(header.magic_, "RNNUE1\0\0", 8) == 0, "RNNUE1 header magic is \"RNNUE1\" and two zero bytes");
-    Check(header.format_version_ == 1 && header.header_bytes_ == 64, "RNNUE1 header: format_version 1, 64 bytes");
+    // format_version is 2 with mirroring on, 1 with it off: the mirrored map changes what a bucket means,
+    // not only how many there are, and the container's rule is that the map's contents are part of the
+    // architecture. king_bucket_map_crc would catch a mix-up anyway, but the version says plainly that the
+    // two are different formats rather than two nets of one format.
+    Check(header.format_version_ == (nnue::kIsKingMirroringEnabled ? 2 : 1),
+          std::format("RNNUE1 header: format_version {} with king mirroring {}", header.format_version_,
+                      nnue::kIsKingMirroringEnabled ? "on" : "off"));
+    Check(header.header_bytes_ == 64, "RNNUE1 header: header_bytes is 64");
     Check(header.features_per_bucket_ == nnue::kInputSize && header.king_buckets_ == nnue::kNumKingBuckets &&
               header.hidden_size_ == nnue::kHiddenSize && header.output_buckets_ == nnue::kNumOutputBuckets,
           "RNNUE1 header: the shape fields are this build's constants");
@@ -274,12 +284,108 @@ void NetHeaderLayout()
           "RNNUE1 header: FinaliseNetHeader writes the CRC of the header's first 56 bytes");
 }
 
+/// @brief The king-bucket map the **trainer** uses must be the same 32 numbers the engine does.
+///
+/// `king_bucket_map_crc` in the net header binds the map to the *engine build* that stamped a net. What it
+/// cannot see is the trainer, which computes nothing from the engine's header — so a map that drifts
+/// between tools/bullet/pawnstar.rs and src/nnue.h trains one network and runs another, and the digest
+/// only reports it after the training run has been spent. That is the half of the risk nnue/README.md §2
+/// called the honest limitation of the digest, and this closes it: read `KING_BUCKETS_HALF` out of the .rs
+/// file and compare it, number for number, with `kKingBucketMapHalf`.
+///
+/// Reading the Rust source as text is crude, and that is the point — it needs no Rust toolchain, no build
+/// step and no generated file to keep in step, and it fails loudly the moment somebody edits one array and
+/// not the other. The engine's 64-entry map is *generated* from its 32, by the same arithmetic bullet uses
+/// on the trainer's 32, so proving the two 32-entry maps equal proves the two 64-entry maps equal.
+void TrainerKingBucketMap()
+{
+    const std::string path = "tools/bullet/pawnstar.rs";
+    std::ifstream     trainer(path);
+    if (!trainer)
+    {
+        Check(false, std::format("cannot open {} to compare its king-bucket map with the engine's (run this "
+                                 "suite from the repository root)",
+                                 path));
+        return;
+    }
+    const std::string source((std::istreambuf_iterator<char>(trainer)), std::istreambuf_iterator<char>());
+
+    const std::string declaration = "const KING_BUCKETS_HALF: [usize; 32] = [";
+    const std::size_t opening     = source.find(declaration);
+    if (opening == std::string::npos)
+    {
+        Check(false, std::format("{} has no `{}` — if the trainer's map was renamed or reshaped, this check and "
+                                 "nnue.h's kKingBucketMapHalf must follow it",
+                                 path, declaration));
+        return;
+    }
+    const std::size_t closing = source.find("];", opening);
+    if (closing == std::string::npos)
+    {
+        Check(false, std::format("{}: KING_BUCKETS_HALF is never closed with `];`", path));
+        return;
+    }
+
+    std::vector<int>  entries;
+    std::string       digits;
+    const std::string body = source.substr(opening + declaration.size(), closing - opening - declaration.size());
+    for (const char character : body + ",")
+    {
+        if (character >= '0' && character <= '9')
+        {
+            digits += character;
+        }
+        else if (!digits.empty())
+        {
+            entries.push_back(std::stoi(digits));
+            digits.clear();
+        }
+    }
+
+    if (entries.size() != nnue::kKingBucketMapHalf.size())
+    {
+        Check(false, std::format("{}: KING_BUCKETS_HALF has {} entries, the engine's kKingBucketMapHalf has {}", path,
+                                 entries.size(), nnue::kKingBucketMapHalf.size()));
+        return;
+    }
+    // One check for the whole array, naming every entry that differs. A per-entry check would print
+    // thirty-two passing lines for one property and bury the one that mattered.
+    std::string differences;
+    for (std::size_t index = 0; index < entries.size(); ++index)
+    {
+        if (entries[index] != nnue::kKingBucketMapHalf[index])
+        {
+            differences += std::format("{}[{}] trainer {} vs engine {}", differences.empty() ? "" : ", ", index,
+                                       entries[index], nnue::kKingBucketMapHalf[index]);
+        }
+    }
+    Check(differences.empty(),
+          differences.empty()
+              ? std::format("{}: KING_BUCKETS_HALF matches the engine's kKingBucketMapHalf, all {} entries", path,
+                            entries.size())
+              : std::format("{}: KING_BUCKETS_HALF differs from the engine's kKingBucketMapHalf at {} — the "
+                            "trainer would train one network and the engine run another",
+                            path, differences));
+
+    // And the generated 64-entry map really is bullet's expansion of those 32.
+    bool expansion_matches = true;
+    for (std::size_t square = 0; square < 64; ++square)
+    {
+        const std::size_t file          = square % 8;
+        const std::size_t mirrored_file = file < 4 ? file : 7 - file;
+        expansion_matches &=
+            nnue::ExpandMirroredKingBucketMap()[square] == nnue::kKingBucketMapHalf[(square / 8) * 4 + mirrored_file];
+    }
+    Check(expansion_matches, "the engine's 64-entry mirrored map is bullet's expansion of the 32-entry one");
+}
+
 } // namespace
 
 int main()
 {
     Crc64();
     NetHeaderLayout();
+    TrainerKingBucketMap();
     BitboardBasics();
     GeneratedTables();
     CastlingText();

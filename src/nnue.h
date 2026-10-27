@@ -90,15 +90,35 @@
 #include <immintrin.h>
 #endif
 
+/// @brief Horizontal king mirroring: 1 to mirror a perspective whose own king stands on files e-h, 0 for
+/// v12's unmirrored shape. A build knob so that either shape can be built from one tree while the three
+/// bit-exact ports are brought across one at a time; both are stamped into the net header, so a net can
+/// only load into a build of its own shape.
+#if !defined(PAWNSTAR_NNUE_KING_MIRRORING)
+#define PAWNSTAR_NNUE_KING_MIRRORING 0
+#endif
+
+/// @brief Material output heads: 8 for the shared shape, 1 for v12's. The same build knob.
+#if !defined(PAWNSTAR_NNUE_OUTPUT_BUCKETS)
+#define PAWNSTAR_NNUE_OUTPUT_BUCKETS 1
+#endif
+
 namespace nnue
 {
+
+/// @brief Whether a perspective whose own king stands on files e-h is horizontally mirrored (`square ^ 7`)
+/// before indexing. Measured in zenith at **+14.3 Elo** at fixed depth, and worth more than that number
+/// suggests: halving the king-placement space gives twice the effective data per bucket at the same file
+/// size, so it is a data multiplier as much as an Elo add. It only paid past ~1.4B training positions,
+/// which is why v12 does not have it.
+constexpr bool kIsKingMirroringEnabled = PAWNSTAR_NNUE_KING_MIRRORING != 0;
 
 /// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
 /// own* orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map
 /// serves both perspectives. MUST be byte-identical to the array passed to ChessBuckets::new in
 /// tools/bullet/*.rs. It is the one place the bucketing is written down: kNumKingBuckets is derived from it
 /// below, so there is no second constant to keep in step.
-constexpr std::array<int, 64> kKingBucketMap = {
+constexpr std::array<int, 64> kKingBucketMapUnmirrored = {
     0, 0, 1, 1, 2, 2, 3, 3, //
     0, 0, 1, 1, 2, 2, 3, 3, //
     0, 0, 1, 1, 2, 2, 3, 3, //
@@ -108,6 +128,56 @@ constexpr std::array<int, 64> kKingBucketMap = {
     4, 4, 5, 5, 6, 6, 7, 7, //
     4, 4, 5, 5, 6, 6, 7, 7, //
 };
+
+/// @brief The mirrored shape's map, over **half** a board: 32 entries indexed `rank * 4 + mirrored_file`,
+/// where `mirrored_file = min(file, 7 - file)`. `half * 4 + mirrored_file`, with `half = rank / 4`.
+///
+/// **This is the one place the mirrored bucketing is written down, and the engine's 64-entry map is
+/// generated from it** by ExpandMirroredKingBucketMap below, using bullet's own expansion arithmetic. The
+/// 32 entries are what `ChessBucketsMirrored::new` is handed in tools/bullet/pawnstar.rs, so trainer and
+/// engine read the same 32 numbers rather than two 64-entry arrays that have to be compared by eye — a map
+/// that drifts trains one network and runs another, and `king_bucket_map_crc` catches that only after the
+/// training run is already spent. `test_primitives` reads the trainer's array out of the .rs file and
+/// compares it with this one, so neither side can drift unnoticed.
+constexpr std::array<int, 32> kKingBucketMapHalf = {
+    0, 1, 2, 3, //
+    0, 1, 2, 3, //
+    0, 1, 2, 3, //
+    0, 1, 2, 3, //
+    4, 5, 6, 7, //
+    4, 5, 6, 7, //
+    4, 5, 6, 7, //
+    4, 5, 6, 7, //
+};
+
+/// @brief XOR mask that mirrors a square across the d/e file boundary (it flips the three file bits).
+constexpr int kFileFlip = 0x07;
+
+/// @brief Expand the 32-entry half-board map to the 64-entry map the engine indexes, exactly as bullet's
+/// `ChessBucketsMirrored::new` does: `expanded[sq] = half[(sq / 8) * 4 + [0,1,2,3,3,2,1,0][sq % 8]]`,
+/// where that eight-entry table is `min(file, 7 - file)`. The expansion folds the file, so the expanded map
+/// gives the same bank for a square and its mirror — which is what makes it safe to index with the king's
+/// unmirrored square, as bullet does.
+/// @return The 64-entry map.
+consteval std::array<int, 64> ExpandMirroredKingBucketMap()
+{
+    std::array<int, 64> expanded{};
+    for (std::size_t square = 0; square < expanded.size(); ++square)
+    {
+        const std::size_t file          = square % 8;
+        const std::size_t mirrored_file = std::min(file, 7 - file);
+        expanded[square]                = kKingBucketMapHalf[(square / 8) * 4 + mirrored_file];
+    }
+    return expanded;
+}
+
+/// @brief The map this build indexes. Mirroring halves the king-placement space, so the two shapes need
+/// genuinely different maps: the mirrored one folds the file (four mirrored files x two halves), while
+/// v12's pairs adjacent files (four file-pairs x two halves) and is not mirror-symmetric, so it has no
+/// 32-entry form at all. Which one is compiled is stamped into the header twice over — in `flags` and in
+/// `king_bucket_map_crc` — so a net trained for one can never load into a build of the other.
+constexpr std::array<int, 64> kKingBucketMap =
+    kIsKingMirroringEnabled ? ExpandMirroredKingBucketMap() : kKingBucketMapUnmirrored;
 
 /// @brief The highest weight-bank index kKingBucketMap selects, i.e. the bank count it needs, less one.
 consteval int MaxKingBucketIndex()
@@ -158,15 +228,14 @@ constexpr int kNumKingBuckets = MaxKingBucketIndex() + 1;     ///< King-square w
 constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-transformer input rows (bucket-major).
 constexpr int kHiddenSize     = 1024; ///< Feature-transformer / accumulator width per perspective.
 
-/// @brief Material output heads. One head is the v12 shape; the shared architecture's eight are selected by
-/// OutputBucket() from the piece count. The count is a compile-time constant because it sizes the payload
-/// and is stamped into the header, so a net and a build can never disagree about it silently.
-constexpr int kNumOutputBuckets = 1;
-
-/// @brief Whether a perspective whose own king stands on files e-h is horizontally mirrored before indexing.
-/// Off at the v12 shape. The flag is stamped into the header, so a mirrored net cannot load into an
-/// unmirrored build (or the reverse) — the two read entirely different feature rows for the same position.
-constexpr bool kIsKingMirroringEnabled = false;
+/// @brief Material output heads, selected by OutputBucket() from the piece count. Eight in the shared
+/// architecture, measured in zenith at **+14.7 Elo** at fixed depth; one in v12's shape. A compile-time
+/// constant because it sizes the payload and is stamped into the header, so a net and a build can never
+/// disagree about it silently.
+constexpr int kNumOutputBuckets = PAWNSTAR_NNUE_OUTPUT_BUCKETS;
+static_assert(kNumOutputBuckets >= 1 && kNumOutputBuckets <= 32,
+              "PAWNSTAR_NNUE_OUTPUT_BUCKETS must be between 1 and 32: bullet's MaterialCount<N> divides the "
+              "piece count by ceil(32 / N), so more than 32 heads would leave heads no position can select");
 
 // Quantisation constants. These MUST match the bullet trainer configuration that produced the net.
 constexpr int kQA    = 255; ///< Feature-transformer weight/activation scale (SCReLU clamp).
@@ -190,7 +259,14 @@ constexpr std::size_t kNetPayloadBytes =
 /// @brief Magic identifying a net in the shared Reckless container: "RNNUE1" and two zero bytes.
 constexpr char kNetMagic[8] = {'R', 'N', 'N', 'U', 'E', '1', '\0', '\0'};
 
-constexpr std::uint16_t kNetFormatVersion = 1;  ///< RNNUE1 format version (bump on any layout change).
+/// @brief RNNUE1 format version. **2 when mirroring is on, 1 when it is off**, and that is not a quirk of
+/// the switch: the map's contents are part of the architecture, and turning mirroring on changes what a
+/// bucket *means* rather than only how many there are. v12's map pairs adjacent files
+/// (`half * 4 + file / 2`); the mirrored map is per-file (`half * 4 + min(file, 7 - file)`) because
+/// mirroring has already folded e-h onto d-a. By the container's own rule that is a format change, so it
+/// bumps the version — which `king_bucket_map_crc` would catch anyway, but the version says plainly that
+/// the two are different formats rather than two nets of one format.
+constexpr std::uint16_t kNetFormatVersion = kIsKingMirroringEnabled ? 2 : 1;
 constexpr std::uint16_t kNetHeaderBytes   = 64; ///< Header size, so a later version can extend it safely.
 
 constexpr std::uint8_t kNetFlagKingMirroring = 0x01; ///< flags_ bit 0: horizontal king mirroring is on.
@@ -281,6 +357,26 @@ inline void FinaliseNetHeader(NetHeader &header, const std::uint8_t *payload, st
     header.header_crc_  = crc64::Checksum(reinterpret_cast<const std::uint8_t *>(&header), kNetHeaderCrcBytes);
 }
 
+/// @brief Everything one perspective needs to turn a (colour, piece, square) into a feature row: which
+/// weight bank it reads, and how a square and a colour are oriented into its own view.
+///
+/// **The whole point of gathering these three into one value is the refresh rule.** A perspective can only
+/// be updated incrementally while all three stay put; if any changes, every feature row it reads moves and
+/// the perspective must be rebuilt from scratch. Before mirroring there was one way for that to happen — a
+/// king crossing a bucket boundary — and the code compared bucket indices. Mirroring adds a second, and
+/// the two are not the same: at the mirrored map a king stepping d1 -> e1 keeps bucket 3 (file 3 and file 4
+/// both mirror to file 3) while `square_flip_` gains the file flip, so a comparison of buckets alone would
+/// diff a perspective whose every row had just moved and be **silently** wrong — no crash, no assertion,
+/// just a wrong evaluation. Comparing the whole Perspective cannot miss either case.
+struct Perspective
+{
+    int bank_;        ///< First feature row of this perspective's bank: bucket * kInputSize.
+    int square_flip_; ///< XOR applied to a square: kRankFlip for black's view, plus kFileFlip if mirrored.
+    int color_flip_;  ///< XOR applied to a piece's colour: 0 for white's view, 1 for black's.
+
+    constexpr bool operator==(const Perspective &) const = default;
+};
+
 /// @brief The two perspective accumulators (each the feature-transformer output, width kHiddenSize).
 /// Maintained incrementally across make/undo so a node's evaluation does not rebuild it from scratch.
 struct Accumulator
@@ -317,10 +413,14 @@ class Network
 
     /// @brief Evaluate from a maintained accumulator using the **int8** output layer — the engine's shipped
     /// evaluator (~1.86x faster than the exact int16 dot; a measured +31.8 Elo at 8+0.08), accurate to a
-    /// bounded ~26 cp of EvaluateExact. @param acc Accumulator matching the position.
-    /// @param side_to_move Selects which perspective feeds the first half of the output layer.
+    /// bounded ~26 cp of EvaluateExact.
+    /// @param acc Accumulator matching @p position.
+    /// @param position The position @p acc was maintained for. It supplies the side to move, which selects
+    /// which perspective feeds the first half of the output layer, and the piece count, which selects the
+    /// output head — both are properties of the position, not of the accumulator, so passing the position
+    /// is what stops the two being read from different places.
     /// @return Score in centipawns from the side-to-move's perspective.
-    int Evaluate(const Accumulator &acc, Color side_to_move) const;
+    int Evaluate(const Accumulator &acc, const Position &position) const;
 
     /// @brief Evaluate a position with a full accumulator refresh, int8 output layer (the engine eval).
     /// @param position Position to evaluate. @return Score in centipawns, side-to-move relative.
@@ -328,26 +428,29 @@ class Network
 
     /// @brief Exact int16 SCReLU forward pass — the **reference** evaluator that reproduces the trainer's
     /// eval (test_nnue cross-checks it to bullet within ±2 cp) and that the int8 Evaluate approximates. Not
-    /// used on the search hot path. @param acc Accumulator matching the position. @param side_to_move stm.
+    /// used on the search hot path. @param acc Accumulator matching @p position.
+    /// @param position The position @p acc was maintained for: side to move and output head.
     /// @return Score in centipawns, side-to-move relative.
-    int EvaluateExact(const Accumulator &acc, Color side_to_move) const;
+    int EvaluateExact(const Accumulator &acc, const Position &position) const;
 
     /// @brief Exact int16 evaluation with a full accumulator refresh (reference / diagnostics).
     /// @param position Position to evaluate. @return Score in centipawns, side-to-move relative.
     int EvaluateExact(const Position &position) const;
 
   private:
-    /// @brief Rebuild a single perspective from scratch (bias + every piece) using its king bucket.
-    /// @param side The perspective accumulator to rebuild (acc.white or acc.black).
-    /// @param position Position to read pieces from. @param bucket That perspective's king bucket.
-    /// @param black true for the black perspective (mirrors the square and swaps the colour offset).
-    void RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position &position, int bucket, bool black) const;
+    /// @brief Rebuild a single perspective from scratch (bias + every piece) through its indexing.
+    /// @param side The perspective accumulator to rebuild (acc.white_ or acc.black_).
+    /// @param position Position to read pieces from.
+    /// @param perspective That perspective's bank, square flip and colour flip.
+    void RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position &position,
+                     const Perspective &perspective) const;
 
-    /// @brief Apply the piece-placement delta from @p from to @p to to a single perspective, within one
-    /// (unchanged) king bucket. @param side Perspective accumulator. @param bucket That perspective's bucket.
-    /// @param black true for the black perspective.
-    void DiffSide(std::array<int16_t, kHiddenSize> &side, const Position &from, const Position &to, int bucket,
-                  bool black) const;
+    /// @brief Apply the piece-placement delta from @p from to @p to to a single perspective, whose indexing
+    /// is unchanged across the move. @param side Perspective accumulator.
+    /// @param from Position before the move. @param to Position after it.
+    /// @param perspective That perspective's (unchanged) bank, square flip and colour flip.
+    void DiffSide(std::array<int16_t, kHiddenSize> &side, const Position &from, const Position &to,
+                  const Perspective &perspective) const;
 
     /// @brief Feature-transformer weights, column-major by feature then hidden: index = feature * kHiddenSize + i.
     /// Feature rows are laid out bucket-major: row = bucket * 768 + chess768_index.
@@ -525,35 +628,47 @@ inline int32_t HsumI32(__m256i v)
 inline const bool kCpuHasAvxVnni = platform::HasAvxVnni();
 #endif // __AVX2__
 
-/// @brief Feature row for a piece in one perspective's bucket bank.
-///   white perspective: bucket*768 + color*384 + (type-1)*64 + square
-///   black perspective: bucket*768 + (1-color)*384 + (type-1)*64 + (square ^ kRankFlip)
-inline int FeatureRow(int bucket, int color, int piece, int sq, bool black)
+/// @brief One perspective's indexing state for a position.
+/// @param position The position. @param black true for the black perspective.
+/// @return Its Perspective. The map is indexed by the king's square oriented to this perspective but
+/// **not** mirrored, matching bullet: the expanded map already folds the file, so a square and its mirror
+/// select the same bank.
+inline Perspective PerspectiveFor(const Position &position, bool black)
 {
-    const int type_offset = (piece - kPawn) * 64;
-    const int base = black ? ((1 - color) * 384 + type_offset + (sq ^ kRankFlip)) : (color * 384 + type_offset + sq);
-    return bucket * kInputSize + base;
+    const int king     = (position.pieces_[kKing] & position.colors_[black ? kBlack : kWhite]).Lsb();
+    const int oriented = black ? (king ^ kRankFlip) : king;
+    // bullet's test is `ksq % 8 > 3` on the perspective's own king square. A file is unchanged by the
+    // rank flip, so the raw square answers it for either perspective.
+    const int mirror = kIsKingMirroringEnabled && (king & kFileFlip) >= 4 ? kFileFlip : 0;
+    return Perspective{kKingBucketMap[static_cast<std::size_t>(oriented)] * kInputSize,
+                       (black ? kRankFlip : 0) | mirror, black ? 1 : 0};
 }
 
-/// @brief Byte offset into feature_weights_ of a piece's column in one perspective's bucket bank.
-inline std::size_t Row(int bucket, int color, int piece, int sq, bool black)
+/// @brief Feature row for a piece in one perspective's bank:
+/// `bank + (colour ^ colour_flip)*384 + (type - 1)*64 + (square ^ square_flip)`.
+inline int FeatureRow(const Perspective &perspective, int color, int piece, int sq)
 {
-    return static_cast<std::size_t>(FeatureRow(bucket, color, piece, sq, black)) * kHiddenSize;
+    return perspective.bank_ + (color ^ perspective.color_flip_) * 384 + (piece - kPawn) * 64 +
+           (sq ^ perspective.square_flip_);
 }
 
-/// @brief A perspective's king bucket: index the map with that perspective's king square, oriented to it.
-inline int WhiteBucket(const Position &p)
+/// @brief Offset into feature_weights_ of a piece's column in one perspective's bank.
+inline std::size_t Row(const Perspective &perspective, int color, int piece, int sq)
 {
-    return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kWhite]).Lsb()];
+    return static_cast<std::size_t>(FeatureRow(perspective, color, piece, sq)) * kHiddenSize;
 }
 
-inline int BlackBucket(const Position &p)
+/// @brief The output head a position selects, matching bullet's `MaterialCount<N>` exactly: the divisor is
+/// `ceil(32 / N)` and the bucket `(piece_count - 2) / divisor`, so at N = 8 it is `(piece_count - 2) / 4`.
+/// At N = 1 the divisor is 32 and every position selects head 0.
+inline int OutputBucket(const Position &position)
 {
-    return kKingBucketMap[(p.pieces_[kKing] & p.colors_[kBlack]).Lsb() ^ kRankFlip];
+    constexpr int divisor = (32 + kNumOutputBuckets - 1) / kNumOutputBuckets;
+    return (position.pieces_[kNone].PopCount() - 2) / divisor;
 }
 
-inline void Network::RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position &position, int bucket,
-                                 bool black) const
+inline void Network::RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position &position,
+                                 const Perspective &perspective) const
 {
     side = feature_bias_;
     for (int color = kWhite; color <= kBlack; ++color)
@@ -563,14 +678,14 @@ inline void Network::RefreshSide(std::array<int16_t, kHiddenSize> &side, const P
         {
             for (Square s : position.pieces_[piece] & friendly)
             {
-                AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
+                AddColumn(side, &feature_weights_[Row(perspective, color, piece, s)]);
             }
         }
     }
 }
 
 inline void Network::DiffSide(std::array<int16_t, kHiddenSize> &side, const Position &from, const Position &to,
-                              int bucket, bool black) const
+                              const Perspective &perspective) const
 {
     for (int color = kWhite; color <= kBlack; ++color)
     {
@@ -580,11 +695,11 @@ inline void Network::DiffSide(std::array<int16_t, kHiddenSize> &side, const Posi
             const Bitboard to_bb   = to.pieces_[piece] & to.colors_[color];
             for (Square s : from_bb & ~to_bb)
             {
-                SubColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
+                SubColumn(side, &feature_weights_[Row(perspective, color, piece, s)]);
             }
             for (Square s : to_bb & ~from_bb)
             {
-                AddColumn(side, &feature_weights_[Row(bucket, color, piece, s, black)]);
+                AddColumn(side, &feature_weights_[Row(perspective, color, piece, s)]);
             }
         }
     }
@@ -778,17 +893,17 @@ inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, 
 inline void Network::Refresh(Accumulator &acc, const Position &position) const
 {
     // Each perspective uses its own king's bucket bank; seed bias and add every piece.
-    RefreshSide(acc.white_, position, WhiteBucket(position), /*black=*/false);
-    RefreshSide(acc.black_, position, BlackBucket(position), /*black=*/true);
+    RefreshSide(acc.white_, position, PerspectiveFor(position, /*black=*/false));
+    RefreshSide(acc.black_, position, PerspectiveFor(position, /*black=*/true));
 }
 
 inline void Network::Update(Accumulator &acc, const Position &from, const Position &to) const
 {
-    // A king move that crosses a bucket boundary changes that whole perspective's bank, so refresh it from
-    // scratch; otherwise apply only the piece-placement delta within the (unchanged) bank. At most one king
-    // moves per ply, so at most one perspective refreshes.
-    const int wf = WhiteBucket(from), wt = WhiteBucket(to);
-    const int bf = BlackBucket(from), bt = BlackBucket(to);
+    // A king move that changes its perspective's bank or its mirroring moves every feature row that
+    // perspective reads, so refresh it from scratch; otherwise apply only the piece-placement delta within
+    // the unchanged indexing. At most one king moves per ply, so at most one perspective refreshes.
+    const Perspective wf = PerspectiveFor(from, /*black=*/false), wt = PerspectiveFor(to, /*black=*/false);
+    const Perspective bf = PerspectiveFor(from, /*black=*/true), bt = PerspectiveFor(to, /*black=*/true);
 
     // Common case (~98%): neither king changed bucket. Find the changed squares directly from the two
     // colour bitboards (a move touches only 2-4 squares — quiet, capture, en passant, castling and
@@ -808,35 +923,36 @@ inline void Network::Update(Accumulator &acc, const Position &from, const Positi
             for (Square s : from_bb & ~to_bb)
             {
                 const int piece = from.squares_[s];
-                SubColumn(acc.white_, &feature_weights_[Row(wt, color, piece, s, false)]);
-                SubColumn(acc.black_, &feature_weights_[Row(bt, color, piece, s, true)]);
+                SubColumn(acc.white_, &feature_weights_[Row(wt, color, piece, s)]);
+                SubColumn(acc.black_, &feature_weights_[Row(bt, color, piece, s)]);
             }
             for (Square s : to_bb & ~from_bb)
             {
                 const int piece = to.squares_[s];
-                AddColumn(acc.white_, &feature_weights_[Row(wt, color, piece, s, false)]);
-                AddColumn(acc.black_, &feature_weights_[Row(bt, color, piece, s, true)]);
+                AddColumn(acc.white_, &feature_weights_[Row(wt, color, piece, s)]);
+                AddColumn(acc.black_, &feature_weights_[Row(bt, color, piece, s)]);
             }
         }
         return;
     }
 
-    // Rare: one king crossed a bucket boundary. Refresh that perspective; diff the other.
+    // Rare: one king changed its perspective's bank or its mirroring. Refresh that perspective; diff the
+    // other. Both faults are caught by the one comparison — see Perspective.
     if (wf != wt)
     {
-        RefreshSide(acc.white_, to, wt, /*black=*/false);
+        RefreshSide(acc.white_, to, wt);
     }
     else
     {
-        DiffSide(acc.white_, from, to, wt, /*black=*/false);
+        DiffSide(acc.white_, from, to, wt);
     }
     if (bf != bt)
     {
-        RefreshSide(acc.black_, to, bt, /*black=*/true);
+        RefreshSide(acc.black_, to, bt);
     }
     else
     {
-        DiffSide(acc.black_, from, to, bt, /*black=*/true);
+        DiffSide(acc.black_, from, to, bt);
     }
 }
 
@@ -854,16 +970,19 @@ inline int Dequant(int64_t output, std::int32_t bias)
     return static_cast<int>(std::clamp<int64_t>(output, -kMaxEvaluation, kMaxEvaluation));
 }
 
-inline int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
+inline int Network::Evaluate(const Accumulator &acc, const Position &position) const
 {
     // The engine's evaluation: the **int8** output layer (the shipped default). Activations are requantised
     // to uint8 (SCReLU >> kInt8Shift) and the output weights to int8; the dot accumulates in int32 (the
     // Phase-1 study showed |dot| <= 86M << 2^31). This is ~1.86x faster than the exact int16 dot (a measured
     // +31.8 Elo at 8+0.08) at a bounded ~26 cp deviation from EvaluateExact. The side-to-move accumulator
     // feeds the first half of the output layer.
-    const bool                              white_to_move = side_to_move == kWhite;
+    const bool                              white_to_move = position.color_to_move_ == kWhite;
     const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white_ : acc.black_;
     const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? acc.black_ : acc.white_;
+    // The output head the piece count selects. The weights are bucket-major, so a head is a contiguous
+    // 2 * kHiddenSize run and selecting one is a pointer offset the kernels never need to know about.
+    const int bucket = OutputBucket(position);
 
     int64_t output = 0;
 #if defined(__AVX2__)
@@ -871,7 +990,7 @@ inline int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
     // Pick the AVX-VNNI kernel at runtime on capable CPUs (bit-identical, ~faster output dot), else AVX2.
     const int16_t *stm = stm_acc.data();
     const int16_t *ntm = ntm_acc.data();
-    const int8_t  *w   = output_weights_i8_.data();
+    const int8_t  *w   = output_weights_i8_.data() + static_cast<std::size_t>(bucket) * 2 * kHiddenSize;
     const int32_t  dot = kCpuHasAvxVnni ? OutputDotInt8Vnni(stm, ntm, w) : OutputDotInt8Avx2(stm, ntm, w);
     output             = static_cast<int64_t>(dot) * output_w_scale_ * (1 << kInt8Shift);
 #else
@@ -884,24 +1003,25 @@ inline int Network::Evaluate(const Accumulator &acc, Color side_to_move) const
             const int a = (c * c + (1 << (kInt8Shift - 1))) >> kInt8Shift;
             return a > 255 ? 255 : a;
         };
-        dot8 += static_cast<int64_t>(u8(stm_acc[i])) * output_weights_i8_[i];
-        dot8 += static_cast<int64_t>(u8(ntm_acc[i])) * output_weights_i8_[kHiddenSize + i];
+        const std::size_t w = static_cast<std::size_t>(bucket) * 2 * kHiddenSize;
+        dot8 += static_cast<int64_t>(u8(stm_acc[i])) * output_weights_i8_[w + i];
+        dot8 += static_cast<int64_t>(u8(ntm_acc[i])) * output_weights_i8_[w + kHiddenSize + i];
     }
     output = dot8 * output_w_scale_ * (1 << kInt8Shift);
 #endif
-    // One output head at this shape, so the bias is the only one there is; the material heads add a
-    // per-bucket selection here.
-    return Dequant(output, output_bias_.front());
+    return Dequant(output, output_bias_[static_cast<std::size_t>(bucket)]);
 }
 
-inline int Network::EvaluateExact(const Accumulator &acc, Color side_to_move) const
+inline int Network::EvaluateExact(const Accumulator &acc, const Position &position) const
 {
     // Exact int16 SCReLU forward pass mirroring bullet's `simple` example. This is the **reference**
     // evaluator: it reproduces the trainer's eval within quantisation rounding (test_nnue, ±2 cp) and is the
     // baseline the int8 Evaluate above approximates. Not used on the search hot path.
-    const bool                              white_to_move = side_to_move == kWhite;
+    const bool                              white_to_move = position.color_to_move_ == kWhite;
     const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white_ : acc.black_;
     const std::array<int16_t, kHiddenSize> &ntm_acc       = white_to_move ? acc.black_ : acc.white_;
+    const int                               bucket        = OutputBucket(position);
+    const int16_t *bucket_weights = output_weights_.data() + static_cast<std::size_t>(bucket) * 2 * kHiddenSize;
 
     int64_t output = 0;
 #if defined(__AVX2__)
@@ -911,7 +1031,7 @@ inline int Network::EvaluateExact(const Accumulator &acc, Color side_to_move) co
     const __m256i  qa         = _mm256_set1_epi16(static_cast<int16_t>(kQA));
     __m256i        acc64      = _mm256_setzero_si256();
     const int16_t *acts[2]    = {stm_acc.data(), ntm_acc.data()};
-    const int16_t *weights[2] = {output_weights_.data(), output_weights_.data() + kHiddenSize};
+    const int16_t *weights[2] = {bucket_weights, bucket_weights + kHiddenSize};
     for (int side = 0; side < 2; ++side)
     {
         const int16_t *a = acts[side];
@@ -939,25 +1059,25 @@ inline int Network::EvaluateExact(const Accumulator &acc, Color side_to_move) co
 #else
     for (int i = 0; i < kHiddenSize; ++i)
     {
-        output += SCReLU(stm_acc[i]) * output_weights_[i];
-        output += SCReLU(ntm_acc[i]) * output_weights_[kHiddenSize + i];
+        output += SCReLU(stm_acc[i]) * bucket_weights[i];
+        output += SCReLU(ntm_acc[i]) * bucket_weights[kHiddenSize + i];
     }
 #endif
-    return Dequant(output, output_bias_.front());
+    return Dequant(output, output_bias_[static_cast<std::size_t>(bucket)]);
 }
 
 inline int Network::Evaluate(const Position &position) const
 {
     Accumulator acc;
     Refresh(acc, position);
-    return Evaluate(acc, position.color_to_move_);
+    return Evaluate(acc, position);
 }
 
 inline int Network::EvaluateExact(const Position &position) const
 {
     Accumulator acc;
     Refresh(acc, position);
-    return EvaluateExact(acc, position.color_to_move_);
+    return EvaluateExact(acc, position);
 }
 
 } // namespace nnue
