@@ -761,7 +761,7 @@ architecture yields a different file size, so an engine built for one cannot loa
 
 ## 8. Reproducibility
 
-`setup_bullet.sh` pins bullet to commit `8893e489…` (bullet's API drifts; `tools/bullet/*.rs` target
+`setup_bullet.sh` pins bullet to commit `da426a49…` (bullet's API drifts; `tools/bullet/*.rs` target
 that commit). It is idempotent: re-running clones if needed, checks out the pinned commit, reinstalls
 the example sources, and registers them in `crates/bullet_lib/Cargo.toml` only if absent. The default
 working area is `~/pawnstar_nnue/` (bullet checkout, datasets, checkpoints); override the bullet
