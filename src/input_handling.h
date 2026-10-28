@@ -155,7 +155,8 @@ inline void handle_uci(Game &game, std::span<std::string>)
 }
 
 /// @brief Handle the "setoption" command: "setoption name <Name> value <Value>".
-/// Recognises EvalFile (load a different NNUE net file; NNUE is the only evaluator), Hash (transposition
+/// Recognises EvalFile (load a different NNUE net file; NNUE is the only evaluator — a net the loader
+/// refuses leaves the net already loaded playing, and says so on both streams, naming it), Hash (transposition
 /// table size in MB, 1..4096), Threads (Lazy SMP search threads, 1..kMaxSearchThreads), Clear Hash (a
 /// button that empties the transposition table), Move Overhead (ms reserved from each deadline, 0..5000) and
 /// OwnBook (whether to consult the built-in opening book). A numeric option whose value is not an integer
@@ -187,8 +188,36 @@ inline void handle_setoption(Game &game, std::span<std::string> args)
     }
     if (name == "EvalFile")
     {
-        game.nnue_network_.Load(value);
-        game.eval_cache_.Clear(); // cached evals belong to the previous net
+        if (game.nnue_network_.Load(value))
+        {
+            game.eval_cache_.Clear(); // cached evals belong to the previous net
+        }
+        else
+        {
+            // **A refusal must say what is still playing, not only what it would not take.** The loader has
+            // already named the field and both values, on stdout and on stderr; what it cannot say is which
+            // net the engine will go on using. Keeping the loaded net is right — every check happens before
+            // a weight is written, so nothing was disturbed — but being *quiet* about it is the defect: a
+            // match harness sets EvalFile, sees `readyok`, and attributes a thousand games to a net that
+            // never played a move. Both streams again, because a harness keeps stderr and routinely drops
+            // `info` lines, and the same wording in all four engines so one harness can grep for it.
+            const std::string kept =
+                game.nnue_network_.loaded_
+                    ? std::format("NNUE: keeping the net already loaded ('{}'); '{}' was refused and is not "
+                                  "in play",
+                                  game.nnue_network_.loaded_net_origin_, value)
+                    // No net has ever loaded on this Game, so there is nothing to keep. The engine binary
+                    // cannot reach this (main exits rather than start without a net), but a Game driven in
+                    // process can, and "keeping the net already loaded ('')" would be a lie.
+                    : std::format("NNUE: no net was loaded, and '{}' was refused, so there is still no net in "
+                                  "play",
+                                  value);
+            std::cout << std::format("info string {}\n", kept) << std::flush;
+            std::cerr << kept << "\n" << std::flush;
+            // The eval cache is deliberately NOT cleared. Its entries belong to the net that is still the
+            // one playing, so clearing them would throw away warm evaluations for a net change that never
+            // happened — the cache is only stale when the net actually changed, which is the branch above.
+        }
     }
     else if (name == "Hash")
     {

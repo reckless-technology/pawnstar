@@ -485,19 +485,42 @@ void NetLoading(Game &game, const std::string &net_path)
         auto  bare_ptr = std::make_unique<Game>();
         Game &bare     = *bare_ptr;
         Check(!bare.nnue_network_.loaded_, "a Game that has loaded no net reports none loaded");
+        Check(bare.nnue_network_.loaded_net_origin_.empty(),
+              "a Game that has loaded no net names no net as its origin");
         const std::string without_net = Run(bare, {"position startpos", "eval", "nnue"});
         Check(Contains(without_net, "info string no NNUE net loaded"), "eval without a net: says so");
         Check(Contains(without_net, "info string NNUE: no net loaded"), "nnue without a net: says so");
+
+        // A refusal on a Game that never loaded a net has nothing to keep, and must not claim it kept
+        // something. Unreachable through the engine binary (main exits rather than start with no net), so
+        // this is where it is reached from.
+        const std::string nothing_kept = Run(bare, {"setoption name EvalFile value this/file/does/not/exist.bin"});
+        Check(Contains(nothing_kept, "info string NNUE: no net was loaded, and "
+                                     "'this/file/does/not/exist.bin' was refused, so there is still no net in play"),
+              "setoption EvalFile on a Game with no net: says there is still no net in play");
+        Check(!Contains(nothing_kept, "keeping the net already loaded"),
+              "setoption EvalFile on a Game with no net: claims to keep nothing");
     }
 
     // **A refused net changes nothing.** Not "leaves no net loaded" — that was the trap. Every check the
     // loader makes happens before a weight is written, so the net that was playing is still playing, and
     // the engine stays in a state it has defined behaviour for.
-    const int evaluation_before = game.nnue_network_.Evaluate(game.CurrentPosition());
-    Run(game, {"setoption name EvalFile value this/file/does/not/exist.bin"});
+    const int         evaluation_before = game.nnue_network_.Evaluate(game.CurrentPosition());
+    const std::string origin_before     = game.nnue_network_.loaded_net_origin_;
+    Check(!origin_before.empty(), "a loaded net names where it came from");
+    const std::string missing_out = Run(game, {"setoption name EvalFile value this/file/does/not/exist.bin"});
     Check(game.nnue_network_.loaded_, "setoption EvalFile <missing file>: refused, the loaded net is untouched");
     Check(game.nnue_network_.Evaluate(game.CurrentPosition()) == evaluation_before,
           "setoption EvalFile <missing file>: refused, and the net still evaluates as it did");
+    // **The half that was missing: which net is playing now.** The loader said why it refused the file; only
+    // this line says what the engine went on using, and without it a harness sets EvalFile, sees readyok and
+    // credits a thousand games to a net that never played a move.
+    Check(Contains(missing_out, std::format("info string NNUE: keeping the net already loaded ('{}'); "
+                                            "'this/file/does/not/exist.bin' was refused and is not in play",
+                                            origin_before)),
+          "setoption EvalFile <missing file>: names the net that is still playing");
+    Check(game.nnue_network_.loaded_net_origin_ == origin_before,
+          "setoption EvalFile <missing file>: the loaded net's origin is unchanged");
 
     const std::string net_bytes = ReadFile(net_path);
     auto              scratch   = std::make_unique<nnue::Network>(); // megabytes of weights: never on the stack
@@ -507,6 +530,16 @@ void NetLoading(Game &game, const std::string &net_path)
     const std::string unstamped = WriteTempFile("pawnstar_uci_unstamped.bin", "not a net, just some bytes here....");
     Run(game, {std::format("setoption name EvalFile value {}", unstamped)});
     Check(game.nnue_network_.loaded_, "setoption EvalFile <unstamped file>: refused, the loaded net is untouched");
+
+    // The eval cache belongs to the net that is playing, so a refusal must leave it alone: clearing it would
+    // throw away warm evaluations for a net change that never happened. A sentinel entry is the cheapest way
+    // to see it either survive a refusal or go when the net really does change.
+    constexpr zobrist_t kSentinelHash  = 0xFEEDFACECAFEB000ULL;
+    constexpr int       kSentinelScore = 1234;
+    int                 cached         = 0;
+    game.eval_cache_.Store(kSentinelHash, kSentinelScore);
+    Check(game.eval_cache_.Probe(kSentinelHash, cached) && cached == kSentinelScore,
+          "the eval cache holds what was stored in it");
 
     // Every way an RNNUE1 net can be wrong, each built from the shipped net so nothing but the one fault
     // differs. A refused net must leave no net loaded: the trap this closes is an engine that quietly falls
@@ -589,10 +622,24 @@ void NetLoading(Game &game, const std::string &net_path)
               std::format("setoption EvalFile <{}>: says on stdout that it refused it", name));
         Check(game.nnue_network_.loaded_ && game.nnue_network_.Evaluate(game.CurrentPosition()) == evaluation_before,
               std::format("setoption EvalFile <{}>: refused, and the loaded net is untouched", name));
+        Check(Contains(output, std::format("info string NNUE: keeping the net already loaded ('{}'); '{}' was "
+                                           "refused and is not in play",
+                                           origin_before, path)),
+              std::format("setoption EvalFile <{}>: names the net that is still playing", name));
+        Check(game.nnue_network_.loaded_net_origin_ == origin_before,
+              std::format("setoption EvalFile <{}>: the loaded net's origin is unchanged", name));
+        Check(game.eval_cache_.Probe(kSentinelHash, cached) && cached == kSentinelScore,
+              std::format("setoption EvalFile <{}>: refused, so the eval cache of the net still playing is "
+                          "kept",
+                          name));
     }
 
     Run(game, {std::format("setoption name EvalFile value {}", net_path)});
     Check(game.nnue_network_.loaded_, "setoption EvalFile <the shipped net>: loaded again");
+    Check(game.nnue_network_.loaded_net_origin_ == net_path,
+          "setoption EvalFile <the shipped net>: the loaded net's origin is the file it came from");
+    Check(!game.eval_cache_.Probe(kSentinelHash, cached),
+          "setoption EvalFile <a net that loads>: the eval cache of the previous net is cleared");
     Check(Contains(Run(game, {"eval"}), "evaluation "), "eval with the net reloaded");
 
     written.push_back(unstamped);

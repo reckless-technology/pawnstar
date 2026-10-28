@@ -472,6 +472,14 @@ class Network
 
   public:
     bool loaded_ = false; ///< Whether Load() has succeeded.
+    /// @brief Where the net now loaded came from: the path it was read from, or "embedded" for the copy
+    /// embedded in the binary. Empty until a load succeeds.
+    ///
+    /// Written only where `loaded_` is set, so the two can never disagree — and, like `loaded_`, left
+    /// untouched by a refusal. That is what lets a caller name **the net that is still playing** rather than
+    /// only the one it would not take: `setoption name EvalFile <an incompatible net>` keeps the loaded net,
+    /// which is right, and must say which net that is, which is the half a match harness needs.
+    std::string loaded_net_origin_;
 };
 
 // ---- Out-of-class definitions (header-only build) ----
@@ -918,7 +926,8 @@ inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, 
         output_weights_i8_[i] = static_cast<int8_t>(std::max<long>(-127, std::min<long>(127, q)));
     }
 
-    loaded_ = true;
+    loaded_            = true;
+    loaded_net_origin_ = origin;
     std::fprintf(stderr, "info string NNUE: loaded net '%s'\n", origin.c_str());
     return true;
 }
