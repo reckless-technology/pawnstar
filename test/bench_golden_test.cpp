@@ -20,6 +20,7 @@
 
 #include "game.h"
 #include "input_handling.h"
+#include "nnue.h"
 #include "test_report.h"
 
 #include <array>
@@ -92,6 +93,14 @@ int main(int argc, char *argv[])
         return test_report::Summary("bench golden: skipped (no net supplied)");
     }
     const std::string net_path = argv[1];
+    // The 6,601,454 signature belongs to this net at this shape. A build at another shape refuses the net
+    // outright, so there is no bench to compare: that shape's gate is the six-position node-count signature
+    // over the synthetic net, tools/new-shape-signature.sh.
+    if (!nnue::IsNetFileThisBuildsShape(net_path))
+    {
+        return test_report::Summary(
+            std::format("bench golden: skipped (net '{}' is not this build's NNUE shape)", net_path));
+    }
 
     auto  game_ptr = std::make_unique<Game>();
     Game &game     = *game_ptr;

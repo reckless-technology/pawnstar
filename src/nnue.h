@@ -737,6 +737,39 @@ inline bool IsNetFileReadable(const std::string &path)
     return static_cast<bool>(in.read(&first_byte, 1));
 }
 
+/// @brief Whether the net file at @p path exists and describes **this build's** NNUE shape.
+///
+/// A test suite whose expected values belong to a particular net — the trainer reference evaluations, the
+/// Bratko-Kopec move set, the golden bench signature — has nothing to compare against when the build is at
+/// another shape, because the engine rightly refuses that net. This extends those suites' existing "skipped
+/// (no net supplied)" contract from *absent* to *absent or of another shape*, which is what the Rust and Go
+/// ports already do (`common::is_net_this_builds_shape`, `skipWithoutTheShippedNet`). A shape with no
+/// trained net is gated instead by the synthetic net: `test_nnue_incremental` builds one in memory, and
+/// `tools/new-shape-signature.sh` searches one over six fixed positions.
+///
+/// Only the architecture fields and the bucket map's digest are compared, never the payload checksums: a net
+/// **of this shape** that is corrupt or truncated must still fail its suite loudly rather than quietly skip
+/// it. This answers "is this the right kind of net", not "is this net sound" — Load answers that.
+/// @param path Path to test. @return true if the file's header describes this build's shape exactly.
+inline bool IsNetFileThisBuildsShape(const std::string &path)
+{
+    std::ifstream in(path, std::ios::binary);
+    NetHeader     header{};
+    if (!in.read(reinterpret_cast<char *>(&header), sizeof(header)))
+    {
+        return false;
+    }
+    const NetHeader expected = ExpectedNetHeader();
+    return std::memcmp(header.magic_, expected.magic_, sizeof(expected.magic_)) == 0 &&
+           header.format_version_ == expected.format_version_ &&
+           header.features_per_bucket_ == expected.features_per_bucket_ &&
+           header.king_buckets_ == expected.king_buckets_ && header.hidden_size_ == expected.hidden_size_ &&
+           header.output_buckets_ == expected.output_buckets_ && header.flags_ == expected.flags_ &&
+           header.activation_ == expected.activation_ && header.qa_ == expected.qa_ && header.qb_ == expected.qb_ &&
+           header.eval_scale_ == expected.eval_scale_ && header.king_bucket_map_crc_ == expected.king_bucket_map_crc_ &&
+           header.payload_bytes_ == expected.payload_bytes_;
+}
+
 inline bool Network::Load(const std::string &path)
 {
     std::ifstream in(path, std::ios::binary | std::ios::ate);

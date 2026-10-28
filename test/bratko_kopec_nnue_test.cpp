@@ -15,6 +15,7 @@
 #include "debug_hashtable.h"
 #include "game.h"
 #include "move.h"
+#include "nnue.h"
 #include "position.h"
 #include "test_report.h"
 #include <memory>
@@ -119,7 +120,15 @@ int main(int argc, char *argv[])
         return test_report::Summary("Bratko-Kopec NNUE: skipped (no net supplied)");
     }
     const std::string net_path = argv[1];
-    const int         depth    = argc > 2 ? std::atoi(argv[2]) : bk::kDefaultDepth;
+    // The accepted-move sets belong to this net at this shape, so a build at another shape has nothing to
+    // compare against — it rightly refuses the net. That shape's own gates are test_nnue_incremental's
+    // synthetic net and tools/new-shape-signature.sh.
+    if (!nnue::IsNetFileThisBuildsShape(net_path))
+    {
+        return test_report::Summary(
+            std::format("Bratko-Kopec NNUE: skipped (net '{}' is not this build's NNUE shape)", net_path));
+    }
+    const int depth = argc > 2 ? std::atoi(argv[2]) : bk::kDefaultDepth;
 
     // Default to a deterministic single-threaded search so `make check` is reproducible (Lazy SMP makes
     // even a fixed-depth search non-deterministic — helper threads race through the shared TT). overwrite=0
