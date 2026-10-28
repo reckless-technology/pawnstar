@@ -219,6 +219,62 @@ Little-endian throughout: a **64-byte header**, then the weight payload, and not
 | 48 | 8 | `payload_crc` | CRC-64 over the payload |
 | 56 | 8 | `header_crc` | CRC-64 over bytes 0–55 |
 
+### A real header, decoded
+
+The shipped v12 net as re-stamped on 2026-10-27. Worth keeping because every field below was
+*verified* against the specification above rather than assumed, and because three independent
+implementations — C++, Rust and Go — produce these 64 bytes identically (whole file SHA-256
+`531dab3e8c920a9dc66fa0ac8d61df86e1df5ddad5ea1d7fbd6ed2522744b420`):
+
+```
+52 4e 4e 55 45 31 00 00  01 00  40 00  00 03  08 00
+00 04  01 00  00  00  ff 00  40 00  90 01  00 00 00 00
+8d b1 0a af 5d db 6d cc  04 18 c0 00 00 00 00 00
+0b 45 6b 6e 36 ec 91 8a  5d 73 04 9a c7 0d ee 19
+```
+
+| bytes | field | value |
+|---|---|---|
+| `52 4e 4e 55 45 31 00 00` | `magic` | `RNNUE1  ` |
+| `01 00` | `format_version` | **1** — v12 is unmirrored with one output head |
+| `40 00` | `header_bytes` | 64 |
+| `00 03` / `08 00` | `features_per_bucket` / `king_buckets` | **768** / **8** |
+| `00 04` / `01 00` | `hidden_size` / `output_buckets` | **1024** / **1** |
+| `00` / `00` | `flags` / `activation` | no mirroring / SCReLU |
+| `ff 00` / `40 00` / `90 01` | `qa` / `qb` / `eval_scale` | **255** / **64** / **400** |
+| `00 00 00 00` | `reserved` | zero |
+| `8d b1 0a af 5d db 6d cc` | `king_bucket_map_crc` | `0xCC6DDB5DAF0AB18D` |
+| `04 18 c0 00 00 00 00 00` | `payload_bytes` | **12,589,060** |
+| `0b 45 6b 6e 36 ec 91 8a` | `payload_crc` | `0x8A91EC366E6B450B` |
+| `5d 73 04 9a c7 0d ee 19` | `header_crc` | `0x19EE0DC79A04735D` |
+
+A net at the shared shape carries `format_version` **2**, `output_buckets` **8**, `flags` **01**,
+`payload_bytes` **12617760** and `king_bucket_map_crc` **0x0A20060D4E9586E0**.
+
+### Who writes the header, and why it should be the trainer
+
+**The trainer is the authority on what a net is; the engine is only an authority on what it can
+load.** `tools/stamp_net.cpp` currently derives the header from *this engine's* compile-time
+constants, which describes the reader's expectation rather than the artefact's truth — and that has a
+consequence that is easy to miss:
+
+`king_bucket_map_crc` exists to catch a **trainer/engine map drift**, the failure where the trainer
+trains one network and the engine runs another. But a stamper compiled from the engine's own map
+writes that engine's map digest **by construction**, and the loader then checks it against the same
+map. It agrees tautologically, and the field can only ever fire when a net is cross-loaded into a
+*differently built* engine. The drift it was added for is exactly the case it cannot see.
+
+Moving the write to the trainer makes it a real cross-check: the trainer asserts *the map I trained
+with*, the engine verifies *the map I index*, and a drift between them is refused at load. The
+separation to aim for is **producer asserts, consumer verifies** — the trainer writes the whole
+header, both CRCs and the bullet-save conversion (int16 output bias widened to int32, trailing
+padding stripped); each engine validates every field against its own constants and refuses loudly,
+and does nothing else. That also collapses one stamper per architecture into one stamper, and removes
+the "stamper built at the wrong architecture" failure class entirely.
+
+`verify_net.sh` stays engine-side, because "does this net load *and play* here" is the one question
+only this engine can answer.
+
 ### The payload
 
 Bucket-major, exactly as bullet's save order emits it:
