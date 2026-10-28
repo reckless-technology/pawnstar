@@ -251,6 +251,55 @@ implementations — C++, Rust and Go — produce these 64 bytes identically (who
 A net at the shared shape carries `format_version` **2**, `output_buckets` **8**, `flags` **01**,
 `payload_bytes` **12617760** and `king_bucket_map_crc` **0x0A20060D4E9586E0**.
 
+### Reading a header: `print_net_header`
+
+`build/print_net_header <net.bin>` (`make tools`) is the one reviewed reader. **Use it instead of `od`**: an
+`od` script that read its `uint16` fields from byte 4 when the magic is 8 bytes printed every label two fields
+out for several multi-hour matches, because a decoder outside the tree has no test. This one decodes against the
+engine's own `nnue::NetHeader` (nothing transcribed), prints every field, verifies `header_crc` and
+`payload_crc`, checks the payload length and the header's own arithmetic, and says whether the file's shape is
+this build's. It **never refuses a file for its shape**: it describes any `RNNUE1` net, including one this build
+could not load, which is when a header is most worth reading.
+
+Output is `key=value` lines in a fixed order on stdout, so a script needs no parser
+(`print_net_header net.bin | sed -n 's/^king_buckets=//p'`); a human reading goes to stderr. Integers are
+decimal, flags and CRCs `0x` upper-case hex, booleans `yes`/`no`, a value that cannot be known `unavailable`.
+`integrity=ok` means the magic, both CRCs, the payload length and the payload arithmetic all hold, and the exit
+status says it too (0 intact whatever the shape, 1 not intact, 2 unreadable). The keys are the header's own field
+names, then `<check>_computed` / `<check>_ok` pairs, then `integrity`, then `shape_matches_build` and
+`shape_mismatches` (a comma-separated list of the architecture fields that differ from this build's constants).
+
+```
+$ build/print_net_header nnue/pawnstar-v12.bin
+file=nnue/pawnstar-v12.bin
+file_bytes=12589124
+header_complete=yes
+magic=RNNUE1  
+magic_ok=yes
+format_version=1
+header_bytes=64
+features_per_bucket=768
+king_buckets=8
+hidden_size=1024
+output_buckets=1
+flags=0x00
+king_mirroring=off
+...
+king_bucket_map_crc=0xCC6DDB5DAF0AB18D
+payload_bytes=12589060
+payload_crc=0x8A91EC366E6B450B
+header_crc=0x19EE0DC79A04735D
+header_crc_ok=yes
+payload_size_ok=yes
+payload_crc_ok=yes
+integrity=ok
+shape_matches_build=yes
+shape_mismatches=
+```
+
+`test/net_header_test.cpp` is its test: hand-laid fixtures with literal expected values and CRCs from a separate
+implementation, and the failing verdict asserted for each kind of damage.
+
 ### Who writes the header, and why it should be the trainer
 
 **The trainer is the authority on what a net is; the engine is only an authority on what it can
@@ -447,6 +496,7 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 | `run_gendata.sh`          | fan `gen_data` across cores, one shard per worker (each with a disjoint slice of the opening pool), resumable, reporting the pool's duplicate rate at the end |
 | `check_duplicates.sh`     | measure what fraction of an assembled pool is distinct positions — the gate `train_pipeline.sh` runs before converting a directory of shards, and the cheap way to catch a degenerate campaign in minutes |
 | `make_openings.sh`        | build `openings.epd`, the **match** set, from the public-domain TSCP opening book: replay each line, keep the roughly balanced positions, dedup (capped at ~420 positions by that source, which is why data generation uses `gen_openings` instead) |
+| `print_net_header.cpp`    | read any `RNNUE1` net and print every header field as `key=value`, with `header_crc` and `payload_crc` verified and the shape compared with this build's (`make tools` → `build/print_net_header <net.bin>`; the logic is `net_header_report.h`, tested by `test_net_header`) |
 | `stamp_net.cpp`           | wrap a raw bullet net in the shared `RNNUE1` container: the 64-byte header, written from that build's own constants, with the map digest and both CRCs (`make tools` → `build/stamp_net`) |
 | `convert_psn1_payload.py` | one-off: read a net in the retired `PSN1` container and write a raw `RNNUE1` payload for `stamp_net` (§2) |
 | `setup_bullet.sh`         | clone bullet at the pinned commit + install/register our trainer examples |
