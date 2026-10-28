@@ -46,7 +46,7 @@
 ///
 /// The authority is lc0's own `struct V6TrainingData` in `src/trainingdata/trainingdata_v6.h`, which is
 /// `#pragma pack(1)` and ends `static_assert(sizeof(V6TrainingData) == 8356, "Wrong struct size")`. The
-/// offsets in kRecord* below are that declaration order; kRecordBytes is that assertion, and the reader
+/// offsets in kRecord* below are that declaration order; kRecordBytesV6 is that assertion, and the reader
 /// refuses a stream whose length is not a multiple of it. Every scalar is little-endian, which is what the
 /// writer's `std::ofstream::write` of the packed struct produces on every machine lc0 is built for.
 ///
@@ -213,15 +213,46 @@ namespace lc0
 // ---------------------------------------------------------------------------
 
 /// @brief Size of one v6 training record. lc0's own static_assert on `sizeof(V6TrainingData)`.
-constexpr std::size_t kRecordBytes = 8356;
+constexpr std::size_t kRecordBytesV6 = 8356;
+
+/// @brief Size of one v7 training record. lc0's declaration is `struct V7TrainingData : V6TrainingData`,
+/// which appends `d_st`, `opp_played_idx`, `next_played_idx` and `reserved[8]` - forty bytes - under
+/// `#pragma pack(1)`, and asserts `sizeof(V7TrainingData) == 8396`. Because v7 *inherits* v6 rather than
+/// restating it, **every v6 field keeps its offset and its meaning**, `best_q` among them, so the offsets
+/// below serve both versions and the value this tool writes means the same thing for each.
+constexpr std::size_t kRecordBytesV7 = 8396;
+
+/// @brief The largest record read, which sizes the lookahead buffer.
+constexpr std::size_t kRecordBytesMax = kRecordBytesV7;
 
 /// @brief History positions in a record's plane block, and bitboards per position (lc0's kMoveHistory and
 /// kPlanesPerBoard).
 constexpr std::size_t kMoveHistory    = 8;
 constexpr std::size_t kPlanesPerBoard = 13;
 
-/// @brief The only record version this reads. v5 and earlier put the result where `dummy` now is.
-constexpr uint32_t kTrainingDataVersion = 6;
+/// @brief The record versions this reads. v5 and earlier put the result where `dummy` now is, so they are
+/// still refused; v7 only adds trailing fields this tool never looks at.
+constexpr uint32_t kTrainingDataVersionV6 = 6;
+constexpr uint32_t kTrainingDataVersionV7 = 7;
+
+/// @brief Bytes in one record of @p version, or 0 if this tool does not read that version.
+///
+/// The version is the first four bytes of every record, so a stream's stride is derived from the data
+/// rather than assumed. A version this returns 0 for must stop the read: striding a v7 stream by 8356
+/// bytes - or a v6 one by 8396 - would not fail, it would decode plausible-looking garbage for an entire
+/// tar, which is a fault nothing downstream could detect.
+constexpr std::size_t RecordBytesForVersion(uint32_t version)
+{
+    switch (version)
+    {
+    case kTrainingDataVersionV6:
+        return kRecordBytesV6;
+    case kTrainingDataVersionV7:
+        return kRecordBytesV7;
+    default:
+        return 0;
+    }
+}
 
 /// @brief The only input format this reads: lc0's INPUT_CLASSICAL_112_PLANE. The canonical formats
 /// transform the board (mirror / flip / transpose, recorded in `invariance_info`) and move the en-passant
@@ -262,8 +293,9 @@ constexpr std::size_t kRecordOffsetBestIndex          = kRecordOffsetPlayedIndex
 constexpr std::size_t kRecordOffsetPolicyKld          = kRecordOffsetBestIndex + 2;
 constexpr std::size_t kRecordOffsetQStandardDeviation = kRecordOffsetPolicyKld + 4;
 
-static_assert(kRecordOffsetQStandardDeviation + 4 == kRecordBytes,
+static_assert(kRecordOffsetQStandardDeviation + 4 == kRecordBytesV6,
               "the field offsets must account for every byte of lc0's V6TrainingData");
+static_assert(kRecordBytesV7 > kRecordBytesV6, "v7 only ever appends to the v6 layout");
 
 /// @brief Bit 5 of `invariance_info`: lc0 adjudicated the game rather than playing it out.
 constexpr uint8_t kInvarianceGameAdjudicated = 1u << 5;
@@ -373,7 +405,7 @@ struct Statistics
 class RecordView
 {
   public:
-    /// @brief Wrap a record. @param bytes Exactly kRecordBytes bytes, which must outlive this view.
+    /// @brief Wrap a record. @param bytes One whole record, which must outlive this view.
     explicit RecordView(const unsigned char *bytes) : bytes_{bytes}
     {
     }
@@ -810,6 +842,13 @@ class RecordReader
     /// @return false once the stream is spent (or malformed, which also sets has_failed()).
     bool NextGame(GameRecords &game);
 
+    /// @brief One record's size for this stream, from the version its records carry.
+    /// @return The size in bytes, or 0 before the first record has been read.
+    std::size_t record_bytes() const
+    {
+        return record_bytes_;
+    }
+
     /// @brief Bytes pulled off the stream, lookahead included. @return The count.
     uint64_t bytes_consumed() const
     {
@@ -845,17 +884,18 @@ class RecordReader
     bool ReadRecord();
     void AppendHeld(GameRecords &game);
 
-    std::istream                           *input_ = nullptr;
-    std::array<unsigned char, kRecordBytes> held_{}; ///< The lookahead record, the next game's first.
-    bool                                    has_held_record_        = false;
-    bool                                    has_failed_             = false;
-    bool                                    is_spent_               = false;
-    float                                   held_plies_left_        = 0.0f;
-    uint64_t                                bytes_consumed_         = 0;
-    uint64_t                                attributable_bytes_     = 0;
-    uint64_t                                boundary_disagreements_ = 0;
-    bool                                    does_digest_input_      = true;
-    sha256::Hasher                          hasher_;
+    std::istream                              *input_ = nullptr;
+    std::array<unsigned char, kRecordBytesMax> held_{}; ///< The lookahead record, the next game's first.
+    std::size_t    record_bytes_           = 0;         ///< One record's size, settled by the first record's version.
+    bool           has_held_record_        = false;
+    bool           has_failed_             = false;
+    bool           is_spent_               = false;
+    float          held_plies_left_        = 0.0f;
+    uint64_t       bytes_consumed_         = 0;
+    uint64_t       attributable_bytes_     = 0;
+    uint64_t       boundary_disagreements_ = 0;
+    bool           does_digest_input_      = true;
+    sha256::Hasher hasher_;
 };
 
 /// @brief Pull one record into held_. @return true if a whole record was read.
@@ -866,18 +906,47 @@ inline bool RecordReader::ReadRecord()
         return false;
     }
 
-    input_->read((char *)held_.data(), (std::streamsize)kRecordBytes);
-    const std::streamsize read = input_->gcount();
+    // Every record carries its version in its first four bytes, so the stride is read out of the data
+    // rather than assumed. Doing it per record, not just for the first, is what makes a stream whose
+    // records are mixed fail here instead of mis-striding: a v7 stream walked in 8356-byte steps would
+    // not error, it would decode plausible-looking garbage for a whole tar, and nothing downstream
+    // could tell. The 32-bytes-per-position check on the output is the same idea one stage later.
+    input_->read((char *)held_.data(), (std::streamsize)sizeof(uint32_t));
 
-    if (read == 0)
+    if (input_->gcount() == 0)
     {
         is_spent_ = true;
         return false;
     }
 
+    bytes_consumed_ += (uint64_t)input_->gcount();
+
+    if (input_->gcount() != (std::streamsize)sizeof(uint32_t))
+    {
+        has_failed_ = true;
+        is_spent_   = true;
+        return false;
+    }
+
+    const uint32_t    version      = RecordView{held_.data()}.version();
+    const std::size_t record_bytes = RecordBytesForVersion(version);
+
+    if (record_bytes == 0 || (record_bytes_ != 0 && record_bytes != record_bytes_))
+    {
+        // An unreadable version, or a stream that changed version part way through. Either way the
+        // stride is no longer known, so stop rather than guess at it.
+        has_failed_ = true;
+        is_spent_   = true;
+        return false;
+    }
+
+    record_bytes_ = record_bytes;
+
+    input_->read((char *)held_.data() + sizeof(uint32_t), (std::streamsize)(record_bytes_ - sizeof(uint32_t)));
+    const std::streamsize read = input_->gcount();
     bytes_consumed_ += (uint64_t)read;
 
-    if (read != (std::streamsize)kRecordBytes)
+    if (read != (std::streamsize)(record_bytes_ - sizeof(uint32_t)))
     {
         // A truncated tail is the shape a rate-limited download or a half-written tar takes, so it is a
         // failure and not an end of input: a run that swallowed it would report a short yield as success.
@@ -894,14 +963,14 @@ inline bool RecordReader::ReadRecord()
 /// @brief Move the held record into @p game, hashing it as part of the attributable prefix.
 inline void RecordReader::AppendHeld(GameRecords &game)
 {
-    game.insert(game.end(), held_.begin(), held_.end());
+    game.insert(game.end(), held_.begin(), held_.begin() + (std::ptrdiff_t)record_bytes_);
 
     if (does_digest_input_)
     {
-        hasher_.Update(held_.data(), kRecordBytes);
+        hasher_.Update(held_.data(), record_bytes_);
     }
 
-    attributable_bytes_ += kRecordBytes;
+    attributable_bytes_ += record_bytes_;
     has_held_record_ = false;
 }
 
@@ -950,11 +1019,21 @@ inline bool RecordReader::NextGame(GameRecords &game)
 
 /// @brief Walk one game and write every position that passes the filters.
 ///
-/// @param game The game's records, back to back; its size must be a multiple of kRecordBytes.
+/// @param game The game's records, back to back.
+/// @param record_bytes One record's size, taken from the stream's own version; @p game must be an exact
+///        multiple of it.
 /// @param options The filters. @param sink Where kept records go. @param statistics Counters, added to.
-inline void ExtractGame(const GameRecords &game, const Options &options, RecordSink &sink, Statistics &statistics)
+inline void ExtractGame(const GameRecords &game, std::size_t record_bytes, const Options &options, RecordSink &sink,
+                        Statistics &statistics)
 {
-    const std::size_t record_count = game.size() / kRecordBytes;
+    if (record_bytes == 0 || game.size() % record_bytes != 0)
+    {
+        // Not a whole number of records. Refuse it rather than stride past the end of the last one: a
+        // mis-stride does not fail, it decodes plausible garbage, and nothing downstream could tell.
+        return;
+    }
+
+    const std::size_t record_count = game.size() / record_bytes;
 
     if (record_count == 0)
     {
@@ -965,7 +1044,7 @@ inline void ExtractGame(const GameRecords &game, const Options &options, RecordS
 
     const RecordView first{game.data()};
 
-    if (first.version() != kTrainingDataVersion)
+    if (RecordBytesForVersion(first.version()) != record_bytes)
     {
         statistics.records_bad_version += record_count;
         return;
@@ -990,7 +1069,7 @@ inline void ExtractGame(const GameRecords &game, const Options &options, RecordS
 
     for (std::size_t index = 0; index < record_count; ++index)
     {
-        const RecordView record{game.data() + index * kRecordBytes};
+        const RecordView record{game.data() + index * record_bytes};
         const int        ply = (int)index;
         ++statistics.plies_seen;
 
@@ -1054,7 +1133,7 @@ inline void ExtractGame(const GameRecords &game, const Options &options, RecordS
 
         if (options.does_require_quiet && index + 1 < record_count)
         {
-            const RecordView      successor{game.data() + (index + 1) * kRecordBytes};
+            const RecordView      successor{game.data() + (index + 1) * record_bytes};
             const DecodedPosition after         = DecodePosition(successor, ply + 1);
             const bool            was_capture   = after.piece_count < decoded.piece_count;
             const bool            was_promotion = after.pawn_count < decoded.pawn_count;

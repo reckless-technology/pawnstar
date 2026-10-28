@@ -124,12 +124,18 @@ void WriteFloat(std::vector<unsigned char> &bytes, std::size_t offset, float val
     WriteUint32(bytes, offset, bits);
 }
 
-/// @brief Build one v6 record. @param planes The plane words, as stored (index 0 is the labelled position's
-/// first bitboard). @param fields Everything else. @return The kRecordBytes bytes.
-std::vector<unsigned char> BuildRecord(const std::vector<uint64_t> &planes, const RecordFields &fields)
+/// @brief Build one record. @param planes The plane words, as stored (index 0 is the labelled position's
+/// first bitboard). @param fields Everything else.
+/// @param version The version to stamp: 6 by default, or 7 for lc0's `V7TrainingData`, which inherits the
+///        v6 layout and appends forty bytes this tool never reads. Those trailing bytes are left zero,
+///        which is all the tests need: the point of a v7 record here is that nothing the tool *does* read
+///        has moved.
+/// @return One whole record, sized for @p version.
+std::vector<unsigned char> BuildRecord(const std::vector<uint64_t> &planes, const RecordFields &fields,
+                                       uint32_t version = lc0::kTrainingDataVersionV6)
 {
-    std::vector<unsigned char> bytes(lc0::kRecordBytes, 0);
-    WriteUint32(bytes, lc0::kRecordOffsetVersion, lc0::kTrainingDataVersion);
+    std::vector<unsigned char> bytes(lc0::RecordBytesForVersion(version), 0);
+    WriteUint32(bytes, lc0::kRecordOffsetVersion, version);
     WriteUint32(bytes, lc0::kRecordOffsetInputFormat, lc0::kInputFormatClassical);
 
     for (std::size_t index = 0; index < planes.size(); ++index)
@@ -198,7 +204,8 @@ std::vector<uint64_t> PlanesFromFen(const std::string &fen)
 /// @brief Build a one-record-per-position game out of FENs, with each position's label.
 /// @param fens The positions, in ply order. @param fields Per-position fields; its planes come from the FEN.
 /// @return The game's records back to back, with a descending plies_left ladder.
-lc0::GameRecords BuildGame(const std::vector<std::string> &fens, std::vector<RecordFields> fields)
+lc0::GameRecords BuildGame(const std::vector<std::string> &fens, std::vector<RecordFields> fields,
+                           uint32_t version = lc0::kTrainingDataVersionV6)
 {
     lc0::GameRecords game;
 
@@ -236,7 +243,7 @@ lc0::GameRecords BuildGame(const std::vector<std::string> &fens, std::vector<Rec
             }
         }
 
-        const std::vector<unsigned char> record = BuildRecord(planes, entry);
+        const std::vector<unsigned char> record = BuildRecord(planes, entry, version);
         game.insert(game.end(), record.begin(), record.end());
     }
 
@@ -383,7 +390,8 @@ void WhiteRelativeColumns()
         fields[1].best_q   = -0.5f;
         fields[1].result_q = -1.0f;
         fields[1].result_d = 0.0f;
-        lc0::ExtractGame(BuildGame({white_to_move, black_to_move}, fields), options, sink, statistics);
+        lc0::ExtractGame(BuildGame({white_to_move, black_to_move}, fields), lc0::kRecordBytesV6, options, sink,
+                         statistics);
 
         Check(sink.records.size() == 2, "both plies of the two-record game were emitted");
 
@@ -408,7 +416,8 @@ void WhiteRelativeColumns()
         std::vector<RecordFields> fields(2);
         fields[0].result_d = 1.0f;
         fields[1].result_d = 1.0f;
-        lc0::ExtractGame(BuildGame({white_to_move, black_to_move}, fields), options, sink, statistics);
+        lc0::ExtractGame(BuildGame({white_to_move, black_to_move}, fields), lc0::kRecordBytesV6, options, sink,
+                         statistics);
 
         Check(sink.records.size() == 2 && sink.records[0].wdl == "0.5" && sink.records[1].wdl == "0.5",
               "result_d = 1 is a draw for either side to move, spelled 0.5 and never 1/2-1/2");
@@ -429,7 +438,7 @@ void Chess960IsRefused()
         const lc0::GameRecords game = BuildGame({"brnqknrb/pppppppp/8/8/8/8/PPPPPPPP/BRNQKNRB w KQkq - 0 1",
                                                  "brnqknrb/pppppppp/8/8/8/8/PPPPPPPP/BRNQKNRB b KQkq - 1 1"},
                                                 {});
-        lc0::ExtractGame(game, options, sink, statistics);
+        lc0::ExtractGame(game, lc0::kRecordBytesV6, options, sink, statistics);
 
         Check(sink.records.empty() && statistics.games_non_standard == 1,
               "a game that did not start from the standard position is dropped whole");
@@ -466,7 +475,7 @@ void QuietFilterReadsTheSuccessor()
         lc0::Options   options;
         options.skip_plies                  = 0;
         options.does_require_standard_start = false;
-        lc0::ExtractGame(BuildGame(fens, {}), options, sink, statistics);
+        lc0::ExtractGame(BuildGame(fens, {}), lc0::kRecordBytesV6, options, sink, statistics);
         return sink.records.size();
     };
 
@@ -519,7 +528,7 @@ void FiltersAndCounters()
         lc0::Options    options;
         options.skip_plies                  = 2;
         options.does_require_standard_start = false;
-        lc0::ExtractGame(BuildGame(fens, {}), options, sink, statistics);
+        lc0::ExtractGame(BuildGame(fens, {}), lc0::kRecordBytesV6, options, sink, statistics);
         Check(statistics.dropped_skip_plies == 2 && sink.records.size() == 3,
               "--skip-plies drops the opening plies, and the last of six is dropped for want of a successor");
         Check(sink.games_ended == 1 && statistics.games_contributing == 1, "the game ended once and contributed");
@@ -532,7 +541,7 @@ void FiltersAndCounters()
         options.skip_plies                  = 0;
         options.does_require_standard_start = false;
         options.max_plies                   = 3;
-        lc0::ExtractGame(BuildGame(fens, {}), options, sink, statistics);
+        lc0::ExtractGame(BuildGame(fens, {}), lc0::kRecordBytesV6, options, sink, statistics);
         Check(statistics.dropped_max_plies == 3 && sink.records.size() == 3, "--max-plies drops the tail");
     }
 
@@ -550,7 +559,7 @@ void FiltersAndCounters()
         }
 
         fields[0].visits = 800;
-        lc0::ExtractGame(BuildGame(fens, fields), options, sink, statistics);
+        lc0::ExtractGame(BuildGame(fens, fields), lc0::kRecordBytesV6, options, sink, statistics);
         Check(statistics.dropped_min_visits == 5 && sink.records.size() == 1,
               "--min-visits drops a record whose search barely ran");
     }
@@ -568,7 +577,7 @@ void FiltersAndCounters()
             entry.best_q = 0.9995f; // past 3000 cp
         }
 
-        lc0::ExtractGame(BuildGame(fens, fields), options, sink, statistics);
+        lc0::ExtractGame(BuildGame(fens, fields), lc0::kRecordBytesV6, options, sink, statistics);
         Check(statistics.dropped_eval_cap == 5 && sink.records.empty(),
               "--eval-cap drops a saturated label rather than writing a 6000 cp score");
     }
@@ -587,7 +596,7 @@ void FiltersAndCounters()
             entry.invariance_info = lc0::kInvarianceGameAdjudicated;
         }
 
-        lc0::ExtractGame(BuildGame(fens, fields), options, sink, statistics);
+        lc0::ExtractGame(BuildGame(fens, fields), lc0::kRecordBytesV6, options, sink, statistics);
         Check(statistics.dropped_adjudicated == 6 && sink.records.empty(),
               "--skip-adjudicated drops a game lc0 called rather than played out");
     }
@@ -602,7 +611,7 @@ void FiltersAndCounters()
         lc0::ExtractGame(BuildGame({"4k3/8/8/8/8/8/8/4K2R w - - 4 20", "4k3/8/8/8/8/8/8/4K1R1 b - - 5 20",
                                     "4k3/8/8/8/8/8/8/4K2R w - - 4 20", "4k3/8/8/8/8/8/8/4K1R1 b - - 5 20"},
                                    {}),
-                         options, sink, statistics);
+                         lc0::kRecordBytesV6, options, sink, statistics);
         Check(statistics.dropped_duplicate == 1 && sink.records.size() == 2,
               "a position already in the shard is dropped, counted as a duplicate");
     }
@@ -615,7 +624,7 @@ void FiltersAndCounters()
         options.skip_plies                  = 0;
         options.does_require_standard_start = false;
         lc0::ExtractGame(BuildGame({"4k3/4R3/8/8/8/8/8/4K3 b - - 4 20", "5k2/4R3/8/8/8/8/8/4K3 w - - 5 21"}, {}),
-                         options, sink, statistics);
+                         lc0::kRecordBytesV6, options, sink, statistics);
         Check(statistics.dropped_in_check == 1 && sink.records.empty(),
               "a side to move in check is dropped, counted as in_check");
     }
@@ -629,7 +638,7 @@ void FiltersAndCounters()
             BuildRecord(PlanesFromFen(std::string{lc0::kStartPositionFen}), RecordFields{});
         WriteUint32(bytes, lc0::kRecordOffsetInputFormat, 132);
         lc0::GameRecords game{bytes.begin(), bytes.end()};
-        lc0::ExtractGame(game, options, sink, statistics);
+        lc0::ExtractGame(game, lc0::kRecordBytesV6, options, sink, statistics);
         Check(statistics.records_bad_format == 1 && sink.records.empty(),
               "a canonical-format record is refused rather than decoded as classical");
     }
@@ -656,11 +665,11 @@ void ReaderAndProvenance()
         lc0::RecordReader  reader{stream};
         lc0::GameRecords   game;
 
-        Check(reader.NextGame(game) && game.size() == 3 * lc0::kRecordBytes,
+        Check(reader.NextGame(game) && game.size() == 3 * lc0::kRecordBytesV6,
               "the plies_left ladder splits the first game off at three records");
-        Check(reader.attributable_bytes() == 3 * lc0::kRecordBytes,
+        Check(reader.attributable_bytes() == 3 * lc0::kRecordBytesV6,
               "and the attributable prefix covers those three and not the lookahead");
-        Check(reader.NextGame(game) && game.size() == 2 * lc0::kRecordBytes, "the second game is two records");
+        Check(reader.NextGame(game) && game.size() == 2 * lc0::kRecordBytesV6, "the second game is two records");
         Check(!reader.NextGame(game), "and then the stream is spent");
         Check(reader.attributable_bytes() == stream_text.size() && !reader.has_failed(),
               "the whole stream was attributed, with no failure");
@@ -702,6 +711,72 @@ void ReaderAndProvenance()
         Check(clean_reader.Digest() != dirty_reader.Digest(), "the digest follows the bytes it hashed");
     }
 }
+
+/// @brief v7 must produce byte-identical output to v6, and a stream that lies about its version must fail.
+///
+/// This is the headline check for v7 support, and it is deliberately an equality rather than a list of
+/// field comparisons. lc0's `struct V7TrainingData : V6TrainingData` appends forty bytes and moves nothing,
+/// so the *only* correct outcome is that the same position, stamped v7, converts to exactly the same text.
+/// A field-by-field test would pass just as happily with an offset misread by four bytes; this one cannot.
+void VersionSevenMatchesVersionSix()
+{
+    const std::vector<std::string> fens = {
+        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+        "rnbqkbnr/pp1ppppp/8/2p5/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+    };
+    const std::vector<RecordFields> fields = {
+        RecordFields{.best_q = 0.25f, .result_q = 1.0f, .result_d = 0.0f, .visits = 800, .plies_left = 42.0f},
+        RecordFields{.best_q = -0.10f, .result_q = -1.0f, .result_d = 0.0f, .visits = 750, .plies_left = 41.0f},
+        RecordFields{.best_q = 0.33f, .result_q = 1.0f, .result_d = 0.0f, .visits = 900, .plies_left = 40.0f},
+    };
+
+    lc0::Options options;
+    options.skip_plies                  = 0;
+    options.does_require_standard_start = false;
+
+    CollectingSink  sink_v6;
+    lc0::Statistics statistics_v6;
+    lc0::ExtractGame(BuildGame(fens, fields, lc0::kTrainingDataVersionV6), lc0::kRecordBytesV6, options, sink_v6,
+                     statistics_v6);
+
+    CollectingSink  sink_v7;
+    lc0::Statistics statistics_v7;
+    lc0::ExtractGame(BuildGame(fens, fields, lc0::kTrainingDataVersionV7), lc0::kRecordBytesV7, options, sink_v7,
+                     statistics_v7);
+
+    Check(!sink_v6.records.empty(), "the v6 game produced records to compare against");
+    bool do_records_match = sink_v7.records.size() == sink_v6.records.size();
+
+    for (std::size_t index = 0; do_records_match && index < sink_v6.records.size(); ++index)
+    {
+        do_records_match = sink_v7.records[index].fen == sink_v6.records[index].fen &&
+                           sink_v7.records[index].white_score == sink_v6.records[index].white_score &&
+                           sink_v7.records[index].wdl == sink_v6.records[index].wdl;
+    }
+
+    Check(do_records_match, "a v7 record converts byte-identically to the same v6 record");
+    Check(statistics_v7.plies_seen == statistics_v6.plies_seen && statistics_v7.games_used == statistics_v6.games_used,
+          "v7 and v6 agree on every counter");
+
+    // The sizes really do differ, so the equality above is not two identical inputs comparing equal.
+    Check(BuildGame(fens, fields, lc0::kTrainingDataVersionV7).size() ==
+              BuildGame(fens, fields, lc0::kTrainingDataVersionV6).size() + 3 * 40,
+          "the v7 game is forty bytes per record larger, so the comparison was of different inputs");
+
+    // Striding a v7 game as though it were v6 must produce nothing rather than plausible garbage.
+    CollectingSink  sink_mixed;
+    lc0::Statistics statistics_mixed;
+    lc0::ExtractGame(BuildGame(fens, fields, lc0::kTrainingDataVersionV7), lc0::kRecordBytesV6, options, sink_mixed,
+                     statistics_mixed);
+    Check(sink_mixed.records.empty(), "a v7 game strided as v6 is refused, not mis-decoded");
+
+    Check(lc0::RecordBytesForVersion(5) == 0 && lc0::RecordBytesForVersion(8) == 0,
+          "a version this tool cannot read has no stride");
+    Check(lc0::RecordBytesForVersion(lc0::kTrainingDataVersionV6) == 8356 &&
+              lc0::RecordBytesForVersion(lc0::kTrainingDataVersionV7) == 8396,
+          "the two readable versions carry lc0's own struct sizes");
+}
 } // namespace
 
 int main()
@@ -713,6 +788,8 @@ int main()
     QuietFilterReadsTheSuccessor();
     FiltersAndCounters();
     ReaderAndProvenance();
+    VersionSevenMatchesVersionSix();
     return test_report::Summary("LC0 EXTRACT: plane decoding against the real archive, the centipawn mapping, "
-                                "White-relative columns, Chess960 refusal, filters, reader provenance");
+                                "White-relative columns, Chess960 refusal, filters, reader provenance, "
+                                "v7 byte-identical to v6");
 }
