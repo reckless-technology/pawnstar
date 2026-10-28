@@ -378,8 +378,22 @@ inline int Run(const std::vector<std::string> &arguments, std::ostream &out, std
         }
         if (!report.shape_mismatches.empty())
         {
-            error << "print_net_header: NOTE this net's shape is not this build's, so this build would refuse it; "
-                     "the fields above are the file's own:\n";
+            // WORDED ABOUT THIS TOOL'S OWN BUILD, DELIBERATELY. `shape_matches_build` compares the file against
+            // the compile-time constants of whichever build of *this tool* is running, which is very often not
+            // the engine that is about to load the net: on the CI runners the decoder a match harness finds is
+            // ~/pawnstar/build/print_net_header, compiled at the old architecture, so every new-shape net it
+            // reads lands here. The note this replaced said "this build would refuse it", which is true of this
+            // decoder and reads as a refusal of the NET - it would stop a human mid-match-setup on a run that is
+            // fine. The verdict on the file is `integrity`, which is what tools/pawnstar-match.sh gates on, so
+            // integrity says itself again here, above the shape note and in the same stream.
+            error
+                << "print_net_header: integrity=" << (report.is_intact ? "ok" : "fail")
+                << " - that is the verdict on the FILE, and nothing below changes it.\n"
+                << "print_net_header: NOTE the shape fields above are the FILE'S OWN. They are not the shape THIS\n"
+                   "print_net_header:   COPY of print_net_header was compiled at, so this copy could not load this\n"
+                   "print_net_header:   net - which is a statement about the decoder's build, not about the net. An\n"
+                   "print_net_header:   engine built at the net's own shape loads it; decode with a print_net_header\n"
+                   "print_net_header:   from that engine's tree for a verdict about it. The fields that differ:\n";
             for (const std::string &detail_line : report.shape_mismatch_details)
             {
                 error << "print_net_header:   " << detail_line << '\n';

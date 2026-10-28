@@ -377,9 +377,21 @@ void TestFourBucketNet()
           "4-bucket: payload_bytes is among the mismatches exactly when this build's payload differs");
     if (nnue::kNumKingBuckets != 4)
     {
-        Check(outcome.standard_error.find("NOTE this net's shape is not this build's") != std::string::npos &&
+        Check(outcome.standard_error.find("COPY of print_net_header was compiled at") != std::string::npos &&
                   outcome.standard_error.find("king_buckets: file 4") != std::string::npos,
               "4-bucket: stderr says the shape differs, with the file's value beside the build's");
+        // The wording is the fix for a real operational trap, so the test holds it to what it must say. A note
+        // about a shape must be unmistakably about THIS DECODER's build (the decoder a match harness finds is
+        // routinely not the engine that will play), and must not read as a refusal of a sound net - while the
+        // verdict that does matter, integrity, stays in front of it.
+        Check(outcome.standard_error.find("integrity=ok - that is the verdict on the FILE") != std::string::npos,
+              "4-bucket: stderr leads with integrity, the verdict on the file, before the shape note");
+        Check(outcome.standard_error.find("would refuse it") == std::string::npos &&
+                  outcome.standard_error.find("not this build's, so") == std::string::npos,
+              "4-bucket: stderr does not read as a refusal of a net that is perfectly sound");
+        Check(outcome.standard_error.find("a statement about the decoder's build, not about the net") !=
+                  std::string::npos,
+              "4-bucket: stderr says whose build the shape verdict is about");
     }
 }
 
