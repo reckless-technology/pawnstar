@@ -6,6 +6,13 @@ file argument), and prints "<fen> | <eval_cp>" using the SAME king-bucketed Ches
 bullet trains with and the SAME SCReLU inference. test_nnue compares the engine's eval to this; agreement
 within rounding confirms feature indexing, king bucketing, orientation and dequantisation all match.
 
+Adapted from bullet (https://github.com/jw1912/bullet, at the commit pinned by tools/setup_bullet.sh):
+Copyright (c) 2023 Jamie Whiting, MIT licence. The SCReLU inference, the Net field layout and the
+dequantisation order follow bullet's `simple` example (examples/simple.rs), and the per-piece feature index
+and the king-bucket offset are those of bullet's `Chess768` and `ChessBuckets` input types
+(crates/bullet_lib/src/game/inputs). Its licence text is reproduced in THIRD-PARTY-NOTICES.md at the root of
+this repository; this file as a whole is distributed under the repository's GPLv3.
+
 Usage:  cargo run --release --example pawnstar_eval -- <net.bin> [fens.txt]
 */
 use std::io::{BufRead, BufReader, Read};

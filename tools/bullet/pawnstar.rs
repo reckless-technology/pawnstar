@@ -7,6 +7,12 @@ SCReLU, matching the in-engine inference in src/nnue.h. One network shape for al
 engines (skill `reckless-nnue`): a net trained here loads in pawnstar, pawnstar-rs, pawnstar-go and
 zenith, and an architecture change here is a change owed to all of them.
 
+Adapted from bullet's `simple` example (examples/simple.rs, https://github.com/jw1912/bullet, at the commit
+pinned by tools/setup_bullet.sh): Copyright (c) 2023 Jamie Whiting, MIT licence. The imports, the QA/QB/SCALE
+constants, the save-format list, the loss function, the two-layer SCReLU network and the schedule and
+loader layout follow that example. Its licence text is reproduced in THIRD-PARTY-NOTICES.md at the root of
+this repository; this file as a whole is distributed under the repository's GPLv3.
+
 Two things differ from the shape that produced the shipped v12 net, each measured in zenith on this
 hardware and SPRT-gated:
 
