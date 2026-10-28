@@ -278,6 +278,16 @@ void HandshakesAndDiagnostics(Game &game)
     {
         Check(Contains(uci, std::format("option name {} type", option)), std::format("uci: advertises {}", option));
     }
+    // The Hash DEFAULT is pinned to the exact number, which the loop above cannot see. pawnstar, pawnstar-rs and
+    // pawnstar-go are bit-exact with each other at a fixed depth only while their transposition tables are the same
+    // size - table size changes the collision pattern and so the node count - and `bench` pins 64 MB in all three,
+    // so the one cross-port gate there was could not see a default that had drifted. pawnstar-go's did, to 512, and
+    // every UCI `go` the three answered diverged for months (diagnosed 2026-10-27). Changing this number means
+    // changing it in all three ports together; claude-skills' reckless-nnue/scripts/hash-default-parity.sh compares
+    // the three binaries.
+    Check(Contains(uci, std::format("option name Hash type spin default {} min 1 max 4096\n", kHashtableMegabytes)) &&
+              kHashtableMegabytes == 64,
+          "uci: advertises Hash default 64, the value the Rust and Go ports advertise too", uci);
     Check(Run(game, {"isready"}) == "readyok\n", "isready: readyok");
     Check(Run(game, {"", "   ", "xyzzy plugh", "Go depth 1"}).empty(),
           "blank lines, unknown and wrongly-cased commands are ignored silently");

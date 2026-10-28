@@ -276,7 +276,7 @@ plain position but diverge on a draw or once the fifty-move clock is high.
 
 Pawnstar advertises these `setoption` options in its `uci` response:
 
-- **`Hash`** (spin, default 64, 1–4096 MB) — transposition-table size; resized at runtime (`setoption name Hash value <MB>`).
+- **`Hash`** (spin, default 64, 1–4096 MB) — transposition-table size; resized at runtime (`setoption name Hash value <MB>`). The default must stay **equal to the Rust and Go ports'**: table size changes the collision pattern and so the node count at a fixed depth, so an unequal default breaks the three ports' bit-exactness at every `go` — and invisibly, since `bench` pins 64 in all three. `test_uci_commands` pins the advertised line.
 - **`Clear Hash`** (button) — empties the transposition table without resizing it.
 - **`Threads`** (spin, default = `PAWNSTAR_THREADS` or all cores, 1–256) — number of Lazy SMP search threads.
 - **`Move Overhead`** (spin, default 30, 0–5000 ms) — time reserved from each move's deadline to cover GUI/network lag, so Pawnstar doesn't forfeit on time.
