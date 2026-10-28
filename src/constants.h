@@ -30,7 +30,12 @@ constexpr Color EnemyOf(Color color)
     return color == Color::kWhite ? Color::kBlack : Color::kWhite;
 }
 
-constexpr int kHashtableMegabytes  = 64;  ///< default transposition table size in MB
+/// Default transposition table size in MB, and the value `uci` advertises as `option name Hash ... default`.
+/// It must stay equal to the Rust HASHTABLE_MEGABYTES and the Go hashTableMB: table size changes the collision
+/// pattern and so the node count at a fixed depth, which makes an unequal default a silent break of the three
+/// ports' bit-exactness at every `go`. `bench` pins 64 in all three, so it cannot see such a break - which is how
+/// Go's 512 survived until 2026-10-27. test_uci_commands pins the advertised line.
+constexpr int kHashtableMegabytes  = 64;
 constexpr int kEvalCacheMb         = 8;   ///< NNUE evaluation cache size in MB (lockless)
 constexpr int kMaxMovesPerPosition = 256; ///< maximum possible number of moves for a chess position
 // Score band (all comfortably within int16, so eval-cache packing and mate scores never overflow):
