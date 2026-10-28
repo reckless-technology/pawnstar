@@ -331,8 +331,8 @@ bool ShardWriter::CloseShard()
          << "contents_licence_url " << kContentsLicenceUrl << '\n'
          << "attribution Position data from the " << kSourceName << " (" << kSourceHomeUrl << "), run " << source_.run
          << ", used under the Open Database License 1.0 (" << kSourceLicenceUrl << ").\n"
-         << "record_format lc0 v6 (" << lc0::kRecordBytes << " bytes, input format " << lc0::kInputFormatClassical
-         << ")\n"
+         << "record_format lc0 v" << (reader_.record_bytes() == lc0::kRecordBytesV7 ? 7 : 6) << " ("
+         << reader_.record_bytes() << " bytes, input format " << lc0::kInputFormatClassical << ")\n"
          << "input_sha256 " << reader_.Digest() << '\n'
          << "input_sha256_covers bytes 0.." << input_bytes_end << " (records handed out in a complete game)\n"
          << "input_bytes_shard_start " << input_bytes_shard_start_ << '\n'
@@ -610,8 +610,8 @@ int main(int argc, char **argv)
 
     while (reader.NextGame(game))
     {
-        statistics.records_seen += game.size() / lc0::kRecordBytes;
-        lc0::ExtractGame(game, options, writer, statistics);
+        statistics.records_seen += game.size() / reader.record_bytes();
+        lc0::ExtractGame(game, reader.record_bytes(), options, writer, statistics);
 
         if (writer.has_failed())
         {
@@ -633,9 +633,10 @@ int main(int argc, char **argv)
 
     if (reader.has_failed())
     {
-        std::cerr << "lc0_extract: the input was not a whole number of " << lc0::kRecordBytes
-                  << "-byte records - it ended mid-record after " << reader.bytes_consumed()
-                  << " bytes. A truncated tar, or an HTTP error body fed to the decompressor.\n";
+        std::cerr << "lc0_extract: the input was not a readable record stream, after " << reader.bytes_consumed()
+                  << " bytes. Either a record's version was neither 6 nor 7, or the version changed part "
+                     "way through the stream, or it ended mid-record: a truncated tar, or an HTTP error "
+                     "body fed to the decompressor.\n";
         return 1;
     }
 
@@ -667,9 +668,10 @@ int main(int argc, char **argv)
 
     if (statistics.records_bad_version > 0 || statistics.records_bad_format > 0)
     {
-        std::cerr << "lc0_extract: " << statistics.records_bad_version << " record(s) were not version "
-                  << lc0::kTrainingDataVersion << " and " << statistics.records_bad_format << " were not input format "
-                  << lc0::kInputFormatClassical << "; those games were skipped\n";
+        std::cerr << "lc0_extract: " << statistics.records_bad_version << " record(s) were neither version "
+                  << lc0::kTrainingDataVersionV6 << " nor " << lc0::kTrainingDataVersionV7 << ", and "
+                  << statistics.records_bad_format << " were not input format " << lc0::kInputFormatClassical
+                  << "; those games were skipped\n";
     }
 
     if (!does_digest_input && source.sha256.empty())
