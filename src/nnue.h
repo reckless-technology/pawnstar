@@ -928,7 +928,12 @@ inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, 
 
     loaded_            = true;
     loaded_net_origin_ = origin;
-    std::fprintf(stderr, "info string NNUE: loaded net '%s'\n", origin.c_str());
+    // To **both** streams, as RefuseNet does for a refusal, and for the same reason: which net is playing is
+    // the one fact a user cannot do without. The `info string` on stdout is what a UCI GUI reads - it used to
+    // be written to stderr with the `info string` prefix on it, a protocol line on the wrong stream that no
+    // GUI ever saw - and the plain line on stderr is what a match harness keeps (tools/run_sprt.sh reads it).
+    std::cout << std::format("info string NNUE: loaded net '{}'\n", origin) << std::flush;
+    std::fprintf(stderr, "NNUE: loaded net '%s'\n", origin.c_str());
     return true;
 }
 

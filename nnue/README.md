@@ -326,7 +326,9 @@ but Go's `Checksum` starts at zero: CRC-64/XZ is `crc64.Update(^uint64(0), table
 (`refusing net '…': king_buckets is 0x9 in the file, 0x8 in this engine`), on **stdout as an `info
 string` and on stderr as a plain line** — a GUI reads the first, a match harness keeps the second and
 routinely drops info lines. The net is not loaded, and because every check happens before a weight is
-written, a net that was already loaded is left untouched and still playing. The failures that make this worth the bytes have all been measured on these machines:
+written, a net that was already loaded is left untouched and still playing. A net that loads says so the same way
+(`info string NNUE: loaded net '…'` on stdout, `NNUE: loaded net '…'` on stderr), so the line a GUI reads and the
+line `tools/run_sprt.sh` reads name the same net. The failures that make this worth the bytes have all been measured on these machines:
 
 - a stock engine handed a mismatched net through an env var **silently fell back to its embedded net** and
   played on, so a match reported a plausible Elo for a net that never played a move;

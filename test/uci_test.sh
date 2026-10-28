@@ -204,6 +204,21 @@ out=$(printf 'eval\nquit\n' | PAWNSTAR_EVALFILE=nnue/pawnstar-v12.bin "$ENGINE" 
 echo "$out" | grep -q '^evaluation ' && ! echo "$out" | grep -q 'embedded' &&
     pass "PAWNSTAR_EVALFILE=<the shipped net>: loaded from the file" || fail "PAWNSTAR_EVALFILE=<net>: got: $out"
 
+# A net that loads says so, as a refusal does: `info string` on stdout, where a UCI GUI reads it, and the plain
+# line on stderr, which a match harness keeps. It was once written to stderr alone with the `info string` prefix
+# on it - a protocol line on the wrong stream - so no GUI ever saw which net was playing.
+out=$(printf 'isready\nquit\n' | PAWNSTAR_EVALFILE=nnue/pawnstar-v12.bin "$ENGINE" 2>"$scratch/loaded_net.err")
+err=$(cat "$scratch/loaded_net.err")
+echo "$out" | grep -qxF "info string NNUE: loaded net 'nnue/pawnstar-v12.bin'" &&
+    pass "startup: stdout says, as an info string, which net loaded" ||
+    fail "startup: stdout lacks the loaded-net info string: $out"
+echo "$err" | grep -qxF "NNUE: loaded net 'nnue/pawnstar-v12.bin'" &&
+    pass "startup: stderr carries the loaded net too, with no protocol prefix" ||
+    fail "startup: stderr lacks the plain loaded-net line: $err"
+echo "$err" | grep -q 'info string' &&
+    fail "startup: stderr carries an info string, a protocol line on the wrong stream: $err" ||
+    pass "startup: no info string on stderr"
+
 # A net file that EXISTS and is REFUSED is fatal: the engine must not fall back to the embedded net and
 # must not play. This is the trap the fallback used to leave open — a mismatched net through
 # PAWNSTAR_EVALFILE started an engine that played the embedded net instead, so a match reported a plausible
@@ -321,9 +336,17 @@ eval_send "uci"
 eval_read_until '^uciok' 10 > /dev/null || fail "EvalFile refusal: no uciok"
 eval_send "setoption name Threads value 1"
 eval_send "setoption name OwnBook value false"
+err_offset=$(($(wc -c < "$evalfile_err") + 1))
 eval_send "setoption name EvalFile value $shipped_net"
 eval_send "isready"
-eval_read_until '^readyok' 20 > /dev/null || fail "EvalFile refusal: no readyok after loading the shipped net"
+loaded=$(eval_read_until '^readyok' 20) || fail "EvalFile refusal: no readyok after loading the shipped net"
+loaded_err=$(tail -c +"$err_offset" "$evalfile_err")
+echo "$loaded" | grep -qxF "info string NNUE: loaded net '$shipped_net'" &&
+    pass "setoption EvalFile <the shipped net>: stdout says, as an info string, which net loaded" ||
+    fail "setoption EvalFile <the shipped net>: stdout lacks the loaded-net info string: $loaded"
+echo "$loaded_err" | grep -qxF "NNUE: loaded net '$shipped_net'" &&
+    pass "setoption EvalFile <the shipped net>: stderr carries the loaded net too" ||
+    fail "setoption EvalFile <the shipped net>: stderr lacks the plain loaded-net line: $loaded_err"
 eval_send "ucinewgame"
 eval_send "position startpos"
 eval_send "go depth $search_depth"
