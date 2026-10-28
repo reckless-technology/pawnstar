@@ -366,12 +366,21 @@ heap-allocated (`std::make_unique<Game>()`) — at 8 buckets the inline `feature
   a while grepping `is incompatible`, `is not a stamped` and `falling back to the embedded net`, none of
   which the engine emits — and the last of those matched the *fatal* message's "Not falling back to the
   embedded net", so a refused startup net was reported as a fallback, the opposite of the truth. It reads
-  headers with `build/print_net_header` and decodes nothing itself; `--print-header <net>` is that alone,
-  and the `new-shape` CI job asserts every field of it against the synthetic net (`king_buckets=8` among
-  them, which the script's own retired `od` decoder read as 64). It lives on the Linux runners as
-  `~/sprt/pawnstar-match.sh`: **install it with an atomic `mv`** — a running bash re-reads its script by
-  byte offset, so editing one mid-match corrupts the run, while `mv` leaves the running process on its old
-  inode.
+  headers with a `print_net_header` (the candidate build's own where there is one - the next bullet) and
+  decodes nothing itself; `--print-header <net>` is that alone, and the `new-shape` CI job asserts every
+  field of it against the synthetic net (`king_buckets=8` among them, which the script's own retired `od`
+  decoder read as 64). It lives on the Linux runners as `~/sprt/pawnstar-match.sh`: **install it with an
+  atomic `mv`** — a running bash re-reads its script by byte offset, so editing one mid-match corrupts the
+  run, while `mv` leaves the running process on its old inode.
+- **`shape_matches_build` is a verdict on the DECODER's build, not on the match.** `print_net_header` compares
+  a net against its own compile-time constants, so the stock `~/pawnstar/build/print_net_header` on the
+  runners (old architecture: `format_version` 1, `output_buckets` 1, map CRC `0xCC6DDB5DAF0AB18D`) says
+  `shape_matches_build=no` for every new-shape net - correct, and about nothing in the match. The harness
+  therefore prefers a `print_net_header` **from the same directory as `--candidate-binary`** when one is there
+  and no decoder was named, and the preflight says in one line whose build the verdict is about. The gate is
+  `integrity=ok` plus the depth-4 probe, which makes each binary load its own net for real; it has never been
+  the shape verdict. The tool's own note says this too, rather than the old wording ("this build would refuse
+  it"), which read as a refusal of a sound net and stopped a 4000-game setup while a human checked.
 - **`pawnstar_eval` is NOT header-aware** → feed it the **raw** (unstamped) net. But `test_nnue` /
   `test_nnue_incremental` now load through the engine, which **only accepts a stamped net** (the raw path
   was removed), so they must be given a stamped net. `tools/verify_net.sh` handles this: it runs

@@ -74,9 +74,15 @@
 #                                header is stripped into a scratch copy (fastchess would read those
 #                                lines as positions).
 #   --repo <dir>                 The pawnstar checkout. Default: $PAWNSTAR_REPO, else $HOME/pawnstar.
-#   --print-net-header <path>    The print_net_header tool to decode headers with. Default: the first of
-#                                $PAWNSTAR_PRINT_NET_HEADER, <repo>/build/print_net_header,
-#                                <repo>/build-new-shape/print_net_header, or one on the PATH.
+#   --print-net-header <path>    The print_net_header tool to decode headers with. Default: a
+#                                print_net_header in the SAME DIRECTORY as --candidate-binary if there
+#                                is one - so its shape verdict is about the engine that will actually
+#                                play - else the first of $PAWNSTAR_PRINT_NET_HEADER,
+#                                <repo>/build/print_net_header, <repo>/build-new-shape/print_net_header,
+#                                or one on the PATH. Whichever is used, the preflight says whose build
+#                                the shape comparison is against: a decoder's `shape_matches_build=no`
+#                                is about THAT BUILD, and this script gates on `integrity=ok` and on
+#                                the depth-4 load probe, never on the shape verdict.
 #   --label <text>               Names the log file. Default: the candidate net's base name.
 #   --log-dir <dir>              Where the log goes. Default: $HOME/sprt/logs.
 #   --pgn <file>                 Also write the games as PGN.
@@ -115,7 +121,7 @@ set -uo pipefail
 readonly kProbeDepth=4
 readonly kProbeTimeoutSeconds=60
 # The comment block above, as --help. One constant so an edit to the block is one edit here.
-readonly kHelpLineRange='3,112p'
+readonly kHelpLineRange='3,118p'
 
 candidate_net=""
 baseline_net=""
@@ -131,6 +137,11 @@ hash_megabytes=16
 openings_file=""
 repository_directory="${PAWNSTAR_REPO:-$HOME/pawnstar}"
 header_tool="${PAWNSTAR_PRINT_NET_HEADER:-}"
+# Whether the decoder was NAMED (by --print-net-header or $PAWNSTAR_PRINT_NET_HEADER) rather than
+# discovered. A named one is never second-guessed; a discovered one may be replaced below by the
+# candidate build's own, whose shape verdict is about the engine that will play.
+header_tool_was_named=0
+[ -z "$header_tool" ] || header_tool_was_named=1
 run_label=""
 log_directory="$HOME/sprt/logs"
 pgn_file=""
@@ -169,7 +180,8 @@ while [ $# -gt 0 ]; do
         --hash)                 hash_megabytes="${2:?}"; shift 2 ;;
         --openings)             openings_file="${2:?}"; shift 2 ;;
         --repo)                 repository_directory="${2:?}"; shift 2 ;;
-        --print-net-header)     header_tool="${2:?--print-net-header needs a path}"; shift 2 ;;
+        --print-net-header)     header_tool="${2:?--print-net-header needs a path}"
+                                header_tool_was_named=1; shift 2 ;;
         --label)                run_label="${2:?}"; shift 2 ;;
         --log-dir)              log_directory="${2:?}"; shift 2 ;;
         --pgn)                  pgn_file="${2:?}"; shift 2 ;;
@@ -215,7 +227,8 @@ locate_header_tool()
 # back empty and be used as if it were a value.
 readonly kRequiredHeaderKeys="file_bytes header_complete magic format_version header_bytes
                               features_per_bucket king_buckets hidden_size output_buckets flags
-                              activation qa qb eval_scale king_bucket_map_crc integrity"
+                              activation qa qb eval_scale king_bucket_map_crc integrity
+                              shape_matches_build"
 
 # Decode one net into g_net_report, and validate that report.
 #
@@ -285,12 +298,18 @@ describe_net_header()
            "$(net_header_field "$report" king_bucket_map_crc)"
 }
 
-header_tool="$(locate_header_tool)"
-[ -n "$header_tool" ] || die "no print_net_header found (looked at \$PAWNSTAR_PRINT_NET_HEADER,
-         $repository_directory/build/print_net_header,
+# No decoder anywhere. A function because the match path looks once more, beside --candidate-binary,
+# before it gives up - see "PREFER A DECODER FROM THE CANDIDATE'S OWN BUILD" below.
+die_with_no_header_tool()
+{
+    die "no print_net_header found (looked at \$PAWNSTAR_PRINT_NET_HEADER, the candidate binary's own
+         directory, $repository_directory/build/print_net_header,
          $repository_directory/build-new-shape/print_net_header and the PATH). Build it with
          'make tools' in the checkout, or say where it is with --print-net-header. This
          script no longer decodes a header itself: one format, one decoder."
+}
+
+header_tool="$(locate_header_tool)"
 
 # ---------------------------------------------------------------------------------------------------
 # --print-header: decode one net and stop. No engine, no fastchess, no opening set - so CI can assert
@@ -299,6 +318,8 @@ header_tool="$(locate_header_tool)"
 # ---------------------------------------------------------------------------------------------------
 
 if [ -n "$print_header_net" ]; then
+    # This mode has no candidate binary to take a decoder from, so a decoder must already be in hand.
+    [ -n "$header_tool" ] || die_with_no_header_tool
     [ -r "$print_header_net" ] || die "cannot read '$print_header_net'"
     decode_net_header "$print_header_net"
     print_header_report="$g_net_report"
@@ -340,6 +361,35 @@ for required_binary in "$candidate_binary" "$baseline_binary"; do
 done
 if [ -n "$stamp_tool" ]; then
     [ -x "$stamp_tool" ] || die "'$stamp_tool' is not an executable stamp_net"
+fi
+
+# ---------------------------------------------------------------------------------------------------
+# PREFER A DECODER FROM THE CANDIDATE'S OWN BUILD.
+#
+# print_net_header's `shape_matches_build` compares a net against the compile-time constants of
+# whichever build of THAT TOOL is running - not against the engine that is about to play. On these
+# runners the discovered decoder is ~/pawnstar/build/print_net_header, which is compiled at the old
+# architecture (format_version 1, output_buckets 1, map CRC 0xCC6DDB5DAF0AB18D), so for any new-shape
+# net it reports `shape_matches_build=no` and prints its shape note. Nothing is wrong when it does: this
+# script gates on `integrity=ok` and on the depth-4 probe below, which runs the exact command fastchess
+# will run and makes each binary load its own net for real. But a shape verdict about a build that is
+# not in the match is a verdict nobody can act on, and on 2026-10-28 that note stopped a 4000-game setup
+# while a human worked out whether it mattered. It did not.
+#
+# So when the decoder was discovered rather than named, and the candidate's build directory holds a
+# print_net_header of its own, use that one: then `shape_matches_build` is a statement about the engine
+# that will play. Deliberately the CANDIDATE's and not the baseline's - the candidate is the side that
+# carries a new shape - and the preflight says below which of the two it got, because with two engines
+# of different architectures no single decoder can speak for both.
+# ---------------------------------------------------------------------------------------------------
+candidate_build_directory="$(dirname "$candidate_binary")"
+if [ "$header_tool_was_named" -eq 0 ] && [ -x "$candidate_build_directory/print_net_header" ]; then
+    header_tool="$candidate_build_directory/print_net_header"
+fi
+[ -n "$header_tool" ] || die_with_no_header_tool
+header_tool_is_candidates_own=0
+if [ "$(dirname "$header_tool")" = "$candidate_build_directory" ]; then
+    header_tool_is_candidates_own=1
 fi
 
 fastchess_binary="${FASTCHESS:-$HOME/sprt/bin/fastchess}"
@@ -512,6 +562,16 @@ probe_engine()
 
 printf '\n--- preflight -------------------------------------------------------------------\n'
 printf 'header reader : %s\n' "$header_tool"
+# Whose build any `shape_matches_build` below is a verdict on - said once, here, rather than left for a
+# reader to work out from a note that looks like a refusal.
+if [ "$header_tool_is_candidates_own" -eq 1 ]; then
+    printf '                built beside the candidate engine, so its shape verdict is about this match.\n'
+else
+    printf '                NOT from the candidate'\''s build directory (%s), so a `shape_matches_build=no`\n' \
+           "$candidate_build_directory"
+    printf '                below is about THIS DECODER'\''s build and says nothing about the engines playing.\n'
+    printf '                This run is gated on `integrity=ok` and on the depth-4 load probe, not on that.\n'
+fi
 
 decode_net_header "$candidate_net"
 candidate_report="$g_net_report"
@@ -523,6 +583,29 @@ printf 'candidate net : %s\n                %s\n' "$candidate_net" "$(describe_n
 printf 'baseline net  : %s\n                %s\n' "$baseline_net" "$(describe_net_header "$baseline_report")"
 printf 'candidate bin : %s\n' "$candidate_binary"
 printf 'baseline bin  : %s\n' "$baseline_binary"
+
+# THE SHAPE VERDICT, SAID WHERE A READER WILL SEE IT AND FRAMED BY WHOSE BUILD IT IS ABOUT. The shape
+# information itself is useful and is kept - it is the whole point when the decoder IS the engine under
+# test, as in the `new-shape` CI job - but on its own it reads as a refusal, and a note that reads like a
+# refusal on a run that is fine is worse than no note. So it is printed with the one thing that decides
+# whether it matters: whether the decoder speaks for the engine that will play.
+for side in candidate baseline; do
+    if [ "$side" = candidate ]; then
+        side_report="$candidate_report"
+    else
+        side_report="$baseline_report"
+    fi
+    [ "$(net_header_field "$side_report" shape_matches_build)" = no ] || continue
+    if [ "$header_tool_is_candidates_own" -eq 1 ] && [ "$side" = candidate ]; then
+        printf 'shape         : the candidate net is NOT the shape the candidate build was compiled at, and\n'
+        printf '                the header reader IS that build - so this one is about the match. The depth-4\n'
+        printf '                probe below decides it: it makes that binary load that net and search.\n'
+    else
+        printf 'shape         : the %s net is not the shape the HEADER READER was compiled at. That is a fact\n' "$side"
+        printf '                about the decoder above, not about this net or the engines: what this run is\n'
+        printf '                gated on is `integrity=ok` and the depth-4 load probe below.\n'
+    fi
+done
 
 # A net whose own CRCs or payload length do not check out is a net the engine will refuse, and the probe
 # below would catch it - but it is worth saying as a corrupt file rather than as an architecture problem.
