@@ -10,3 +10,6 @@ cmake-build/
 /build-*/
 
 .vs/
+
+# Python bytecode caches (the one Python suite sets sys.dont_write_bytecode, but a hand-run import does not)
+__pycache__/

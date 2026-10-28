@@ -264,6 +264,39 @@ if(EXISTS "${EMBED_NET}")
 endif()
 add_test(NAME net_header COMMAND test_net_header ${PAWNSTAR_NET_HEADER_NET}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+
+# The pentanomial pooling tool (tools/pool_matches.py), against real measured matches. Python rather than a
+# C++ suite because the tool itself is Python - one copy of the formula, run by the test, is the whole point:
+# the pooling maths was re-implemented in four throwaway scripts in one day and one of them applied the 95%
+# deviate twice. A plain interpreter and no packages, so there is nothing to install on a hosted runner.
+#
+# `python` as well as `python3` in the NAMES, and the interpreter is then RUN at configure time, because
+# Windows ships a `python3.exe` App Execution Alias in WindowsApps that is on the PATH, is found by
+# find_program, and exits non-zero asking to open the Store. Registering that as a ctest would fail the
+# Windows job on a machine where Python is in fact fine. Override with -DPYTHON3_EXE=… .
+set(PAWNSTAR_TEST_PYTHON "")
+find_program(PYTHON3_EXE NAMES python3 python)
+if(NOT PYTHON3_EXE)
+  message(STATUS "Pawnstar: no Python interpreter found; the pool_matches suite is not registered")
+else()
+  execute_process(COMMAND "${PYTHON3_EXE}" -c "print('interpreter ok')"
+                  RESULT_VARIABLE PAWNSTAR_PYTHON_STATUS OUTPUT_QUIET ERROR_QUIET)
+  if(PAWNSTAR_PYTHON_STATUS EQUAL 0)
+    set(PAWNSTAR_TEST_PYTHON "${PYTHON3_EXE}")
+  else()
+    # Said as "found one and it does not work", never as "found none": a message naming the wrong cause is
+    # the thing this whole pull request is about.
+    message(STATUS "Pawnstar: '${PYTHON3_EXE}' is not a working interpreter (it exited "
+                   "${PAWNSTAR_PYTHON_STATUS}); the pool_matches suite is not registered")
+  endif()
+endif()
+if(PAWNSTAR_TEST_PYTHON)
+  # -I: isolated. The test imports tools/pool_matches.py by the path it computes itself, and nothing else,
+  # so neither the working directory nor a PYTHONPATH can substitute another module of that name.
+  add_test(NAME pool_matches COMMAND "${PAWNSTAR_TEST_PYTHON}" -I
+           ${CMAKE_CURRENT_SOURCE_DIR}/test/pool_matches_test.py
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 # NNUE suites take the net (and reference) explicitly; only register them if the shipped net is present
 # (so a checkout without the .bin still configures, matching the Makefile's $(wildcard) degrade-to-no-op).
 if(EXISTS "${EMBED_NET}")
