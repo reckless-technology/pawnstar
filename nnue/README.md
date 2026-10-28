@@ -129,6 +129,38 @@ working, not a fault: nothing has been trained at the new shape yet. `test_nnue_
 own synthetic net at whatever shape the build was configured for, which is how the new shape is tested
 before a net exists.
 
+**The whole suite runs at either shape**, and `make check` at the new one is green. The suites whose
+expected values belong to v12 specifically - the trainer reference evaluations (`nnue`), the
+Bratko-Kopec move set, and the 6,601,454 bench signature - skip on `nnue::IsNetFileThisBuildsShape`,
+extending their existing "skipped (no net supplied)" contract from *absent* to *absent or of another
+shape*, which is what the Rust and Go ports already do. The rest are handed a net of the build's own
+shape instead of being skipped: at a non-default shape CMake builds `<build dir>/synthetic-net.bin`
+(the `synthetic_net` target) and gives it to `nnue_incremental`, `principal_variation`, `uci_commands`
+and, through `PAWNSTAR_EVALFILE`, the `uci` protocol suite. What those check holds for any weights at
+all, so the new shape gets real coverage rather than a row of skips.
+
+### The new shape's cross-port node-count signature
+
+At the new shape `bench` cannot run - the engine rightly refuses the shipped net - so the parity
+signature is instead six fixed-depth searches over the synthetic net, whose bytes are identical on every
+platform and in all three ports. [`tools/new-shape-signature.sh`](../tools/new-shape-signature.sh) is
+that gate, and it is **committed byte-identical in `pawnstar`, `pawnstar-rs` and `pawnstar-go`**: the
+six expected results live in it and nowhere else, so `diff` between the three repositories is the whole
+audit and there is no second copy of the numbers to drift. CI runs it on every pull request (the
+`new-shape` job).
+
+```bash
+make BUILD_DIR=build-new-shape KING_MIRRORING=1 OUTPUT_BUCKETS=8 check
+tools/new-shape-signature.sh --hash 64 --net build-new-shape/synthetic-net.bin build-new-shape/pawnstar
+```
+
+It asserts the net's size, SHA-256 (`4abfdb7b…871b`, 12,617,824 bytes) and RNNUE1 header - including
+`format_version` 2, `payload_bytes` 12,617,760 and `king_bucket_map_crc` `0x0A20060D4E9586E0` - **before**
+searching it, so a drifted generator fails as a drifted generator instead of reading as a search
+regression. `--hash` is mandatory and deliberately not defaulted, and its value is printed beside every
+node count: table size changes the collision pattern and so the node count at a fixed depth, which is
+how `pawnstar-go`'s 512 MB default stayed invisible for five months against this port's 64 MB.
+
 **A shape change is an evaluation change.** It moves the bench signature and breaks parity with
 `pawnstar-rs` and `pawnstar-go` until all three are ported together, so the defaults are not to be
 flipped for one engine alone. The mirrored map also changes what a bucket *means* rather than only how

@@ -562,8 +562,15 @@ void NetLoading(Game &game, const std::string &net_path)
         {"pawnstar_uci_mirroring.bin",
          with_header_field(&nnue::NetHeader::flags_,
                            static_cast<std::uint8_t>(net_bytes[20] ^ nnue::kNetFlagKingMirroring))},
+        // The OTHER format version, derived from this build's rather than written down: 1 is v12's shape
+        // (mirroring off, one output head) and 2 is the shared one (mirroring on with eight), so a literal
+        // 2 here is "a version this engine does not speak" only while this engine speaks 1. At the shared
+        // shape it named the build's own version, the engine accepted the net exactly as it should, and the
+        // check failed for being wrong rather than the engine being wrong. Deriving it is the same rule the
+        // container itself follows — the version comes from the shape, never from a literal.
         {"pawnstar_uci_format_version.bin",
-         with_header_field(&nnue::NetHeader::format_version_, static_cast<std::uint16_t>(2))},
+         with_header_field(&nnue::NetHeader::format_version_,
+                           static_cast<std::uint16_t>(nnue::kNetFormatVersion == 1 ? 2 : 1))},
         {"pawnstar_uci_map_crc.bin",
          with_header_field(&nnue::NetHeader::king_bucket_map_crc_, static_cast<std::uint64_t>(1))},
         {"pawnstar_uci_payload_bytes.bin",

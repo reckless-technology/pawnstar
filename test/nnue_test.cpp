@@ -37,6 +37,13 @@ int main(int argc, char **argv)
     {
         return test_report::Summary("NNUE: skipped (no net/reference supplied)");
     }
+    // The reference evaluations are this net's, produced by the trainer that trained it, so a build at
+    // another shape has nothing to compare against — it rightly refuses the net. That shape's own gates are
+    // test_nnue_incremental's synthetic net and tools/new-shape-signature.sh.
+    if (!nnue::IsNetFileThisBuildsShape(argv[1]))
+    {
+        return test_report::Summary(std::format("NNUE: skipped (net '{}' is not this build's NNUE shape)", argv[1]));
+    }
     auto           net_ptr = std::make_unique<nnue::Network>();
     nnue::Network &net     = *net_ptr;
     if (!net.Load(argv[1]))
