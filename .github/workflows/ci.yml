@@ -244,6 +244,105 @@ jobs:
             sed -n '/tests passed/p' new-shape-check.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      # THE MATCH HARNESS READS A HEADER CORRECTLY. tools/pawnstar-match.sh runs the preflight that proves
+      # the right net actually loaded before a multi-hour SPRT, and until 2026-10-28 it lived only on the CI
+      # runners, in no repository, with a decoder of its own. That decoder read the header's uint16 fields
+      # from byte offset 4 when the RNNUE1 magic is 8 bytes, so every label was two fields out: it printed
+      # `buckets2` for this 8-king-bucket net and the real bucket count surfaced under the `qb` label. No
+      # match result was ever wrong — the engine validates independently — but a verification tool printing
+      # confident wrong values is worse than one printing nothing, and nothing here would have noticed.
+      #
+      # So this step is that missing check: decode the deterministic synthetic net (SHA-256 pinned by the
+      # signature step below) through the harness's own `--print-header` path and assert every field. The
+      # harness no longer decodes anything itself — it parses tools/print_net_header's key=value output —
+      # and running it through the harness rather than calling the tool directly means a harness that reads
+      # the WRONG KEY fails here too, which is the shape the original bug actually had.
+      #
+      # `king_buckets=8` is the assertion the old decoder would have failed (it read 2 there). Every other
+      # field is asserted beside it, including both CRC-64s: every one of them is fully determined by this
+      # build's shape and the pinned fixture, so a value that moves is either a real shape change or a
+      # drifted reader, and both want a red job.
+      - name: The match harness decodes the fixture net's header (king_buckets is 8)
+        run: |
+          set -o pipefail
+          # `|| harness_status=$?` rather than a bare call: the job's shell is `bash -e`, so a non-zero exit
+          # would end the step before a single field had been compared — and a not-intact fixture is exactly
+          # the run whose fields are worth printing.
+          harness_status=0
+          tools/pawnstar-match.sh --print-header build-new-shape/synthetic-net.bin \
+              --print-net-header build-new-shape/print_net_header > harness-header.log || harness_status=$?
+          cat harness-header.log
+          failures=0
+          while IFS= read -r expected; do
+            case "$expected" in ''|'#'*) continue ;; esac
+            if grep -Fxq -- "$expected" harness-header.log; then
+              printf 'ok     %s\n' "$expected"
+            else
+              printf '::error::expected `%s`, the harness printed `%s`\n' "$expected" \
+                     "$(grep -E "^${expected%%=*}=" harness-header.log | head -1)"
+              failures=$((failures + 1))
+            fi
+          done <<'EXPECTED'
+          # The file itself, and the container.
+          file_bytes=12617824
+          header_complete=yes
+          magic=RNNUE1\x00\x00
+          magic_ok=yes
+          # The architecture. These ARE the shared shape: mirroring on with eight material output heads.
+          format_version=2
+          header_bytes=64
+          features_per_bucket=768
+          king_buckets=8
+          hidden_size=1024
+          output_buckets=8
+          flags=0x01
+          king_mirroring=on
+          flags_unknown_bits=0x00
+          activation=0
+          activation_name=screlu
+          qa=255
+          qb=64
+          eval_scale=400
+          reserved_zero=yes
+          king_bucket_map_crc=0x0A20060D4E9586E0
+          # Integrity: the payload's length and both CRC-64s, computed against the file and found equal.
+          payload_bytes=12617760
+          payload_crc=0xE6F3FB70D96D876A
+          header_crc=0x7B18813893FDE2D9
+          header_crc_computed=0x7B18813893FDE2D9
+          header_crc_ok=yes
+          actual_payload_bytes=12617760
+          payload_size_ok=yes
+          payload_crc_computed=0xE6F3FB70D96D876A
+          payload_crc_ok=yes
+          payload_bytes_from_fields=12617760
+          payload_bytes_from_fields_ok=yes
+          integrity=ok
+          # This job builds AT the fixture's shape, so the net is this build's own and would load here.
+          shape_matches_build=yes
+          shape_mismatches=
+          # The harness's own two lines, built by it from the keys above: a harness that reads the wrong key
+          # decodes a correct report into a wrong summary, which is exactly what the old bug did.
+          description=magic=RNNUE1\x00\x00 v2/hdr64/feat768/kb8/hidden1024/ob8/flags0x01/act0/qa255/qb64/scale400/mapcrc=0x0A20060D4E9586E0
+          shape_signature=format_version=2 header_bytes=64 features_per_bucket=768 king_buckets=8 hidden_size=1024 output_buckets=8 flags=0x01 activation=0 qa=255 qb=64 eval_scale=400 king_bucket_map_crc=0x0A20060D4E9586E0
+          EXPECTED
+          if [ "$harness_status" -ne 0 ]; then
+            echo "::error::pawnstar-match.sh --print-header exited $harness_status (expected 0: the fixture is intact)"
+            failures=$((failures + 1))
+          fi
+          [ "$failures" -eq 0 ] \
+            || { echo "::error::$failures header assertion(s) failed — the harness is misreading RNNUE1"; exit 1; }
+          echo "Every RNNUE1 header field read back as expected."
+      - name: The harness's header report in the job summary
+        if: always()
+        run: |
+          [ -f harness-header.log ] || exit 0
+          {
+            echo '### The match harness reading the fixture net'
+            echo '```'
+            cat harness-header.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       # The cross-port gate. `--hash` is mandatory in the script and its value is printed beside every node
       # count: table size changes the collision pattern and so the node count at a fixed depth, so a node
       # count with no table size next to it is not comparable — and it was precisely the absence of one that
