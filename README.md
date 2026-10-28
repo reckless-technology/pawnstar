@@ -54,7 +54,7 @@ wrapper falls back to Unix Makefiles if Ninja is absent). Use whichever you pref
 make           # engine → build/pawnstar_<major>_<minor>_<build> (+ the build/pawnstar alias)
 make check     # build everything and run all test suites (ctest)
 make tests     # build the test executables without running them
-make tools     # build helper tools (gen_data, gen_openings, lichess_extract, lc0_extract, stamp_net, filter_book, nnue_quant_study, dump_magics)
+make tools     # build helper tools (gen_data, gen_openings, lichess_extract, lc0_extract, stamp_net, print_net_header, filter_book, nnue_quant_study, dump_magics)
 make doc       # generate Doxygen HTML into doc/html
 make clean     # remove the build/ tree
 ```
@@ -112,7 +112,7 @@ The target is also the **coverage gate**: it fails when `src/`'s line coverage i
 `PAWNSTAR_COVERAGE_MIN_LINES`, 90 % - one number in `CMakeLists.txt`, which CI's coverage job and a developer's
 `make coverage` both read (`make coverage COVERAGE_MIN_LINES=95`, `tools\build.ps1 coverage -CoverageMinLines 95`;
 0 reports without gating). What is measured is `src/`: the engine and its UCI front end, every header and
-`main.cpp`. The developer tools in `tools/` (`stamp_net`, `filter_book`, `nnue_quant_study`, `dump_magics`), which
+`main.cpp`. The developer tools in `tools/` (`stamp_net`, `print_net_header`, `filter_book`, `nnue_quant_study`, `dump_magics`), which
 no release ships and no ctest runs, and the tests themselves are not counted. The suites cover 98.0 % of `src/`'s
 lines on Windows (clang 22) and 95.8 % in CI on Linux (clang 18); what is left is unreachable (the fallbacks for a corrupt embedded book or net, switch defaults,
 the max-ply guards), machine-dependent (the AVX-VNNI kernel on a CPU without it) or timing-dependent.
@@ -181,7 +181,7 @@ its latest result on `main`). Every job runs on a GitHub-hosted runner, on an im
 (`ubuntu-24.04`, `windows-2025`), and installs what it needs with pinned versions. The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
-  build through the wrapper and runs all fourteen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  build through the wrapper and runs all fifteen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
   PyPI wheel in a venv of the job's own; apt has no `clang-format-22`). This is independent of the
@@ -743,8 +743,8 @@ prints the available book moves and their frequencies for the current position.
 make check
 ```
 
-builds and runs thirteen standalone test executables (plus a shell-driven UCI integration test,
-`test/uci_test.sh`, run against `build/pawnstar` — fourteen suites in all; the script also checks where the engine
+builds and runs fourteen standalone test executables (plus a shell-driven UCI integration test,
+`test/uci_test.sh`, run against `build/pawnstar` — fifteen suites in all; the script also checks where the engine
 finds its net and book at startup, the embedded copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the
 end of input):
 
@@ -763,6 +763,7 @@ end of input):
 | `build/test_principal_variation` | The principal variation the search publishes: every ply legal, replayable without touching the game history, and evaluating from its FEN exactly as from the position |
 | `build/test_lichess_extract` | `tools/lichess_extract.h`'s extraction rules, driven against PGN written by hand |
 | `build/test_lc0_extract` | `tools/lc0_extract.h`'s extraction rules, driven against Lc0 v6 records built from plane words copied out of a real `test80` tar |
+| `build/test_net_header` | `tools/net_header_report.h`, the `RNNUE1` header reader `build/print_net_header` wraps: every field decoded at its documented offset from hand-laid fixtures (8 and 4 king buckets, and a header with no two equal fields), both CRCs and the payload length verified, each kind of damage reported, and the build's own net decoded against its known values |
 
 `test_bench_golden` runs the `bench` recipe (`RunBench` in `src/input_handling.h`, the code the `bench` command
 runs: depth 13, single-threaded, book off, hash cleared) with the shipped net and checks it against the golden
