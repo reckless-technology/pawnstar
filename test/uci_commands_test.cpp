@@ -634,8 +634,12 @@ void NetLoading(Game &game, const std::string &net_path)
                           name));
     }
 
-    Run(game, {std::format("setoption name EvalFile value {}", net_path)});
+    const std::string loaded_out = Run(game, {std::format("setoption name EvalFile value {}", net_path)});
     Check(game.nnue_network_.loaded_, "setoption EvalFile <the shipped net>: loaded again");
+    // The success is a protocol message like the refusal is: `info string` on stdout, where a GUI reads it. It
+    // went to stderr alone, with the prefix on it, and no GUI ever saw which net was playing.
+    Check(Contains(loaded_out, std::format("info string NNUE: loaded net '{}'\n", net_path)),
+          "setoption EvalFile <the shipped net>: says on stdout, as an info string, which net it loaded");
     Check(game.nnue_network_.loaded_net_origin_ == net_path,
           "setoption EvalFile <the shipped net>: the loaded net's origin is the file it came from");
     Check(!game.eval_cache_.Probe(kSentinelHash, cached),
