@@ -260,37 +260,43 @@ constexpr std::size_t RecordBytesForVersion(uint32_t version)
 constexpr uint32_t kInputFormatClassical = 1;
 
 // Byte offsets of every field read, in the packed struct's declaration order.
-constexpr std::size_t kRecordOffsetVersion            = 0;
-constexpr std::size_t kRecordOffsetInputFormat        = 4;
-constexpr std::size_t kRecordOffsetProbabilities      = 8;
-constexpr std::size_t kRecordOffsetPlanes             = kRecordOffsetProbabilities + 4 * 1858;
-constexpr std::size_t kRecordOffsetCastlingUsOoo      = kRecordOffsetPlanes + 8 * kMoveHistory * kPlanesPerBoard;
-constexpr std::size_t kRecordOffsetCastlingUsOo       = kRecordOffsetCastlingUsOoo + 1;
-constexpr std::size_t kRecordOffsetCastlingThemOoo    = kRecordOffsetCastlingUsOo + 1;
-constexpr std::size_t kRecordOffsetCastlingThemOo     = kRecordOffsetCastlingThemOoo + 1;
-constexpr std::size_t kRecordOffsetSideToMove         = kRecordOffsetCastlingThemOo + 1;
-constexpr std::size_t kRecordOffsetRule50Count        = kRecordOffsetSideToMove + 1;
-constexpr std::size_t kRecordOffsetInvarianceInfo     = kRecordOffsetRule50Count + 1;
-constexpr std::size_t kRecordOffsetDummy              = kRecordOffsetInvarianceInfo + 1;
-constexpr std::size_t kRecordOffsetRootQ              = kRecordOffsetDummy + 1;
-constexpr std::size_t kRecordOffsetBestQ              = kRecordOffsetRootQ + 4;
-constexpr std::size_t kRecordOffsetRootD              = kRecordOffsetBestQ + 4;
-constexpr std::size_t kRecordOffsetBestD              = kRecordOffsetRootD + 4;
-constexpr std::size_t kRecordOffsetRootM              = kRecordOffsetBestD + 4;
-constexpr std::size_t kRecordOffsetBestM              = kRecordOffsetRootM + 4;
-constexpr std::size_t kRecordOffsetPliesLeft          = kRecordOffsetBestM + 4;
-constexpr std::size_t kRecordOffsetResultQ            = kRecordOffsetPliesLeft + 4;
-constexpr std::size_t kRecordOffsetResultD            = kRecordOffsetResultQ + 4;
-constexpr std::size_t kRecordOffsetPlayedQ            = kRecordOffsetResultD + 4;
-constexpr std::size_t kRecordOffsetPlayedD            = kRecordOffsetPlayedQ + 4;
-constexpr std::size_t kRecordOffsetPlayedM            = kRecordOffsetPlayedD + 4;
-constexpr std::size_t kRecordOffsetOrigQ              = kRecordOffsetPlayedM + 4;
-constexpr std::size_t kRecordOffsetOrigD              = kRecordOffsetOrigQ + 4;
-constexpr std::size_t kRecordOffsetOrigM              = kRecordOffsetOrigD + 4;
-constexpr std::size_t kRecordOffsetVisits             = kRecordOffsetOrigM + 4;
-constexpr std::size_t kRecordOffsetPlayedIndex        = kRecordOffsetVisits + 4;
-constexpr std::size_t kRecordOffsetBestIndex          = kRecordOffsetPlayedIndex + 2;
-constexpr std::size_t kRecordOffsetPolicyKld          = kRecordOffsetBestIndex + 2;
+constexpr std::size_t kRecordOffsetVersion         = 0;
+constexpr std::size_t kRecordOffsetInputFormat     = 4;
+constexpr std::size_t kRecordOffsetProbabilities   = 8;
+constexpr std::size_t kRecordOffsetPlanes          = kRecordOffsetProbabilities + 4 * 1858;
+constexpr std::size_t kRecordOffsetCastlingUsOoo   = kRecordOffsetPlanes + 8 * kMoveHistory * kPlanesPerBoard;
+constexpr std::size_t kRecordOffsetCastlingUsOo    = kRecordOffsetCastlingUsOoo + 1;
+constexpr std::size_t kRecordOffsetCastlingThemOoo = kRecordOffsetCastlingUsOo + 1;
+constexpr std::size_t kRecordOffsetCastlingThemOo  = kRecordOffsetCastlingThemOoo + 1;
+constexpr std::size_t kRecordOffsetSideToMove      = kRecordOffsetCastlingThemOo + 1;
+constexpr std::size_t kRecordOffsetRule50Count     = kRecordOffsetSideToMove + 1;
+constexpr std::size_t kRecordOffsetInvarianceInfo  = kRecordOffsetRule50Count + 1;
+constexpr std::size_t kRecordOffsetDummy           = kRecordOffsetInvarianceInfo + 1;
+constexpr std::size_t kRecordOffsetRootQ           = kRecordOffsetDummy + 1;
+constexpr std::size_t kRecordOffsetBestQ           = kRecordOffsetRootQ + 4;
+constexpr std::size_t kRecordOffsetRootD           = kRecordOffsetBestQ + 4;
+constexpr std::size_t kRecordOffsetBestD           = kRecordOffsetRootD + 4;
+constexpr std::size_t kRecordOffsetRootM           = kRecordOffsetBestD + 4;
+constexpr std::size_t kRecordOffsetBestM           = kRecordOffsetRootM + 4;
+constexpr std::size_t kRecordOffsetPliesLeft       = kRecordOffsetBestM + 4;
+constexpr std::size_t kRecordOffsetResultQ         = kRecordOffsetPliesLeft + 4;
+constexpr std::size_t kRecordOffsetResultD         = kRecordOffsetResultQ + 4;
+constexpr std::size_t kRecordOffsetPlayedQ         = kRecordOffsetResultD + 4;
+constexpr std::size_t kRecordOffsetPlayedD         = kRecordOffsetPlayedQ + 4;
+constexpr std::size_t kRecordOffsetPlayedM         = kRecordOffsetPlayedD + 4;
+constexpr std::size_t kRecordOffsetOrigQ           = kRecordOffsetPlayedM + 4;
+constexpr std::size_t kRecordOffsetOrigD           = kRecordOffsetOrigQ + 4;
+constexpr std::size_t kRecordOffsetOrigM           = kRecordOffsetOrigD + 4;
+constexpr std::size_t kRecordOffsetVisits          = kRecordOffsetOrigM + 4;
+constexpr std::size_t kRecordOffsetPlayedIndex     = kRecordOffsetVisits + 4;
+constexpr std::size_t kRecordOffsetBestIndex       = kRecordOffsetPlayedIndex + 2;
+constexpr std::size_t kRecordOffsetPolicyKld       = kRecordOffsetBestIndex + 2;
+// q_st, lc0's "Q standard deviation". Nothing here reads it, and nothing should without checking the
+// stream first: lc0's own comment says it "was uint32_t reserved in original v6", and measured on
+// 2026-10-28 it is **exactly zero in every test91 record** - the main run never populates it. The
+// experimental BT4 forks (cleanvisits-bt4tf13g-v7op1, k2hybrid-bt4tf13g-v7op1) do write something
+// there, but it alternates sign between consecutive plies, so whatever it is it is not a standard
+// deviation. The offset is right; the contents are not dependable across runs.
 constexpr std::size_t kRecordOffsetQStandardDeviation = kRecordOffsetPolicyKld + 4;
 
 static_assert(kRecordOffsetQStandardDeviation + 4 == kRecordBytesV6,
