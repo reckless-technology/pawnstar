@@ -355,6 +355,23 @@ heap-allocated (`std::make_unique<Game>()`) — at 8 buckets the inline `feature
   so it fatal-exits at startup before fastchess can send `setoption EvalFile`. Give it a net at startup:
   `CAND_STARTUP_NET=<cand net> BIN_A=<cand engine> BIN_B=<baseline engine> BASELINE_NET=<old net> TC=40/20 tools/run_sprt.sh <cand net> <openings> <rounds>`
   (run_sprt.sh wraps the candidate when `CAND_STARTUP_NET` is set).
+- **A long match runs through `tools/pawnstar-match.sh`**, which wraps every engine so it gets its net at
+  *startup* through `PAWNSTAR_EVALFILE` (so a variant binary survives the handshake) and then **proves each
+  (binary, net) pair before a single game** by running the exact command fastchess will run and making it
+  search. It refuses the run on anything the engine says about the net: `NNUE: refusing net '<path>'`
+  (`nnue::RefuseNet`, on **both** streams), `NNUE: keeping the net already loaded` (a net refused through
+  `setoption EvalFile` leaves the previous one playing — the match would credit every game to a net that
+  never moved), `main.cpp`'s `FATAL: the NNUE net …` startup exit, and `NNUE: no net file at …; using the
+  embedded net`, the one fallback left. **Grep for what the engine prints, nothing else:** the script spent
+  a while grepping `is incompatible`, `is not a stamped` and `falling back to the embedded net`, none of
+  which the engine emits — and the last of those matched the *fatal* message's "Not falling back to the
+  embedded net", so a refused startup net was reported as a fallback, the opposite of the truth. It reads
+  headers with `build/print_net_header` and decodes nothing itself; `--print-header <net>` is that alone,
+  and the `new-shape` CI job asserts every field of it against the synthetic net (`king_buckets=8` among
+  them, which the script's own retired `od` decoder read as 64). It lives on the Linux runners as
+  `~/sprt/pawnstar-match.sh`: **install it with an atomic `mv`** — a running bash re-reads its script by
+  byte offset, so editing one mid-match corrupts the run, while `mv` leaves the running process on its old
+  inode.
 - **`pawnstar_eval` is NOT header-aware** → feed it the **raw** (unstamped) net. But `test_nnue` /
   `test_nnue_incremental` now load through the engine, which **only accepts a stamped net** (the raw path
   was removed), so they must be given a stamped net. `tools/verify_net.sh` handles this: it runs
