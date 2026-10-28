@@ -11,6 +11,9 @@
 *.sh       text eol=lf
 .githooks/* text eol=lf
 Makefile   text eol=lf
+# Same reason for the Python tools: they carry a `#!/usr/bin/env python3` line, and a CRLF checkout makes the
+# interpreter name end in a carriage return the moment one is run directly rather than as `python3 <script>`.
+*.py       text eol=lf
 
 # Opening sets are read line by line by tools that split on whitespace (tools/gen_data.cpp --openings,
 # tools/run_sprt.sh, fastchess), where a CRLF checkout leaves a "\r" stuck to the last field of every FEN

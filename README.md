@@ -181,7 +181,7 @@ its latest result on `main`). Every job runs on a GitHub-hosted runner, on an im
 (`ubuntu-24.04`, `windows-2025`), and installs what it needs with pinned versions. The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
-  build through the wrapper and runs all fifteen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  build through the wrapper and runs all sixteen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
   PyPI wheel in a venv of the job's own; apt has no `clang-format-22`). This is independent of the
@@ -744,9 +744,9 @@ make check
 ```
 
 builds and runs fourteen standalone test executables (plus a shell-driven UCI integration test,
-`test/uci_test.sh`, run against `build/pawnstar` — fifteen suites in all; the script also checks where the engine
-finds its net and book at startup, the embedded copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the
-end of input):
+`test/uci_test.sh`, run against `build/pawnstar`, and one Python suite, `test/pool_matches_test.py` — sixteen
+suites in all; the shell script also checks where the engine finds its net and book at startup, the embedded
+copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of input):
 
 | Executable | Description |
 |---|---|
@@ -764,6 +764,7 @@ end of input):
 | `build/test_lichess_extract` | `tools/lichess_extract.h`'s extraction rules, driven against PGN written by hand |
 | `build/test_lc0_extract` | `tools/lc0_extract.h`'s extraction rules, driven against Lc0 v6 records built from plane words copied out of a real `test80` tar |
 | `build/test_net_header` | `tools/net_header_report.h`, the `RNNUE1` header reader `build/print_net_header` wraps: every field decoded at its documented offset from hand-laid fixtures (8 and 4 king buckets, and a header with no two equal fields), both CRCs and the payload length verified, each kind of damage reported, and the build's own net decoded against its known values |
+| `test/pool_matches_test.py` | `tools/pool_matches.py`, the pentanomial pooling tool: three completed matches' `Ptnml(0-2)` vectors pooled to their measured Elo, 95% bar and LOS, the chunk-scatter diagnostics on a known case, and the two traps - a doubled 1.959964 in the bar, and a 95% bar compared against a one-sigma scatter. Run by ctest as `pool_matches` wherever a Python interpreter is found |
 
 `test_bench_golden` runs the `bench` recipe (`RunBench` in `src/input_handling.h`, the code the `bench` command
 runs: depth 13, single-threaded, book off, hash cleared) with the shipped net and checks it against the golden
@@ -805,7 +806,7 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 |---|---|
 | `src/` | Engine source and headers |
 | `test/` | Standalone test programs |
-| `tools/` | Bullet trainer sources, training/verify/SPRT scripts, the training-data generator (`gen_data`) and extractors (`lichess_extract`, `lc0_extract`), and helper tools (`gen_openings`, `stamp_net`, `filter_book`, `nnue_quant_study`, `dump_magics`) |
+| `tools/` | Bullet trainer sources, training/verify/SPRT scripts (`pawnstar-match.sh` to run a match, `pool_matches.py` to pool its chunks into one Elo with a correct 95% bar), the training-data generator (`gen_data`) and extractors (`lichess_extract`, `lc0_extract`), and helper tools (`gen_openings`, `stamp_net`, `print_net_header`, `filter_book`, `nnue_quant_study`, `dump_magics`) |
 | `nnue/` | The shipped NNUE net (`pawnstar-v12.bin`) plus training-pipeline documentation |
 | `Doxyfile` | Doxygen configuration |
 | `LICENSE` | GNU General Public License v3 |
