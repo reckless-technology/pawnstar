@@ -888,5 +888,9 @@ redistribute and/or modify it under the terms of that license; it comes with **n
 
 The bundled opening book ([pawnstar.book](pawnstar.book)) is derived from the public-domain
 [TSCP](https://github.com/terredeciels/TSCP) `book.txt`. The NNUE trainer sources under
-[tools/bullet/](tools/bullet) are written for the [bullet](https://github.com/jw1912/bullet) trainer
-(MIT-licensed), which is fetched separately by `tools/setup_bullet.sh` and is not redistributed here.
+[tools/bullet/](tools/bullet) are written for the [bullet](https://github.com/jw1912/bullet) trainer and
+adapted from it: `pawnstar.rs` from its `simple` example, and `pawnstar_eval.rs` from that example and from its
+`Chess768` and `ChessBuckets` input code. bullet is MIT-licensed, Copyright (c) 2023 Jamie Whiting, so those two
+files are redistributed here with that attribution in their headers and bullet's licence text in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). bullet itself is not redistributed: `tools/setup_bullet.sh`
+fetches it at a pinned commit.
