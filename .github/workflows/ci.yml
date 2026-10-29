@@ -333,6 +333,78 @@ jobs:
           [ "$failures" -eq 0 ] \
             || { echo "::error::$failures header assertion(s) failed — the harness is misreading RNNUE1"; exit 1; }
           echo "Every RNNUE1 header field read back as expected."
+      - name: The busy-runner gate counts worker PROCESSES, not mentions of them
+        run: |
+          set -o pipefail
+          # Until this change the gate read `ps -e -o args=` and grepped for `[R]unner\.Worker`, so it counted
+          # any process whose COMMAND LINE mentioned the worker rather than the worker itself. On 2026-10-28
+          # that refused a match on a demonstrably idle machine: the operator's own per-minute sampler and a
+          # log monitor each carried the string in their argv, so the gate reported three running jobs while
+          # 54 samples, both runners' `_work` trees and the newest `Worker_*.log` all agreed nothing had run
+          # for two days. It fails safe, refusing rather than contending, but it cost a launch — and the
+          # `[R]unner` bracket form guards only that grep against matching itself, never other watchers.
+          #
+          # PAWNSTAR_PROCESS_LISTER substitutes a known process list for `ps`, so these cases are the before
+          # and after of that incident. Full command lines that MENTION the worker must read idle; a process
+          # name that IS the worker must refuse. The gate sits before the engine probe, so the refusing case
+          # exits there and needs no engine, while the idle cases walk on and fail later — which is why they
+          # assert on the note rather than on the exit status.
+          printf '%s\n' \
+            'bash /home/jonny/sprt/arm1_runner_sample.sh pgrep -x Runner.Worker' \
+            'tail -f /home/jonny/sprt/logs/Runner.Worker.log' \
+            'ssh -4 jonny@192.168.50.22 pgrep -x Runner.Worker' > argv-style-mentions.txt
+          printf '%s\n' bash grep ps sshd > names-idle.txt
+          printf '%s\n' bash Runner.Worker grep > names-busy.txt
+
+          harness() {
+            PAWNSTAR_PROCESS_LISTER="cat $1" FASTCHESS=/bin/true \
+            tools/pawnstar-match.sh --dry-run --allow-same-net \
+              --candidate build-new-shape/synthetic-net.bin \
+              --baseline  build-new-shape/synthetic-net.bin \
+              --candidate-binary build-new-shape/pawnstar \
+              --baseline-binary  build-new-shape/pawnstar \
+              --print-net-header build-new-shape/print_net_header 2>&1
+          }
+
+          failures=0
+          out=$(harness argv-style-mentions.txt || true)
+          if printf '%s' "$out" | grep -Fq 'Actions runner: idle.'; then
+            echo 'ok     command lines MENTIONING the worker read as idle (the old gate counted three)'
+          else
+            echo '::error::command lines mentioning Runner.Worker counted as running jobs - the argv bug is back'
+            printf '%s\n' "$out" | grep -F 'Actions' || true
+            failures=$((failures + 1))
+          fi
+
+          out=$(harness names-idle.txt || true)
+          if printf '%s' "$out" | grep -Fq 'Actions runner: idle.'; then
+            echo 'ok     a process list without the worker reads as idle'
+          else
+            echo '::error::an idle process list did not read as idle'
+            failures=$((failures + 1))
+          fi
+
+          status=0
+          out=$(harness names-busy.txt) || status=$?
+          if [ "$status" -ne 0 ] && printf '%s' "$out" | grep -Fq 'GitHub Actions job(s) are running on this machine'; then
+            echo 'ok     a real worker process name still refuses the match'
+          else
+            echo "::error::a running worker was NOT detected (exit $status) - the gate no longer protects a job"
+            failures=$((failures + 1))
+          fi
+
+          status=0
+          out=$(harness /nonexistent/process-list) || status=$?
+          if [ "$status" -ne 0 ] && printf '%s' "$out" | grep -Fq 'could not list processes'; then
+            echo 'ok     a process list that cannot be read refuses, rather than reading as idle'
+          else
+            echo "::error::an unreadable process list did not refuse (exit $status) - a broken check reporting clean is worse than none"
+            failures=$((failures + 1))
+          fi
+
+          [ "$failures" -eq 0 ] \
+            || { echo "::error::$failures busy-runner gate assertion(s) failed"; exit 1; }
+          echo 'The busy-runner gate counts processes, not mentions of them.'
       - name: The harness's header report in the job summary
         if: always()
         run: |

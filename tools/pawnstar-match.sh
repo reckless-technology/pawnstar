@@ -439,7 +439,26 @@ fi
 # Is a GitHub Actions job running on this machine? Its work matters more than ours.
 # ---------------------------------------------------------------------------------------------------
 
-running_job_count="$(ps -e -o args= | grep -c '[R]unner\.Worker' || true)"
+# Count the worker processes by NAME, never by command line. `ps -e -o args=` lists every process's
+# full argv, so it counts anything that merely MENTIONS the worker - a monitor, a sampler, an ssh
+# command, a `pgrep -x Runner.Worker` watching for the same thing. On 2026-10-28 that refused a match
+# on a demonstrably idle machine: the operator's own per-minute sampler and a log monitor each carried
+# the string in their argv, so this check reported three running jobs while 54 samples, both runners'
+# `_work` directories and the newest `Worker_*.log` all agreed nothing had run for two days. The
+# `[R]unner` bracket form guards only this grep against matching itself and does nothing about other
+# watchers. A process NAME carries no arguments, so the confusion cannot arise - and `grep -F -x`
+# keeps it an exact whole-name match rather than a substring or a regex.
+#
+# PAWNSTAR_PROCESS_LISTER exists so a test can feed a known process list. Leave it unset in real use.
+process_lister="${PAWNSTAR_PROCESS_LISTER:-ps -e -o comm=}"
+# Deliberately unquoted: the default is a command with arguments and must word-split. And the lister
+# is NOT allowed to fail quietly: a broken process list reading as "idle" would start a match beside
+# a running job, which is the very failure this check exists to prevent.
+# shellcheck disable=SC2086
+process_names="$($process_lister)" \
+    || die "could not list processes with '$process_lister', so whether an Actions job runs here
+         is unknown - refusing rather than assuming the machine is idle."
+running_job_count="$(printf '%s\n' "$process_names" | grep -F -x -c 'Runner.Worker' || true)"
 if [ "$running_job_count" -gt 0 ]; then
     if [ "$does_allow_busy_runner" -eq 0 ]; then
         die "$running_job_count GitHub Actions job(s) are running on this machine. A local load this
