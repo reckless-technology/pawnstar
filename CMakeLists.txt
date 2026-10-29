@@ -308,7 +308,8 @@ if(EXISTS "${EMBED_NET}")
   add_test(NAME nnue_incremental COMMAND test_nnue_incremental "${PAWNSTAR_SHAPE_NET}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   # The one net-independent check on the engine's USE of a net's weights: a position and its colour-flipped
-  # vertical mirror must evaluate equal and opposite, which no absolute score can state and which a
+  # vertical mirror must evaluate EQUAL, not equal and opposite - Evaluate is side-to-move-relative, so the flip
+  # swaps the side to move and the sign is already in the convention. No absolute score can state it, and a
   # mirroring, perspective or bucketing defect breaks while the training loss stays perfect
   # (test/eval_symmetry_test.cpp). It pins no expected score, so it gates every future net unchanged.
   add_test(NAME eval_symmetry COMMAND test_eval_symmetry "${PAWNSTAR_SHAPE_NET}"
