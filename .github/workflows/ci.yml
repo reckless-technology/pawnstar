@@ -363,7 +363,8 @@ jobs:
               --baseline  build-new-shape/synthetic-net.bin \
               --candidate-binary build-new-shape/pawnstar \
               --baseline-binary  build-new-shape/pawnstar \
-              --print-net-header build-new-shape/print_net_header \n              --repo . 2>&1
+              --print-net-header build-new-shape/print_net_header \
+              --repo . 2>&1
           }
 
           failures=0
