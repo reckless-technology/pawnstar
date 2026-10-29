@@ -784,7 +784,16 @@ Trainer hyperparameters ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)
 AdamW, `batch_size=16384`, loss `sigmoid(out)` squared-error against
 `target = wdl·result + (1-wdl)·sigmoid(score/SCALE)` with `ConstantWDL=0.5`, `StepLR{start=0.001,
 gamma=0.3, step=SBS/3}`, `eval_scale=400`. Overridable via env: `PAWNSTAR_DATA`, `PAWNSTAR_BPS`,
-`PAWNSTAR_SBS`, `PAWNSTAR_OUT`. GPU training reports the device (e.g. `Training on NVIDIA GeForce RTX
+`PAWNSTAR_SBS`, `PAWNSTAR_OUT`, `PAWNSTAR_LR_STEP`. **The schedule is checked before the run
+starts.** `StepLR` applies drop N from superbatch `N·step + 1`, so `step = SBS/3` puts the third
+drop at `SBS + 1` whenever SBS divides by 3, where it never fires — which is what happened to
+every net trained before 2026-10-29 (0, 1 or 2 superbatches at the lowest rate; the 819-superbatch
+run got none, and the missing stage measured 0.88% of held-out loss). The trainer prints the
+schedule it will follow, refuses to start one whose last drop cannot apply, reports the tail
+length, and prints `LR CHECK: superbatch <n> -> lr <rate>` every superbatch — the only record of
+the rate actually applied, since bullet logs the scheduler's description instead. Pin
+`PAWNSTAR_LR_STEP` to repair a truncated schedule or to hold the lowest rate across a resume.
+GPU training reports the device (e.g. `Training on NVIDIA GeForce RTX
 4070`) and runs at ~2.4M positions/sec on that card for this 1024-wide net (~0.34M on an older GTX
 1050 Ti; see §7).
 
