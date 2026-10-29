@@ -181,7 +181,7 @@ its latest result on `main`). Every job runs on a GitHub-hosted runner, on an im
 (`ubuntu-24.04`, `windows-2025`), and installs what it needs with pinned versions. The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
-  build through the wrapper and runs all sixteen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  build through the wrapper and runs all seventeen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
   PyPI wheel in a venv of the job's own; apt has no `clang-format-22`). This is independent of the
@@ -743,8 +743,8 @@ prints the available book moves and their frequencies for the current position.
 make check
 ```
 
-builds and runs fourteen standalone test executables (plus a shell-driven UCI integration test,
-`test/uci_test.sh`, run against `build/pawnstar`, and one Python suite, `test/pool_matches_test.py` — sixteen
+builds and runs fifteen standalone test executables (plus a shell-driven UCI integration test,
+`test/uci_test.sh`, run against `build/pawnstar`, and one Python suite, `test/pool_matches_test.py` — seventeen
 suites in all; the shell script also checks where the engine finds its net and book at startup, the embedded
 copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of input):
 
@@ -755,6 +755,7 @@ copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of inpu
 | `build/test_bratko_kopec_nnue` | 24 Bratko-Kopec positions searched with the NNUE net; reports moves solved |
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
+| `build/test_eval_symmetry` | The net-independent evaluation check: 24 positions, each against its colour-flipped vertical mirror, which a perspective network must score exactly equally (the White-relative `eval(P) == -eval(flip(P))`) - a mirroring, perspective, colour-mapping or bucketing defect breaks it while the training loss stays perfect. It pins no expected score, so it gates every future net unchanged; the flip itself is checked against hand-computed FENs, for `flip(flip(P)) == P` and for the legal move count |
 | `build/test_opening_book` | Opening book: loading (file, memory, comments, an illegal move), weighting, display, `?` moves |
 | `build/test_chess_clock` | `ChessClock` `std::chrono` timing logic (deadline / elapsed / ponderhit / reset) |
 | `build/test_bench_golden` | The `bench` signature: each of the 16 positions' best move and node count, and the 6,601,454 total |
@@ -776,7 +777,9 @@ a new net, and re-port the change to both ports.
 
 `make check` runs the NNUE tests against the shipped `nnue/pawnstar-v12.bin`: `test_nnue` against the
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
-asserts the incremental accumulator matches a full refresh at every node, and `test_bratko_kopec_nnue`
+asserts the incremental accumulator matches a full refresh at every node, `test_eval_symmetry` which asserts
+every position scores exactly as its colour-flipped vertical mirror (net-independent, so it gates a new net
+where the reference evals cannot — they are v12's own), and `test_bratko_kopec_nnue`
 which searches the 24 BK positions with the net (single-threaded, deterministic) and **must solve all 24**
 — each position's best move must be in its accepted-move set (the `kCases` array in `test/bratko_kopec_nnue_test.cpp`). The NNUE
 ctest cases are registered only when the shipped net is present, so a checkout without it still configures
