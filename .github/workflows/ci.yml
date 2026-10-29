@@ -372,9 +372,7 @@ jobs:
             echo 'ok     command lines MENTIONING the worker read as idle (the old gate counted three)'
           else
             echo '::error::command lines mentioning Runner.Worker counted as running jobs - the argv bug is back'
-            printf 'harness output was:
-%s
-' "$out" | head -30
+            echo "$out" | head -30
             failures=$((failures + 1))
           fi
 
@@ -392,9 +390,7 @@ jobs:
             echo 'ok     a real worker process name still refuses the match'
           else
             echo "::error::a running worker was NOT detected (exit $status) - the gate no longer protects a job"
-            printf 'harness output was:
-%s
-' "$out" | head -30
+            echo "$out" | head -30
             failures=$((failures + 1))
           fi
 
