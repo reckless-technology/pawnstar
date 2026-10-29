@@ -214,8 +214,9 @@ set_source_files_properties(tools/lc0_extract.cpp PROPERTIES
 
 # --- Tests (each a standalone TU with its own main()). ---
 enable_testing()
-set(PAWNSTAR_TESTS perft see bratko_kopec_nnue nnue nnue_incremental opening_book chess_clock bench_golden
-                   uci_commands primitives principal_variation lichess_extract lc0_extract net_header)
+set(PAWNSTAR_TESTS perft see bratko_kopec_nnue nnue nnue_incremental eval_symmetry opening_book chess_clock
+                   bench_golden uci_commands primitives principal_variation lichess_extract lc0_extract
+                   net_header)
 foreach(t IN LISTS PAWNSTAR_TESTS)
   add_executable(test_${t} test/${t}_test.cpp)
 endforeach()
@@ -305,6 +306,12 @@ if(EXISTS "${EMBED_NET}")
   add_test(NAME nnue COMMAND test_nnue "${EMBED_NET}" "${NNUE_REF}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   add_test(NAME nnue_incremental COMMAND test_nnue_incremental "${PAWNSTAR_SHAPE_NET}"
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  # The one net-independent check on the engine's USE of a net's weights: a position and its colour-flipped
+  # vertical mirror must evaluate equal and opposite, which no absolute score can state and which a
+  # mirroring, perspective or bucketing defect breaks while the training loss stays perfect
+  # (test/eval_symmetry_test.cpp). It pins no expected score, so it gates every future net unchanged.
+  add_test(NAME eval_symmetry COMMAND test_eval_symmetry "${PAWNSTAR_SHAPE_NET}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   # The principal variation Game publishes, which tools/gen_data.cpp harvests: every ply legal, replayable
   # without touching the game history, and evaluating from its FEN exactly as it does from the position.
