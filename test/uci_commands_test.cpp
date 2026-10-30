@@ -301,13 +301,20 @@ void HandshakesAndDiagnostics(Game &game)
     Check(lists_every_command, "help: lists every command in the table");
 
     // The notice the shipped network's training data obliges has to reach a user who downloaded only a binary,
-    // so the engine prints it itself. These are the three facts ODbL asks the notice to name.
+    // so the engine prints it itself. These are the facts ODbL asks the notice to name, and both runs by name:
+    // the attribution line is per run, and a notice that named one of them would be incomplete.
     const std::string license = Run(game, {"license"});
     Check(Contains(license, "GNU General Public License, version 3") &&
-              Contains(license, "Leela Chess Zero self-play training data") &&
-              Contains(license, "http://opendatacommons.org/licenses/odbl/1.0/") &&
+              Contains(license, "Leela Chess Zero self-play training data") && Contains(license, "run test91") &&
+              Contains(license, "run test60") && Contains(license, "http://opendatacommons.org/licenses/odbl/1.0/") &&
               Contains(license, "http://opendatacommons.org/licenses/dbcl/1.0/") && Contains(license, "Produced Work"),
-          "license: names the engine's licence and the training data's, with both ODbL URLs", license);
+          "license: names the engine's licence and the training data's, both runs and both ODbL URLs", license);
+    // The two notices this repository owes that the Rust port does not: the bullet-adapted trainer sources are
+    // here, so the MIT notice is owed here. The rest of the text is that port's, line for line.
+    Check(Contains(license, "tools/bullet/") && Contains(license, "MIT-licensed") &&
+              Contains(license, "THIRD-PARTY-NOTICES.md") && Contains(license, "PlentyChess") &&
+              Contains(license, "Yoshie2000") && Contains(license, "TSCP"),
+          "license: names bullet's MIT notice, the withdrawn data and the book's source", license);
 
     const std::string dbg = Run(game, {"dbgclear", "dbg"});
 #if DEBUGX
