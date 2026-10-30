@@ -237,7 +237,10 @@ workflow creates the release `vMAJOR.MINOR.BUILD` and its tag itself. It never r
 | `pawnstar-<version>-windows-x86_64.exe` | the engine (AVX2), Authenticode-signed through SSL.com eSigner (Jonathan Reckless) |
 | `pawnstar-<version>-macos-arm64.zip` | the engine for Apple silicon, signed with a Developer ID (hardened runtime) and notarised by Apple |
 | `pawnstar-<version>-linux-x86_64` | the engine for Linux (AVX2) |
-| `pawnstar-<version>-docs-html.zip`, `-source.tar.gz` | the Doxygen HTML documentation, and the source at the commit |
+| `pawnstar-<version>-docs-html.zip` | the Doxygen HTML documentation |
+
+**No source archive is published.** The source is this repository: clone or fork it. (GitHub attaches its own
+automatic "Source code" archives to every release, which are its doing and not the workflow's.)
 
 The binaries are built with `RELEASE=1` (the DEBUGX counters off). The macOS engine ships in a zip because a bare
 binary can't carry a stapled notarisation ticket: Gatekeeper looks its ticket up online, and the zip keeps the
@@ -637,8 +640,19 @@ engine **requires**: an unstamped (raw bullet) net or one whose header doesn't m
 architecture is rejected rather than misread. Stamp a freshly trained raw net with `tools/stamp_net` before loading
 (see [nnue/README.md](nnue/README.md)).
 
-**Training data.** The shipped net is trained **entirely on Leela Chess Zero self-play data**, and so is
-every net from **v20 (release 2.0.0)** onward.
+**Training data, and the notice it obliges.** The shipped net is trained **entirely on Leela Chess Zero
+self-play data**, and so is every net from **v20 (release 2.0.0)** onward. That data is published as a
+database under the **Open Database License 1.0**, its contents under the **Database Contents License 1.0**:
+
+> Position data from the Leela Chess Zero self-play training data
+> (<https://storage.lczero.org/files/training_data/>), runs `test91` and `test60`, used under the Open Database
+> License 1.0 (<http://opendatacommons.org/licenses/odbl/1.0/>).
+
+A trained net is a *Produced Work* under that licence, so distributing it obliges **that notice** naming the
+source — and nothing more: ODbL does **not** make the net itself ODbL-licensed, and the net is not GPL merely
+because this project's GPLv3 code trained it. The full notice, with both licences, both runs and their shares
+of the pool, is in **[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)**, and the engine prints it itself in
+answer to the `license` command.
 
 **Credit for the earlier nets.** Every net up to and including `pawnstar-v12.bin` — all of them now retired —
 was trained on **the PlentyChess bulletformat dataset**, generated and published by
@@ -904,6 +918,14 @@ the published node counts for the standard positions.
 Pawnstar is free software, licensed under the **GNU General Public License, version 3** (GPLv3). You may
 redistribute and/or modify it under the terms of that license; it comes with **no warranty**. See the
 [LICENSE](LICENSE) file for the full text, or <https://www.gnu.org/licenses/gpl-3.0.html>.
+
+**The shipped network carries a notice of its own.** `nnue/pawnstar-v20.bin` was trained entirely on the
+**Leela Chess Zero self-play training data** (<https://storage.lczero.org/files/training_data/>), a database
+published under the **Open Database License 1.0** with its contents under the **Database Contents License
+1.0**. A trained net is an ODbL *Produced Work*, and distributing one obliges a notice naming that source:
+the notice is in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and the engine prints it in answer to the
+`license` command. The obligation is the notice alone — the net is neither ODbL-licensed nor GPL-licensed by
+having been trained with GPLv3 tooling.
 
 The bundled opening book ([pawnstar.book](pawnstar.book)) is derived from the public-domain
 [TSCP](https://github.com/terredeciels/TSCP) `book.txt`. The NNUE trainer sources under

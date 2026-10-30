@@ -592,6 +592,36 @@ inline void handle_position(Game &game, std::span<std::string> args)
     }
 }
 
+/// @brief Handle the "license" command: print the engine's own licence and the third-party notices a
+/// distributed copy of it owes - above all the Open Database License attribution the shipped network carries.
+/// A user who downloads only a release binary gets no file from the repository, so the notice has to be
+/// printable by the engine itself. It writes to stdout and touches no engine state, so it cannot affect a
+/// search: the text is the whole of it. Keep it in step with THIRD-PARTY-NOTICES.md, which is its long form.
+inline void handle_license(Game &, std::span<std::string>)
+{
+    std::cout << std::format("Pawnstar {} is free software under the GNU General Public License, version 3.\n",
+                             VersionString())
+              << "It comes with NO WARRANTY. See the LICENSE file, or <https://www.gnu.org/licenses/gpl-3.0.html>.\n"
+                 "\n"
+                 "The shipped network was trained entirely on the Leela Chess Zero self-play training data\n"
+                 "(https://storage.lczero.org/files/training_data/), runs test91 and test60: a database published\n"
+                 "under the Open Database License 1.0 (http://opendatacommons.org/licenses/odbl/1.0/), its contents\n"
+                 "under the Database Contents License 1.0 (http://opendatacommons.org/licenses/dbcl/1.0/).\n"
+                 "\n"
+                 "  Position data from the Leela Chess Zero self-play training data\n"
+                 "  (https://storage.lczero.org/files/training_data/), runs test91 and test60, used under the\n"
+                 "  Open Database License 1.0 (http://opendatacommons.org/licenses/odbl/1.0/).\n"
+                 "\n"
+                 "A trained network is an ODbL Produced Work. Distributing it obliges the notice above, naming the\n"
+                 "source and its licence, and that alone: ODbL does not require the network itself to be\n"
+                 "ODbL-licensed, and the network is not GPL merely because this project's GPLv3 code trained it.\n"
+                 "\n"
+                 "The NNUE trainer sources under tools/bullet/ are adapted from the MIT-licensed bullet trainer\n"
+                 "(https://github.com/jw1912/bullet), and the opening book from the public-domain TSCP book.\n"
+                 "The notices in full, with the MIT text: THIRD-PARTY-NOTICES.md in the source repository,\n"
+                 "<https://github.com/reckless-technology/pawnstar>.\n";
+}
+
 /// @brief Handle the "help" command: list all available commands.
 inline void handle_help(Game &, std::span<std::string>);
 
@@ -612,6 +642,7 @@ inline constexpr std::array handlers =
     Handler { COMMAND(go),             "Search the current position"},
     Handler { COMMAND(help),           "Display a summary of commands"},
     Handler { COMMAND(isready),        "Respond with readyok"},
+    Handler { COMMAND(license),        "Print the licence and the third-party notices, the net's data among them"},
     Handler { COMMAND(nnue),           "Display the raw NNUE evaluation of the current position"},
     Handler { COMMAND(ponderhit),      "Pondered move was played; convert ponder search to a timed search"},
     Handler { COMMAND(position),       "Set the position and series of moves"},
