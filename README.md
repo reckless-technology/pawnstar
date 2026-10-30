@@ -709,10 +709,14 @@ out at, and `tools/train_pipeline.sh` runs it as a gate before training on one.
 **Shipped net.** [nnue/pawnstar-v20.bin](nnue/pawnstar-v20.bin) is a **1024-wide net with 8 horizontally
 mirrored king buckets (file × board-half) and 8 material output heads** — the shared Reckless NNUE shape —
 trained **entirely on Leela Chess Zero self-play data**. It measures **+9.99 Elo at 8+0.08** (8,000 games,
-95% +4.33..+15.66) and **+1.13 at 12+0.12** (12,000 games, 95% −3.17..+5.43) over the v12 net it retires: a
-gain at fast time controls, level at slower ones. The two shape additions it needs were measured separately
-in zenith at fixed depth, **+14.3 Elo** for mirroring and **+14.7** for the output heads, and both only pay
-past ~1.4B training positions, which is why no earlier net had either.
+95% +2.42..+17.57) and **+1.13 at 12+0.12** (12,000 games, 95% −5.63..+7.89) over the v12 net it retires: a
+gain at fast time controls, level at slower ones. Both bars are widened for the replay of the 306-opening
+book by `tools/opening_icc.py`, which the nominal pentanomial bar does not account for. The 12+0.12 bar is
+measured directly from that arm's PGNs (ICC 0.0746, design effect 2.473); the 8+0.08 bar is an **estimate**,
+bracketed from the ICC of 0.061 measured on the same machine at the same openings, because that arm's PGNs
+were never written. The two shape additions it needs were measured separately in zenith at fixed depth,
+**+14.3 Elo** for mirroring and **+14.7** for the output heads, and both only pay past ~1.4B training
+positions, which is why no earlier net had either.
 
 Lineage of the retired nets, all SPRT-measured
 (against the since-removed hand-crafted eval, "HCE", in the early steps): Pawnstar self-play *lost* to the

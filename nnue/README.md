@@ -982,11 +982,17 @@ setoption name EvalFile value /path/to/other-net.bin
 (§6, Data). It is the shared Reckless NNUE shape: a 1024-wide transformer, **8 horizontally mirrored
 king buckets selected by king file × board-half** (`kKingBucketMap`, §1) and **8 material output heads**
 selected by `(piece_count - 2) / 4`. It beats the v12 net it retires by **+9.99 Elo at 8+0.08** (8,000
-games, 95% +4.33..+15.66) and **+1.13 at 12+0.12** (12,000 games, 95% −3.17..+5.43, Birge-scaled
-±6.03) — a gain at fast time controls and level at slower ones. Two variables moved together there, the
-training data and the shape, so that pair of numbers is the net-to-net verdict and not a measurement of
-either lever on its own; the shape's two additions were measured separately in zenith at fixed depth,
-**+14.3 Elo** for mirroring and **+14.7** for the output heads.
+games, 95% +2.42..+17.57) and **+1.13 at 12+0.12** (12,000 games, 95% −5.63..+7.89) — a gain at fast time
+controls and level at slower ones. Both bars are widened for the replay of the 306-opening book by
+`tools/opening_icc.py`, which the nominal pentanomial bar does not account for. The 12+0.12 bar is measured
+directly from that arm's PGNs (ICC 0.0746, design effect 2.473); the 8+0.08 bar is an **estimate**,
+bracketed from the ICC of 0.061 measured on the same machine at the same openings, because that arm's PGNs
+were never written. The 12+0.12 chunks' mild residual over-dispersion (chi-square 21.65 on 11 df, ratio
+1.40) is a separate heterogeneity question and is **not** multiplied into the bar above — the two corrections
+act on the same pooled variance, and a Birge factor's baseline is not ICC-aware. Two variables moved
+together there, the training data and the shape, so that pair of numbers is the net-to-net verdict and not
+a measurement of either lever on its own; the shape's two additions were measured separately in zenith at
+fixed depth, **+14.3 Elo** for mirroring and **+14.7** for the output heads.
 
 Its held-out loss is **0.012182 ± 0.000003** on the frozen 100,141,613-position validation set at lambda
 0.0, which is **0.879%** better than the same run 51 superbatches earlier — the largest recipe gain this
