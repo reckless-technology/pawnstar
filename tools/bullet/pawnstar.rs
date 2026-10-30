@@ -43,6 +43,8 @@ Configured via environment variables:
     PAWNSTAR_OUT        output checkpoint directory               (default: checkpoints)
     PAWNSTAR_SAVE_RATE  checkpoint every this many superbatches    (default: 10)
     PAWNSTAR_WDL        how much of the target is the game result  (default: 0.5)
+    PAWNSTAR_RESUME     checkpoint directory to continue from     (default: none - train from scratch)
+    PAWNSTAR_START_SB   absolute superbatch to resume at          (default: 1)
 
 A batch is 16,384 positions. The convention these nets are trained on is a superbatch of about 60M of
 them - PAWNSTAR_BPS near 3662 - which leaves PAWNSTAR_SBS to set how many passes are made over a pool
@@ -75,6 +77,19 @@ historical run on its original schedule and for nothing else.
 The default step is deliberately still PAWNSTAR_SBS / 3. Changing it would move all three drops and
 so make every past run's schedule unreproducible from this file, and one measurement says only that
 the tail must exist and that ~30 superbatches realises it - not what the best spacing is.
+
+**Resuming is this trainer, not a second trainer.** PAWNSTAR_RESUME names a checkpoint directory -
+one of the `<out>/pawnstar-<n>` directories a run writes every PAWNSTAR_SAVE_RATE superbatches - and
+PAWNSTAR_START_SB the ABSOLUTE superbatch to re-enter the schedule at. Both the learning rate and the
+data position are indexed by that absolute number: StepLR reads it directly, and bullet's
+`ReadMapLoader` skips `batch_size * batches_per_superbatch * (start - 1)` positions modulo the pool
+size, so nothing else needs setting. Re-entering a run mid-schedule is exactly when the schedule's
+shape is easiest to break - raising PAWNSTAR_SBS to continue a run MOVES the derived step's drops, as
+the paragraph above describes - so a resume runs the same check_lr_schedule refusal a fresh run does,
+before the GPU, the checkpoint or the data file is touched. runF's resume of runE lived for two days
+as a copy of this file with the LoggedLR printing but no guard, defaulting lr_step to end_sb / 3; that
+default is the defect that cost five runs their last drop, and a copy is where a guard goes to drift.
+There is one trainer here and both entry points go through it.
 
 The final quantised net is written to <out>/pawnstar-<sbs>/pawnstar-<sbs>.bin in bullet's native
 headerless format. **Stamp it before the engine will load it**: `build/stamp_net <raw> <out.bin>` wraps
@@ -193,7 +208,13 @@ fn lr_after_drops(drops: usize) -> f32 {
 /// about 0.88% of held-out loss - roughly eight times what a 59%-larger training pool bought - so the
 /// house rule applies and this fails closed, as tools/pawnstar-match.sh refuses a match rather than
 /// assume a machine is idle when it cannot tell.
-fn check_lr_schedule(end_sb: usize, step: usize) {
+///
+/// `start_sb` is a resume's first superbatch (1 for a fresh run) and is REPORTING only: it marks the
+/// drops the run being resumed already took, and does not enter the arithmetic. The shape of a
+/// schedule is a property of `end_sb` and `step` alone, and a resume that pins PAWNSTAR_LR_STEP is
+/// continuing one schedule rather than starting a shorter one - so the drops it must reach, and the
+/// tail it must leave, are counted over the whole schedule the loaded checkpoint is partway through.
+fn check_lr_schedule(end_sb: usize, step: usize, start_sb: usize) {
     if step == 0 {
         eprintln!("LR SCHEDULE REFUSED: the step is 0, which StepLR divides by.");
         eprintln!("  end_superbatch (PAWNSTAR_SBS) = {end_sb}, so the default PAWNSTAR_SBS / 3 is 0.");
@@ -212,12 +233,18 @@ fn check_lr_schedule(end_sb: usize, step: usize) {
         if std::env::var("PAWNSTAR_LR_STEP").is_ok() { "PAWNSTAR_LR_STEP" } else { "PAWNSTAR_SBS / 3" };
 
     println!("LR SCHEDULE: start {LR_START} gamma {LR_GAMMA} step {step} ({derived}) end_sb {end_sb}");
+    if start_sb > 1 {
+        println!("  resuming at superbatch {start_sb}: this run covers {start_sb}..{end_sb} of one");
+        println!("  {end_sb}-superbatch schedule, and StepLR is fed the absolute superbatch number.");
+    }
     println!("  StepLR is start * gamma^((superbatch - 1) / step): drop N applies from N * step + 1:");
     for drop in 1..=intended {
         let at = drop * step + 1;
         let rate = lr_after_drops(drop);
         if at > end_sb {
             println!("    drop {drop} at superbatch {at} -> lr {rate:.8}  NEVER APPLIES (run ends {end_sb})");
+        } else if at < start_sb {
+            println!("    drop {drop} at superbatch {at} -> lr {rate:.8}  (taken by the run being resumed)");
         } else {
             println!("    drop {drop} at superbatch {at} -> lr {rate:.8}");
         }
@@ -279,6 +306,71 @@ fn check_lr_schedule(end_sb: usize, step: usize) {
     }
 }
 
+/// Validates the resume controls and **exits non-zero** on a combination that would train something
+/// other than the continuation it looks like. Called before check_lr_schedule, so a resume's schedule
+/// is still printed and still refused by the same arithmetic a fresh run's is.
+///
+/// Four ways a resume goes wrong while reading in the log exactly like a resume that went right:
+///
+///  * PAWNSTAR_START_SB without PAWNSTAR_RESUME re-enters the schedule at a mid-run learning rate and
+///    a mid-pool data position with FRESHLY INITIALISED weights, which continues nothing.
+///  * PAWNSTAR_START_SB past PAWNSTAR_SBS leaves no superbatches to train, which bullet reports as
+///    `InvalidSchedule` after the device is up and without naming which field is wrong.
+///  * PAWNSTAR_RESUME without PAWNSTAR_START_SB loads the checkpoint and then runs the whole schedule
+///    again from the starting rate, spending the anneal the checkpoint had already paid for. That is a
+///    legitimate warm start on a new pool, so it warns rather than refuses.
+///  * a missing or incomplete checkpoint directory panics inside bullet's `load_weights_from_file`
+///    (`File::open(..).unwrap()`), after the GPU is up and the data loader has started, in a form that
+///    looks like a device fault. The files are checked here instead, before anything is allocated.
+fn check_resume(resume_from: &str, start_sb: usize, end_sb: usize) {
+    if start_sb == 0 {
+        eprintln!("RESUME REFUSED: PAWNSTAR_START_SB=0, but superbatches are numbered from 1.");
+        eprintln!("  Set 1 to train from the beginning, or the superbatch to re-enter the schedule at.");
+        std::process::exit(1);
+    }
+
+    if start_sb > end_sb {
+        eprintln!("RESUME REFUSED: PAWNSTAR_START_SB={start_sb} is past PAWNSTAR_SBS={end_sb}, so the run");
+        eprintln!("  has no superbatches left to train. Raise PAWNSTAR_SBS past {start_sb} - and pin");
+        eprintln!("  PAWNSTAR_LR_STEP when you do, because raising it moves the derived step's drops.");
+        std::process::exit(1);
+    }
+
+    if resume_from.is_empty() {
+        if start_sb > 1 {
+            eprintln!("RESUME REFUSED: PAWNSTAR_START_SB={start_sb} without PAWNSTAR_RESUME would train a");
+            eprintln!("  freshly initialised net from superbatch {start_sb}: a mid-schedule rate and a");
+            eprintln!("  mid-pool data position applied to random weights. Set PAWNSTAR_RESUME to the");
+            eprintln!("  checkpoint directory to continue, or PAWNSTAR_START_SB=1 to train from scratch.");
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    // bullet appends `/optimiser_state` to the path it is given, and the AdamW state there is three
+    // files: the weights, and the optimiser's own momentum and velocity.
+    let state_dir = format!("{resume_from}/optimiser_state");
+    let missing: Vec<&str> = ["weights.bin", "momentum.bin", "velocity.bin"]
+        .into_iter()
+        .filter(|file| !std::path::Path::new(&format!("{state_dir}/{file}")).exists())
+        .collect();
+    if !missing.is_empty() {
+        let missing = missing.join(", ");
+        eprintln!("RESUME REFUSED: {state_dir} is missing {missing}.");
+        eprintln!("  PAWNSTAR_RESUME names the checkpoint DIRECTORY, e.g. checkpoints/pawnstar-819 - not");
+        eprintln!("  the optimiser_state inside it, and not a quantised .bin net, which carries no");
+        eprintln!("  optimiser state at all and so cannot be resumed from.");
+        std::process::exit(1);
+    }
+
+    if start_sb == 1 {
+        println!("RESUME WARNING: PAWNSTAR_RESUME is set with PAWNSTAR_START_SB left at 1, so the loaded");
+        println!("  checkpoint will be trained through the whole schedule again from lr {LR_START},");
+        println!("  spending the anneal it already has. To continue a run instead, set PAWNSTAR_START_SB");
+        println!("  to one past the superbatch the checkpoint was written at.");
+    }
+}
+
 /// Wraps the real scheduler and prints the learning rate at the first batch of every superbatch.
 ///
 /// bullet prints the scheduler's *description* in its preamble but never the rate it applies, so the
@@ -323,6 +415,11 @@ fn main() {
     // whose data is engine self-play where result and eval agree. Human games disagree far more often -
     // a player loses a won position - so a human-game set may want this lower.
     let wdl_weight: f32 = env_or("PAWNSTAR_WDL", 0.5);
+    // Resume controls. PAWNSTAR_RESUME is a checkpoint directory and PAWNSTAR_START_SB the ABSOLUTE
+    // superbatch to re-enter the schedule at; both the learning rate and the data position are indexed
+    // by that number, so those two are the whole of what a resume needs.
+    let start_sb: usize = env_or("PAWNSTAR_START_SB", 1);
+    let resume_from = std::env::var("PAWNSTAR_RESUME").unwrap_or_default();
 
     println!(
         "pawnstar trainer: (768x{NUM_BUCKETS}hm -> {HIDDEN_SIZE})x2 -> {OUTPUT_BUCKETS} -> 1, SCReLU, \
@@ -330,8 +427,11 @@ fn main() {
     );
 
     // Before the GPU, the data file or the optimiser: a schedule whose last drop cannot apply is a
-    // run whose final stage is silently missing, and the run costs hours.
-    check_lr_schedule(end_sb, lr_step);
+    // run whose final stage is silently missing, and the run costs hours. A resume goes through the
+    // same guard - it is the entry point most likely to break the schedule's shape, since raising
+    // PAWNSTAR_SBS to continue a run moves the derived step's drops rather than extending past them.
+    check_resume(&resume_from, start_sb, end_sb);
+    check_lr_schedule(end_sb, lr_step, start_sb);
 
     let mut trainer = ValueTrainerBuilder::default()
         .dual_perspective()
@@ -371,13 +471,23 @@ fn main() {
             l1.forward(hidden_layer).select(output_buckets)
         });
 
+    // After the net is built and before the schedule runs: this loads the weights and the AdamW
+    // momentum and velocity out of <resume_from>/optimiser_state. Resuming without the optimiser state
+    // would restart Adam's moments at zero and take a few hundred batches to recover them, which is
+    // why this is a checkpoint directory and not a quantised net.
+    if !resume_from.is_empty() {
+        println!("RESUME: loading optimiser state from {resume_from}/optimiser_state");
+        trainer.load_from_checkpoint(&resume_from);
+        println!("RESUME: optimiser state loaded; starting at superbatch {start_sb}");
+    }
+
     let schedule = TrainingSchedule {
         net_id: "pawnstar".to_string(),
         eval_scale: SCALE as f32,
         steps: TrainingSteps {
             batch_size: 16_384,
             batches_per_superbatch: bps,
-            start_superbatch: 1,
+            start_superbatch: start_sb,
             end_superbatch: end_sb,
         },
         wdl_scheduler: wdl::ConstantWDL { value: wdl_weight },
