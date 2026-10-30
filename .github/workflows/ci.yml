@@ -188,13 +188,19 @@ jobs:
           if-no-files-found: error
 
   # ---------------------------------------------------------------------------------------------------------
-  # The SHARED NNUE SHAPE — horizontal king mirroring plus 8 material output heads — which every job above
-  # leaves entirely untested, because the shape is behind a build knob that defaults off and they all
-  # exercise the default. That path is about to carry a freshly trained net the whole project depends on, and
-  # a gated path with no CI rots silently: pawnstar-go's transposition table defaulted to 512 MB against this
+  # The SHARED NNUE SHAPE — horizontal king mirroring plus 8 material output heads. This job was added while
+  # the shape was behind a build knob that defaulted OFF and every job above exercised the default, because a
+  # gated path with no CI rots silently: pawnstar-go's transposition table defaulted to 512 MB against this
   # port's 64 MB from May until 2026-10-27, through every release, because the only cross-port gate that ran
   # was `bench` and `bench` pins the table to 64 MB in all three. A gate that controls for a difference cannot
   # detect it.
+  #
+  # Since release 2.0.0 the shape is the DEFAULT, so this job no longer reaches an otherwise-unbuilt path; it
+  # names the knobs anyway, which is what keeps it a statement about the shape rather than about whatever the
+  # default happens to be. The gated path is now v12's shape, which has a job of its own at the foot of this
+  # file. Keeping this one is still worth its minutes: it builds and tests THIS shape in a tree of its own,
+  # and it runs tools/new-shape-signature.sh over a net generated from nothing, where `bench` locks the
+  # signature over the SHIPPED net and so moves with every net that ships.
   #
   # Its own job rather than a matrix dimension on build-test, for three reasons. The default shape's node
   # counts, its coverage percentage and its uploaded artifacts must not move, and a matrix would recompute all
