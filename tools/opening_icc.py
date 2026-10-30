@@ -79,6 +79,15 @@ machine-local, the floor is a floor for a run on one machine rather than for the
 permutation null confirms the estimator itself is unbiased: shuffling which opening each pair is attributed
 to gives ICC -0.001 +- 0.004, against the measured +0.075 - twenty sigma.
 
+AND THE ICC IS STABLE IN THE PAIR COUNT, WHICH IS WHAT LETS ONE MATCH'S VALUE BE USED FOR ANOTHER'S. Over
+the lin-2 arm's own chunks, taken two, four, six and eight at a time - the same machine, the same engines,
+the same stream of games - the ICC measures 0.188, 0.144, 0.144 and 0.140 as the pairs per opening go 3.4,
+7.0, 10.5 and 13.9. Flat from about seven pairs an opening upward, which is what the model says it should
+be: the ICC is a property of the conditions and `m_effective` carries the growth. So the lin-0 arm's 0.061
+and the lin-2 arm's 0.140 are a real difference between the two MACHINES, not an artefact of their
+different sizes, and a match with no PGN of its own is best corrected with the ICC measured on the machine
+it ran on - at that match's own `m_effective`, never at the one the ICC was measured at.
+
     python3 tools/opening_icc.py chunk-a.pgn chunk-b.pgn ...
     python3 tools/opening_icc.py --candidate candidate --label "12+0.12 pooled" ~/sprt/**/runF-*.pgn
     python3 tools/opening_icc.py --per-file chunk-a.pgn chunk-b.pgn
