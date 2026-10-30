@@ -200,19 +200,19 @@ echo "$out" | grep -q '^MOVE   COUNT' && echo "$out" | grep -q '^evaluation ' &&
 out=$(printf 'isready\nquit\n' | PAWNSTAR_EVALFILE=no/such/net.bin "$ENGINE" 2>/dev/null)
 echo "$out" | grep -q 'using the embedded net' && echo "$out" | grep -q '^readyok' &&
     pass "PAWNSTAR_EVALFILE=<missing>: the embedded net" || fail "PAWNSTAR_EVALFILE=<missing>: got: $out"
-out=$(printf 'eval\nquit\n' | PAWNSTAR_EVALFILE=nnue/pawnstar-v12.bin "$ENGINE" 2>/dev/null)
+out=$(printf 'eval\nquit\n' | PAWNSTAR_EVALFILE=nnue/pawnstar-v20.bin "$ENGINE" 2>/dev/null)
 echo "$out" | grep -q '^evaluation ' && ! echo "$out" | grep -q 'embedded' &&
     pass "PAWNSTAR_EVALFILE=<the shipped net>: loaded from the file" || fail "PAWNSTAR_EVALFILE=<net>: got: $out"
 
 # A net that loads says so, as a refusal does: `info string` on stdout, where a UCI GUI reads it, and the plain
 # line on stderr, which a match harness keeps. It was once written to stderr alone with the `info string` prefix
 # on it - a protocol line on the wrong stream - so no GUI ever saw which net was playing.
-out=$(printf 'isready\nquit\n' | PAWNSTAR_EVALFILE=nnue/pawnstar-v12.bin "$ENGINE" 2>"$scratch/loaded_net.err")
+out=$(printf 'isready\nquit\n' | PAWNSTAR_EVALFILE=nnue/pawnstar-v20.bin "$ENGINE" 2>"$scratch/loaded_net.err")
 err=$(cat "$scratch/loaded_net.err")
-echo "$out" | grep -qxF "info string NNUE: loaded net 'nnue/pawnstar-v12.bin'" &&
+echo "$out" | grep -qxF "info string NNUE: loaded net 'nnue/pawnstar-v20.bin'" &&
     pass "startup: stdout says, as an info string, which net loaded" ||
     fail "startup: stdout lacks the loaded-net info string: $out"
-echo "$err" | grep -qxF "NNUE: loaded net 'nnue/pawnstar-v12.bin'" &&
+echo "$err" | grep -qxF "NNUE: loaded net 'nnue/pawnstar-v20.bin'" &&
     pass "startup: stderr carries the loaded net too, with no protocol prefix" ||
     fail "startup: stderr lacks the plain loaded-net line: $err"
 echo "$err" | grep -q 'info string' &&
@@ -241,7 +241,7 @@ echo "$err" | grep -q 'refusing net' && echo "$err" | grep -q 'FATAL' &&
     pass "PAWNSTAR_EVALFILE=<a refused net>: the reason and the FATAL are on stderr" ||
     fail "PAWNSTAR_EVALFILE=<a refused net>: stderr lacks the reason: $err"
 # A truncated copy of the real net: the magic is right, so this is refused by a later check.
-head -c 4096 nnue/pawnstar-v12.bin > "$scratch/truncated_net.bin"
+head -c 4096 nnue/pawnstar-v20.bin > "$scratch/truncated_net.bin"
 out=$(printf 'isready\nquit\n' | PAWNSTAR_EVALFILE="$scratch/truncated_net.bin" "$ENGINE" 2>/dev/null)
 status=$?
 [ "$status" -ne 0 ] && ! echo "$out" | grep -q 'readyok' &&
@@ -272,7 +272,7 @@ crc64_xz() { # CRC-64/XZ of the decimal byte values in "$@" (nnue/README.md sect
     printf '%s' $((crc ^ 0xFFFFFFFFFFFFFFFF))
 }
 
-shipped_net=nnue/pawnstar-v12.bin
+shipped_net=nnue/pawnstar-v20.bin
 # The check value every CRC-64/XZ implementation must reproduce, asserted before this CRC is trusted to
 # build a net file: a wrong CRC here would hand the engine a net refused as a *corrupt header* rather than
 # for the field changed below, and the case would pass while testing the wrong refusal.

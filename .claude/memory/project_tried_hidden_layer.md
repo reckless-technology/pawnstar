@@ -10,7 +10,8 @@ metadata:
 **Experiment (2026-06-24, branch `nnue-hidden-layer`, NOT merged): add a hidden layer to the NNUE head.**
 Current arch is FT(768x4 -> 1024) per perspective -> SCReLU -> concat(2048) -> **1**. The candidate inserted
 a head: concat(2048) -> **16** -> 1, SCReLU on the 16. Single-variable A/B: trained a control (current arch)
-AND the candidate on the **same shuffled 200M** PlentyChess set, same schedule (30 superbatches, BPS 12207,
+AND the candidate on the **same shuffled 200M** set from the PlentyChess dataset (since withdrawn and no
+longer used), same schedule (30 superbatches, BPS 12207,
 StepLR), then SPRT'd head-to-head.
 
 **Result: REJECTED. Fixed-depth-8 SPRT, candidate vs control: Elo -11.29 ± 12.85, H0 accepted (LLR -2.95),

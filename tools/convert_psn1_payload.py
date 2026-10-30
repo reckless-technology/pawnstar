@@ -5,13 +5,17 @@ The two containers hold the same trained weights in the same order. Exactly one 
 payload: PSN1 ended with a single `int16` output bias, and RNNUE1 ends with an `int32` bias per output
 bucket (src/nnue.h, skill `reckless-nnue`). Widening one `int16` to `int32` is a sign extension, so the
 weights this writes are bit-for-bit the weights that went in and the engine's evaluation is unchanged --
-which is what lets pawnstar's bench signature stay at 6,601,454 across the format bump.
+which is what let pawnstar's bench signature stay at 6,601,454 across the format bump in 2026-10-27 (it is
+5,617,906 now, with the v20 net).
 
 It writes a *raw* payload, not a net: the RNNUE1 header is then written by `stamp_net`, from that build's
 own compiled constants, so no header is ever produced by hand.
 
-    python3 tools/convert_psn1_payload.py nnue/pawnstar-v12.bin /tmp/v12-raw.bin
-    ./build/stamp_net /tmp/v12-raw.bin nnue/pawnstar-v12.bin
+    python3 tools/convert_psn1_payload.py old-psn1-net.bin /tmp/raw.bin
+    ./build/stamp_net /tmp/raw.bin nnue/converted.bin
+
+No PSN1 net is shipped any more - the last one was pawnstar-v12.bin, retired at release 2.0.0 - so this
+is a migration tool for a net held outside the repository.
 
 Only nets with a single output bucket can be converted, which is every PSN1 net there ever was: PSN1 had
 no output-bucket field because the architecture had exactly one head.

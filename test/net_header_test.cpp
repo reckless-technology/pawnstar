@@ -44,6 +44,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -589,7 +590,26 @@ void TestUnreadableFileAndUsage()
 
 // --- The real files the build's other suites are given.
 
-/// @brief Literal facts about the two real nets this repository's builds are handed, keyed by file size.
+/// @brief The shipped net's own CRCs - the only two fields that tell it from the synthetic net of the same
+/// shape and the same size. Re-bless both together whenever a new net ships.
+constexpr std::string_view kShippedNetPayloadCrc = "0x62C460241DDC3EF7";
+constexpr std::string_view kShippedNetHeaderCrc  = "0x5A2DFC8FA67F2B2C";
+
+/// @brief The synthetic net at the shared shape, written by test_nnue_incremental from a fixed seed; its
+/// size and SHA-256 are what tools/new-shape-signature.sh asserts, and these CRCs were computed by a
+/// separate Python implementation rather than by this build.
+constexpr std::string_view kSyntheticSharedShapePayloadCrc = "0xE6F3FB70D96D876A";
+constexpr std::string_view kSyntheticSharedShapeHeaderCrc  = "0x7B18813893FDE2D9";
+
+/// @brief The synthetic net at the retired v12 shape - mirroring off, one output head - which the build
+/// knobs still reach. No net of that shape is shipped, so this is the only file of that size a build is
+/// ever handed. Its payload is the same fixed-seed stream as the shared shape's up to the smaller output
+/// layer, which is why only its header CRC differs from that net's.
+constexpr std::string_view kSyntheticV12ShapePayloadCrc = "0x710AB57A62B2043D";
+constexpr std::string_view kSyntheticV12ShapeHeaderCrc  = "0xB207CEAD671664E1";
+
+/// @brief Literal facts about the real nets this repository's builds are handed, keyed by file size and,
+/// where a size no longer identifies one file, by payload CRC.
 void TestRealNet(const std::string &path)
 {
     Bytes bytes;
@@ -605,40 +625,68 @@ void TestRealNet(const std::string &path)
     ExpectKey(outcome, label, "shape_matches_build", "yes"); // the build is handed a net of its own shape
     Check(outcome.is_shape_probe_in_agreement, label + ": agrees with nnue::IsNetFileThisBuildsShape");
 
-    if (bytes.size() == 12'589'124)
+    if (bytes.size() == 12'617'824)
     {
-        // pawnstar-v12.bin as re-stamped into RNNUE1 (skill reckless-nnue, "Landing this without risking strength").
-        ExpectKey(outcome, label, "format_version", "1");
-        ExpectKey(outcome, label, "king_buckets", "8");
-        ExpectKey(outcome, label, "output_buckets", "1");
-        ExpectKey(outcome, label, "flags", "0x00");
-        ExpectKey(outcome, label, "king_bucket_map_crc", "0xCC6DDB5DAF0AB18D");
-        ExpectKey(outcome, label, "payload_bytes", "12589060");
-        ExpectKey(outcome, label, "payload_crc", "0x8A91EC366E6B450B");
-        ExpectKey(outcome, label, "header_crc", "0x19EE0DC79A04735D");
-    }
-    else if (bytes.size() == 12'617'824)
-    {
-        // The synthetic net every port writes from one seed (SHA-256 4abfdb7b...ad4871b, which
-        // tools/new-shape-signature.sh checks). Its two CRCs were computed by the separate Python implementation, not
-        // by this build.
+        // The shared shape, which is the default and the shipped net's. TWO files have this size: the
+        // shipped pawnstar-v20.bin and the synthetic net every port writes from one fixed seed (SHA-256
+        // 4abfdb7b...ad4871b, which tools/new-shape-signature.sh checks). Their architecture fields are
+        // identical - that is what "the same shape" means - so the shape is asserted once here and the two
+        // are then told apart by payload_crc, which pins the header_crc that belongs with it. A net of this
+        // size that is neither fails, rather than passing on the shape alone.
         ExpectKey(outcome, label, "format_version", "2");
         ExpectKey(outcome, label, "features_per_bucket", "768");
         ExpectKey(outcome, label, "king_buckets", "8");
         ExpectKey(outcome, label, "hidden_size", "1024");
         ExpectKey(outcome, label, "output_buckets", "8");
         ExpectKey(outcome, label, "flags", "0x01");
+        ExpectKey(outcome, label, "king_mirroring", "on");
         ExpectKey(outcome, label, "qa", "255");
         ExpectKey(outcome, label, "qb", "64");
         ExpectKey(outcome, label, "eval_scale", "400");
         ExpectKey(outcome, label, "king_bucket_map_crc", "0x0A20060D4E9586E0");
         ExpectKey(outcome, label, "payload_bytes", "12617760");
-        ExpectKey(outcome, label, "payload_crc", "0xE6F3FB70D96D876A");
-        ExpectKey(outcome, label, "header_crc", "0x7B18813893FDE2D9");
+
+        const std::string payload_crc = outcome.Get("payload_crc");
+        if (payload_crc == kShippedNetPayloadCrc)
+        {
+            ExpectKey(outcome, label, "header_crc", std::string(kShippedNetHeaderCrc));
+            std::cout << "[INFO] " << label << ": the shipped pawnstar-v20.bin\n";
+        }
+        else if (payload_crc == kSyntheticSharedShapePayloadCrc)
+        {
+            ExpectKey(outcome, label, "header_crc", std::string(kSyntheticSharedShapeHeaderCrc));
+            std::cout << "[INFO] " << label << ": the synthetic net at the shared shape\n";
+        }
+        else
+        {
+            Check(false, label + ": payload_crc is " + payload_crc + ", which is neither the shipped net's " +
+                             std::string(kShippedNetPayloadCrc) + " nor the synthetic net's " +
+                             std::string(kSyntheticSharedShapePayloadCrc));
+        }
+    }
+    else if (bytes.size() == 12'589'124)
+    {
+        // The retired v12 shape - mirroring off, one output head - which the build knobs still reach. No
+        // net of that shape is shipped any more, so the only file of this size a build is handed is the
+        // synthetic net written at that shape.
+        ExpectKey(outcome, label, "format_version", "1");
+        ExpectKey(outcome, label, "features_per_bucket", "768");
+        ExpectKey(outcome, label, "king_buckets", "8");
+        ExpectKey(outcome, label, "hidden_size", "1024");
+        ExpectKey(outcome, label, "output_buckets", "1");
+        ExpectKey(outcome, label, "flags", "0x00");
+        ExpectKey(outcome, label, "king_mirroring", "off");
+        ExpectKey(outcome, label, "qa", "255");
+        ExpectKey(outcome, label, "qb", "64");
+        ExpectKey(outcome, label, "eval_scale", "400");
+        ExpectKey(outcome, label, "king_bucket_map_crc", "0xCC6DDB5DAF0AB18D");
+        ExpectKey(outcome, label, "payload_bytes", "12589060");
+        ExpectKey(outcome, label, "payload_crc", std::string(kSyntheticV12ShapePayloadCrc));
+        ExpectKey(outcome, label, "header_crc", std::string(kSyntheticV12ShapeHeaderCrc));
     }
     else
     {
-        std::cout << "[INFO] " << label << ": not one of the two known nets, so only its integrity and shape were "
+        std::cout << "[INFO] " << label << ": not one of the known nets, so only its integrity and shape were "
                   << "checked\n";
     }
 }

@@ -101,3 +101,44 @@ fresh `Game` that never loaded one.
 
 CRC-64/XZ check value, which every implementation must reproduce before anything else:
 `123456789` → `0x995DC9BBDF1939FA`. It is what caught a real bug in the Go port on its first run.
+
+## Landed as the default (2026-10-30, release 2.0.0)
+
+Step 3 of the plan above is done here: `PAWNSTAR_NNUE_KING_MIRRORING` and `PAWNSTAR_NNUE_OUTPUT_BUCKETS`
+now default to **1 and 8**, and the shipped net is **`nnue/pawnstar-v20.bin`** at the shared shape -
+12,617,824 bytes, SHA-256 `c8a29b328849cd1ea60c65f5d3dea84f585f404037ec026c44a94e1174b1cc34`,
+`payload_crc` `0x62C460241DDC3EF7`, `header_crc` `0x5A2DFC8FA67F2B2C`. `pawnstar-v12.bin` is deleted from
+the tree. The right-hand column of the values table above is therefore the *shipped* shape now, and the
+left-hand one is what the knobs reach.
+
+**The bench signature moved, which is the whole point of it**: 6,601,454 -> **5,617,906** at depth 13,
+single-threaded. `pawnstar-rs` and `pawnstar-go` must produce the identical number.
+
+**What the flip itself broke, and it was silent until the container caught it.** `CMakeLists.txt` added
+`PAWNSTAR_NNUE_KING_MIRRORING=1` only in the `ON` branch and defined nothing in the `OFF` one, which was
+correct while `src/nnue.h` defaulted the macro to 0. With the header's default at 1, `OFF` left the
+header's value in force, so `KING_MIRRORING=0 OUTPUT_BUCKETS=1` built a **mirrored engine with one output
+head** - a shape that exists nowhere. It stamped `format_version` 2 over a 12,589,060-byte payload, and
+`test_net_header` is what reported it, by the mirrored map's CRC appearing on a one-head net. CMake now
+defines the macro in both branches. **A compile-time default and a build-system default are two defaults,
+and moving one moves the other only in the direction that happens to be spelled out.**
+
+Its sibling trap, which cost a whole build and test cycle: `PAWNSTAR_NNUE_OUTPUT_BUCKETS` is a CMake
+**cache** variable, so an existing build tree keeps the value it was configured with. A `build/` dir from
+before the flip configured as mirroring-ON (passed explicitly by `tools/build.ps1`) with one output head
+(from the stale cache) - the same mixed shape, from the other direction. Delete the build tree rather
+than reconfiguring it.
+
+**And the non-default shape's own suite is now only *mostly* runnable, which is worth knowing before
+promising a green `make check` there.** At `KING_MIRRORING=0 OUTPUT_BUCKETS=1`, sixteen of the seventeen
+suites pass in **19.46 s** (Legion, clang 22.1.8 MSVC ABI, 2026-10-30). The seventeenth,
+`principal_variation`, searches the **synthetic** net to depth 8, and random weights give RFP, LMP and
+LMR no traction at all, so the tree is near full width: it **had not finished in five minutes**. The
+payload is the same fixed-seed stream at either shape, so this is not the weights changing - it is how
+they are *read*: the same bytes under the mirrored map happened to prune well (that run measured
+331.75 s) and under the unmirrored map do not. So the figure is luck of the weights, and a future
+synthetic net could land either way at either shape. `CMakeLists.txt` already recorded the same effect
+from the other side, a depth-12 search not finishing in two minutes. The consequence: CI's guard on the
+non-default shape runs `net_header` and `nnue_incremental` - the two suites that actually read the shape,
+and the two that caught the macro bug - rather than a second full `make check`, which would be an
+open-ended job.

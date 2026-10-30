@@ -7,7 +7,7 @@ with the bundled tool (the figures are net-specific, so they shift slightly):
 
 ```bash
 make build/nnue_quant_study
-build/nnue_quant_study nnue/pawnstar-v12.bin test/nnue_reference.txt
+build/nnue_quant_study nnue/pawnstar-v20.bin test/nnue_reference.txt
 ```
 
 The tool ([tools/nnue_quant_study.cpp](../tools/nnue_quant_study.cpp)) loads the shipped net, drives the
@@ -238,7 +238,7 @@ committed (off by default, `INT8_FT=1`) so a future quantisation-aware net can b
 ### Quantisation-aware retrain — DONE, definitive **REJECT** (−8 Elo)
 
 Closed the open question. Trained a quantisation-aware net (bullet `set_params_for_weight("l0w",
-AdamWParams{ min_weight: -127/QA, max_weight: 127/QA })`, 1024-wide single-bank, ~750M PlentyChess positions), which
+AdamWParams{ min_weight: -127/QA, max_weight: 127/QA })`, 1024-wide single-bank, ~750M positions of the PlentyChess dataset), which
 clips the exported FT weights to **`max|w| = 127` → `scale = 1`** — verified on the net (0 weights > 127).
 At scale 1 the int8-FT column-add is just widen+add (no `mullo`; the engine has a hoisted `scale==1` fast
 path), and the `INT8_FT` and standard engines evaluate **bit-identically** (confirmed on test positions),
@@ -296,8 +296,8 @@ emulation/microbench are self-contained.
 ```bash
 # Phase 0/1 dynamic-range study + per-call kernel timings (int8 Evaluate vs int16 reference internally):
 make build/nnue_quant_study
-build/nnue_quant_study nnue/pawnstar-v12.bin test/nnue_reference.txt
-build/test_nnue nnue/pawnstar-v12.bin test/nnue_reference.txt   # EvaluateExact==trainer; int8 within 40 cp
+build/nnue_quant_study nnue/pawnstar-v20.bin test/nnue_reference.txt
+build/test_nnue nnue/pawnstar-v20.bin test/nnue_reference.txt   # EvaluateExact==trainer; int8 within 40 cp
 
 # The VNNI vpdpbusd kernel needs no build flag — it is selected at runtime by cpuid on capable CPUs
 # (bit-identical to the AVX2 pmaddubsw path); a single `make` builds the binary that runs on both.

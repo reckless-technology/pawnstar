@@ -112,7 +112,7 @@
 ///   --no-dedup            keep repeated positions. By default a position whose Zobrist hash was already
 ///                         written to this shard is dropped: self-play repeats openings heavily.
 ///   --hash MB             transposition-table size per process (default: the engine's own 64 MB).
-///   --net PATH            the labelling net (default: $PAWNSTAR_EVALFILE, else nnue/pawnstar-v12.bin).
+///   --net PATH            the labelling net (default: $PAWNSTAR_EVALFILE, else nnue/pawnstar-v20.bin).
 ///   --progress N          games between progress lines on stderr (default 50, 0 = silent).
 ///
 /// Each run also writes `<out_file>.meta`, a provenance sidecar naming the engine version, the labelling
@@ -1037,7 +1037,7 @@ int main(int argc, char **argv)
     if (options.net_path.empty())
     {
         const char *eval_file = std::getenv("PAWNSTAR_EVALFILE");
-        options.net_path      = eval_file != nullptr ? eval_file : "nnue/pawnstar-v12.bin";
+        options.net_path      = eval_file != nullptr ? eval_file : "nnue/pawnstar-v20.bin";
     }
 
     if (options.worker_count == 0 || options.worker_index >= options.worker_count)

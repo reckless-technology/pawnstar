@@ -107,45 +107,53 @@ if(PAWNSTAR_DEBUGX)
   add_compile_definitions(DEBUGX=1)
 endif()
 
-# --- The NNUE network shape. Two knobs, so either shape can be built from one tree while the three
-#     bit-exact ports (C++, Rust, Go) are brought across one at a time. The defaults are the v12 shape the
-#     shipped net was trained for; the shared architecture is mirroring ON with 8 output heads:
+# --- The NNUE network shape. Two knobs, so either shape can still be built from this one tree. The
+#     defaults are the SHARED architecture - mirroring ON with 8 output heads - which is the shape the
+#     shipped net (nnue/pawnstar-v20.bin) was trained for, and what all three bit-exact ports default to.
+#     The shape the retired v12 net needed is what the knobs now reach:
 #
-#       cmake -S . -B build-new-shape -G Ninja -DCMAKE_CXX_COMPILER=clang++ \
-#             -DPAWNSTAR_NNUE_KING_MIRRORING=ON -DPAWNSTAR_NNUE_OUTPUT_BUCKETS=8
+#       cmake -S . -B build-v12-shape -G Ninja -DCMAKE_CXX_COMPILER=clang++ \
+#             -DPAWNSTAR_NNUE_KING_MIRRORING=OFF -DPAWNSTAR_NNUE_OUTPUT_BUCKETS=1
 #
 #     Both are stamped into every net's header (`flags` bit 0, `output_buckets`, and the bucket map's
 #     CRC-64), and the loader checks all three, so a net can only ever load into a build of its own shape —
-#     a new-shape build refuses pawnstar-v12.bin, which is correct, not a fault. A shape change is also an
+#     an old-shape build refuses pawnstar-v20.bin, which is correct, not a fault. A shape change is also an
 #     evaluation change, so it moves the bench signature and breaks parity with the Rust and Go ports until
 #     all three are ported together: do not flip these defaults for one engine alone.
 option(PAWNSTAR_NNUE_KING_MIRRORING
-       "NNUE: mirror a perspective whose own king is on files e-h (the shared architecture; +14.3 Elo)" OFF)
-set(PAWNSTAR_NNUE_OUTPUT_BUCKETS "1" CACHE STRING
+       "NNUE: mirror a perspective whose own king is on files e-h (the shared architecture; +14.3 Elo)" ON)
+set(PAWNSTAR_NNUE_OUTPUT_BUCKETS "8" CACHE STRING
     "NNUE: material output heads, selected by (piece_count - 2) / ceil(32 / N). 8 in the shared architecture (+14.7 Elo)")
+# Define it either way. src/nnue.h defaults the macro to 1, so an `OFF` that defined nothing would leave
+# the header's default in force and build a MIRRORED engine with whatever output-head count was asked for
+# - a mixed shape, which stamps format_version 2 over a one-head payload. Found exactly that way when the
+# knob was turned off after the default moved: the synthetic net came out mirrored with one head.
 if(PAWNSTAR_NNUE_KING_MIRRORING)
   add_compile_definitions(PAWNSTAR_NNUE_KING_MIRRORING=1)
+else()
+  add_compile_definitions(PAWNSTAR_NNUE_KING_MIRRORING=0)
 endif()
 add_compile_definitions(PAWNSTAR_NNUE_OUTPUT_BUCKETS=${PAWNSTAR_NNUE_OUTPUT_BUCKETS})
 message(STATUS "Pawnstar NNUE shape: king mirroring ${PAWNSTAR_NNUE_KING_MIRRORING}, "
                "${PAWNSTAR_NNUE_OUTPUT_BUCKETS} output head(s)")
 
-# Is the shipped net's shape this build's? v12 was trained with mirroring off and one output head, so
-# anything else means the engine will REFUSE it — correctly, since nothing has been trained at the other
-# shape yet. The test registration below needs to know, because a suite handed a net it cannot load fails
-# rather than skipping, and `make check KING_MIRRORING=1 OUTPUT_BUCKETS=8` — the command this file's own
-# comment above recommends — was red for seven of fourteen suites on that account.
-if(PAWNSTAR_NNUE_KING_MIRRORING OR NOT PAWNSTAR_NNUE_OUTPUT_BUCKETS STREQUAL "1")
-  set(PAWNSTAR_SHIPPED_NET_IS_THIS_SHAPE OFF)
-else()
+# Is the shipped net's shape this build's? v20 was trained with mirroring on and eight output heads, so
+# anything else means the engine will REFUSE it — correctly, since no net of any other shape is shipped.
+# The test registration below needs to know, because a suite handed a net it cannot load fails rather than
+# skipping, and `make check KING_MIRRORING=0 OUTPUT_BUCKETS=1` — the command this file's own comment above
+# recommends for the old shape — was red for seven of fourteen suites on that account when the defaults
+# were the other way round.
+if(PAWNSTAR_NNUE_KING_MIRRORING AND PAWNSTAR_NNUE_OUTPUT_BUCKETS STREQUAL "8")
   set(PAWNSTAR_SHIPPED_NET_IS_THIS_SHAPE ON)
+else()
+  set(PAWNSTAR_SHIPPED_NET_IS_THIS_SHAPE OFF)
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # --- Shipped resources embedded into the engine binary via .incbin (runtime-load fallback). Absolute paths
 #     so .incbin resolves regardless of the (out-of-tree) build directory; the .S files rebuild if they change.
-set(EMBED_NET  "${CMAKE_CURRENT_SOURCE_DIR}/nnue/pawnstar-v12.bin")
+set(EMBED_NET  "${CMAKE_CURRENT_SOURCE_DIR}/nnue/pawnstar-v20.bin")
 set(EMBED_BOOK "${CMAKE_CURRENT_SOURCE_DIR}/pawnstar.book")
 set_source_files_properties(src/embedded_net.S PROPERTIES
   COMPILE_DEFINITIONS "EMBED_NET_PATH=\"${EMBED_NET}\"" OBJECT_DEPENDS "${EMBED_NET}")
@@ -238,7 +246,7 @@ set(NNUE_REF "${CMAKE_CURRENT_SOURCE_DIR}/test/nnue_reference.txt")
 # from-scratch rebuild, a published principal variation replays, every UCI command does what it says — so
 # giving them a net of the build's own shape makes them RUN at a new shape instead of being skipped there,
 # which is the half of the coverage a shape change most needs. The three suites whose expected values belong
-# to v12 specifically (the trainer reference evaluations, the Bratko-Kopec move set, the 6,601,454 bench
+# to the shipped net specifically (the trainer reference evaluations, the Bratko-Kopec move set, the bench
 # signature) keep the shipped net and skip themselves on nnue::IsNetFileThisBuildsShape.
 set(PAWNSTAR_SHAPE_NET "${EMBED_NET}")
 if(NOT PAWNSTAR_SHIPPED_NET_IS_THIS_SHAPE)
@@ -258,7 +266,7 @@ foreach(t perft see opening_book chess_clock primitives lichess_extract lc0_extr
 endforeach()
 # The RNNUE1 header reader (tools/net_header_report.h, the print_net_header tool). Its fixtures are built in memory,
 # so it needs no resource; handed the net this build's other suites get, it also decodes that real file against
-# the literals known for the shipped v12 net and for the synthetic net, and checks it is this build's own shape.
+# the literals known for the shipped v20 net and for the synthetic net, and checks it is this build's own shape.
 set(PAWNSTAR_NET_HEADER_NET "")
 if(EXISTS "${EMBED_NET}")
   set(PAWNSTAR_NET_HEADER_NET "${PAWNSTAR_SHAPE_NET}")
@@ -318,7 +326,7 @@ if(EXISTS "${EMBED_NET}")
   # without touching the game history, and evaluating from its FEN exactly as it does from the position.
   add_test(NAME principal_variation COMMAND test_principal_variation "${PAWNSTAR_SHAPE_NET}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-  # The bench signature - every position's best move and node count and the 6,601,454 total, which the Go and Rust
+  # The bench signature - every position's best move and node count and the 5,617,906 total, which the Go and Rust
   # ports pin too (test/bench_golden_test.cpp). RunBench forces one thread itself; the environment says so as well.
   add_test(NAME bench_golden COMMAND test_bench_golden "${EMBED_NET}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
@@ -356,11 +364,11 @@ if(BASH_EXE AND NOT CMAKE_CROSSCOMPILING)
     # This suite is the one that cannot be carried across to another shape, and it is worth saying why
     # rather than leaving it unregistered, which would be an invisible skip. Its first half is pure
     # protocol and does run on the synthetic net — that was tried and passed — but its second half is
-    # about the SHIPPED net specifically: a `bench` run twice for determinism, which at this shape has no
-    # trained net to bench and over random weights does not finish a depth-13 search in any useful time
+    # about the SHIPPED net specifically: a `bench` run twice for determinism, which at another shape has
+    # no trained net to bench and over random weights does not finish a depth-13 search in any useful time
     # (measured: a depth-12 search from the start position had not finished in two minutes); and the
     # startup cases, which assert where the engine finds its net and book and that it falls back to the
-    # copies embedded in the binary — all of which are statements about the shipped v12 net. Pointing
+    # copies embedded in the binary — all of which are statements about the shipped net. Pointing
     # PAWNSTAR_EVALFILE at a synthetic net would make those halves assert the opposite of what they mean.
     add_test(NAME uci COMMAND ${CMAKE_COMMAND} -E echo
              "[PASS] uci: skipped - the shipped net is not this build's NNUE shape, and this suite's second half is about that net (bench determinism, where the net is found, the embedded fallback). The shape's own gates are nnue_incremental and tools/new-shape-signature.sh.")

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # One-shot NNUE experiment: train the net, VERIFY it, then run an SPRT.
 #
-# The data source is an already-converted bulletformat .data file (e.g. a public dataset, which is
-# how the shipped nets were trained). NNUE is the only evaluator, so the SPRT is net-vs-net: set
+# The data source is an already-converted bulletformat .data file. The shipped net's pool was built that
+# way, from Leela Chess Zero self-play data (tools/lc0_extract), and so was every retired net's, from the
+# PlentyChess dataset, by Yoshie2000, which has since been withdrawn: DO NOT train on the PlentyChess
+# dataset (nnue/README.md §7, "Provenance of the earlier networks").
+# NNUE is the only evaluator, so the SPRT is net-vs-net: set
 # BASELINE_NET=<baseline net.bin> to choose the opponent (see run_sprt.sh for TC / cross-width options).
 #
 # Usage: OPENINGS=<openings.epd> run_experiment.sh <shuffled.data> <net.bin> [superbatches] [sprt_rounds] [depth]
