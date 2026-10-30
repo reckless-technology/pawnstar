@@ -6,17 +6,22 @@
 #     -> combined, CHECKED FOR DUPLICATE POSITIONS (tools/check_duplicates.sh: a pool that is mostly copies
 #     of the same games is refused here rather than trained on, see [2/4]),
 #     converted to bulletformat, and shuffled before training; or
-#   * an already-converted bulletformat .data FILE (e.g. a public dataset, already shuffled) ->
+#   * an already-converted bulletformat .data FILE (an assembled, shuffled pool, as the shipped net's
+#     pool is) ->
 #     trained directly, skipping the combine/convert/shuffle steps.
 #
-# The shipped net (nnue/pawnstar-v12.bin) and its predecessors from v2 on were trained the second way,
-# on the public PlentyChess bulletformat dataset — strong-engine label quality, not self-play volume, is what
-# made NNUE beat the handcrafted eval. Self-play text was only the original bootstrap source.
+# The shipped net (nnue/pawnstar-v20.bin) was trained the second way, on a shuffled .data pool built
+# entirely from Leela Chess Zero self-play data (tools/lc0_extract). Its retired predecessors from v2 on
+# were trained the same way on the PlentyChess dataset, by Yoshie2000, which has since been withdrawn:
+# DO NOT train on the PlentyChess dataset (nnue/README.md §7, "Provenance of the earlier networks").
+# The lesson that carried across both is that strong-engine label quality, not self-play volume, is what
+# made NNUE beat the handcrafted eval - this engine's own self-play text was only the original bootstrap
+# source.
 #
 # Usage: train_pipeline.sh <data_dir | shuffled.data> <out_net.bin> [end_superbatch]
 #
 # The net width is fixed by the trainer example (tools/bullet/pawnstar.rs, HIDDEN_SIZE) and MUST match
-# the engine's nnue::kHiddenSize (1024 for v12). setup_bullet.sh installs/builds that example.
+# the engine's nnue::kHiddenSize (1024 for the shipped net). setup_bullet.sh installs/builds that example.
 #
 # Prerequisites: CUDA toolkit at $CUDA_PATH, bullet cloned at $BULLET (default ~/pawnstar_nnue/bullet; under
 # %USERPROFILE% on Windows, as MSYS2 has a ~ of its own).
@@ -59,7 +64,8 @@ UTILS="$BULLET/target/release/bullet-utils"
 # [2/4] Produce a single shuffled bulletformat file (SHUF_DATA) for the trainer, by whichever route fits the
 # input. WORK is the scratch/output directory (checkpoints land under it).
 if [ -f "$DATA_IN" ] && [[ "$DATA_IN" == *.data ]]; then
-    # Already bulletformat (e.g. a public dataset, pre-shuffled). Train on it directly.
+    # Already bulletformat and pre-shuffled (an assembled pool, as the shipped net's was). Train on it
+    # directly.
     echo "[2/4] using pre-converted bulletformat data: $DATA_IN"
     SHUF_DATA="$DATA_IN"
     WORK="$(dirname "$DATA_IN")"

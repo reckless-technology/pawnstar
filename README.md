@@ -294,7 +294,7 @@ Pawnstar advertises these `setoption` options in its `uci` response:
 ### The NNUE net
 
 NNUE is Pawnstar's **only** evaluator, so a net is required. At startup the engine loads the shipped net
-`nnue/pawnstar-v12.bin` (~12.6 MB; resolved relative to the working directory, like `pawnstar.book`). If that file
+`nnue/pawnstar-v20.bin` (~12.6 MB; resolved relative to the working directory, like `pawnstar.book`). If that file
 can't be loaded (wrong cwd, missing/renamed file), the engine **falls back to a copy of the net embedded
 in the binary** at build time, so it always has a working evaluator; it only errors out if both the file
 and the embedded copy fail. To use a different net:
@@ -637,15 +637,16 @@ engine **requires**: an unstamped (raw bullet) net or one whose header doesn't m
 architecture is rejected rather than misread. Stamp a freshly trained raw net with `tools/stamp_net` before loading
 (see [nnue/README.md](nnue/README.md)).
 
-**Training data — credit, and where it stands.** Every shipped net up to and including `pawnstar-v12.bin` was
-trained on **the PlentyChess bulletformat dataset**, generated and published by **Patrick Leonhardt
-([Yoshie2000](https://github.com/Yoshie2000/PlentyChess))**. The strength of those nets owes a great deal to the
-quality of that data, and it is credited here with thanks.
+**Training data.** The shipped net is trained **entirely on Leela Chess Zero self-play data**, and so is
+every net from **v20 (release 2.0.0)** onward.
 
-He has since asked that Pawnstar not use it, and **it is no longer used**: the dataset is deleted from this
-project's training and validation sets and no future net will be trained on it. This section records where the
-existing nets came from rather than how to obtain the data, and the retrieval details have deliberately not
-been restored. A further scale-up needs a data source of its own — self-play, or an openly licensed set.
+**Credit for the earlier nets.** Every net up to and including `pawnstar-v12.bin` — all of them now retired —
+was trained on **the PlentyChess bulletformat dataset**, generated and published by **Patrick Leonhardt
+([Yoshie2000](https://github.com/Yoshie2000/PlentyChess))**, about 6 billion positions. The strength of those
+nets owed a great deal to the quality of that data, and it is credited here with thanks. That data is no
+longer used: it is deleted from this project's training and validation sets, and the retrieval details have
+deliberately not been restored. The credit is kept because the record should show where those nets came
+from.
 
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
 [nnue/README.md](nnue/README.md). The minimal flow, with a dataset of your own:
@@ -686,8 +687,15 @@ a couple of random plies on top of each one, and a disjoint slice of the pool pe
 cannot start a game from the same position. `tools/check_duplicates.sh` measures what a pool actually came
 out at, and `tools/train_pipeline.sh` runs it as a gate before training on one.
 
-**Shipped net.** [nnue/pawnstar-v12.bin](nnue/pawnstar-v12.bin) is a **1024-wide net with 8 king buckets
-(file-pair × board-half)** trained on **~6B** positions of **the public PlentyChess bulletformat dataset**. Lineage, all SPRT-measured
+**Shipped net.** [nnue/pawnstar-v20.bin](nnue/pawnstar-v20.bin) is a **1024-wide net with 8 horizontally
+mirrored king buckets (file × board-half) and 8 material output heads** — the shared Reckless NNUE shape —
+trained **entirely on Leela Chess Zero self-play data**. It measures **+9.99 Elo at 8+0.08** (8,000 games,
+95% +4.33..+15.66) and **+1.13 at 12+0.12** (12,000 games, 95% −3.17..+5.43) over the v12 net it retires: a
+gain at fast time controls, level at slower ones. The two shape additions it needs were measured separately
+in zenith at fixed depth, **+14.3 Elo** for mirroring and **+14.7** for the output heads, and both only pay
+past ~1.4B training positions, which is why no earlier net had either.
+
+Lineage of the retired nets, all SPRT-measured
 (against the since-removed hand-crafted eval, "HCE", in the early steps): Pawnstar self-play *lost* to the
 HCE (label quality, not quantity, was the lever); scaling that data ~12× gave nothing (capacity-limited);
 **doubling the width 256→512 added +55 Elo (fixed depth) / +71 (time control)** — that is v4; doubling
@@ -707,12 +715,13 @@ v10 net**; then, holding that same arch, **scaling ~3.82B→~6.05B (six more sha
 Elo at 8+0.08 (LOS 99.7%) — the v11 net**. Then, holding that same ~6B data fixed and **doubling the king
 buckets 4→8 (file-pair × board-half — bank `file/2`, plus 4 when the king is in its own advanced half,
 ranks 5–8), beat v11 by +17.29 ± 8.68 Elo at 8+0.08 (3520 games) and +10.97 ± 6.57 at 12+0.12 (5610 games)
-— the v12 net (shipped)**; the only variable vs v11 was the bucket count. Each shipped net retires its predecessor
-(v4 at v6, v6 at v7, v7 at v8, v8 at v9, v9 at v10, v10 at v11, v11 at v12). The recurring lesson is **more data is the
-lever** — though the per-step *data* gain is shrinking (+16 for +1.5B → +9 for +2.2B) and v12's ~6B is still only
-a fraction of what a larger pool would give — **but king buckets are *not* at diminishing returns: the 4→8 step (+17/+11) is
-bigger than the 0→4 step (+11.4)**, because the rank split captures real own-half-vs-advanced king-safety
-signal. See [nnue/README.md §7](nnue/README.md)
+— the v12 net**; the only variable vs v11 was the bucket count. **v12 was then retired by v20**, which moved
+the training data to Leela Chess Zero self-play and the shape to the shared architecture at the same time.
+Each shipped net retires its predecessor (v4 at v6, v6 at v7, v7 at v8, v8 at v9, v9 at v10, v10 at v11,
+v11 at v12, v12 at v20). The lesson that recurred through the earlier steps is **more data is the lever** —
+though the per-step *data* gain shrank (+16 for +1.5B → +9 for +2.2B) — **and king buckets were *not* at
+diminishing returns: the 4→8 step (+17/+11) is bigger than the 0→4 step (+11.4)**, because the rank split
+captures real own-half-vs-advanced king-safety signal. See [nnue/README.md §7](nnue/README.md)
 for the full lineage and exact recreation steps.
 
 ### Opening book
@@ -758,7 +767,7 @@ copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of inpu
 | `build/test_eval_symmetry` | The net-independent evaluation check: 24 positions, each against its colour-flipped vertical mirror, which a perspective network must score exactly equally (the White-relative `eval(P) == -eval(flip(P))`) - a mirroring, perspective, colour-mapping or bucketing defect breaks it while the training loss stays perfect. It pins no expected score, so it gates every future net unchanged; the flip itself is checked against hand-computed FENs, for `flip(flip(P)) == P` and for the legal move count |
 | `build/test_opening_book` | Opening book: loading (file, memory, comments, an illegal move), weighting, display, `?` moves |
 | `build/test_chess_clock` | `ChessClock` `std::chrono` timing logic (deadline / elapsed / ponderhit / reset) |
-| `build/test_bench_golden` | The `bench` signature: each of the 16 positions' best move and node count, and the 6,601,454 total |
+| `build/test_bench_golden` | The `bench` signature: each of the 16 positions' best move and node count, and the 5,617,906 total |
 | `build/test_primitives` | Bitboards, the attack tables' generators rebuilt at run time, castling text, material draws, the TT |
 | `build/test_uci_commands` | Every UCI command, option and `go` parameter through `ProcessInput`, in process, with the net |
 | `build/test_principal_variation` | The principal variation the search publishes: every ply legal, replayable without touching the game history, and evaluating from its FEN exactly as from the position |
@@ -775,11 +784,11 @@ table in `test/bench_golden_test.cpp` - the cross-engine bit-parity signature th
 ordering, the pruning, the TT or the eval moves it; update the table only for a deliberate, SPRT-gated change or
 a new net, and re-port the change to both ports.
 
-`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v12.bin`: `test_nnue` against the
+`make check` runs the NNUE tests against the shipped `nnue/pawnstar-v20.bin`: `test_nnue` against the
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
 asserts the incremental accumulator matches a full refresh at every node, `test_eval_symmetry` which asserts
 every position scores exactly as its colour-flipped vertical mirror (net-independent, so it gates a new net
-where the reference evals cannot — they are v12's own), and `test_bratko_kopec_nnue`
+where the reference evals cannot — they are the shipped net's own), and `test_bratko_kopec_nnue`
 which searches the 24 BK positions with the net (single-threaded, deterministic) and **must solve all 24**
 — each position's best move must be in its accepted-move set (the `kCases` array in `test/bratko_kopec_nnue_test.cpp`). The NNUE
 ctest cases are registered only when the shipped net is present, so a checkout without it still configures
@@ -789,7 +798,7 @@ and the BK accepted moves (the net-specific union over depths 8–11) — see [n
 
 The Bratko-Kopec suite is the **move-based** `test_bratko_kopec_nnue` (the classic metric — did the engine
 find a good move). It takes an optional depth argument, e.g.
-`./build/test_bratko_kopec_nnue nnue/pawnstar-v12.bin 10`, and searches single-threaded for a reproducible
+`./build/test_bratko_kopec_nnue nnue/pawnstar-v20.bin 10`, and searches single-threaded for a reproducible
 result; the accepted moves are recorded over depths 8–11, so it solves 24/24 at each of those depths.
 There is no score-based Bratko-Kopec test: NNUE scores are non-deterministic under Lazy SMP
 and on a different scale. The earlier score-based `test_bratko_kopec` and the `test_pawn_structure` suite
@@ -810,7 +819,7 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 | `src/` | Engine source and headers |
 | `test/` | Standalone test programs |
 | `tools/` | Bullet trainer sources, training/verify/SPRT scripts (`pawnstar-match.sh` to run a match, `pool_matches.py` to pool its chunks into one Elo with a correct 95% bar), the training-data generator (`gen_data`) and extractors (`lichess_extract`, `lc0_extract`), and helper tools (`gen_openings`, `stamp_net`, `print_net_header`, `filter_book`, `nnue_quant_study`, `dump_magics`) |
-| `nnue/` | The shipped NNUE net (`pawnstar-v12.bin`) plus training-pipeline documentation |
+| `nnue/` | The shipped NNUE net (`pawnstar-v20.bin`) plus training-pipeline documentation |
 | `Doxyfile` | Doxygen configuration |
 | `LICENSE` | GNU General Public License v3 |
 
@@ -843,9 +852,9 @@ Pawnstar has no official CCRL rating. The figures currently tracked are:
 
 - **Move generation** — roughly 600 million legal moves per second on a modern laptop core.
 - **Bratko-Kopec** — `test_bratko_kopec_nnue` solves 24/24 at each depth 8–11 with the shipped net (depth 8 runs in `make check`).
-- **Strength (rough).** `nnue/pawnstar-v12.bin` measures roughly ~2900+ Elo (CCRL-ballpark, anchored
+- **Strength (rough).** `nnue/pawnstar-v20.bin` measures roughly ~2900+ Elo (CCRL-ballpark, anchored
   against reference engines at a fast time control) — far above the since-removed hand-crafted eval (~2350);
-  v12 is the strongest shipped net, each step in the lineage above adding measured Elo over its predecessor. At equal *time*, the incremental accumulator is
+  v20 is the strongest shipped net, each step in the lineage above adding measured Elo over its predecessor. At equal *time*, the incremental accumulator is
   worth ~+80 Elo over a full refresh and the AVX2 SIMD kernels a further ~+180 Elo over the scalar
   versions (both by SPRT).
 
@@ -865,10 +874,10 @@ the published node counts for the standard positions.
 - **NNUE is the only evaluator.** The engine loads the shipped net at startup, falls back to a copy
   embedded in the binary if the file can't be loaded, and **exits** only if both fail (there is no
   hand-crafted fallback). The accumulator is maintained incrementally and **lazily** across make/undo (the
-  update is deferred until an evaluation reads it; one perspective is rebuilt when its king crosses a file-pair
-  or board-half bucket boundary) and the kernels are AVX2-vectorised,
-  so it is fast on the clock; the shipped net is a 1024-wide, 8-king-bucket (file-pair × board-half) `ChessBuckets` net
-  (v12). The owning `Game` is heap-allocated, since the inline ~12.6 MB weight array would overflow the default stack.
+  update is deferred until an evaluation reads it; one perspective is rebuilt when its king crosses a file
+  or board-half bucket boundary, or the mirror's file boundary) and the kernels are AVX2-vectorised,
+  so it is fast on the clock; the shipped net is a 1024-wide `ChessBucketsMirrored` net with 8 mirrored king
+  buckets (file × board-half) and 8 material output heads (v20). The owning `Game` is heap-allocated, since the inline ~12.6 MB weight array would overflow the default stack.
 
 ## Contributing
 

@@ -157,7 +157,7 @@ int main()
     // move, and the number was taken seriously for as long as it took to find out. An engine that cannot
     // play the net it was given must not play at all.
     const char       *eval_file = std::getenv("PAWNSTAR_EVALFILE");
-    const std::string net_path  = eval_file ? eval_file : LocateResource("nnue/pawnstar-v12.bin");
+    const std::string net_path  = eval_file ? eval_file : LocateResource("nnue/pawnstar-v20.bin");
     if (!game.nnue_network_.Load(net_path))
     {
         if (nnue::IsNetFileReadable(net_path))

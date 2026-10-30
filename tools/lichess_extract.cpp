@@ -5,8 +5,10 @@
 ///
 /// ## What this is for
 ///
-/// The nets shipped so far were trained on a third-party bulletformat dataset which is no longer available
-/// and is not to be used again. The Lichess open database replaces it: the monthly standard-chess exports
+/// The nets up to and including v12 were trained on the PlentyChess bulletformat dataset, by Yoshie2000,
+/// which is no longer used (nnue/README.md §7, "Provenance of the earlier networks"). The shipped net is
+/// trained entirely on Leela Chess Zero self-play data (tools/lc0_extract), and the Lichess open database
+/// is the third source this one adds: the monthly standard-chess exports
 /// are published **CC0 1.0** (public domain dedication), about 10% of their games carry inline Stockfish
 /// `[%eval]` comments, and every game carries its result - which is exactly the pair tools/bullet/pawnstar.rs
 /// wants, since it labels with `ConstantWDL { value: 0.5 }`, half game result and half eval sigmoid.

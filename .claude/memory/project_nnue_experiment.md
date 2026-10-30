@@ -25,7 +25,7 @@ working anchors are stronger than Pawnstar, so the estimate extrapolates from lo
 and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastchess (errors out).
 
 **Update (later 2026-06-14) — NNUE now beats HCE, all merged to main:**
-- **v2** net trained on ~60M positions of the public PlentyChess bulletformat dataset **beats HCE by ~+345 Elo**
+- **v2** net trained on ~60M positions of the PlentyChess bulletformat dataset **beats HCE by ~+345 Elo**
   at fixed depth 8. Lesson: **label quality** (strong-engine data) was the lever, not self-play volume.
   Shipped as `nnue/pawnstar-v2.bin`. (v1 = our own self-play, lost -67.)
 - **Incremental accumulator** (maintained across make/undo): **+80 Elo** equal-time SPRT vs full-refresh.
@@ -297,6 +297,15 @@ and a non-CCRL TC; treat as approximate. AICE 0.99.2 can't be driven by fastches
   (12,589,152 B); v11 retired; `test/nnue_reference.txt` + Bratko-Kopec accepted moves regenerated (24/24 at
   depths 8-11); docs updated; `make check` green (bench signature 6857880). Enabled by the heap-allocate
   Game/Network commit 279f087 (the 12.6 MB inline FT array would overflow the 8 MB stack).
+
+**Update (2026-10-30) — v20 SHIPPED (release 2.0.0): new training data and the shared shape, together. v12 RETIRED and removed from the tree.**
+- **`nnue/pawnstar-v20.bin`**: 1024-wide, **8 horizontally mirrored king buckets** (`half * 4 + min(file, 7 - file)`, per-*file* where v12's was per file-*pair*) and **8 material output heads** (`(piece_count - 2) / 4`). 12,617,824 bytes stamped, SHA-256 `c8a29b328849cd1ea60c65f5d3dea84f585f404037ec026c44a94e1174b1cc34`, `format_version` 2, `payload_crc` `0x62C460241DDC3EF7`, `header_crc` `0x5A2DFC8FA67F2B2C`.
+- **Trained entirely on Leela Chess Zero self-play data** — a 6,143,698,748-position pool (196,598,359,936 bytes), 62.83% lc0 `test91` and 37.17% `test60`, via `tools/lc0_extract`. The PlentyChess dataset every net from v2 to v12 used has been withdrawn and is no longer used; the credit for it stays in `nnue/README.md` §7 and in the repository README.
+- **Recipe**: 8 epochs at `PAWNSTAR_BPS=3662`, `PAWNSTAR_SBS=819`, `PAWNSTAR_WDL=0.0` (runE), then 51 more superbatches with `PAWNSTAR_LR_STEP=273` pinned so `StepLR`'s **third** drop applied, which no run of this project had ever reached (runF, checkpoint 870). Held-out loss **0.012182 ± 0.000003** on the frozen 100,141,613-position validation set at lambda 0.0, **0.879%** better than the same run at superbatch 819 — the largest recipe gain measured here, against **0.106%** for that pool's 59% size increase over the previous one. **The schedule was worth ~8x the whole data campaign for about 22 GPU-minutes.** The curve was flat from sb850 to sb870, so the run was stopped there on purpose.
+- **Measured**: **+9.99 Elo at 8+0.08** (8,000 games, 95% +4.33..+15.66) and **+1.13 at 12+0.12** (12,000 games, 95% −3.17..+5.43, Birge-scaled ±6.03) over v12. A gain at fast time controls, level at slower ones. **Two variables moved at once** (data and shape), so this measures the net and not either lever; the shape's parts were measured separately in zenith at fixed depth, +14.3 (mirroring) and +14.7 (output heads), and both only pay past ~1.4B positions — which is why [[project_tried_output_buckets]] rejected the heads on v11's data and that finding still stands.
+- **Bench signature moved: 6,601,454 → 5,617,906** at depth 13 single-threaded; `pawnstar-rs` and `pawnstar-go` must match it. `test/nnue_reference.txt` was regenerated with a `pawnstar_eval` rebuilt at the new shape (max |ref16 − bullet| **0 cp** over all 250 FENs, which is the independent confirmation that mirroring, the map, head selection and dequantisation all agree); the Bratko-Kopec accepted moves were regenerated as the single-threaded union over depths 8–11 (24/24); the shipped net's two CRCs in `test_net_header` were re-blessed.
+- **The int8 output deviation grew**: max |int8 − ref16| is now exactly **40 cp** over the 250 reference FENs, the bound `test_nnue` asserts, against 26 cp for single-head v12. One int8 scale is shared across all eight heads, so the head with the largest weight sets the scale for the rest. It is integer arithmetic and identical on every platform, so it is deterministic at the bound rather than marginal — but a future net with a wider spread across heads would need a per-head scale rather than a looser bound.
+- **The flip itself had a silent trap**: `CMakeLists.txt` defined `PAWNSTAR_NNUE_KING_MIRRORING` only in its `ON` branch, so with `src/nnue.h`'s default now 1, `KING_MIRRORING=0` built a *mirrored* engine with one output head. See [[project_shared_nnue_shape]].
 
 Pre-existing bug surfaced during matches, now **FIXED** (commit d376b8a): frequent "Illegal PV move"
 warnings from both evaluators — the reported PV *string* sometimes contained an illegal continuation

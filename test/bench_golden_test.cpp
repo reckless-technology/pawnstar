@@ -1,8 +1,8 @@
 /// @file bench_golden_test.cpp The bench-golden test: the cross-engine bit-parity signature as a gate.
 ///
 /// `bench` searches the 16 kBenchFens positions to kBenchDepth (13), single-threaded with the book off and the hash
-/// cleared. With the shipped net (pawnstar-v12.bin) this engine and its two bit-exact ports, pawnstar-go and
-/// pawnstar-rs, report the identical signature: 6,601,454 nodes, and the same best move and node count at every
+/// cleared. With the shipped net (pawnstar-v20.bin) this engine and its two bit-exact ports, pawnstar-go and
+/// pawnstar-rs, report the identical signature: 5,617,906 nodes, and the same best move and node count at every
 /// position. This test runs that recipe through RunBench (input_handling.h) - the very code the `bench` command runs
 /// - and checks every position's best move and node count and the total against the table below, so a change that
 /// moves the search, the move ordering, the pruning, the TT or the eval fails here at once rather than being caught
@@ -42,30 +42,32 @@ struct GoldenEntry
     uint64_t         nodes_;     ///< Expected main-thread node count.
 };
 
-/// @brief The bench signature with pawnstar-v12.bin at depth 13, single-threaded, in kBenchFens order: the same
-/// table as pawnstar-rs's `GOLDEN` (tests/bench_golden_test.rs).
+/// @brief The bench signature with pawnstar-v20.bin at depth 13, single-threaded, in kBenchFens order: the same
+/// table as pawnstar-rs's `GOLDEN` (tests/bench_golden_test.rs). Re-blessed for the v20 net (release 2.0.0),
+/// which changed both the training data and the network shape; the previous table was v12's, totalling
+/// 6,601,454.
 inline constexpr std::array<GoldenEntry, 16> kGolden{{
-    {"d6d1", 13710},
-    {"d4d5", 147492},
-    {"f8g8", 1230595},
-    {"e5e6", 582804},
-    {"c3d5", 410154},
-    {"g5g6", 180915},
-    {"d1c1", 911931},
-    {"f4f5", 170315},
-    {"f1b5", 686447},
-    {"f6d7", 552912},
-    {"f2f4", 514815},
-    {"d7f5", 261314},
-    {"b2b4", 324298},
-    {"d1d2", 271979},
-    {"g4g7", 119154},
-    {"d2e4", 222619},
+    {"d6d1", 12124},
+    {"d4d5", 158702},
+    {"f8g8", 356067},
+    {"e5e6", 706104},
+    {"c3d5", 411424},
+    {"g5g6", 83001},
+    {"f3g3", 363104},
+    {"f4f5", 108017},
+    {"f1b5", 455575},
+    {"b6c5", 603920},
+    {"f2f4", 732278},
+    {"d7f5", 398390},
+    {"b2b4", 484449},
+    {"d1e1", 239053},
+    {"g4g7", 160967},
+    {"d2e4", 344731},
 }};
 
 /// @brief The bench total: the cross-engine signature, pinned in pawnstar-go (`benchGoldenNodes`) and pawnstar-rs
 /// (`GOLDEN_TOTAL`) as well. It is the sum of kGolden's node counts (checked at compile time below).
-inline constexpr uint64_t kGoldenTotal = 6'601'454;
+inline constexpr uint64_t kGoldenTotal = 5'617'906;
 
 /// @brief The sum of kGolden's node counts.
 consteval uint64_t GoldenSum()
@@ -93,7 +95,7 @@ int main(int argc, char *argv[])
         return test_report::Summary("bench golden: skipped (no net supplied)");
     }
     const std::string net_path = argv[1];
-    // The 6,601,454 signature belongs to this net at this shape. A build at another shape refuses the net
+    // The 5,617,906 signature belongs to this net at this shape. A build at another shape refuses the net
     // outright, so there is no bench to compare: that shape's gate is the six-position node-count signature
     // over the synthetic net, tools/new-shape-signature.sh.
     if (!nnue::IsNetFileThisBuildsShape(net_path))

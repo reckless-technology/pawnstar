@@ -47,7 +47,7 @@
 #   --candidate <net.bin>        The net being screened. Stamped, or raw with --stamp-raw-with.
 #
 # Options:
-#   --baseline <net.bin>         Opponent net. Default: <repo>/nnue/pawnstar-v12.bin, the shipped net
+#   --baseline <net.bin>         Opponent net. Default: <repo>/nnue/pawnstar-v20.bin, the shipped net
 #                                (1024 wide, 8 king buckets, one output head).
 #   --candidate-binary <path>    Engine for the candidate. Default: <repo>/build/pawnstar.
 #   --baseline-binary <path>     Engine for the baseline. Default: <repo>/build/pawnstar.
@@ -340,7 +340,7 @@ fi
 default_binary="$repository_directory/build/pawnstar"
 : "${candidate_binary:=$default_binary}"
 : "${baseline_binary:=$default_binary}"
-: "${baseline_net:=$repository_directory/nnue/pawnstar-v12.bin}"
+: "${baseline_net:=$repository_directory/nnue/pawnstar-v20.bin}"
 : "${openings_file:=$repository_directory/nnue/openings.epd}"
 
 if [ -n "$search_depth" ] && [ -n "$time_control" ]; then

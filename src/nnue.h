@@ -1,21 +1,28 @@
 #pragma once
 /// @file nnue.h NNUE (efficiently-updatable neural network) evaluation — the engine's only evaluator.
 ///
-/// The network is a "perspective" net with bullet's `ChessBuckets` feature set:
+/// The network is a "perspective" net with bullet's `ChessBucketsMirrored` feature set:
 ///
 ///   768 inputs per (perspective, king bucket)  ->  kHiddenSize feature transformer  (x2 perspectives)
-///   SCReLU activation, concat[own | opponent] = 2*kHiddenSize  ->  1 output (centipawns, stm relative)
+///   SCReLU activation, concat[own | opponent] = 2*kHiddenSize  ->  kNumOutputBuckets heads  ->  1
+///   (centipawns, stm relative)
 ///
-/// The shipped net (**v12**) is **1024-wide with kNumKingBuckets = 8** — eight king-square weight banks
-/// selected by king **file-pair × board-half** (`kKingBucketMap`, below): the file-pair `file/2` (a/b→0 …
-/// g/h→3) plus +4 when the king is in the advanced half (its own ranks 5–8, per perspective). On the same
-/// ~6B data this beat the 4-bucket v11 by **+17.3 ± 8.7 Elo at 8+0.08 and +11.0 ± 6.6 at 12+0.12** — king
-/// buckets are NOT at diminishing returns (0→4 was +11.4; 4→8 is bigger), the rank-split capturing real
-/// king-safety signal (own-half vs advanced king). Each perspective selects one of kNumKingBuckets banks by
-/// *its own* king's square (in that perspective's orientation), the feature row being
-/// `bucket * 768 + chess768_index`, matching bullet's `ChessBuckets::new(kKingBucketMap)` (the same 64-entry
-/// map; see `kKingBucketMap` below). A king move that crosses a bucket boundary refreshes that whole
+/// The shipped net (**v20**, release 2.0.0) is the **shared Reckless shape**: **1024-wide, kNumKingBuckets
+/// = 8 horizontally mirrored king banks and kNumOutputBuckets = 8 material output heads**. The banks are
+/// selected by king **file × board-half** (`kKingBucketMap`, below) *after* mirroring has folded files e-h
+/// onto d-a, so `min(file, 7 - file)` plus +4 when the king is in the advanced half (its own ranks 5-8, per
+/// perspective); the head is selected by `(piece_count - 2) / 4`. Each perspective selects one of
+/// kNumKingBuckets banks by *its own* king's square (in that perspective's orientation), the feature row
+/// being `bucket * 768 + chess768_index`, matching bullet's
+/// `ChessBucketsMirrored::new(kKingBucketMapHalf)`. A king move that crosses a bucket boundary - or that
+/// crosses the mirror's file boundary, which moves every row the perspective reads - refreshes that whole
 /// perspective's bank rather than diffing it.
+///
+/// v20 is trained **entirely on Leela Chess Zero self-play data**, and measures **+9.99 Elo at 8+0.08**
+/// (8,000 games, 95% +4.33..+15.66) and **+1.13 at 12+0.12** (12,000 games, 95% -3.17..+5.43) over the
+/// retired v12 net it replaces: a gain at fast time controls and level at slower ones. The two shape
+/// additions were measured separately in zenith at fixed depth, +14.3 Elo for mirroring and +14.7 for the
+/// output heads; both only pay past ~1.4B training positions, which is why v12 had neither.
 ///
 /// **`kKingBucketMap` is the one place the bucketing is written down.** kNumKingBuckets is *derived* from it,
 /// `MaxKingBucketIndex() + 1`, so the two cannot disagree: change the map and the count follows, and there is
@@ -91,16 +98,18 @@
 #endif
 
 /// @brief Horizontal king mirroring: 1 to mirror a perspective whose own king stands on files e-h, 0 for
-/// v12's unmirrored shape. A build knob so that either shape can be built from one tree while the three
-/// bit-exact ports are brought across one at a time; both are stamped into the net header, so a net can
-/// only load into a build of its own shape.
+/// the unmirrored shape the retired v12 net was trained for. **The default is 1** - the shared shape, which
+/// is what the shipped net (nnue/pawnstar-v20.bin) needs. The knob stays so the old shape can still be
+/// built from this one tree; both knobs are stamped into every net's header, so a net can only ever load
+/// into a build of its own shape.
 #if !defined(PAWNSTAR_NNUE_KING_MIRRORING)
-#define PAWNSTAR_NNUE_KING_MIRRORING 0
+#define PAWNSTAR_NNUE_KING_MIRRORING 1
 #endif
 
-/// @brief Material output heads: 8 for the shared shape, 1 for v12's. The same build knob.
+/// @brief Material output heads: 8 for the shared shape, which is the default and the shipped net's; 1 for
+/// the shape v12 was trained for. The same build knob.
 #if !defined(PAWNSTAR_NNUE_OUTPUT_BUCKETS)
-#define PAWNSTAR_NNUE_OUTPUT_BUCKETS 1
+#define PAWNSTAR_NNUE_OUTPUT_BUCKETS 8
 #endif
 
 namespace nnue

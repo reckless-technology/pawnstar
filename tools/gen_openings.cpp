@@ -74,7 +74,7 @@
 ///   --max-lines N  stop after this many lines however few positions were kept (default: 64 per requested
 ///                  position, which is ample - the measured acceptance rate is about one line in six).
 ///   --net PATH     the net whose evaluation filters (default: $PAWNSTAR_EVALFILE, else
-///                  nnue/pawnstar-v12.bin).
+///                  nnue/pawnstar-v20.bin).
 ///   --progress N   positions between progress lines on stderr (default 5000, 0 = silent).
 ///
 /// The output carries its provenance in '#' comment lines, as nnue/openings.epd does: the generator, the
@@ -408,7 +408,7 @@ int main(int argc, char **argv)
     if (options.net_path.empty())
     {
         const char *eval_file = std::getenv("PAWNSTAR_EVALFILE");
-        options.net_path      = eval_file != nullptr ? eval_file : "nnue/pawnstar-v12.bin";
+        options.net_path      = eval_file != nullptr ? eval_file : "nnue/pawnstar-v20.bin";
     }
 
     // Force a deterministic single-threaded search for the optional shallow check, as tools/gen_data.cpp

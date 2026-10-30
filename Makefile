@@ -60,14 +60,15 @@ else
   CMAKE_ARGS += -DPAWNSTAR_COVERAGE=OFF
 endif
 
-# The NNUE network shape. The defaults are the v12 shape the shipped net was trained for; the shared
-# architecture is KING_MIRRORING=1 with OUTPUT_BUCKETS=8. A shape change is an evaluation change, so give it
-# a build tree of its own and expect the shipped net to be refused there:
-#   make check BUILD_DIR=build-newshape KING_MIRRORING=1 OUTPUT_BUCKETS=8
-ifeq ($(KING_MIRRORING),1)
-  CMAKE_ARGS += -DPAWNSTAR_NNUE_KING_MIRRORING=ON
-else
+# The NNUE network shape. The defaults are the shared architecture, KING_MIRRORING=1 with
+# OUTPUT_BUCKETS=8, which is the shape the shipped net was trained for; KING_MIRRORING=0 with
+# OUTPUT_BUCKETS=1 is the shape the retired v12 net needed. A shape change is an evaluation change, so give
+# it a build tree of its own and expect the shipped net to be refused there:
+#   make check BUILD_DIR=build-v12shape KING_MIRRORING=0 OUTPUT_BUCKETS=1
+ifeq ($(KING_MIRRORING),0)
   CMAKE_ARGS += -DPAWNSTAR_NNUE_KING_MIRRORING=OFF
+else
+  CMAKE_ARGS += -DPAWNSTAR_NNUE_KING_MIRRORING=ON
 endif
 
 ifdef OUTPUT_BUCKETS

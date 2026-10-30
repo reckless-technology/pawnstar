@@ -217,19 +217,24 @@ jobs:
         run: |
           grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
             || { echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1; }
-      # A build tree of its own, as the Makefile's own comment on these knobs says: a shape change is an
-      # evaluation change, and sharing a tree with the default shape would mean recompiling the world each
-      # way round. The build also writes build-new-shape/synthetic-net.bin (CMakeLists.txt, the
-      # `synthetic_net` target), which is the net the suites below and the signature both read.
+      # A build tree of its own, and the knobs passed explicitly even though this is the DEFAULT shape
+      # since release 2.0.0: naming them is what keeps this job a statement about the shape rather than
+      # about whatever the default happens to be, so it would still be this shape's gate if the default
+      # moved again.
       #
       # CTEST_ARGS is left at the Makefile's default `-V`, which streams each suite's own output, rather
-      # than cut down to --output-on-failure: at this shape several suites report that they SKIPPED and
-      # why, and a skip nobody can read in the log is the invisible skip this job was built to avoid.
+      # than cut down to --output-on-failure: a suite that SKIPS says so and why, and a skip nobody can
+      # read in the log is the invisible skip this job was built to avoid.
       - name: Build + test at the shared shape
         run: |
           set -o pipefail
           make -j"$(nproc)" BUILD_DIR=build-new-shape KING_MIRRORING=1 OUTPUT_BUCKETS=8 WERROR=1 \
                CXX=clang++-18 check 2>&1 | tee new-shape-check.log
+      # The synthetic net the two steps below read. CMake's `synthetic_net` target builds it only when the
+      # shipped net is NOT this build's shape, which it now is, so at this shape the suites are handed the
+      # shipped net and nothing writes the fixture: write it here, from the same generator, explicitly.
+      - name: Write the synthetic fixture net
+        run: build-new-shape/test_nnue_incremental --write-synthetic-net build-new-shape/synthetic-net.bin
       # The skip and run decisions, where a reader will look for them: which suites this shape could not
       # carry across, and which were handed the synthetic net and really ran.
       - name: What the suite did at this shape, in the job summary
@@ -440,6 +445,34 @@ jobs:
             cat new-shape-signature.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      # THE OTHER SHAPE MUST STILL BUILD, and nothing else in CI exercises it now that the shared shape is
+      # the default. That is not a hypothetical: flipping the default on 2026-10-30 broke this path the same
+      # day. `CMakeLists.txt` added `PAWNSTAR_NNUE_KING_MIRRORING=1` in its `ON` branch and defined nothing
+      # in the `OFF` one, which was right while `src/nnue.h` defaulted the macro to 0 - and with that
+      # default now 1, `KING_MIRRORING=0` left the header's value in force and built a MIRRORED engine with
+      # one output head, a shape that exists nowhere. It stamped `format_version` 2 over a 12,589,060-byte
+      # payload and `test_net_header` is what reported it.
+      #
+      # So this step is cheap and targeted rather than a second full `make check`: the two suites that
+      # actually read the shape. `net_header` decodes the synthetic net written at this build's own shape
+      # and asserts every architecture field and both CRC-64s against literals, which is what catches a
+      # mixed shape; `nnue_incremental` searches it, which is what catches a mirror-refresh defect. The
+      # suites whose expected values are the shipped net's skip here by design - the shipped net is of the
+      # other shape and the engine rightly refuses it.
+      #
+      # The other reason it is targeted: `principal_variation` searches the SYNTHETIC net to depth 8, and
+      # random weights give the pruning heuristics no traction. Sixteen of the seventeen suites pass at
+      # this shape in about 20 seconds; that one had not finished in five minutes when measured locally on
+      # 2026-10-30. It is the weights rather than the shape - this file records the same effect for a
+      # depth-12 search above - but a full `make check` here would be an open-ended job.
+      - name: The retired v12 shape still builds and reads its own net
+        run: |
+          set -o pipefail
+          cmake -S . -B build-v12-shape -G Ninja -DCMAKE_CXX_COMPILER=clang++-18 -DWERROR=ON \
+                -DPAWNSTAR_NNUE_KING_MIRRORING=OFF -DPAWNSTAR_NNUE_OUTPUT_BUCKETS=1
+          cmake --build build-v12-shape --parallel --target test_net_header test_nnue_incremental synthetic_net
+          ctest --test-dir build-v12-shape -V -R '^(net_header|nnue_incremental)$' 2>&1 \
+              | tee v12-shape-check.log
 
   # The single required check for the branch ruleset. `main` takes pull requests and requires this one context,
   # so the jobs above can be renamed, split or added to without editing the ruleset on the server. `if: always()`

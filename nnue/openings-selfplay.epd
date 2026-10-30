@@ -5,7 +5,8 @@
 # from the start position, each to a ply drawn uniformly from [8, 12], and the position
 # the line ended at was kept when it was not in check and the static NNUE evaluation of it was
 # within 125 centipawns of the net's evaluation of the start position (158 cp,
-# White's perspective; net nnue/pawnstar-v12.bin). Duplicates were dropped on the Zobrist key. One
+# White's perspective; net pawnstar-v12.bin, the net shipped then and retired at release 2.0.0, so
+# regenerating this file byte for byte needs that net). Duplicates were dropped on the Zobrist key. One
 # position per line played, so no two openings here share a line - and the count is a parameter,
 # not a ceiling of the source.
 #
