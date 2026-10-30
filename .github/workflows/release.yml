@@ -22,12 +22,12 @@
 #     Gatekeeper finds its ticket online, as the release checks it does.
 #   A publishing run that would ship an unsigned binary fails instead.
 #
-# The files: pawnstar-<version>-linux-x86_64, -windows-x86_64.exe and -macos-arm64.zip (the binary inside), the source
-# as -source.tar.gz (git archive at the commit) and the API documentation as -docs-html.zip (Doxygen). verify
-# opens the release as a draft and each job uploads straight onto it, so no workflow artifact stands between a build
-# and its release; publish makes the source and documentation (in a dry run too), checks all five are on the draft,
-# pushes the tag and takes the draft public. A failed job can be run again; a run that fails before it publishes leaves
-# only a draft, which the next run replaces.
+# The files: pawnstar-<version>-linux-x86_64, -windows-x86_64.exe and -macos-arm64.zip (the binary inside), and the
+# API documentation as -docs-html.zip (Doxygen). No source archive is published: the source is the repository, to
+# clone or fork. verify opens the release as a draft and each job uploads straight onto it, so no workflow artifact
+# stands between a build and its release; publish makes the documentation (in a dry run too), checks all four files
+# are on the draft, pushes the tag and takes the draft public. A failed job can be run again; a run that fails before
+# it publishes leaves only a draft, which the next run replaces.
 #
 # Every job runs on a GitHub-hosted runner, on an image named by its version (ubuntu-24.04, windows-2025, macos-15 for
 # Apple silicon), each starting from a clean machine and installing what it needs; never for a pull request: this
@@ -349,12 +349,12 @@ jobs:
         if: always() && runner.os == 'macOS'
         run: tools/sign-macos.sh close
 
-  # The source and the documentation, made in a dry run too, so a release's first run of this job is not its first run
+  # The documentation, made in a dry run too, so a release's first run of this job is not its first run
   # at all; then, in a publishing run, the draft checked and published. Every step is safe to run again: an upload
   # replaces a file of the same name an earlier attempt left on the draft, and a tag an earlier attempt pushed is taken
   # as it stands when it names this commit.
   publish:
-    name: source, documentation, publish
+    name: documentation, publish
     needs: [verify, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -372,13 +372,12 @@ jobs:
       # Doxygen through the doc target's own script (cmake -P, the version as PROJECT_NUMBER), which needs no compiler.
       - name: Install doc toolchain
         run: sudo apt-get update && sudo apt-get install -y doxygen graphviz
-      - name: The source and the documentation
+      - name: The documentation
         run: |
           set -euo pipefail
           rm -rf assets doc && mkdir assets
           cmake -DSOURCE_DIR="$PWD" -DBIN_DIR="$PWD/build" -DVERSION="$VERSION" -P cmake/run_doxygen.cmake
           (cd doc && zip -rq "../assets/pawnstar-$VERSION-docs-html.zip" html)
-          git archive --format=tar.gz --prefix="pawnstar-$VERSION/" -o "assets/pawnstar-$VERSION-source.tar.gz" "$GITHUB_SHA"
           ls -l assets
       - name: Onto the draft
         if: env.PUBLISH == 'true'
@@ -399,7 +398,7 @@ jobs:
         if: env.PUBLISH != 'true'
         continue-on-error: true
         with:
-          name: source-and-docs
+          name: docs
           path: assets/*
           retention-days: 1
       - name: Publish the release
@@ -412,8 +411,7 @@ jobs:
           assets=$(gh api "$release" --jq '.assets[].name')
           missing=""
           for file in "pawnstar-$VERSION-linux-x86_64" "pawnstar-$VERSION-windows-x86_64.exe" \
-                      "pawnstar-$VERSION-macos-arm64.zip" "pawnstar-$VERSION-source.tar.gz" \
-                      "pawnstar-$VERSION-docs-html.zip"; do
+                      "pawnstar-$VERSION-macos-arm64.zip" "pawnstar-$VERSION-docs-html.zip"; do
             grep -qx "$file" <<< "$assets" || { echo "::error::$file is not on the draft $TAG"; missing="$missing $file"; }
           done
           [ -z "$missing" ] || exit 1
