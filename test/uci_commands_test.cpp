@@ -6,7 +6,7 @@
 /// of its parameters (depth, nodes, movetime, the clock and increments for either side, movestogo, infinite,
 /// ponder with ponderhit and stop, searchmoves, malformed values), every command that stops a search sent the
 /// instant after `go` (the lost-stop race), the diagnostic commands (eval, nnue, getboard, bookmoves,
-/// freebook, dbg, dbgclear, help, bench), malformed and unknown input, the root search's short cuts (a book
+/// freebook, dbg, dbgclear, help, license, bench), malformed and unknown input, the root search's short cuts (a book
 /// move, a forced move, no legal move) and the net loader's refusals (a missing file, an unstamped one, a
 /// different architecture, a truncated one).
 ///
@@ -299,6 +299,15 @@ void HandshakesAndDiagnostics(Game &game)
         lists_every_command = lists_every_command && Contains(help, handler.name_);
     }
     Check(lists_every_command, "help: lists every command in the table");
+
+    // The notice the shipped network's training data obliges has to reach a user who downloaded only a binary,
+    // so the engine prints it itself. These are the three facts ODbL asks the notice to name.
+    const std::string license = Run(game, {"license"});
+    Check(Contains(license, "GNU General Public License, version 3") &&
+              Contains(license, "Leela Chess Zero self-play training data") &&
+              Contains(license, "http://opendatacommons.org/licenses/odbl/1.0/") &&
+              Contains(license, "http://opendatacommons.org/licenses/dbcl/1.0/") && Contains(license, "Produced Work"),
+          "license: names the engine's licence and the training data's, with both ODbL URLs", license);
 
     const std::string dbg = Run(game, {"dbgclear", "dbg"});
 #if DEBUGX
