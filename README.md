@@ -641,8 +641,8 @@ architecture is rejected rather than misread. Stamp a freshly trained raw net wi
 every net from **v20 (release 2.0.0)** onward.
 
 **Credit for the earlier nets.** Every net up to and including `pawnstar-v12.bin` — all of them now retired —
-was trained on **the PlentyChess bulletformat dataset**, generated and published by **Patrick Leonhardt
-([Yoshie2000](https://github.com/Yoshie2000/PlentyChess))**, about 6 billion positions. The strength of those
+was trained on **the PlentyChess bulletformat dataset**, generated and published by
+**[Yoshie2000](https://github.com/Yoshie2000/PlentyChess)**, about 6 billion positions. The strength of those
 nets owed a great deal to the quality of that data, and it is credited here with thanks. That data is no
 longer used: it is deleted from this project's training and validation sets, and the retrieval details have
 deliberately not been restored. The credit is kept because the record should show where those nets came
