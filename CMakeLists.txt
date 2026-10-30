@@ -274,10 +274,11 @@ endif()
 add_test(NAME net_header COMMAND test_net_header ${PAWNSTAR_NET_HEADER_NET}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-# The pentanomial pooling tool (tools/pool_matches.py), against real measured matches. Python rather than a
-# C++ suite because the tool itself is Python - one copy of the formula, run by the test, is the whole point:
-# the pooling maths was re-implemented in four throwaway scripts in one day and one of them applied the 95%
-# deviate twice. A plain interpreter and no packages, so there is nothing to install on a hosted runner.
+# The three match-analysis tools in tools/ (pool_matches.py, opening_icc.py, pgn_nps.py), against measured
+# matches and hand-computed fixtures. Python rather than C++ suites because the tools themselves are
+# Python - one copy of each formula, run by its test, is the whole point: the pooling maths was
+# re-implemented in four throwaway scripts in one day and one of them applied the 95% deviate twice. A
+# plain interpreter and no packages, so there is nothing to install on a hosted runner.
 #
 # `python` as well as `python3` in the NAMES, and the interpreter is then RUN at configure time, because
 # Windows ships a `python3.exe` App Execution Alias in WindowsApps that is on the PATH, is found by
@@ -286,7 +287,7 @@ add_test(NAME net_header COMMAND test_net_header ${PAWNSTAR_NET_HEADER_NET}
 set(PAWNSTAR_TEST_PYTHON "")
 find_program(PYTHON3_EXE NAMES python3 python)
 if(NOT PYTHON3_EXE)
-  message(STATUS "Pawnstar: no Python interpreter found; the pool_matches suite is not registered")
+  message(STATUS "Pawnstar: no Python interpreter found; the Python suites are not registered")
 else()
   execute_process(COMMAND "${PYTHON3_EXE}" -c "print('interpreter ok')"
                   RESULT_VARIABLE PAWNSTAR_PYTHON_STATUS OUTPUT_QUIET ERROR_QUIET)
@@ -296,14 +297,28 @@ else()
     # Said as "found one and it does not work", never as "found none": a message naming the wrong cause is
     # the thing this whole pull request is about.
     message(STATUS "Pawnstar: '${PYTHON3_EXE}' is not a working interpreter (it exited "
-                   "${PAWNSTAR_PYTHON_STATUS}); the pool_matches suite is not registered")
+                   "${PAWNSTAR_PYTHON_STATUS}); the Python suites are not registered")
   endif()
 endif()
 if(PAWNSTAR_TEST_PYTHON)
-  # -I: isolated. The test imports tools/pool_matches.py by the path it computes itself, and nothing else,
+  # -I: isolated. Each test imports its tool from tools/ by the path it computes itself, and nothing else,
   # so neither the working directory nor a PYTHONPATH can substitute another module of that name.
   add_test(NAME pool_matches COMMAND "${PAWNSTAR_TEST_PYTHON}" -I
            ${CMAKE_CURRENT_SOURCE_DIR}/test/pool_matches_test.py
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  # tools/opening_icc.py - the opening-replay correction to a pooled bar. Registered beside pool_matches
+  # for the same reason: it is the measurement that decides whether a published interval was wide enough,
+  # and a checker kept only on the runners drifts and starts printing confident wrong values. Its fixtures
+  # are hand-computed ANOVA cases, and its nominal figures are anchored to pool_matches' own match A, so
+  # the two cannot drift apart silently.
+  add_test(NAME opening_icc COMMAND "${PAWNSTAR_TEST_PYTHON}" -I
+           ${CMAKE_CURRENT_SOURCE_DIR}/test/opening_icc_test.py
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  # tools/pgn_nps.py - absolute nodes per second per engine, taken from a match's own PGN, because an idle
+  # bench overstates match speed (about 2.2x on a machine whose cores are threads) and a percentage of one
+  # machine's idle rate is not comparable with another's.
+  add_test(NAME pgn_nps COMMAND "${PAWNSTAR_TEST_PYTHON}" -I
+           ${CMAKE_CURRENT_SOURCE_DIR}/test/pgn_nps_test.py
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 # NNUE suites take the net (and reference) explicitly; only register them if the shipped net is present
