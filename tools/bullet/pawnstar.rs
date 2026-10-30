@@ -13,8 +13,11 @@ constants, the save-format list, the loss function, the two-layer SCReLU network
 loader layout follow that example. Its licence text is reproduced in THIRD-PARTY-NOTICES.md at the root of
 this repository; this file as a whole is distributed under the repository's GPLv3.
 
-Two things differ from the shape that produced the shipped v12 net, each measured in zenith on this
-hardware and SPRT-gated:
+This is the shape every engine has shipped since release 2.0.0 (pawnstar 2.0.0 / zenith 3.0.0,
+2026-10-30), whose v20 net was trained entirely on Leela Chess Zero self-play data. Two things differ
+from the shape that produced the WITHDRAWN v12 net - which was trained on the PlentyChess bulletformat
+dataset, by Yoshie2000, data that is withdrawn and never to be trained on again (see
+pipeline/train_pipeline.sh's header) - each measured in zenith on this hardware and SPRT-gated:
 
   * horizontal king mirroring          +14.3 Elo at fixed depth
   * 8 material output heads            +14.7 Elo at fixed depth

@@ -82,9 +82,10 @@ void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
 
 /// @brief A net at **this build's** shape, with deterministic pseudo-random weights.
 ///
-/// The crossing cases below have to run at whatever shape the build was configured for, and at the shared
-/// architecture (mirroring on, 8 output heads) no trained net exists yet — the shipped v12 net is a
-/// different shape and is rightly refused. So the test makes its own. Weight *quality* is irrelevant here:
+/// The crossing cases below have to run at whatever shape the build was configured for, and at any shape but
+/// the shared one (mirroring on, 8 output heads) the shipped net is rightly refused: `nnue/pawnstar-v20.bin`
+/// is at the shared shape, so a build configured for the retired v12's cannot load it. So the test makes its
+/// own. Weight *quality* is irrelevant here:
 /// what is being checked is that the incrementally-updated accumulator equals a from-scratch rebuild, and
 /// that holds for any weights at all. Writing the payload out by hand is also a second opinion on the
 /// payload layout — an independent writer against nnue.h's reader.
