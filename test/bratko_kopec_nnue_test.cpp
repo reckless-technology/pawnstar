@@ -42,6 +42,26 @@
 /// the extra moves each set carries are the depths that genuinely disagreed, not history: only pos02
 /// (f2f3 at depth 8, d4d5 deeper), pos23 (c8f5/f7f6) and pos24 (g2g3/e4f5) have more than one.
 ///
+/// **Two positions moved off the classical Bratko-Kopec answer with v20, and they are named here so that a
+/// future re-blessing cannot silently absorb them:**
+///
+///   * **pos02** plays `f2f3` at depth 8 and reaches the classical `d4d5` only from depth 9 (measured at
+///     depths 9, 10 and 11).
+///   * **pos24** plays `g2g3` at depths 8–10 and `e4f5` at depth 11, and does **not** find the classical
+///     `f2f4` at any of depths 8–11.
+///
+/// v12 found both at depth 8. Bratko-Kopec is 24 positions and is not a strength measurement — v20 measured
+/// +9.99 Elo at 8+0.08 (8,000 games) and +1.13 at 12+0.12 (12,000 games) against v12 — so this is a
+/// recorded difference, not a regression to chase.
+///
+/// Verified across the three ports on 2026-10-30 (the Legion, Windows): each port's own binary, Hash pinned
+/// to 64 MB, single-threaded, book off, over all 24 positions at depths 7, 8, 9, 10 and 11 — identical best
+/// move *and* identical node count in all 120 position/depth pairs in C++, Rust and Go. So the two moved
+/// positions moved in all three, as bit-exactness requires, and the three repositories' sets are three
+/// recordings of one measurement. pawnstar-go's set is the union over depths **7 and 8** rather than 8–11,
+/// because its suite drops to depth 7 under `-short`; that adds pos03 `f7g5` and pos20 `e2h5`, which are
+/// the depth-7 choices and were measured here too.
+///
 /// Move ordering is **platform-independent**: SortMoves (move.h) is a stable insertion sort, so equal-
 /// ordering-score moves keep their generation order on every STL, and the single-threaded best move at a
 /// given depth is identical across libstdc++, libc++ and MSVC.

@@ -63,7 +63,23 @@ int main(int argc, char **argv)
     //      indexing, SCReLU and dequantisation; and
     //  (2) the shipped int8 Evaluate stays within kInt8Bound cp of that reference — guards the int8 kernel
     //      (the int8 output layer deliberately differs from bullet by the SCReLU-into-8-bits requant).
-    constexpr int kInt8Bound = 40; // measured max ~26 cp on this set; a little headroom.
+    //
+    // kInt8Bound is 40, which is EXACTLY what this set measures: **40 cp over v20's 250 reference positions,
+    // 2026-10-30**, and the same 40 in all three ports (C++, Rust and Go each report it). It was 26-28 cp
+    // with v12, and the rise is not drift: ONE int8 scale is shared across all eight output heads, so the
+    // head carrying the largest weight sets the scale every other head is then requantised against.
+    //
+    // A bound sitting exactly on the measured maximum is deliberate here, because this is integer
+    // arithmetic: the deviation is exactly 40 on every platform, deterministically, so there is no marginal
+    // pass to tip over — this is not a tolerance with the headroom spent. The three ports being bit-exact
+    // on node counts (bench 5,617,906 at depth 13) is the corroborating evidence that they compute the same
+    // integers. So 40 is a tight and TRUE gate, and widening it — pawnstar-rs carried 64 for a day, reading
+    // a measured-40-against-40 as a latent red CI — weakens a deterministic passing check for no gain.
+    //
+    // THE REAL FIX for a future net whose heads spread wider is a PER-HEAD int8 scale, not a looser bound:
+    // one scale across eight heads is what couples them, and only a per-head scale decouples them. Re-measure
+    // this number whenever a net ships, and record beside it what it was measured on and when.
+    constexpr int kInt8Bound = 40;
     int           checked = 0, max_abs_diff = 0, max_int8_dev = 0;
     for (std::string line; std::getline(ref, line);)
     {

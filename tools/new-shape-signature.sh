@@ -2,14 +2,22 @@
 # The cross-port gate for the SHARED NNUE SHAPE — horizontal king mirroring plus 8 material output heads
 # — measured over the deterministic synthetic net at a fixed depth.
 #
-# WHY THIS EXISTS. The shared shape is behind a compile-time switch that defaults off (a C++ define, a
-# Cargo feature, a Go build tag), and until this script landed nothing in any of the three CI systems built
-# or searched at that shape: every job exercised the default. A gated path with no CI rots silently, and the
-# cost of that is already measured — pawnstar-go's transposition table defaulted to 512 MB against the
-# other two ports' 64 MB from May until 2026-10-27, through every release, because the only cross-port gate
-# that ran was `bench` and `bench` pins the table to 64 MB in all three. A gate that controls for a
-# difference cannot detect it. This path is about to carry the net the whole project depends on, so it gets
-# a gate before it carries it, not after.
+# WHY THIS EXISTS. It was written while the shared shape was still behind a compile-time switch that
+# defaulted OFF (a C++ define, a Cargo feature, a Go build tag), and nothing in any of the three CI systems
+# built or searched at that shape: every job exercised the default. A gated path with no CI rots silently,
+# and the cost of that is already measured — pawnstar-go's transposition table defaulted to 512 MB against
+# the other two ports' 64 MB from May until 2026-10-27, through every release, because the only cross-port
+# gate that ran was `bench` and `bench` pins the table to 64 MB in all three. A gate that controls for a
+# difference cannot detect it.
+#
+# SINCE 2026-10-30 THE SHARED SHAPE IS THE DEFAULT in all three ports — release 2.0.0 ships the v20 net,
+# which is of this shape — and it is v12's unmirrored single-head shape that is now behind the knob
+# (`KING_MIRRORING=0 OUTPUT_BUCKETS=1`, `--no-default-features`, `-tags pawnstar_nnue_*`), with a CI job of
+# its own in each repository. That does not retire this script, it changes what it is for: `bench` locks
+# the signature over the SHIPPED net, and this locks it over a net generated from nothing, so a net change
+# and a code change can never be confused for one another — and the six node counts below stay comparable
+# across every net the ports go on to ship, which the bench signature does not (v12's 6,601,454 became
+# v20's 5,617,906 on the day the shape flipped).
 #
 # WHAT IT CHECKS, in this order, and the order matters:
 #
@@ -37,26 +45,31 @@
 # cross-repo artifact download, a token with access to the others, and a job that goes red when an
 # unrelated repository's CI is red or its last green run has aged out of retention. Three independent
 # assertions against one shared constant catch any port drifting, at that port's own commit, with the blame
-# on the change that caused it — the same mechanism as the default shape's `bench` signature, which has
-# held the three ports bit-exact for years. What it cannot catch is the constant itself being wrong, and
+# on the change that caused it — the same mechanism as the ports' `bench` signature, which has held the
+# three bit-exact for years. What it cannot catch is the constant itself being wrong, and
 # that is what checks 1 and 2 close: if the generator moves, the SHA-256 fails; if the shape moves, the
-# header fails. Re-blessing the table in three repositories at once is then a deliberate act, and the
+# header fails. Re-blessing the table in every copy at once is then a deliberate act, and the
 # `reckless-nnue` skill is the written record of what the numbers are.
 #
-# THIS FILE IS BYTE-IDENTICAL IN pawnstar, pawnstar-rs AND pawnstar-go, on purpose: the three ports' gate is
-# one script and one table, so `diff` is the whole audit. Change it in all three or in none.
+# THIS FILE IS BYTE-IDENTICAL IN pawnstar, pawnstar-rs, pawnstar-go AND nnue-training, on purpose: the
+# three ports' gate is one script and one table, so `diff` is the whole audit. nnue-training carries it as
+# `pipeline/new-shape-signature.sh` and is the one file there deliberately left without that repository's
+# SPDX header, for exactly this reason — a fourth variant differing by two cosmetic lines is the drift this
+# mechanism exists to detect. Change it in all four or in none.
 #
 # Usage:
 #   tools/new-shape-signature.sh --hash <MB> --net <synthetic net> [--depth N] <engine>
 #
 # Write the net with this port's own generator first — all three emit the same bytes, which is half the
-# proof on its own, because two ports comparing node counts have to be searching the same net:
+# proof on its own, because two ports comparing node counts have to be searching the same net. The shape is
+# the default now, so Rust and Go need no flags; the C++ line names the knobs anyway, as its CI job does,
+# so that the command stays a statement about the shape rather than about whatever the default happens to
+# be:
 #
 #   C++   cmake -S . -B build-new-shape -DPAWNSTAR_NNUE_KING_MIRRORING=ON -DPAWNSTAR_NNUE_OUTPUT_BUCKETS=8
-#         build-new-shape/test_nnue_incremental --write-synthetic-net synthetic.bin
-#   Rust  CARGO_TARGET_DIR=target-newshape cargo run --release --features nnue-shared-shape \
-#             --bin write_synthetic_net -- synthetic.bin
-#   Go    make synthetic-net NET=synthetic.bin KING_MIRRORING=1 OUTPUT_BUCKETS=8
+#         build-new-shape/test_nnue_incremental --write-synthetic-net build-new-shape/synthetic-net.bin
+#   Rust  cargo build --release --bins && target/release/write_synthetic_net synthetic-net.bin
+#   Go    make build && make synthetic-net NET=synthetic-net.bin
 #
 # Exit status: 0 when the net and all six positions are exactly as expected, 1 on any mismatch, 2 on a
 # usage or environment error.
@@ -198,10 +211,13 @@ fi
 # Check 3: the six fixed-depth node counts.
 # ---------------------------------------------------------------------------------------------------------
 # Single-threaded through both routes each port offers, because the node count is only a signature when the
-# search is serial. PAWNSTAR_EVALFILE is how the C++ and Rust engines are given a net at startup, which they
-# need: at this shape they rightly REFUSE the shipped v12 net and, since a refused net is fatal rather than a
-# silent fall back to the embedded one, a build started without it exits before answering `uci`. The Go port
-# takes the net through `setoption name EvalFile` below, which all three accept.
+# search is serial. PAWNSTAR_EVALFILE is how the C++ and Rust engines are pointed at the SYNTHETIC net at
+# startup, and it is the synthetic net rather than the shipped one on purpose: since 2026-10-30 the shipped
+# net is of this same shape and would load perfectly well, so without this the table below would move with
+# every net that ships, which is the one thing it exists not to do. (No tree holds a v12-shape net any more
+# — v12's `.bin` was removed when 2.0.0 shipped — so there is nothing of the other shape left here for a
+# build to refuse.) The Go port takes the net through `setoption name EvalFile` below, which all three
+# accept.
 export PAWNSTAR_THREADS=1
 export PAWNSTAR_EVALFILE="$NET"
 
