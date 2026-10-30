@@ -19,8 +19,12 @@
 /// perspective's bank rather than diffing it.
 ///
 /// v20 is trained **entirely on Leela Chess Zero self-play data**, and measures **+9.99 Elo at 8+0.08**
-/// (8,000 games, 95% +4.33..+15.66) and **+1.13 at 12+0.12** (12,000 games, 95% -3.17..+5.43) over the
-/// retired v12 net it replaces: a gain at fast time controls and level at slower ones. The two shape
+/// (8,000 games, 95% +2.42..+17.57) and **+1.13 at 12+0.12** (12,000 games, 95% -5.63..+7.89) over the
+/// retired v12 net it replaces: a gain at fast time controls and level at slower ones. Both bars are
+/// widened for the replay of the 306-opening book by `tools/opening_icc.py`, which the nominal pentanomial
+/// bar does not account for; the 12+0.12 bar is measured directly from that arm's PGNs (ICC 0.0746, design
+/// effect 2.473), while the 8+0.08 bar is an *estimate* bracketed from the ICC of 0.061 measured on the
+/// same machine at the same openings, because that arm's PGNs were never written. The two shape
 /// additions were measured separately in zenith at fixed depth, +14.3 Elo for mirroring and +14.7 for the
 /// output heads; both only pay past ~1.4B training positions, which is why v12 had neither.
 ///
