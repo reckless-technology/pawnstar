@@ -784,7 +784,8 @@ Trainer hyperparameters ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)
 AdamW, `batch_size=16384`, loss `sigmoid(out)` squared-error against
 `target = wdl·result + (1-wdl)·sigmoid(score/SCALE)` with `ConstantWDL=0.5`, `StepLR{start=0.001,
 gamma=0.3, step=SBS/3}`, `eval_scale=400`. Overridable via env: `PAWNSTAR_DATA`, `PAWNSTAR_BPS`,
-`PAWNSTAR_SBS`, `PAWNSTAR_OUT`, `PAWNSTAR_LR_STEP`. **The schedule is checked before the run
+`PAWNSTAR_SBS`, `PAWNSTAR_OUT`, `PAWNSTAR_LR_STEP`, `PAWNSTAR_RESUME`, `PAWNSTAR_START_SB`.
+**The schedule is checked before the run
 starts.** `StepLR` applies drop N from superbatch `N·step + 1`, so `step = SBS/3` puts the third
 drop at `SBS + 1` whenever SBS divides by 3, where it never fires — which is what happened to
 every net trained before 2026-10-29 (0, 1 or 2 superbatches at the lowest rate; the 819-superbatch
@@ -793,6 +794,15 @@ schedule it will follow, refuses to start one whose last drop cannot apply, repo
 length, and prints `LR CHECK: superbatch <n> -> lr <rate>` every superbatch — the only record of
 the rate actually applied, since bullet logs the scheduler's description instead. Pin
 `PAWNSTAR_LR_STEP` to repair a truncated schedule or to hold the lowest rate across a resume.
+**A run is resumed through this same trainer**, not a copy of it: `PAWNSTAR_RESUME` names a
+checkpoint directory (`<out>/pawnstar-<n>`, which holds the AdamW optimiser state — not a
+quantised `.bin`, which carries none) and `PAWNSTAR_START_SB` the **absolute** superbatch to
+re-enter the schedule at; both the learning rate and the data position are indexed by that
+number, so those two are the whole of what a resume needs. The resume controls are validated
+before the device, the checkpoint or the data file is touched, and the schedule check above runs
+for a resume too — re-entering mid-schedule is exactly when its shape is easiest to break, since
+raising `PAWNSTAR_SBS` to continue a run moves the derived step's drops rather than extending
+past them.
 GPU training reports the device (e.g. `Training on NVIDIA GeForce RTX
 4070`) and runs at ~2.4M positions/sec on that card for this 1024-wide net (~0.34M on an older GTX
 1050 Ti; see §7).
