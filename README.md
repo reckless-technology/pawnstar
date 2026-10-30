@@ -648,6 +648,11 @@ longer used: it is deleted from this project's training and validation sets, and
 deliberately not been restored. The credit is kept because the record should show where those nets came
 from.
 
+**No network in the current release was trained on any PlentyChess data, and every network that was has
+been withdrawn.** `pawnstar-v12.bin` and every net before it are removed from the source tree, and every
+release that shipped them has been deleted - so no binary distributed from this repository contains an
+evaluator trained on that data.
+
 **Training a net.** All tooling lives in [tools/](tools) and is documented in
 [nnue/README.md](nnue/README.md). The minimal flow, with a dataset of your own:
 

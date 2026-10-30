@@ -1073,6 +1073,11 @@ networks from **v20 (release 2.0.0)** onward are trained entirely on Leela Chess
 The attribution is kept here deliberately. Those networks were measurably stronger for having been
 trained on that data, and the record should show where they came from.
 
+**No network in the current release was trained on any PlentyChess data, and every network that was has
+been withdrawn.** `pawnstar-v12.bin` and every net before it are removed from the source tree, and every
+release that shipped them has been deleted - so no binary distributed from this repository contains an
+evaluator trained on that data.
+
 ### Recreating `pawnstar-v20.bin` (step by step)
 
 `pawnstar-v20.bin` is a **1024-wide net with 8 horizontally mirrored king buckets (file × board-half) and
