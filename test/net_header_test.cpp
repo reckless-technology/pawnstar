@@ -28,8 +28,9 @@
 /// CRC was recomputed over fields that cannot produce its payload size. A check that has never been seen to
 /// fail is not a check, so each of these asserts the failing verdict, not merely the absence of a crash.
 ///
-/// Last, with a net path argument, the real file the build's other suites are given — the shipped v12 net, or
-/// at the shared shape the synthetic net — is decoded against literals for those two files.
+/// Last, with a net path argument, the real file the build's other suites are given — the shipped v20 net at the
+/// shared shape, or the synthetic net at whichever shape the build is — is decoded against literals for those two
+/// files.
 ///
 /// Usage:  test_net_header [net.bin]
 
