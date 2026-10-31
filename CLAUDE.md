@@ -396,7 +396,7 @@ heap-allocated (`std::make_unique<Game>()`) — at 8 buckets the inline `feature
   so a match with more pairs than it has openings replays some of them and replayed pairs are not
   independent. **Every figure in this bullet was measured when that file held 306 positions**, which it did
   until 2026-10-30: at 306 a long match replayed each opening about 13 times over 4,000 pairs and about 20
-  times over 6,000. It now holds **6,377**, the opening book behind it having been replaced (see the
+  times over 6,000. It now holds **6,433**, the opening book behind it having been replaced (see the
   opening-book section), so the replay factor - and the correction - is far smaller. The tool reads the real
   count out of the PGN either way. The tool measures the
   intraclass correlation of pair scores grouped by opening (one-way random-effects ANOVA, written for the
