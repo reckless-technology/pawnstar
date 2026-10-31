@@ -30,7 +30,7 @@
 /// openings:
 ///
 ///  1. **The opening pool** (`--openings`): tens of thousands of balanced positions of our own play from
-///     tools/gen_openings.cpp, or millions generated to a path of its own. The 6,377-position set
+///     tools/gen_openings.cpp, or millions generated to a path of its own. The 6,433-position set
 ///     tools/make_openings.sh harvests from the opening book is a match set, not a campaign's pool: it is
 ///     bounded by how wide the book is, and a book is a few thousand lines because that is what a book is.
 ///  2. **A few random plies on top of it** (`--random-plies`), which multiply each opening by the number of

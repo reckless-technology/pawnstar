@@ -33,9 +33,12 @@ correlation of pair scores grouped by opening measured **0.07-0.13**, which `too
 widen a bar for. Every ICC figure in that tool and in `nnue/README.md` was measured on the 306-position set
 and is kept as a record of what was measured, not updated to the new size.
 
-The new book is **3,244 lines** as `make_book` wrote them - **3,328** since `filter_book` added 84 - and
-`nnue/openings.epd` is **6,377 positions**, derived from the book before that screening, so the replay
-factor falls by about 21x and the correction with it. More distinct openings is a direct, free win on
+The new book is **3,244 lines** as `make_book` wrote them - **3,328** since the screening added 84 - and
+`nnue/openings.epd` is **6,433 positions**, regenerated from the screened book on 2026-10-31. That
+regeneration added 56 positions and **removed none**, which follows from what screening does: it marks a
+move or adds a line, never deletes one, and `make_openings.sh` strips the `?` marks before harvesting. So
+the 6,377-position set is a strict subset of this one, and a figure measured on it was not invalidated. The
+replay factor falls by about 21x against the old 306 and the correction with it. More distinct openings is a direct, free win on
 every confidence interval the matches produce.
 
 ## How the book is built (the decisions worth not re-deriving)

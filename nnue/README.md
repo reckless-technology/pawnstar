@@ -542,7 +542,7 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 | `run_gendata.sh`          | fan `gen_data` across cores, one shard per worker (each with a disjoint slice of the opening pool), resumable, reporting the pool's duplicate rate at the end |
 | `check_duplicates.sh`     | measure what fraction of an assembled pool is distinct positions — the gate `train_pipeline.sh` runs before converting a directory of shards, and the cheap way to catch a degenerate campaign in minutes |
 | `make_book.cpp`           | build `pawnstar.book`, the shipped opening book, from Lichess PGN on standard input: walk each accepted game's opening into a prefix tree, keep a move only where enough games played it, and write each pruned leaf as one line with the source, the CC0 dedication and the input's SHA-256 in a `#` header (`make tools` -> `build/make_book`) |
-| `make_openings.sh`        | build `openings.epd`, the **match** set, from the shipped opening book (`pawnstar.book`, built by `make_book.cpp` from the CC0 Lichess open database): replay each line, keep the roughly balanced positions, dedup (6,377 positions, bounded by how wide a book is, which is why data generation uses `gen_openings` instead) |
+| `make_openings.sh`        | build `openings.epd`, the **match** set, from the shipped opening book (`pawnstar.book`, built by `make_book.cpp` from the CC0 Lichess open database): replay each line, keep the roughly balanced positions, dedup (6,433 positions, bounded by how wide a book is, which is why data generation uses `gen_openings` instead) |
 | `print_net_header.cpp`    | read any `RNNUE1` net and print every header field as `key=value`, with `header_crc` and `payload_crc` verified and the shape compared with this build's (`make tools` → `build/print_net_header <net.bin>`; the logic is `net_header_report.h`, tested by `test_net_header`) |
 | `stamp_net.cpp`           | wrap a raw bullet net in the shared `RNNUE1` container: the 64-byte header, written from that build's own constants, with the map digest and both CRCs (`make tools` → `build/stamp_net`) |
 | `convert_psn1_payload.py` | one-off: read a net in the retired `PSN1` container and write a raw `RNNUE1` payload for `stamp_net` (§2) |
@@ -861,7 +861,7 @@ GPU training reports the device (e.g. `Training on NVIDIA GeForce RTX
 ### Openings
 
 The SPRT needs an EPD opening book (`OPENINGS=…`) of varied, roughly balanced early-game positions so
-matches don't all start from the same spot. **[openings.epd](openings.epd) is committed**: 6,377
+matches don't all start from the same spot. **[openings.epd](openings.epd) is committed**: 6,433
 positions built by `tools/make_openings.sh` from `pawnstar.book`, which `tools/make_book.cpp` built from the
 [Lichess open database](https://database.lichess.org/) under its **Creative Commons CC0 1.0** public-domain
 dedication, so the set carries no licence restriction of its own and no third party's data. Each book line
@@ -875,7 +875,7 @@ the net changes, since the balance filter is the net's own judgement. **This set
 problem:** it held 306 positions, derived from a 385-line book, which a long match replayed about 13 times
 each - and replayed games are correlated, which is what `tools/opening_icc.py` widens a bar for (ICC
 0.07-0.13 measured). The book behind it is now 3,244 lines as `make_book` wrote them (3,328 since
-`filter_book` screened it and added 84), so the set is 6,377 positions and the
+screening added 84), so the set is 6,433 positions and the
 replay factor falls with it. An SPRT with more rounds than openings still replays some of them
 (`order=random`), and the correction still applies; it is simply much smaller.
 
