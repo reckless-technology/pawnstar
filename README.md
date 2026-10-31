@@ -586,168 +586,53 @@ above) and to prune losing captures in quiescence, and is covered by `test_see`.
 
 ### NNUE evaluation
 
-Pawnstar evaluates exclusively with an **NNUE** (Efficiently Updatable Neural Network) — a neural net
-trained to score positions. It is the engine's only evaluator: the shipped net is loaded at startup (with
-a copy embedded in the binary as a fallback if the file can't be loaded), and a different net can be
-loaded at runtime (see [The NNUE net](#the-nnue-net) above).
+Pawnstar evaluates exclusively with an **NNUE** (Efficiently Updatable Neural Network), and has no
+hand-crafted evaluation to fall back on. `EvaluatePosition` consults the net directly, after a draw
+short-circuit. The shipped net is loaded at startup, with a copy embedded in the binary in case the file
+cannot be read, and another can be loaded at run time — see [The NNUE net](#the-nnue-net) above.
 
-**How it works.** The network ([src/nnue.h](src/nnue.h)) is a
-"perspective" net using bullet's `ChessBuckets` feature set:
+**The shape.** [nnue/pawnstar-v20.bin](nnue/pawnstar-v20.bin) is the shared Reckless NNUE shape, the same
+one [zenith](https://github.com/reckless-technology/zenith) and the two ports carry:
 
 ```
-768 inputs per (perspective, king bucket)  ->  1024 feature transformer (x2 perspectives)
-SCReLU,  concat[side-to-move | opponent] = 2048  ->  1 output (centipawns, side-to-move relative)
+768 inputs per (perspective, king bucket)  ->  1024 feature transformer  (x2 perspectives)
+SCReLU,  concat[side to move | opponent] = 2048  ->  8 material output heads  ->  1 centipawn score
 ```
 
-The 768 base inputs are (piece colour × piece type × square). The shipped net uses **8 king buckets**
-selected by king file-pair × board-half, so the feature row is `bucket*768 + base` (each perspective picks its bank by
-its own king's square). Two accumulators are built — one from the side-to-move's perspective and one from the
-opponent's (board vertically mirrored) — passed through a squared-clipped-ReLU activation and a single
-output layer that produces a centipawn score. `EvaluatePosition` evaluates with the net directly (after a
-draw short-circuit) — NNUE is the only evaluator. The network is an `nnue::Network` instance owned by the
-`Game` (no globals, and **heap-allocated** — at 8 king buckets the inline ~12.6 MB weight array would overflow the
-default stack), read-only after load and shared by all search threads. Its accumulator is **maintained
-incrementally and lazily** on each thread's `SearchState` — only the feature columns for the pieces
-that moved are updated (a king crossing a file-pair or board-half bucket boundary rebuilds that one perspective's
-accumulator), and the update itself is deferred until an evaluation actually reads the accumulator, so nodes
-that cut off first pay nothing. Concretely, each `SearchState` holds a **per-ply stack of accumulators** (`acc_stack_`, one entry per
-position on the search stack, with a parallel `acc_valid_` flag) — a *copy-make* scheme. `PlayMove` and
-`MakeNullMove` only push the child position and mark the new ply's accumulator stale; `UndoMove` is free
-(pop the stack — every ancestor accumulator stays valid for the next sibling). All the work is in
-`CurrentAccumulator()`, and only on an eval-cache *miss* that actually reads it (a hit skips even that): it
-walks back to the deepest valid ancestor, then for each ply forward **copies the parent accumulator and
-applies that move's feature delta** (add the arriving pieces' columns, subtract the departing ones; a king
-crossing a bucket boundary rebuilds that one perspective from scratch). Because ancestor accumulators are
-cached on the stack, switching to a sibling after a deep sub-search costs a single copy + delta rather than
-replaying moves. `acc_stack_` is `reserve`d to the maximum depth once at construction, so the search itself
-performs no heap allocation (and the reference `CurrentAccumulator` returns never dangles).
+The 768 base inputs are (piece colour × piece type × square), replicated across **8 king buckets** chosen
+by the perspective's own king square — its file × board-half, with files e–h **mirrored** onto a–d so the
+whole perspective flips horizontally and every bucket sees both wings. The score comes from one of **8
+output heads** selected by the number of pieces on the board, so the same hidden features are weighed
+differently as material comes off. `kKingBucketMap` in [src/nnue.h](src/nnue.h) is the one place the
+bucketing is written down; `kNumKingBuckets` is derived from it, and the trainer reads the same map.
 
-Copy-make replaced an earlier single-accumulator *make/unmake* design (advance one accumulator forward on
-eval, reverse it on undo) after measurement. Both are bit-identical, but make/unmake does **two** incremental
-updates per evaluated node — forward on eval, reverse on undo — each re-reading feature-weight columns from
-L2, whereas copy-make does **one** update plus a cheap ~4 KB accumulator `memcpy`, and the copy is cheaper
-than a second weight-reading update. On the 16-position bench at depth 12 (identical node counts) copy-make
-measured **~14% higher nps** (≈12% less wall time), most of all in quiescence where nearly every node
-evaluates. The trade is memory footprint — a per-ply stack (~270 KB/thread) versus one 4 KB accumulator —
-for fewer weight-column reads. This keeps NNUE competitive on equal time, not just equal depth. Weights are quantised
-`int16` (`QA=255`, `QB=64`, output scaled by `SCALE=400`) from the
-[bullet](https://github.com/jw1912/bullet) trainer. The feature transformer and accumulator stay `int16`,
-but the shipped forward pass runs the **output layer in `int8`** (uint8 SCReLU activations × int8 output
-weights, accumulated in int32) — ~1.86× faster than the exact `int16` dot for a measured **+31.8 Elo at
-8+0.08** at a bounded ~26 cp deviation; the exact `int16` path survives as `Network::EvaluateExact`, the
-reference the `int8` path is cross-checked against. The net carries a small self-describing header that the
-engine **requires**: an unstamped (raw bullet) net or one whose header doesn't match this build's
-architecture is rejected rather than misread. Stamp a freshly trained raw net with `tools/stamp_net` before loading
-(see [nnue/README.md](nnue/README.md)).
+Everything is integer: the feature weights and biases are `int16` at scale QA, the output weights `int16`
+at QB and the output biases `int32` at QA·QB. That is what makes a search's node count a property of the
+position and the depth alone, so the three ports are bit-exact with each other at a fixed depth. The
+weights are **heap-allocated** — at 8 king buckets the array is about 12.6 MB and would overflow a default
+thread stack — owned by the `Game`, read-only after load and shared by every search thread.
 
-**Training data, and the notice it obliges.** The shipped net is trained **entirely on Leela Chess Zero
-self-play data**, and so is every net from **v20 (release 2.0.0)** onward. That data is published as a
-database under the **Open Database License 1.0**, its contents under the **Database Contents License 1.0**:
+**The accumulator is maintained incrementally and lazily.** Each `SearchState` holds a per-ply stack of
+accumulators, a *copy-make* scheme: playing a move pushes the child and marks its accumulator stale, and
+undoing one is free, because every ancestor's accumulator is still valid for the next sibling. The work
+happens only when an evaluation actually reads an accumulator and the eval cache misses: it walks back to
+the deepest valid ancestor and, for each ply forward, copies the parent and applies that move's feature
+delta — adding the arriving pieces' columns and subtracting the departing ones. A king crossing a bucket
+boundary rebuilds that one perspective from scratch. So a node that cuts off before evaluating pays
+nothing, and returning to a sibling after a deep sub-search costs one copy and one delta rather than a
+replay. The stack is reserved once at construction, so the search performs no heap allocation.
 
-> Position data from the Leela Chess Zero self-play training data
-> (<https://storage.lczero.org/files/training_data/>), runs `test91` and `test60`, used under the Open Database
-> License 1.0 (<http://opendatacommons.org/licenses/odbl/1.0/>).
+**Training data, and the notice it obliges.** The shipped net is trained entirely on
+[Leela Chess Zero self-play data](https://storage.lczero.org/files/training_data/), published under the
+Open Database License 1.0. A trained net is a *Produced Work* under that licence, so **distributing one
+obliges a notice naming the source** — it does not make the net ODbL-licensed, and does not make it GPL
+merely because this project's code trained it. The notice is in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and the engine prints it itself: send `license` over UCI.
 
-A trained net is a *Produced Work* under that licence, so distributing it obliges **that notice** naming the
-source — and nothing more: ODbL does **not** make the net itself ODbL-licensed, and the net is not GPL merely
-because this project's GPLv3 code trained it. The full notice, with both licences, both runs and their shares
-of the pool, is in **[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)**, and the engine prints it itself in
-answer to the `license` command.
-
-**Credit for the earlier nets.** Every net up to and including `pawnstar-v12.bin` — all of them now retired —
-was trained on **the PlentyChess bulletformat dataset**, generated and published by
-**[Yoshie2000](https://github.com/Yoshie2000/PlentyChess)**, about 6 billion positions. The strength of those
-nets owed a great deal to the quality of that data, and it is credited here with thanks. That data is no
-longer used: it is deleted from this project's training and validation sets, and the retrieval details have
-deliberately not been restored. The credit is kept because the record should show where those nets came
-from.
-
-**No network in the current release was trained on any PlentyChess data, and every network that was has
-been withdrawn.** `pawnstar-v12.bin` and every net before it are removed from the source tree, and every
-release that shipped them has been deleted - so no binary distributed from this repository contains an
-evaluator trained on that data.
-
-**Training a net.** All tooling lives in [tools/](tools) and is documented in
-[nnue/README.md](nnue/README.md). The minimal flow, with a dataset of your own:
-
-```bash
-tools/setup_bullet.sh                                       # clone + register the bullet trainer (pinned commit)
-OPENINGS=nnue/openings.epd \
-  tools/run_experiment.sh ~/pawnstar_nnue/shuffled.data net.bin   # train, verify, then SPRT
-```
-
-`run_experiment.sh` takes an already-converted bulletformat `.data` file (plus an `OPENINGS`
-EPD book — [nnue/openings.epd](nnue/openings.epd) is shipped, 6,377 roughly balanced positions
-generated by `tools/make_openings.sh` from the engine's own opening book, which
-[tools/make_book.cpp](tools/make_book.cpp) built from the CC0-dedicated
-[Lichess open database](https://database.lichess.org/)); it produces `net.bin`,
-**verifies** it (`tools/verify_net.sh`: engine inference vs the
-trainer, plus the incremental accumulator vs a full refresh), then runs the SPRT. Load the net with
-`setoption name EvalFile`. The same two checks are wired into `make check` via `test_nnue` and
-`test_nnue_incremental` (see [Test suite](#test-suite)); GPU training needs a CUDA toolkit and a driver
-supporting CUDA ≥ 12.3, otherwise set `BULLET_FEATURES=""` to train on CPU. NNUE strength is measured by
-game play (SPRT — now always net-vs-net, since the hand-crafted baseline was removed), not by the
-Bratko-Kopec suite.
-
-**Generating your own data.** `tools/gen_data.cpp` (`make tools` → `build/gen_data`) has the engine play
-itself and writes one text record per kept position, `<fen> | <white_relative_eval_cp> | <wdl>`, which
-`tools/train_pipeline.sh` converts and shuffles when handed the shard directory. The engine's **search** is
-the teacher, not its net, so the generator plays each game on a cheap budget and then re-labels a sampled
-subset of the kept quiet positions with a much larger one, harvesting the first few plies of each deep
-label's principal variation as further positions (they share the same White-relative score). Every shard
-gets a `.meta` provenance sidecar naming the engine version, the labelling net and its SHA-256, and every
-budget used. `tools/run_gendata.sh <out_dir> <workers> <games> [options…]` fans the work across cores and is
-resumable. See [nnue/README.md](nnue/README.md) §6 for the options and the measured throughput.
-
-**Where the diversity comes from.** The engine is deterministic at a fixed budget with its book off, so a
-self-play game is decided by the position it starts from — which makes the opening set, not the game count,
-the limit on how many distinct games a campaign can produce. Three things compose to lift it: a large
-opening pool of the engine's own play (`tools/gen_openings.cpp` → the committed
-[nnue/openings-selfplay.epd](nnue/openings-selfplay.epd), 30,000 positions, and the count is a parameter),
-a couple of random plies on top of each one, and a disjoint slice of the pool per worker, so two workers
-cannot start a game from the same position. `tools/check_duplicates.sh` measures what a pool actually came
-out at, and `tools/train_pipeline.sh` runs it as a gate before training on one.
-
-**Shipped net.** [nnue/pawnstar-v20.bin](nnue/pawnstar-v20.bin) is a **1024-wide net with 8 horizontally
-mirrored king buckets (file × board-half) and 8 material output heads** — the shared Reckless NNUE shape —
-trained **entirely on Leela Chess Zero self-play data**. It measures **+9.99 Elo at 8+0.08** (8,000 games,
-95% +2.42..+17.57) and **+1.13 at 12+0.12** (12,000 games, 95% −5.63..+7.89) over the v12 net it retires: a
-gain at fast time controls, level at slower ones. Both bars are widened for the replay of the 306-opening
-book by `tools/opening_icc.py`, which the nominal pentanomial bar does not account for. The 12+0.12 bar is
-measured directly from that arm's PGNs (ICC 0.0746, design effect 2.473); the 8+0.08 bar is an **estimate**,
-bracketed from the ICC of 0.061 measured on the same machine at the same openings, because that arm's PGNs
-were never written. The two shape additions it needs were measured separately in zenith at fixed depth,
-**+14.3 Elo** for mirroring and **+14.7** for the output heads, and both only pay past ~1.4B training
-positions, which is why no earlier net had either.
-
-Lineage of the retired nets, all SPRT-measured
-(against the since-removed hand-crafted eval, "HCE", in the early steps): Pawnstar self-play *lost* to the
-HCE (label quality, not quantity, was the lever); scaling that data ~12× gave nothing (capacity-limited);
-**doubling the width 256→512 added +55 Elo (fixed depth) / +71 (time control)** — that is v4; doubling
-again to **1024 on 60M gave ~0 at fixed depth and −74 on the clock** (rejected *then* — 60M saturates the
-512 net). **King buckets were flat on 60M (data-starved) but on ~818M gave +47 fixed depth and +17 on the
-clock** — the v6 net — once two speed fixes (an 8 MB lockless eval cache and a single-pass accumulator
-update) clawed back the wider table's per-move cost. **Scaling that 512×4 arch to ~2.31B gave +29.96 fixed
-depth and +20.73 on the clock — the v7 net**. Then, at that same 2.31B data, **doubling the width to 1024
-*without* king buckets (a single bank) beat v7 by +31.9 ± 16.6 Elo at 40/20 — and at half the file size —
-reversing the old 60M result now that the data no longer saturates the wider net: the v8 net**. Then,
-holding the width at 1024 and the data at ~2.31B, **adding 4 king buckets (file-pair) beat v8 by +11.4 ±
-6.75 Elo at 8+0.08 — the v9 net**; the bucket gain shrinks with data (+29 at 750M → +11 at
-2.31B) but stays positive, and the earlier "width beats buckets" call was really width-vs-buckets
-confounded (it compared 512+buckets v7 to 1024-no-buckets v8). Then, holding that v9 arch fixed,
-**scaling the data ~2.31B→~3.82B (four more PlentyChess shards) beat v9 by +16.3 ± 10.8 Elo at 8+0.08 — the
-v10 net**; then, holding that same arch, **scaling ~3.82B→~6.05B (six more shards) beat v10 by +9.28 ± 6.58
-Elo at 8+0.08 (LOS 99.7%) — the v11 net**. Then, holding that same ~6B data fixed and **doubling the king
-buckets 4→8 (file-pair × board-half — bank `file/2`, plus 4 when the king is in its own advanced half,
-ranks 5–8), beat v11 by +17.29 ± 8.68 Elo at 8+0.08 (3520 games) and +10.97 ± 6.57 at 12+0.12 (5610 games)
-— the v12 net**; the only variable vs v11 was the bucket count. **v12 was then retired by v20**, which moved
-the training data to Leela Chess Zero self-play and the shape to the shared architecture at the same time.
-Each shipped net retires its predecessor (v4 at v6, v6 at v7, v7 at v8, v8 at v9, v9 at v10, v10 at v11,
-v11 at v12, v12 at v20). The lesson that recurred through the earlier steps is **more data is the lever** —
-though the per-step *data* gain shrank (+16 for +1.5B → +9 for +2.2B) — **and king buckets were *not* at
-diminishing returns: the 4→8 step (+17/+11) is bigger than the 0→4 step (+11.4)**, because the rank split
-captures real own-half-vs-advanced king-safety signal. See [nnue/README.md §7](nnue/README.md)
-for the full lineage and exact recreation steps.
+**Where the rest lives.** [nnue/README.md](nnue/README.md) is the net's own record: the RNNUE1 container
+and its checks, how a net is trained, verified and stamped, what each net measured, and the attribution for
+the retired nets. The trainers and the data pipeline are shared across the engines and live in
+[nnue-training](https://github.com/reckless-technology/nnue-training).
 
 ### Opening book
 
