@@ -272,7 +272,7 @@ f7 3e dc 1d 24 60 c4 62  2c 2b 7f a6 8f fc 2d 5a
 
 | bytes | field | value |
 |---|---|---|
-| `52 4e 4e 55 45 31 00 00` | `magic` | `RNNUE1  ` |
+| `52 4e 4e 55 45 31 00 00` | `magic` | `RNNUE1\0\0` |
 | `02 00` | `format_version` | **2** — mirrored, with eight output heads |
 | `40 00` | `header_bytes` | 64 |
 | `00 03` / `08 00` | `features_per_bucket` / `king_buckets` | **768** / **8** |
@@ -315,7 +315,7 @@ $ build/print_net_header nnue/pawnstar-v20.bin
 file=nnue/pawnstar-v20.bin
 file_bytes=12617824
 header_complete=yes
-magic=RNNUE1  
+magic=RNNUE1\0\0
 magic_ok=yes
 format_version=2
 header_bytes=64
@@ -830,7 +830,8 @@ from the first argument:
 
 Trainer hyperparameters ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)): `HIDDEN_SIZE=1024`,
 AdamW, `batch_size=16384`, loss `sigmoid(out)` squared-error against
-`target = wdl·result + (1-wdl)·sigmoid(score/SCALE)` with `ConstantWDL=0.5`, `StepLR{start=0.001,
+`target = wdl·result + (1-wdl)·sigmoid(score/SCALE)` with `ConstantWDL` (the trainer's default is
+0.5; **v20 was trained at 0.0**, the eval sigmoid alone - see 7 and the recipe in 9), `StepLR{start=0.001,
 gamma=0.3, step=SBS/3}`, `eval_scale=400`. Overridable via env: `PAWNSTAR_DATA`, `PAWNSTAR_BPS`,
 `PAWNSTAR_SBS`, `PAWNSTAR_OUT`, `PAWNSTAR_LR_STEP`, `PAWNSTAR_RESUME`, `PAWNSTAR_START_SB`.
 **The schedule is checked before the run
