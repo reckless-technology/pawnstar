@@ -43,7 +43,13 @@ if command -v cygpath >/dev/null 2>&1; then
     # nvcc is found whatever the Windows PATH the installer edited reaches this shell; CUDA_PATH itself stays the
     # Windows path, which the cuda crates' build scripts read. Windows finds the CUDA DLLs on the PATH, not
     # LD_LIBRARY_PATH.
-    export PATH="$(cygpath -u "$CUDA_PATH")/bin:$PATH"
+    # Assign, then export: `export VAR="$(cmd)"` takes export's own exit status, so a failing cygpath
+    # would leave $? at 0, set -e would not see it, and the run would die much later looking for nvcc.
+    CUDA_PATH_POSIX=$(cygpath -u "$CUDA_PATH") || {
+        echo "cannot convert CUDA_PATH ($CUDA_PATH) to a POSIX path with cygpath" >&2
+        exit 1
+    }
+    export PATH="$CUDA_PATH_POSIX/bin:$PATH"
 else
     export PATH="$CUDA_PATH/bin:$PATH"
     export LD_LIBRARY_PATH="$CUDA_PATH/lib64:${LD_LIBRARY_PATH:-}"
