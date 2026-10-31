@@ -117,6 +117,14 @@ monthly export of standard rated games named in the book file's own header, whic
 used, the counts and the SHA-256 of exactly the bytes read. `tools/make_book.cpp` built it, and
 `nnue/openings.epd` (the match opening set, built by `tools/make_openings.sh`) is derived from the same book.
 
+**84 of its 3,328 lines end in a move this engine chose, not one the database played.** `tools/filter_book`
+marks a move scoring more than its margin below the position's best with a trailing `?`, which the loader
+replays but never selects; where that left a position with nothing it could play, the engine's own choice was
+added there. The book's own header says so of them and gathers them in a marked section at its end. **The CC0
+statement below is about the database's lines.** Those 84 are this project's own work and carry no condition
+either, so nothing downstream changes - but a reader checking the book's provenance against this file should
+not have to discover the distinction from the file it describes.
+
 - **Source:** Lichess open database, standard rated games, <https://database.lichess.org/>
 - **Dedication:** Creative Commons CC0 1.0 Universal (`CC0-1.0`),
   <https://creativecommons.org/publicdomain/zero/1.0/>
