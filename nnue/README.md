@@ -539,7 +539,8 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 | `gen_openings.cpp`        | balanced opening generator from **our own play**: short randomised lines from the start position, filtered on the net's static evaluation and deduplicated on the Zobrist key, written as EPD with its provenance header (`make tools` → `build/gen_openings`) — the data campaign's opening source, see §6 |
 | `run_gendata.sh`          | fan `gen_data` across cores, one shard per worker (each with a disjoint slice of the opening pool), resumable, reporting the pool's duplicate rate at the end |
 | `check_duplicates.sh`     | measure what fraction of an assembled pool is distinct positions — the gate `train_pipeline.sh` runs before converting a directory of shards, and the cheap way to catch a degenerate campaign in minutes |
-| `make_openings.sh`        | build `openings.epd`, the **match** set, from the public-domain TSCP opening book: replay each line, keep the roughly balanced positions, dedup (capped at ~420 positions by that source, which is why data generation uses `gen_openings` instead) |
+| `make_book.cpp`           | build `pawnstar.book`, the shipped opening book, from Lichess PGN on standard input: walk each accepted game's opening into a prefix tree, keep a move only where enough games played it, and write each pruned leaf as one line with the source, the CC0 dedication and the input's SHA-256 in a `#` header (`make tools` -> `build/make_book`) |
+| `make_openings.sh`        | build `openings.epd`, the **match** set, from the shipped opening book (`pawnstar.book`, built by `make_book.cpp` from the CC0 Lichess open database): replay each line, keep the roughly balanced positions, dedup (6,377 positions, bounded by how wide a book is, which is why data generation uses `gen_openings` instead) |
 | `print_net_header.cpp`    | read any `RNNUE1` net and print every header field as `key=value`, with `header_crc` and `payload_crc` verified and the shape compared with this build's (`make tools` → `build/print_net_header <net.bin>`; the logic is `net_header_report.h`, tested by `test_net_header`) |
 | `stamp_net.cpp`           | wrap a raw bullet net in the shared `RNNUE1` container: the 64-byte header, written from that build's own constants, with the map digest and both CRCs (`make tools` → `build/stamp_net`) |
 | `convert_psn1_payload.py` | one-off: read a net in the retired `PSN1` container and write a raw `RNNUE1` payload for `stamp_net` (§2) |
@@ -857,24 +858,31 @@ GPU training reports the device (e.g. `Training on NVIDIA GeForce RTX
 ### Openings
 
 The SPRT needs an EPD opening book (`OPENINGS=…`) of varied, roughly balanced early-game positions so
-matches don't all start from the same spot. **[openings.epd](openings.epd) is committed**: 306 positions
-built by `tools/make_openings.sh` from `pawnstar.book`, which is the **public-domain** TSCP book, so the
-set carries no licence restriction of its own and no third party's data. Each book line is replayed from
-the start position and every position it reaches between ply 4 and ply 24 is kept when the engine's static
-evaluation of it is within 125 cp of its evaluation of the start position (which this net puts at +158 cp,
-so a zero-centred filter would keep only the openings it mildly dislikes); then duplicates are dropped.
+matches don't all start from the same spot. **[openings.epd](openings.epd) is committed**: 6,377
+positions built by `tools/make_openings.sh` from `pawnstar.book`, which `tools/make_book.cpp` built from the
+[Lichess open database](https://database.lichess.org/) under its **Creative Commons CC0 1.0** public-domain
+dedication, so the set carries no licence restriction of its own and no third party's data. Each book line
+is replayed from the start position and every position it reaches between ply 4 and ply 24 is kept when the
+engine's static evaluation of it is within 125 cp of its evaluation of the start position (which the shipped
+v20 net puts at +62 cp, so a zero-centred filter would keep only the openings it mildly dislikes); then
+duplicates are dropped.
 
 Regenerate it with `tools/make_openings.sh [out.epd] [min_ply] [max_ply] [margin_cp]` — worth doing when
-the net changes, since the balance filter is the net's own judgement. **Its size is capped by the source:**
-the TSCP book's 385 lines overlap heavily and hold only about 420 distinct positions in that window, so an
-SPRT with more rounds than openings replays some of them (`order=random`), which is fine but worth knowing.
+the net changes, since the balance filter is the net's own judgement. **This set used to be the measurement
+problem:** it held 306 positions, derived from a 385-line book, which a long match replayed about 13 times
+each - and replayed games are correlated, which is what `tools/opening_icc.py` widens a bar for (ICC
+0.07-0.13 measured). The book behind it is now 3,244 lines, so the set is 6,377 positions and the
+replay factor falls with it. An SPRT with more rounds than openings still replays some of them
+(`order=random`), and the correction still applies; it is simply much smaller.
+
 Any standard EPD set works instead. The file carries a `#` provenance header; `run_sprt.sh` strips comment
 lines into a scratch copy before handing the file to fastchess, whose EPD reader would try to parse one as
 a position.
 
 #### The data campaign's openings (`gen_openings`) — a pool, not a book
 
-That 420-position ceiling is fine for a match and fatal for a data campaign (see *Data diversity* above), so
+A few thousand book positions are fine for a match and nowhere near enough for a data campaign (see *Data
+diversity* above), so
 the campaign's openings come from **our own play** instead. **[openings-selfplay.epd](openings-selfplay.epd)
 is committed**: 30,000 positions written by `build/gen_openings`, which plays short randomised lines from the
 start position and keeps the position a line ends at when it is not in check and the net's static evaluation

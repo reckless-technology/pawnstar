@@ -10,14 +10,16 @@
 /// openings a player would recognise rather than randomised ones. Training data wants the opposite - the
 /// wider the distribution the labels cover, the better, which is what makes random lines right here.
 ///
-/// **Why this exists beside tools/make_openings.sh.** That script harvests the TSCP book, whose 385
-/// heavily-overlapping lines hold only about 420 distinct positions in any sensible ply window - about 306
-/// of them balanced. A self-play campaign starting from a 306-position set is capped near 306 distinct
-/// games, because the engine is deterministic at a fixed budget with the book off: the opening decides the
-/// game (near, not exactly, because the transposition table carries over between the games of one process -
-/// see tools/gen_data.cpp's header, which measures it; a repeat is a near-copy, not a mechanism to rely on).
-/// Random play has no such ceiling, so the count is a parameter here (tens of thousands committed, millions
-/// generated to a path of its own for a campaign) rather than a property of the source.
+/// **Why this exists beside tools/make_openings.sh.** That script harvests the opening book, and a book is
+/// a few thousand heavily-overlapping lines because that is what a book is: the set it yields is
+/// 6,377 balanced positions, which is ample for a match and nowhere near a campaign. A self-play
+/// campaign starting from an N-position set is capped near N distinct games, because the engine is
+/// deterministic at a fixed budget with the book off: the opening decides the game (near, not exactly,
+/// because the transposition table carries over between the games of one process - see tools/gen_data.cpp's
+/// header, which measures it; a repeat is a near-copy, not a mechanism to rely on). Random play has no such
+/// ceiling, so the count is a parameter here (tens of thousands committed, millions generated to a path of
+/// its own for a campaign) rather than a property of the source. The book-derived set was 306 positions
+/// until 2026-10-30, which is where the figures elsewhere in these tools come from.
 ///
 /// **One position per line played.** A line is played to a ply drawn uniformly from the window and only the
 /// position it ends at is considered. Harvesting every ply of a window from one line, as the book script

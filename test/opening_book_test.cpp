@@ -160,6 +160,42 @@ int main()
         Check(shipped_book.GetMove(HashAfter({})) != Move::None() &&
                   shipped_from_memory.GetMove(HashAfter({})) != Move::None(),
               "the shipped book has moves for the start position");
+
+        // The book's own provenance header, which is the reason this book exists at all. The book it replaced
+        // was derived from TSCP's book.txt and was asserted to be public domain in about twenty places in this
+        // repository; TSCP is Copyright 1997 Tom Kerrigan under an informal non-commercial permission, which
+        // GPLv3 cannot take, so the claim was false and the material had to go. This book is built from the
+        // Lichess open database, whose CC0 1.0 dedication makes the same claim true. Pinned here because a
+        // false provenance claim is exactly the kind of defect that survives a rewrite of the prose around it:
+        // the file itself has to say where it came from, and must not say the old thing.
+        Check(shipped.find("Lichess open database") != std::string::npos &&
+                  shipped.find("https://database.lichess.org/") != std::string::npos &&
+                  shipped.find("CC0 1.0") != std::string::npos &&
+                  shipped.find("https://creativecommons.org/publicdomain/zero/1.0/") != std::string::npos,
+              "the shipped book names its Lichess source and the CC0 dedication");
+        Check(shipped.find("TSCP") == std::string::npos && shipped.find("Kerrigan") == std::string::npos,
+              "the shipped book makes no claim about TSCP");
+        // CC0 waives attribution, so the header must not imply an obligation that does not exist - claiming a
+        // duty nobody owes is the mirror image of claiming a permission nobody gave.
+        Check(shipped.find("asks for no attribution") != std::string::npos,
+              "the shipped book says the Lichess credit is a courtesy, not an obligation");
+        // Every line below the header parses, which the Initialize above already proves - but ParseLineOfPlay
+        // stops at the first bad line and reports failure, so count the lines too: a book truncated to its
+        // header would load perfectly and play nothing, and only the start-position check above would catch
+        // it. This pins the width that was the other half of the point: 385 lines replayed each opening about
+        // 13 times in a long match, which inflated every confidence interval the matches produced.
+        std::size_t        shipped_lines = 0;
+        std::istringstream shipped_text{shipped};
+
+        for (std::string line; std::getline(shipped_text, line);)
+        {
+            if (!line.empty() && line.front() != '#')
+            {
+                ++shipped_lines;
+            }
+        }
+
+        Check(shipped_lines > 385, "the shipped book is wider than the 385-line book it replaced");
     }
 
     return test_report::Summary("OPENING BOOK: loading, weighting, display and '?' (questionable) moves");

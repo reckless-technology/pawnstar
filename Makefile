@@ -91,7 +91,7 @@ ifdef COVERAGE_MIN_LINES
   CMAKE_ARGS += -DPAWNSTAR_COVERAGE_MIN_LINES=$(COVERAGE_MIN_LINES)
 endif
 
-TOOL_TARGETS := gen_data gen_openings lichess_extract lc0_extract stamp_net print_net_header filter_book \
+TOOL_TARGETS := gen_data gen_openings lichess_extract lc0_extract make_book stamp_net print_net_header filter_book \
                 nnue_quant_study dump_magics
 TEST_TARGETS := test_perft test_see test_bratko_kopec_nnue test_nnue test_nnue_incremental \
                 test_eval_symmetry test_opening_book test_chess_clock test_bench_golden \

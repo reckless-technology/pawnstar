@@ -60,7 +60,7 @@ trap 'if [ ${#SCRATCH_FILES[@]} -gt 0 ]; then rm -f "${SCRATCH_FILES[@]}"; fi
       if [ ${#SCRATCH_DIRS[@]} -gt 0 ]; then rm -rf "${SCRATCH_DIRS[@]}"; fi' EXIT
 
 # fastchess hands every non-empty line of an EPD file to its FEN parser, so a '#' provenance header - which
-# nnue/openings.epd carries, saying where its positions came from and that their source is public domain -
+# nnue/openings.epd carries, saying where its positions came from and that their source is a CC0 dedication -
 # would be read as a position. Strip comments and blank lines into a scratch copy and give fastchess that.
 # A file with no comments is passed straight through, so this is invisible to any other opening set.
 if grep -q '^[[:space:]]*#' "$OPENINGS"; then

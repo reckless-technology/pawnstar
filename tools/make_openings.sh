@@ -1,36 +1,45 @@
 #!/usr/bin/env bash
 # Build an EPD opening set from Pawnstar's own opening book, for SPRT matches (tools/run_sprt.sh OPENINGS=).
 #
-# FOR SELF-PLAY DATA GENERATION, USE tools/gen_openings.cpp INSTEAD. This source has a hard ceiling of about
-# 420 distinct positions (see SIZE below), and the engine is deterministic at a fixed budget with its book
-# off, so a data campaign started from this set could not produce many more distinct games than it has
-# openings - a 500M-position pool would be 306 games' worth of positions over and over. gen_openings plays
-# short randomised lines of our own instead and filters them the same way, so its count is a parameter rather
-# than a ceiling; nnue/openings-selfplay.epd is the committed 30,000-position set it wrote. This set remains
-# the MATCH set: its positions are book lines, which is what an SPRT wants.
+# FOR SELF-PLAY DATA GENERATION, USE tools/gen_openings.cpp INSTEAD. The engine is deterministic at a fixed
+# budget with its book off, so a data campaign started from this set could produce no more distinct games
+# than it has openings, and a 500M-position pool wants far more openings than any opening book holds.
+# gen_openings plays short randomised lines of our own instead and filters them the same way, so its count is
+# a parameter rather than a ceiling; nnue/openings-selfplay.epd is the committed 30,000-position set it wrote.
+# This set remains the MATCH set: its positions are book lines, which is what an SPRT wants.
 #
-# The source is pawnstar.book, the public-domain TSCP book.txt in coordinate notation, so the result carries
-# no licence restriction of its own and no third party's data. Every book line is replayed from the start
-# position; each position it reaches inside the ply window is a candidate. The engine then evaluates each
-# one and only roughly balanced positions are kept, so a match that starts there is decided by the engines
-# rather than by the opening. Duplicates are dropped - the book's lines share prefixes heavily.
+# The source is pawnstar.book, in coordinate notation, which tools/make_book.cpp built from the Lichess open
+# database - released under the Creative Commons CC0 1.0 public-domain dedication, so the result carries no
+# licence restriction of its own and no third party's data. (CC0 waives attribution; Lichess is credited in
+# THIRD-PARTY-NOTICES.md because it is right, not because it is owed. The book file's own header records the
+# monthly export, the filters and the SHA-256 of the bytes it was built from.) Every book line is replayed
+# from the start position; each position it reaches inside the ply window is a candidate. The engine then
+# evaluates each one and only roughly balanced positions are kept, so a match that starts there is decided
+# by the engines rather than by the opening. Duplicates are dropped - the book's lines share prefixes
+# heavily.
 #
 # "Roughly balanced" is measured against the engine's own evaluation of the START POSITION, not against
-# zero: this net scores the initial position at about +158 cp, so a zero-centred filter would reject normal
-# openings and keep only the ones it mildly dislikes. The baseline is read from the engine at run time, so
-# this stays right when the net changes.
+# zero: a net that scores the initial position well away from zero - the shipped v20 net puts it at about
+# +62 cp, and the retired v12 put it at +158 - would have a zero-centred filter reject normal openings and
+# keep only the ones it mildly dislikes. The baseline is read from the engine at run time, so this stays
+# right when the net changes, and the figure it used is recorded in the output's header.
 #
 # Usage: make_openings.sh [out.epd] [min_ply] [max_ply] [margin_cp]
 #   out.epd    where to write (default nnue/openings.epd, the committed set).
 #   min_ply    first ply harvested from each line (default 4).
-#   max_ply    last ply harvested from each line (default 24, i.e. the end of every line in this book).
+#   max_ply    last ply harvested from each line (default 24, i.e. past the end of every line in this book).
 #   margin_cp  keep a position only when its White-relative evaluation is within this many centipawns of
 #              the start position's (default 125).
 #
-# SIZE: the TSCP book is 385 heavily-overlapping lines, which hold only ~420 distinct positions in this
-# window however wide the margin; the default margin keeps ~306 of them. That is the ceiling of this source,
-# not a choice - an SPRT with more rounds than openings will replay some of them (fastchess `order=random`),
-# which is fine but worth knowing.
+# SIZE, AND WHY IT IS NOW WORTH SPENDING: this set's size is the single biggest lever on how wide a match's
+# confidence interval really is, because a match with more rounds than openings REPLAYS openings (fastchess
+# `order=random`), and two games from the same opening are correlated. The set that preceded this one held
+# 306 positions, which a long match replayed about 13 times each; the intraclass correlation measured over
+# real matches was 0.07-0.13, and tools/opening_icc.py exists to widen a bar for it. The book
+# tools/make_book.cpp writes is far wider than the book that preceded it, so this set is now thousands of
+# positions rather than hundreds, and the replay factor falls in proportion. The count the run produced is
+# printed at the end and recorded in the file's own header; it is a function of the book and the margin, not
+# a ceiling of the source.
 #
 # Requires build/pawnstar (`make`, or `tools\build.ps1` on Windows). The engine is driven over one UCI
 # session: per candidate it is sent `position startpos moves ...` then `getboard` (which prints the FEN) and
@@ -95,7 +104,8 @@ awk -v min_ply="$MIN_PLY" -v max_ply="$MAX_PLY" '
     }
 ' "$BOOK" > "$WORK/commands.txt"
 printf 'quit\n' >> "$WORK/commands.txt"
-echo "[2/4] $(( $(wc -l < "$WORK/commands.txt") / 3 )) candidate positions from $(wc -l < "$BOOK") book lines"
+echo "[2/4] $(( $(wc -l < "$WORK/commands.txt") / 3 )) candidate positions from" \
+    "$(grep -cv '^[[:space:]]*#' "$BOOK") book lines"
 
 # [3/4] One engine session reports them all. Run from the repository root so the engine finds its net.
 ( cd "$ROOT" && "$ENGINE" < "$WORK/commands.txt" ) > "$WORK/replies.txt" 2>/dev/null
@@ -123,15 +133,21 @@ awk -v baseline="$BASELINE" -v margin="$MARGIN" '
 {
     echo "# Pawnstar opening set, for SPRT matches and self-play data generation."
     echo "#"
-    echo "# Generated by tools/make_openings.sh from pawnstar.book, which is the opening book of TSCP"
-    echo "# (Tom Kerrigan's Simple Chess Program, https://github.com/terredeciels/TSCP) and is in the"
-    echo "# PUBLIC DOMAIN - so this set carries no licence restriction of its own and no third party's"
-    echo "# data. Every book line was replayed from the start position, and each position it reached"
-    echo "# between ply $MIN_PLY and ply $MAX_PLY was kept when the engine's static NNUE evaluation of it was"
-    echo "# within $MARGIN centipawns of its evaluation of the start position ($BASELINE cp, White's"
-    echo "# perspective); then duplicates were removed. The book's 385 lines overlap heavily and hold only"
-    echo "# about 420 distinct positions in this window, so this is near the ceiling of the source: an SPRT"
-    echo "# with more rounds than there are openings here replays some of them."
+    echo "# Generated by tools/make_openings.sh from pawnstar.book, which tools/make_book.cpp built from"
+    echo "# the Lichess open database (https://database.lichess.org/) - released under the Creative"
+    echo "# Commons CC0 1.0 Universal public-domain dedication"
+    echo "# (https://creativecommons.org/publicdomain/zero/1.0/), so this set carries no licence"
+    echo "# restriction of its own and no third party's data. CC0 waives attribution: Lichess is"
+    echo "# credited in THIRD-PARTY-NOTICES.md because it is right, not because anything obliges it."
+    echo "# pawnstar.book's own header records the monthly export, the filters and the SHA-256 of the"
+    echo "# exact bytes the book was built from."
+    echo "#"
+    echo "# Every one of pawnstar.book's $(grep -cv '^[[:space:]]*#' "$BOOK") lines was replayed from the start position, and each"
+    echo "# position it reached between ply $MIN_PLY and ply $MAX_PLY was kept when the engine's static NNUE"
+    echo "# evaluation of it was within $MARGIN centipawns of its evaluation of the start position"
+    echo "# ($BASELINE cp, White's perspective); then duplicates were removed. A match with more rounds"
+    echo "# than there are openings here replays some of them, which is what tools/opening_icc.py"
+    echo "# corrects a confidence interval for - so the count below is the number that matters."
     echo "#"
     echo "# One position per line, as the first four FEN fields. Lines beginning with '#' are comments:"
     echo "# tools/gen_data.cpp skips them, and tools/run_sprt.sh strips them before handing the file to"
