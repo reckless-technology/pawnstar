@@ -197,8 +197,8 @@ jobs:
   #
   # Since release 2.0.0 the shape is the DEFAULT, so this job no longer reaches an otherwise-unbuilt path; it
   # names the knobs anyway, which is what keeps it a statement about the shape rather than about whatever the
-  # default happens to be. The gated path is now v12's shape, which has a job of its own at the foot of this
-  # file. Keeping this one is still worth its minutes: it builds and tests THIS shape in a tree of its own,
+  # default happens to be. The gated path is now v12's shape, which has a step of its own at the foot of this
+  # job. Keeping this one is still worth its minutes: it builds and tests THIS shape in a tree of its own,
   # and it runs tools/new-shape-signature.sh over a net generated from nothing, where `bench` locks the
   # signature over the SHIPPED net and so moves with every net that ships.
   #
@@ -467,10 +467,11 @@ jobs:
       # other shape and the engine rightly refuses it.
       #
       # The other reason it is targeted: `principal_variation` searches the SYNTHETIC net to depth 8, and
-      # random weights give the pruning heuristics no traction. Sixteen of the seventeen suites pass at
-      # this shape in about 20 seconds; that one had not finished in five minutes when measured locally on
-      # 2026-10-30. It is the weights rather than the shape - this file records the same effect for a
-      # depth-12 search above - but a full `make check` here would be an open-ended job.
+      # random weights give the pruning heuristics no traction. Eighteen of the nineteen suites pass at
+      # this shape in about 20 seconds (22.0 s, measured locally 2026-10-31); that one had not finished in
+      # five minutes when measured on 2026-10-30. It is the weights rather than the shape - this file
+      # records the same effect for a depth-12 search above - but a full `make check` here would be an
+      # open-ended job.
       - name: The retired v12 shape still builds and reads its own net
         run: |
           set -o pipefail

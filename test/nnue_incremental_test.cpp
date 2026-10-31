@@ -40,7 +40,8 @@ namespace
 long g_checks = 0;
 
 /// @brief Recursively play random legal moves, comparing the incremental accumulator against a full
-/// refresh at entry and again after undoing all children (to catch UndoMove reverse bugs).
+/// refresh at entry and again after undoing all children (which under copy-make catches a slot whose
+/// validity was tracked wrongly, where it used to catch a reverse-update bug in UndoMove).
 void Walk(SearchState &state, std::mt19937_64 &rng, int depth, int branch)
 {
     const Position      &p   = state.CurrentPosition();
@@ -215,7 +216,8 @@ void CheckLine(const nnue::Network &net, const std::string &fen, const std::vect
             return;
         }
     }
-    // And back: Update is its own inverse with `from` and `to` swapped, which is what UndoMove relies on.
+    // And back: Update is its own inverse with `from` and `to` swapped. Copy-make means UndoMove no longer
+    // relies on that, but it is the property any reverse delta would need, so it stays pinned here.
     for (std::size_t ply = line.size() - 1; ply > 0; --ply)
     {
         net.Update(incremental, line[ply], line[ply - 1]);

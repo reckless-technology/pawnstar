@@ -152,7 +152,7 @@ engine`. That is the container working, not a fault: no net of that shape is shi
 which is what gives the non-default shape a net to test with at all.
 
 **The whole suite runs at either shape**, with one caveat worth knowing before you run it: at the
-non-default shape sixteen of the seventeen suites pass in about 20 seconds, and `principal_variation`
+non-default shape eighteen of the nineteen suites pass in about 20 seconds (22.0 s, measured 2026-10-31), and `principal_variation`
 searches the **synthetic** net to depth 8, where random weights give the pruning heuristics no traction -
 measured on this machine, it had not finished in five minutes at the v12 shape. That is a property of
 random weights rather than of the shape (the same thing is recorded in `CMakeLists.txt` for a depth-12
@@ -176,9 +176,10 @@ all, so either shape gets real coverage rather than a row of skips.
 which is what gated it before any net existed for it and what still gates it whatever net is shipped:
 six fixed-depth searches over the synthetic net, whose bytes are identical on every
 platform and in all three ports. [`tools/new-shape-signature.sh`](../tools/new-shape-signature.sh) is
-that gate, and it is **committed byte-identical in `pawnstar`, `pawnstar-rs` and `pawnstar-go`**: the
-six expected results live in it and nowhere else, so `diff` between the three repositories is the whole
-audit and there is no second copy of the numbers to drift. CI runs it on every pull request (the
+that gate, and it is **committed byte-identical in `pawnstar`, `pawnstar-rs`, `pawnstar-go` and
+`nnue-training`** (there as `pipeline/new-shape-signature.sh`): the
+six expected results live in it and nowhere else, so `diff` between the four copies is the whole
+audit and there is no second copy of the numbers to drift - and a change belongs in all four or in none. CI runs it on every pull request (the
 `new-shape` job).
 
 ```bash
@@ -315,7 +316,7 @@ $ build/print_net_header nnue/pawnstar-v20.bin
 file=nnue/pawnstar-v20.bin
 file_bytes=12617824
 header_complete=yes
-magic=RNNUE1\0\0
+magic=RNNUE1\x00\x00
 magic_ok=yes
 format_version=2
 header_bytes=64
@@ -502,8 +503,9 @@ payload, the 512×4 king-bucketed v6/v7 a 3148802-byte payload, the 1024-wide 4-
 
 A net is required (NNUE is the only evaluator). `main.cpp` loads `nnue/pawnstar-v20.bin` (cwd-relative) at
 startup. **Embedded fallback:** a byte-identical copy of the shipped net is compiled into the engine
-binary (`src/embedded_net.S` `.incbin`'s the net at the build's `EMBED_NET` path — the Makefile and the
-CMake build both pass it via `-DEMBED_NET_PATH`, the single source of truth, so the embedded copy can't
+binary (`src/embedded_net.S` `.incbin`'s the net at the build's `EMBED_NET` path — `CMakeLists.txt` sets
+`EMBED_NET` and passes it via `-DEMBED_NET_PATH`, the single source of truth (the `Makefile` is a wrapper
+over that configure step and has no rule of its own), so the embedded copy can't
 drift from the shipped net; the `.S` embeds into ELF `.rodata` or COFF `.rdata`, so the engine binary is
 self-contained on Linux and Windows alike; linked into the engine only, not the test binaries).
 
@@ -545,7 +547,7 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 | `stamp_net.cpp`           | wrap a raw bullet net in the shared `RNNUE1` container: the 64-byte header, written from that build's own constants, with the map digest and both CRCs (`make tools` → `build/stamp_net`) |
 | `convert_psn1_payload.py` | one-off: read a net in the retired `PSN1` container and write a raw `RNNUE1` payload for `stamp_net` (§2) |
 | `setup_bullet.sh`         | clone bullet at the pinned commit + install/register our trainer examples |
-| `bullet/pawnstar.rs`      | the trainer (arch `768×8 king-bucketed → 1024×2 → 1`, SCReLU, QA/QB/SCALE) |
+| `bullet/pawnstar.rs`      | the trainer (arch `768×8 mirrored king-bucketed → 1024×2 → 8 heads → 1`, SCReLU, QA/QB/SCALE) |
 | `bullet/pawnstar_eval.rs` | reference evaluator for the `test_nnue` cross-check |
 | `train_pipeline.sh`       | train → export a net from a bulletformat `.data` file (or a directory of text shards) |
 | `verify_net.sh`           | cross-check (engine == trainer) + incremental-accumulator gate for a trained net |
@@ -872,7 +874,8 @@ Regenerate it with `tools/make_openings.sh [out.epd] [min_ply] [max_ply] [margin
 the net changes, since the balance filter is the net's own judgement. **This set used to be the measurement
 problem:** it held 306 positions, derived from a 385-line book, which a long match replayed about 13 times
 each - and replayed games are correlated, which is what `tools/opening_icc.py` widens a bar for (ICC
-0.07-0.13 measured). The book behind it is now 3,244 lines, so the set is 6,377 positions and the
+0.07-0.13 measured). The book behind it is now 3,244 lines as `make_book` wrote them (3,328 since
+`filter_book` screened it and added 84), so the set is 6,377 positions and the
 replay factor falls with it. An SPRT with more rounds than openings still replays some of them
 (`order=random`), and the correction still applies; it is simply much smaller.
 
@@ -941,7 +944,8 @@ arguments `test_nnue` is a no-op, so `make check` stays green if the net/referen
 
 A second test, `test_nnue_incremental <net.bin>`, plays random move sequences through a `SearchState`
 and asserts the incrementally-maintained accumulator evaluates **bit-identically** to a full refresh at
-every node (and again after every undo, to catch reverse-update bugs). With no argument it is a no-op,
+every node (and again after undoing every child, so a wrongly-tracked slot in the copy-make stack is
+caught too). With no argument it is a no-op,
 so `make check` stays green; run it with a net (e.g. `./build/test_nnue_incremental nnue/pawnstar-v20.bin`)
 after any change to the accumulator, feature indexing, or make/undo.
 

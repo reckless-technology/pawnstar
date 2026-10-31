@@ -90,10 +90,14 @@
 /// `OpeningBook` understands a trailing `?` on a move - *questionable*: replayed so the rest of the line
 /// still parses, never chosen - and `tools/filter_book` is what puts them there, by searching every book
 /// move and flagging the ones that lose more than a margin against the engine's best. This tool writes none,
-/// and the output has none. The frequency threshold is already a stronger filter than the one the marks were
-/// for: a move that a dozen 2200+ players chose from the same position is not a move the engine should be
-/// warned off. `filter_book` still runs over this book unchanged if that judgement is ever wanted - it
-/// preserves lines, comments and move numbers verbatim and only ever adds a `?` - and
+/// and its own output has none: the frequency threshold is already a strong filter, a move that a dozen
+/// 2200+ players chose from the same position needing no second opinion. **The shipped book has since been
+/// through `filter_book` anyway** (2026-10-31, 100 cp against the engine's own choice with pawnstar-v20.bin
+/// at depth 12), so `pawnstar.book` does carry `?` marks even though nothing here wrote them - regenerating
+/// with this tool means running `filter_book` after it, and `test_opening_book` is what catches forgetting
+/// that second step.
+/// The filter preserves lines, comments and move numbers verbatim and only ever adds a `?` or, where a
+/// position's every move was marked, one line ending in the engine's own unmarked choice - and
 /// `tools/make_openings.sh` strips the mark either way.
 ///
 /// Build:  make tools   ->   build/make_book

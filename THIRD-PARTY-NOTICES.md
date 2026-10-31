@@ -79,7 +79,7 @@ Adapted here:
   transposed output layer and its 32-bit bias, and the environment-variable configuration.
 - `tools/bullet/pawnstar_eval.rs`, the reference evaluator, follows the same example's SCReLU inference, the
   field layout of its `Network` struct and its dequantisation order, and takes the per-piece feature index and
-  the king-bucket offset from bullet's `Chess768` and `ChessBuckets` input types
+  the king-bucket offset and the mirror flip from bullet's `Chess768` and `ChessBucketsMirrored` input types
   (`crates/bullet_lib/src/game/inputs/chess768.rs` and `chess_buckets.rs`). The net loader, the FEN driver and
   the rest are Pawnstar's own.
 
