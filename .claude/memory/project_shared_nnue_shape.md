@@ -131,7 +131,9 @@ than reconfiguring it.
 
 **And the non-default shape's own suite is now only *mostly* runnable, which is worth knowing before
 promising a green `make check` there.** At `KING_MIRRORING=0 OUTPUT_BUCKETS=1`, sixteen of the seventeen
-suites pass in **19.46 s** (Legion, clang 22.1.8 MSVC ABI, 2026-10-30). The seventeenth,
+suites then registered pass in **19.46 s** (Legion, clang 22.1.8 MSVC ABI, 2026-10-30); re-measured once
+`opening_icc` and `pgn_nps` had landed it is **eighteen of nineteen in 22.0 s** (same machine,
+2026-10-31). The one that does not,
 `principal_variation`, searches the **synthetic** net to depth 8, and random weights give RFP, LMP and
 LMR no traction at all, so the tree is near full width: it **had not finished in five minutes**. The
 payload is the same fixed-seed stream at either shape, so this is not the weights changing - it is how

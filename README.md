@@ -1,6 +1,6 @@
 # Pawnstar
 
-[![CI](https://github.com/jonny-reckless/pawnstar/actions/workflows/ci.yml/badge.svg)](https://github.com/jonny-reckless/pawnstar/actions/workflows/ci.yml)
+[![CI](https://github.com/reckless-technology/pawnstar/actions/workflows/ci.yml/badge.svg)](https://github.com/reckless-technology/pawnstar/actions/workflows/ci.yml)
 
 Pawnstar is a [UCI](https://en.wikipedia.org/wiki/Universal_Chess_Interface) chess engine written in
 C++23. It uses a bitboard board representation, a parallel alpha-beta search (Lazy SMP),
@@ -114,7 +114,7 @@ The target is also the **coverage gate**: it fails when `src/`'s line coverage i
 0 reports without gating). What is measured is `src/`: the engine and its UCI front end, every header and
 `main.cpp`. The developer tools in `tools/` (`make_book`, `stamp_net`, `print_net_header`, `filter_book`, `nnue_quant_study`, `dump_magics`), which
 no release ships and no ctest runs, and the tests themselves are not counted. The suites cover 98.0 % of `src/`'s
-lines on Windows (clang 22) and 95.8 % in CI on Linux (clang 18); what is left is unreachable (the fallbacks for a corrupt embedded book or net, switch defaults,
+lines on Windows (clang 22) and 95.2 % in CI on Linux (clang 18, measured 2026-10-31: 3478 of 3654 lines); what is left is unreachable (the fallbacks for a corrupt embedded book or net, switch defaults,
 the max-ply guards), machine-dependent (the AVX-VNNI kernel on a CPU without it) or timing-dependent.
 
 The wrapper reconfigures on each invocation, so branch/knob changes are picked up automatically; if a build
@@ -181,7 +181,7 @@ its latest result on `main`). Every job runs on a GitHub-hosted runner, on an im
 (`ubuntu-24.04`, `windows-2025`), and installs what it needs with pinned versions. The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
-  build through the wrapper and runs all seventeen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  build through the wrapper and runs all nineteen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
   PyPI wheel in a venv of the job's own; apt has no `clang-format-22`). This is independent of the
@@ -191,6 +191,10 @@ its latest result on `main`). Every job runs on a GitHub-hosted runner, on an im
   instrumented with clang's source-based coverage, red when `src/`'s line coverage is under
   `PAWNSTAR_COVERAGE_MIN_LINES` (90 %), with the per-file table in the job summary. It installs clang-18 with
   llvm-18 from apt, so `llvm-profdata-18` and `llvm-cov-18` match the compiler that instrumented the build.
+- **new NNUE shape (mirroring + 8 output heads)** — the same suite in a build tree of its own with the shape
+  named explicitly (`KING_MIRRORING=1 OUTPUT_BUCKETS=8`), then `tools/new-shape-signature.sh` over a net
+  generated from nothing, and a last step that configures the retired v12 shape and runs the two suites that
+  read the shape (`net_header`, `nnue_incremental`) so the gated path cannot rot.
 - **artifact (linux x86_64 / windows x86_64)** — two per-OS jobs that build a release binary, run the full
   test suite on that platform, and — only on success — upload the version-named executable
   (`pawnstar_<major>_<minor>_<build>`, `.exe` on Windows) as a downloadable build artifact for that run. The
@@ -298,9 +302,11 @@ Pawnstar advertises these `setoption` options in its `uci` response:
 
 NNUE is Pawnstar's **only** evaluator, so a net is required. At startup the engine loads the shipped net
 `nnue/pawnstar-v20.bin` (~12.6 MB; resolved relative to the working directory, like `pawnstar.book`). If that file
-can't be loaded (wrong cwd, missing/renamed file), the engine **falls back to a copy of the net embedded
-in the binary** at build time, so it always has a working evaluator; it only errors out if both the file
-and the embedded copy fail. To use a different net:
+is **not there** (wrong cwd, missing/renamed file), the engine **falls back to a copy of the net embedded
+in the binary** at build time, so it always has a working evaluator; it errors out if that copy is refused too.
+A net file that **is** there and is **read and refused** — wrong architecture, wrong bucket map, corrupt
+payload — is **fatal and does not fall back**: the engine prints the reason and exits non-zero, because an
+engine that cannot play the net it was given must not play at all. To use a different net:
 
 ```
 setoption name EvalFile value /path/to/net.bin      # load a different net at runtime
@@ -589,7 +595,7 @@ above) and to prune losing captures in quiescence, and is covered by `test_see`.
 Pawnstar evaluates exclusively with an **NNUE** (Efficiently Updatable Neural Network), and has no
 hand-crafted evaluation to fall back on. `EvaluatePosition` consults the net directly, after a draw
 short-circuit. The shipped net is loaded at startup, with a copy embedded in the binary in case the file
-cannot be read, and another can be loaded at run time — see [The NNUE net](#the-nnue-net) above.
+is not there, and another can be loaded at run time — see [The NNUE net](#the-nnue-net) above.
 
 **The shape.** [nnue/pawnstar-v20.bin](nnue/pawnstar-v20.bin) is the shared Reckless NNUE shape, the same
 one [zenith](https://github.com/reckless-technology/zenith) and the two ports carry:
@@ -667,7 +673,8 @@ make check
 ```
 
 builds and runs fifteen standalone test executables (plus a shell-driven UCI integration test,
-`test/uci_test.sh`, run against `build/pawnstar`, and one Python suite, `test/pool_matches_test.py` — seventeen
+`test/uci_test.sh`, run against `build/pawnstar`, and three Python suites, `test/pool_matches_test.py`,
+`test/opening_icc_test.py` and `test/pgn_nps_test.py` — nineteen
 suites in all; the shell script also checks where the engine finds its net and book at startup, the embedded
 copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of input):
 
@@ -689,6 +696,8 @@ copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of inpu
 | `build/test_lc0_extract` | `tools/lc0_extract.h`'s extraction rules, driven against Lc0 v6 records built from plane words copied out of a real `test80` tar |
 | `build/test_net_header` | `tools/net_header_report.h`, the `RNNUE1` header reader `build/print_net_header` wraps: every field decoded at its documented offset from hand-laid fixtures (8 and 4 king buckets, and a header with no two equal fields), both CRCs and the payload length verified, each kind of damage reported, and the build's own net decoded against its known values |
 | `test/pool_matches_test.py` | `tools/pool_matches.py`, the pentanomial pooling tool: three completed matches' `Ptnml(0-2)` vectors pooled to their measured Elo, 95% bar and LOS, the chunk-scatter diagnostics on a known case, and the two traps - a doubled 1.959964 in the bar, and a 95% bar compared against a one-sigma scatter. Run by ctest as `pool_matches` wherever a Python interpreter is found |
+| `test/opening_icc_test.py` | `tools/opening_icc.py`, the opening-replay correction: four hand-computed one-way ANOVA fixtures (perfect correlation, none at all, exactly a third, and an unbalanced case where the balanced-design shortcut understates the inflation), its PGN reader against a fixture holding one of each way a round fails to be a colour-reversed pair, and its nominal figures anchored to `pool_matches`' own match A. Run by ctest as `opening_icc` |
+| `test/pgn_nps_test.py` | `tools/pgn_nps.py`, the absolute-nps reader: hand-summed node and time totals, a Black-to-move opening, a book move carrying no node counts, and a game missing a comment altogether. Run by ctest as `pgn_nps` |
 
 `test_bench_golden` runs the `bench` recipe (`RunBench` in `src/input_handling.h`, the code the `bench` command
 runs: depth 13, single-threaded, book off, hash cleared) with the shipped net and checks it against the golden
@@ -786,8 +795,8 @@ the published node counts for the standard positions.
   `PAWNSTAR_THREADS` environment variable if set, otherwise `hardware_concurrency()`.
 - **No syzygy/tablebase** support.
 - **NNUE is the only evaluator.** The engine loads the shipped net at startup, falls back to a copy
-  embedded in the binary if the file can't be loaded, and **exits** only if both fail (there is no
-  hand-crafted fallback). The accumulator is maintained incrementally and **lazily** across make/undo (the
+  embedded in the binary if the file is **not there**, and **exits** if that copy is refused too (there is no
+  hand-crafted fallback); a net file that is read and **refused** is fatal with no fallback. The accumulator is maintained incrementally and **lazily** across make/undo (the
   update is deferred until an evaluation reads it; one perspective is rebuilt when its king crosses a file
   or board-half bucket boundary, or the mirror's file boundary) and the kernels are AVX2-vectorised,
   so it is fast on the clock; the shipped net is a 1024-wide `ChessBucketsMirrored` net with 8 mirrored king
@@ -829,7 +838,7 @@ attribution, so the credit in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) i
 obligation Pawnstar carries - and nothing downstream inherits one either. The NNUE trainer sources under
 [tools/bullet/](tools/bullet) are written for the [bullet](https://github.com/jw1912/bullet) trainer and
 adapted from it: `pawnstar.rs` from its `simple` example, and `pawnstar_eval.rs` from that example and from its
-`Chess768` and `ChessBuckets` input code. bullet is MIT-licensed, Copyright (c) 2023 Jamie Whiting, so those two
+`Chess768` and `ChessBucketsMirrored` input code. bullet is MIT-licensed, Copyright (c) 2023 Jamie Whiting, so those two
 files are redistributed here with that attribution in their headers and bullet's licence text in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). bullet itself is not redistributed: `tools/setup_bullet.sh`
 fetches it at a pinned commit.

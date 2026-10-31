@@ -33,7 +33,8 @@ correlation of pair scores grouped by opening measured **0.07-0.13**, which `too
 widen a bar for. Every ICC figure in that tool and in `nnue/README.md` was measured on the 306-position set
 and is kept as a record of what was measured, not updated to the new size.
 
-The new book is **3,244 lines** and `nnue/openings.epd` is **6,377 positions**, so the replay
+The new book is **3,244 lines** as `make_book` wrote them - **3,328** since `filter_book` added 84 - and
+`nnue/openings.epd` is **6,377 positions**, derived from the book before that screening, so the replay
 factor falls by about 21x and the correction with it. More distinct openings is a direct, free win on
 every confidence interval the matches produce.
 
@@ -47,9 +48,12 @@ every confidence interval the matches produce.
   standard variant, finished game, at least 16 plies long. 73,128 of 10,680,708 games survived.
 - **The quality filter is frequency, nothing else.** Each accepted game's first 16 plies go into a
   prefix tree; a move is kept only where at least **8 games, and 1% of the games reaching the position** games played it from that position. A
-  move a dozen-plus strong players chose does not need a second opinion, which is why `tools/filter_book`
-  was **not** run and the book carries no `?` marks (it still runs over this book unchanged if that is ever
-  wanted).
+  move a dozen-plus strong players chose does not need a second opinion, so `tools/filter_book` was not run
+  when the book was first built. **It was run on 2026-10-31**, at a 100 cp margin against the engine's own
+  judgement with `pawnstar-v20.bin` at depth 12, so the shipped book now carries 1,172 `?` marks over 120
+  distinct moves, and 84 lines were added - the engine's own choice, unmarked - for the positions whose
+  every move was marked and which would otherwise have had nothing to play. Every database line is still
+  present in full; the book's own `# ---- filter_book ----` header records all of it.
 - **Each pruned leaf is one line**, so no line is a prefix of another and each appears once. **That makes a
   move's weight in `OpeningBook::GetMove` the number of lines passing through it, not the number of games
   that played it** - the two correlate but are not the same number. Writing one line per game would

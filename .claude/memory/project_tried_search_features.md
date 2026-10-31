@@ -130,6 +130,9 @@ Search features already experimented on in Pawnstar (SPRT-tested) — do not re-
   correctness gate (eval values identical ⇒ search identical), then SPRT'd as a pure speed→Elo win. Much
   bigger than the SEE micro-opt because the accumulator update is a real chunk of an NNUE-bound node, not
   ~1–2% like movegen. **Lesson: defer per-node NNUE work past the pruning that might skip it.**
+  (The *deferral* shipped and stayed; the single `accumulator_ply_` catch-up it was built on did not -
+  commit a167ea4 replaced it with the per-ply copy-make stack `acc_stack_`/`acc_valid_`, where `UndoMove`
+  does no accumulator work at all. Read the member names here as of 2026-06-27.)
 
 - **Runtime AVX-VNNI dispatch for the int8 output dot: SHIPPED, bit-identical, ~+1.3% nps** (2026-06-27,
   commit 1aec979, merged+pushed). The int8 output dot now picks the AVX-VNNI `vpdpbusd` kernel

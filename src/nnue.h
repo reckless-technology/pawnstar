@@ -33,7 +33,7 @@
 /// no second constant to forget. It was a hand-set constant until 2026-10-27, and lowering it without editing
 /// the map left WhiteBucket/BlackBucket returning the map's old bank indices, which reach past the end of
 /// feature_weights_ (768 * kNumKingBuckets rows) - a buffer overrun, not a smaller net. This mirrors
-/// tools/bullet/pawnstar.rs, which derives its own NUM_BUCKETS from KING_BUCKETS the same way. A
+/// tools/bullet/pawnstar.rs, which derives its own NUM_BUCKETS from KING_BUCKETS_HALF the same way. A
 /// static_assert beside the map still checks what the derivation cannot see: that no entry is negative and
 /// that the banks are numbered from 0 with no gaps, since a map selecting only banks {0, 3} would size the
 /// weights for four and leave two of them untrained.
@@ -126,11 +126,13 @@ namespace nnue
 /// which is why v12 does not have it.
 constexpr bool kIsKingMirroringEnabled = PAWNSTAR_NNUE_KING_MIRRORING != 0;
 
-/// @brief King-square -> weight-bank map (bullet `ChessBuckets`). Indexed by a square in the *perspective's
-/// own* orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map
-/// serves both perspectives. MUST be byte-identical to the array passed to ChessBuckets::new in
-/// tools/bullet/*.rs. It is the one place the bucketing is written down: kNumKingBuckets is derived from it
-/// below, so there is no second constant to keep in step.
+/// @brief **The RETIRED v12 shape's** king-square -> weight-bank map (bullet `ChessBuckets`, unmirrored):
+/// four file-*pairs* by board-half, `half * 4 + file / 2`. Indexed by a square in the *perspective's own*
+/// orientation (white king square directly; black king square ^ kRankFlip), so the same 64-entry map serves
+/// both perspectives. It is compiled only when mirroring is off (see kKingBucketMap below) and no trainer in
+/// tools/bullet/*.rs passes it any more - the shipped shape's map is kKingBucketMapHalf, which is where the
+/// bucketing is written down and which test_primitives compares against the trainer's copy. Kept because the
+/// retired shape still has a CI gate, and because it has no 32-entry form: it is not mirror-symmetric.
 constexpr std::array<int, 64> kKingBucketMapUnmirrored = {
     0, 0, 1, 1, 2, 2, 3, 3, //
     0, 0, 1, 1, 2, 2, 3, 3, //
@@ -426,7 +428,8 @@ class Network
 
     /// @brief Evaluate from a maintained accumulator using the **int8** output layer — the engine's shipped
     /// evaluator (~1.86x faster than the exact int16 dot; a measured +31.8 Elo at 8+0.08), accurate to a
-    /// bounded ~26 cp of EvaluateExact.
+    /// bounded 40 cp of EvaluateExact (v20's measured maximum over test/nnue_reference.txt, 2026-10-30; it
+    /// was 26-28 cp with single-head v12, one int8 scale being shared across all eight heads).
     /// @param acc Accumulator matching @p position.
     /// @param position The position @p acc was maintained for. It supplies the side to move, which selects
     /// which perspective feeds the first half of the output layer, and the piece count, which selects the
@@ -1035,7 +1038,8 @@ inline int Network::Evaluate(const Accumulator &acc, const Position &position) c
     // The engine's evaluation: the **int8** output layer (the shipped default). Activations are requantised
     // to uint8 (SCReLU >> kInt8Shift) and the output weights to int8; the dot accumulates in int32 (the
     // Phase-1 study showed |dot| <= 86M << 2^31). This is ~1.86x faster than the exact int16 dot (a measured
-    // +31.8 Elo at 8+0.08) at a bounded ~26 cp deviation from EvaluateExact. The side-to-move accumulator
+    // +31.8 Elo at 8+0.08) at a bounded 40 cp deviation from EvaluateExact (v20's measured maximum,
+    // 2026-10-30; 26-28 cp with single-head v12). The side-to-move accumulator
     // feeds the first half of the output layer.
     const bool                              white_to_move = position.color_to_move_ == kWhite;
     const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white_ : acc.black_;
