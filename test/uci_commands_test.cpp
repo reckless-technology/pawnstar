@@ -330,6 +330,12 @@ void HandshakesAndDiagnostics(Game &game)
     // turning the courtesy back into a duty.
     Check(Contains(license, "CC0 waives attribution"),
           "license: says plainly that the Lichess credit is owed to nobody", license);
+    // Not every line of the book came from the database: screening marks the moves this engine rates far below its
+    // own choice, and where that left a position nothing it would play, its own choice was added there. Those lines
+    // are this project's work. The notice says so because a reader checking the book's provenance against the CC0
+    // paragraph should not have to discover the distinction from the book file itself.
+    Check(Contains(license, "Eighty-four of the book's 3,328 lines"),
+          "license: distinguishes the lines the engine chose from the database's own", license);
 
     const std::string dbg = Run(game, {"dbgclear", "dbg"});
 #if DEBUGX
