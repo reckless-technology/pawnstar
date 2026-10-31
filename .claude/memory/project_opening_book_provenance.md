@@ -51,12 +51,33 @@ every confidence interval the matches produce.
   standard variant, finished game, at least 16 plies long. 73,128 of 10,680,708 games survived.
 - **The quality filter is frequency, nothing else.** Each accepted game's first 16 plies go into a
   prefix tree; a move is kept only where at least **8 games, and 1% of the games reaching the position** games played it from that position. A
-  move a dozen-plus strong players chose does not need a second opinion, so `tools/filter_book` was not run
-  when the book was first built. **It was run on 2026-10-31**, at a 100 cp margin against the engine's own
-  judgement with `pawnstar-v20.bin` at depth 12, so the shipped book now carries 1,172 `?` marks over 120
-  distinct moves, and 84 lines were added - the engine's own choice, unmarked - for the positions whose
-  every move was marked and which would otherwise have had nothing to play. Every database line is still
-  present in full; the book's own `# ---- filter_book ----` header records all of it.
+  move a dozen-plus strong players chose does not need a second opinion, so the book was not screened
+  against the engine's judgement when it was first built. **It was screened on 2026-10-31**, at a 100 cp
+  margin with `pawnstar-v20.bin` at depth 12: 555 of its 8,923 (position, move) pairs were marked, which is
+  1,172 `?` marks over 120 distinct moves in the file, and 84 lines were added - the engine's own choice,
+  unmarked - for the positions whose every move was marked and which would otherwise have had nothing to
+  play. 3,328 lines out, from 3,244 in. Every database line is still present in full; the book's own
+  `# ---- filter_book ----` header records all of it, and keeps that name because it is the record of the
+  run that produced the committed file.
+- **The screener has moved out of this repository.** It was `tools/filter_book.cpp`, which linked this
+  engine's evaluation in; that meant one copy per engine, each rotting separately, and it had not compiled
+  since the eight-bucket net landed - nothing built against it and no test ran it, so nobody noticed until a
+  book needed screening, and when repaired it had five independent defects, three of which silently
+  corrupted its output. It was retired on 2026-10-31. The replacement drives any engine over UCI and is
+  library code with tests, in the public `amphitheater-chess` repository:
+
+  ```sh
+  amphitheater-cli screenbook -engine cmd=<engine> -book <book> [-out <book>] [-depth 12] [-margin 100] [-marks <file>]
+  ```
+
+  `-out` defaults to the book that was read. **The reasons are written up in that repository's
+  `src/match/BookScreener.h` header comment**, and are worth reading before changing any of it rather than
+  re-deriving: that a weak move is *marked* rather than deleted because deleting cost 45% of the book's
+  lines, 2,225 positions and its answer to 13 opponent second moves; that `ucinewgame` must precede every
+  search, or the parent search's fail-low bound on a move is read back as evidence against that same move;
+  and that a restricted and an unrestricted search are not the same quantity - after `1.Nf3 g6` an
+  unrestricted depth-12 search scores `e2e4` at +190, while the same move searched alone at the same depth
+  scores +102, so the reference move is re-scored the same restricted way every book move is.
 - **Each pruned leaf is one line**, so no line is a prefix of another and each appears once. **That makes a
   move's weight in `OpeningBook::GetMove` the number of lines passing through it, not the number of games
   that played it** - the two correlate but are not the same number. Writing one line per game would

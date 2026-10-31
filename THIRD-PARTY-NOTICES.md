@@ -117,10 +117,12 @@ monthly export of standard rated games named in the book file's own header, whic
 used, the counts and the SHA-256 of exactly the bytes read. `tools/make_book.cpp` built it, and
 `nnue/openings.epd` (the match opening set, built by `tools/make_openings.sh`) is derived from the same book.
 
-**84 of its 3,328 lines end in a move this engine chose, not one the database played.** `tools/filter_book`
-marks a move scoring more than its margin below the position's best with a trailing `?`, which the loader
-replays but never selects; where that left a position with nothing it could play, the engine's own choice was
-added there. The book's own header says so of them and gathers them in a marked section at its end. **The CC0
+**84 of its 3,328 lines end in a move this engine chose, not one the database played.** The book was screened
+against the engine's own judgement at depth 12 with a 100 cp margin, by `amphitheater-cli screenbook` in the
+public `amphitheater-chess` repository: a move scoring more than the margin below its position's best carries a
+trailing `?`, which the loader replays but never selects, and where that left a position with nothing it could
+play, the engine's own choice was added there. The book's own header says so of them and gathers them in a
+marked section at its end. **The CC0
 statement below is about the database's lines.** Those 84 are this project's own work and carry no condition
 either, so nothing downstream changes - but a reader checking the book's provenance against this file should
 not have to discover the distinction from the file it describes.

@@ -197,14 +197,15 @@ int main()
 
         Check(shipped_lines > 385, "the shipped book is wider than the 385-line book it replaced");
 
-        // The book has been through tools/filter_book: a move scoring far enough below its position's best
-        // carries a '?', which is replayed but never chosen. Pinned for the same reason as the line count
-        // above - an unfiltered book loads perfectly and plays every move the database offered, including the
-        // ones this engine evaluates as losing a pawn, and nothing else here would notice. Regenerating the
-        // book means make_book THEN filter_book; this is what catches forgetting the second step.
+        // The book has been screened against the engine's own judgement, at depth 12 with a 100 cp margin: a
+        // move scoring far enough below its position's best carries a '?', which is replayed but never
+        // chosen. Pinned for the same reason as the line count above - an unscreened book loads perfectly and
+        // plays every move the database offered, including the ones this engine evaluates as losing a pawn,
+        // and nothing else here would notice. Regenerating the book means make_book THEN screening it with
+        // `amphitheater-cli screenbook`; this is what catches forgetting the second step.
         Check(shipped.find('?') != std::string::npos, "the shipped book carries questionable-move marks");
 
-        // Where every move a position had is marked, filter_book adds the engine's own choice there, unmarked.
+        // Where every move a position had is marked, the screener adds the engine's own choice there, unmarked.
         // Those are the only moves in the file that are not the database's, so the file has to say so: the
         // header's CC0 claim is about the database's lines, and a reader must not take it to cover these.
         Check(shipped.find("NOT THE DATABASE'S") != std::string::npos,

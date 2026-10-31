@@ -80,7 +80,7 @@ echo "[1/4] start-position baseline ${BASELINE} cp; keeping positions within +/-
 
 # [2/4] Turn each book line into the UCI commands for its candidate positions.
 #
-# A book line is whitespace-separated coordinate moves; filter_book may have suffixed a move with '?' to
+# A book line is whitespace-separated coordinate moves; the book screener may have suffixed a move with '?' to
 # mark it questionable, which is not part of the move, and move-number tokens start with a digit. Strip
 # both. Then, for every ply in [MIN_PLY, MAX_PLY] that the line reaches, emit the three commands that set
 # that position up and report it.
