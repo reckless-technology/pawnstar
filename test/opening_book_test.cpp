@@ -196,6 +196,57 @@ int main()
         }
 
         Check(shipped_lines > 385, "the shipped book is wider than the 385-line book it replaced");
+
+        // The book has been through tools/filter_book: a move scoring far enough below its position's best
+        // carries a '?', which is replayed but never chosen. Pinned for the same reason as the line count
+        // above - an unfiltered book loads perfectly and plays every move the database offered, including the
+        // ones this engine evaluates as losing a pawn, and nothing else here would notice. Regenerating the
+        // book means make_book THEN filter_book; this is what catches forgetting the second step.
+        Check(shipped.find('?') != std::string::npos, "the shipped book carries questionable-move marks");
+
+        // Where every move a position had is marked, filter_book adds the engine's own choice there, unmarked.
+        // Those are the only moves in the file that are not the database's, so the file has to say so: the
+        // header's CC0 claim is about the database's lines, and a reader must not take it to cover these.
+        Check(shipped.find("NOT THE DATABASE'S") != std::string::npos,
+              "the shipped book distinguishes the engine's own moves from the database's");
+
+        // And the invariant that addition exists for: no position the book reaches is left with nothing to
+        // play. A '?' move is not selectable, so a position whose every move is marked would return
+        // Move::None and drop the engine out of book - silently, and exactly where an opponent had just
+        // played something unusual. Replay every line and require a selectable move at every position the
+        // line continues from; the last position of a line is a leaf and is allowed to have none.
+        std::istringstream lines_text{shipped};
+        std::size_t        dead_ends = 0;
+
+        for (std::string line; std::getline(lines_text, line);)
+        {
+            if (line.empty() || line.front() == '#')
+            {
+                continue;
+            }
+            Position                 position = Position::FromString(kStartFen);
+            std::vector<std::string> moves;
+            std::istringstream       tokens{line};
+
+            for (std::string token; tokens >> token;)
+            {
+                if (token.front() == '#')
+                {
+                    break;
+                }
+                moves.push_back(token.back() == '?' ? token.substr(0, token.size() - 1) : token);
+            }
+            for (std::size_t i = 0; i + 1 < moves.size(); ++i) // every position but the line's last
+            {
+                position = Play(position, moves[i]);
+                if (shipped_book.GetMove(position.hash_) == Move::None())
+                {
+                    ++dead_ends;
+                }
+            }
+        }
+
+        Check(dead_ends == 0, "every position the shipped book continues from has a move it may actually play");
     }
 
     return test_report::Summary("OPENING BOOK: loading, weighting, display and '?' (questionable) moves");

@@ -36,6 +36,7 @@
 #include <atomic>
 #include <cctype>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <map>
@@ -43,6 +44,7 @@
 #include <mutex>
 #include <optional>
 #include <ranges>
+#include <set>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -51,6 +53,31 @@
 namespace
 {
 constexpr const char *kStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+// This tool's own comment block is fenced by these, so re-running on a book it already pruned rewrites that
+// block instead of stacking a second copy above it. Re-running is a documented thing to do - it is how a
+// different margin is tried - and a committed book must not grow a header every time.
+constexpr const char *kBlockStart = "# ---- filter_book ----";
+constexpr const char *kBlockEnd   = "# ---- end filter_book ----";
+constexpr const char *kRefillMark = "# ---- filter_book: the engine's own moves ----";
+
+/// @brief True for a comment line belonging to a previous run's own block, which this run has rewritten.
+/// @param line         The input line.
+/// @param inside_block Carried between calls: true while between the fence markers.
+bool IsOurOwnComment(const std::string &line, bool &inside_block)
+{
+    if (line.starts_with(kBlockStart))
+    {
+        inside_block = true;
+        return true;
+    }
+    if (line.starts_with(kBlockEnd))
+    {
+        inside_block = false;
+        return true;
+    }
+    return inside_block || line.starts_with(kRefillMark);
+}
 
 struct SearchResult
 {
@@ -109,11 +136,21 @@ struct Shared
     int                         margin_;
     std::map<std::string, bool> verdict_; ///< (position, move) -> questionable. Guarded by verdict_mtx.
     std::mutex                  verdict_mtx_;
-    std::map<zobrist_t, int>    reference_; ///< position -> the score its moves are measured against.
-    std::mutex                  reference_mtx_;
-    std::mutex                  log_mtx_;         ///< Serialises stderr flag messages.
-    std::atomic<int>            moves_scored_{0}; ///< Search pairs computed (may double-count racing duplicates).
-    std::atomic<int>            moves_flagged_{0};
+
+    /// A position's reference: the engine's own choice there, and that move's score measured the same
+    /// restricted way every book move is. The move is kept because it is what refills the position if the
+    /// margin removes everything the book offered.
+    struct Reference
+    {
+        int         score_;
+        std::string move_;
+    };
+
+    std::map<zobrist_t, Reference> reference_;
+    std::mutex                     reference_mtx_;
+    std::mutex                     log_mtx_;         ///< Serialises stderr flag messages.
+    std::atomic<int>               moves_scored_{0}; ///< Search pairs computed (may double-count racing duplicates).
+    std::atomic<int>               moves_flagged_{0};
 };
 
 /// @brief The score to measure this position's book moves against: the engine's own preferred move, scored the
@@ -137,7 +174,7 @@ struct Shared
 /// here: a '?' on a sound move costs the engine a line it should have played.
 ///
 /// @return The reference score, or nullopt if the position has no legal move at all.
-std::optional<int> ReferenceScore(Game &game, const Position &pos, Shared &sh)
+std::optional<Shared::Reference> ReferenceScore(Game &game, const Position &pos, Shared &sh)
 {
     {
         std::lock_guard<std::mutex> lk{sh.reference_mtx_};
@@ -152,12 +189,13 @@ std::optional<int> ReferenceScore(Game &game, const Position &pos, Shared &sh)
     {
         return std::nullopt;
     }
-    const SearchResult reference = Search(game, fen, sh.depth_, chosen.move_);
+    const SearchResult      scored    = Search(game, fen, sh.depth_, chosen.move_);
+    const Shared::Reference reference = {scored.score_, chosen.move_};
     {
         std::lock_guard<std::mutex> lk{sh.reference_mtx_};
-        sh.reference_[pos.hash_] = reference.score_;
+        sh.reference_[pos.hash_] = reference;
     }
-    return reference.score_;
+    return reference;
 }
 
 /// @brief Decide whether a book move is questionable, consulting/updating the shared verdict cache.
@@ -212,9 +250,9 @@ bool JudgeQuestionable(Game &game, const Position &pos, const Move &mv, Shared &
         }
     }
     // Cache miss: run the two scoring searches with no lock held (see threading note above).
-    const std::string        parent_fen = pos.ToString();
-    const std::optional<int> reference  = ReferenceScore(game, pos, sh);
-    const SearchResult       book       = Search(game, parent_fen, sh.depth_, mv.ToString());
+    const std::string                      parent_fen = pos.ToString();
+    const std::optional<Shared::Reference> reference  = ReferenceScore(game, pos, sh);
+    const SearchResult                     book       = Search(game, parent_fen, sh.depth_, mv.ToString());
 
     bool questionable = false;
     // Either search failing to find a move means the root has no legal move at all, so the book line has ended
@@ -222,8 +260,8 @@ bool JudgeQuestionable(Game &game, const Position &pos, const Move &mv, Shared &
     // a strong move with '?'.
     if (reference.has_value() && book.found_)
     {
-        const int book_value = book.score_;             // the book move's own score, restricted
-        const int loss       = *reference - book_value; // how far below the engine's own move, measured alike
+        const int book_value = book.score_;                    // the book move's own score, restricted
+        const int loss       = reference->score_ - book_value; // how far below the engine's own move, alike
         questionable         = loss > sh.margin_;
         sh.moves_scored_.fetch_add(1, std::memory_order_relaxed);
         if (questionable)
@@ -232,7 +270,7 @@ bool JudgeQuestionable(Game &game, const Position &pos, const Move &mv, Shared &
             // Log every flag so the run can be reviewed: the move, the two scores, the loss, and the FEN of the
             // position it was played from. log_mtx keeps concurrent messages from interleaving on stderr.
             std::lock_guard<std::mutex> lk{sh.log_mtx_};
-            std::cerr << "  flag " << mv.ToString() << "  best=" << *reference << " book=" << book_value
+            std::cerr << "  drop " << mv.ToString() << "  best=" << reference->score_ << " book=" << book_value
                       << " loss=" << loss << "  " << parent_fen << "\n";
         }
     }
@@ -256,33 +294,51 @@ bool JudgeQuestionable(Game &game, const Position &pos, const Move &mv, Shared &
 /// @param line_no Zero-based line index, used only for diagnostics.
 /// @param sh      Shared verdict cache / counters / logging.
 /// @return The rewritten line (single-spaced tokens, comment re-appended).
-std::string ProcessLine(Game &game, const std::string &line, int line_no, Shared &sh)
+/// @brief What judging one book line produced.
+struct LineOutcome
+{
+    std::vector<std::string> kept_;        ///< The line's tokens, each move carrying a '?' if it was marked.
+    std::string              comment_;     ///< Any trailing '#' comment, preserved verbatim.
+    bool                     has_moves_{}; ///< False for a blank or comment-only line, which passes through.
+};
+
+/// @brief Judge one book line, marking each below-margin move with a trailing '?'.
+///
+/// A move more than the margin below its position's reference gets a '?', which `OpeningBook::ParseLineOfPlay`
+/// replays - so the rest of the line still parses - but never selects. The line keeps its full length, and
+/// that is the point of marking rather than deleting: the moves after a marked move are the replies to it, and
+/// the engine needs them when an opponent plays the move it declined itself. Deleting the move would take the
+/// whole continuation with it and leave the engine out of book exactly where an opponent had surprised it.
+///
+/// A marked move is not selectable, though, so a position all of whose moves are marked has nothing to play.
+/// The caller puts the engine's own choice at those positions, unmarked. See main.
+LineOutcome ProcessLine(Game &game, const std::string &line, int line_no, Shared &sh)
 {
     // Split off any trailing '#' comment (to end of line) and keep it verbatim to re-append at the end.
     std::string body = line;
-    std::string comment;
+    LineOutcome outcome;
     if (const auto h = line.find('#'); h != std::string::npos)
     {
-        body    = line.substr(0, h);
-        comment = line.substr(h);
+        body             = line.substr(0, h);
+        outcome.comment_ = line.substr(h);
     }
 
     // Every line is replayed from the standard start position, just like the book loader does.
-    Position                 pos = Position::FromString(kStartFen);
-    std::vector<std::string> out_tokens;
-    std::stringstream        ss{body};
-    std::string              tok;
+    Position          pos = Position::FromString(kStartFen);
+    std::stringstream ss{body};
+    std::string       tok;
 
     while (ss >> tok)
     {
         // Move numbers ("1.", "12.") start with a digit and are not moves - copy them through unchanged.
         if (std::isdigit(static_cast<unsigned char>(tok[0])))
         {
-            out_tokens.push_back(tok);
+            outcome.kept_.push_back(tok);
             continue;
         }
-        // Strip any pre-existing '?' so re-running the filter recomputes the verdict from scratch (idempotent
-        // on a book that was already filtered, and lets you re-run with a different margin).
+        outcome.has_moves_ = true;
+        // Strip any pre-existing '?' so a book that was already marked still reads, and re-running recomputes
+        // the verdict from scratch: idempotent, and it lets you re-run with a different margin.
         const std::string coord = (tok.back() == '?') ? tok.substr(0, tok.size() - 1) : tok;
 
         // Resolve the coordinate token to the actual legal Move from this position (needed to advance and to
@@ -295,34 +351,45 @@ std::string ProcessLine(Game &game, const std::string &line, int line_no, Shared
             // remaining tokens depend on a position we can no longer reconstruct).
             std::lock_guard<std::mutex> lk{sh.log_mtx_};
             std::cerr << "filter_book: illegal move '" << coord << "' in line " << line_no + 1 << "; passing through\n";
-            out_tokens.push_back(tok);
+            outcome.kept_.push_back(tok);
             break;
         }
         const Move mv           = *it;
         const bool questionable = JudgeQuestionable(game, pos, mv, sh);
-        out_tokens.push_back(questionable ? coord + "?" : coord);
+        outcome.kept_.push_back(questionable ? coord + "?" : coord);
         pos = pos.MakeMove(mv); // advance to judge the next move from the resulting position
     }
 
-    // Reassemble: single-spaced tokens, then the preserved comment (if any).
-    std::string rebuilt;
-    for (size_t i = 0; i < out_tokens.size(); ++i)
+    return outcome;
+}
+
+/// @brief The move tokens of a line, with any move-number tokens dropped - what makes two lines the same line.
+std::vector<std::string> MoveTokensOf(const std::vector<std::string> &tokens)
+{
+    std::vector<std::string> moves;
+    for (const std::string &t : tokens)
     {
-        if (i)
+        if (!std::isdigit(static_cast<unsigned char>(t[0])))
         {
-            rebuilt += ' ';
+            moves.push_back(t);
         }
-        rebuilt += out_tokens[i];
     }
-    if (!comment.empty())
+    return moves;
+}
+
+/// @brief Join move tokens with single spaces.
+std::string JoinMoves(const std::vector<std::string> &moves)
+{
+    std::string joined;
+    for (const std::string &m : moves)
     {
-        if (!rebuilt.empty())
+        if (!joined.empty())
         {
-            rebuilt += ' ';
+            joined += ' ';
         }
-        rebuilt += comment;
+        joined += m;
     }
-    return rebuilt;
+    return joined;
 }
 } // namespace
 
@@ -394,7 +461,12 @@ int main(int argc, char *argv[])
         input_lines.push_back(line);
     }
 
-    std::ofstream out{out_path};
+    // Binary, so a newline stays one byte. In text mode on Windows the runtime writes CRLF, and the same
+    // book filtered on Windows and on Linux would then differ in every line ending - which matters more
+    // here than it looks: this file is copied byte for byte into pawnstar-rs and pawnstar-go, where the
+    // three copies having one SHA-256 is the check that the copy actually happened. The book is marked
+    // `-text` in .gitattributes for the same reason, so git will not quietly normalise this either.
+    std::ofstream out{out_path, std::ios::binary};
     if (!out)
     {
         std::cerr << "filter_book: cannot write '" << out_path << "'\n";
@@ -440,7 +512,7 @@ int main(int argc, char *argv[])
 
     // Per-line outputs, written back at their original index so the final file order matches the input order
     // regardless of which worker finished which line when.
-    std::vector<std::string> output_lines(input_lines.size());
+    std::vector<LineOutcome> outcomes(input_lines.size());
     std::atomic<size_t>      next{0}; // shared cursor: the next line index to claim (work-stealing)
     std::atomic<bool>        load_failed{false};
 
@@ -460,13 +532,13 @@ int main(int argc, char *argv[])
         // Claim line indices atomically until they run out; lines are independent units of work.
         for (size_t idx = next.fetch_add(1); idx < input_lines.size(); idx = next.fetch_add(1))
         {
-            output_lines[idx] = ProcessLine(game, input_lines[idx], (int)idx, sh);
+            outcomes[idx]     = ProcessLine(game, input_lines[idx], (int)idx, sh);
             const size_t done = idx + 1;
             if (done % 20 == 0) // periodic progress; "~" because claim order is not completion order
             {
                 std::lock_guard<std::mutex> lk{sh.log_mtx_};
                 std::cerr << "filter_book: ~" << done << "/" << input_lines.size() << " lines, "
-                          << sh.moves_flagged_.load() << " flagged so far\n";
+                          << sh.moves_flagged_.load() << " marked so far\n";
             }
         }
     };
@@ -487,13 +559,149 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // All workers done: flush the rewritten lines in input order.
-    for (const auto &l : output_lines)
+    // ---- Which positions have nothing selectable? ----
+    //
+    // A verdict is per (position, move), but "this position has nothing to play" is a property of the whole
+    // book: the same position is reached by several lines and by several move orders, and a move marked in one
+    // line is the same move in another. So replay every line - no searching, just the moves - and collect the
+    // positions that have at least one move the engine may actually choose, and the way each was reached.
+    std::set<zobrist_t>                           selectable;
+    std::map<zobrist_t, std::vector<std::string>> reached_by;
+    for (const LineOutcome &outcome : outcomes)
     {
-        out << l << '\n';
+        Position                 pos = Position::FromString(kStartFen);
+        std::vector<std::string> prefix;
+        for (const std::string &token : MoveTokensOf(outcome.kept_))
+        {
+            const bool        marked = token.back() == '?';
+            const std::string coord  = marked ? token.substr(0, token.size() - 1) : token;
+            auto              moves  = pos.GenerateLegalMoves();
+            auto              it = std::ranges::find_if(moves, [&](const Move &m) { return m.ToString() == coord; });
+            if (it == moves.end())
+            {
+                break; // an illegal token passed through above, and was reported there
+            }
+            reached_by.try_emplace(pos.hash_, prefix);
+            if (!marked)
+            {
+                selectable.insert(pos.hash_);
+            }
+            // The prefix keeps each move's mark. Writing it bare would put every marked move along the way
+            // back into the selectable set, because the parser selects whatever carries no '?' - so the
+            // lines added to stop a position dead-ending would undo the marking that created it. Only the
+            // move appended at the end is unmarked, and only there because the engine chose it.
+            prefix.push_back(token);
+            pos = pos.MakeMove(*it);
+        }
     }
 
-    std::cerr << "filter_book: done. " << input_lines.size() << " lines, " << sh.moves_scored_.load()
-              << " move searches, " << sh.moves_flagged_.load() << " flagged questionable. Wrote " << out_path << "\n";
+    // ---- Refill the emptied positions with the engine's own choice ----
+    //
+    // The reference move is at zero loss by construction - it IS the move the margin is measured from - so a
+    // refilled position offers exactly what the engine would have found by searching. The book keeps its job
+    // without ever offering a move the engine would decline.
+    // The chosen move is never itself marked - its loss is zero by construction, being what the margin is
+    // measured from - so a position whose every move is marked is a position the book does not offer it.
+    std::vector<std::vector<std::string>> refills;
+    for (const auto &[hash, prefix] : reached_by)
+    {
+        if (selectable.count(hash) != 0)
+        {
+            continue;
+        }
+        const auto it = sh.reference_.find(hash);
+        if (it == sh.reference_.end())
+        {
+            std::cerr << "filter_book: no reference move cached for a position with nothing to play\n";
+            continue;
+        }
+        std::vector<std::string> line = prefix;
+        line.push_back(it->second.move_);
+        refills.push_back(line);
+    }
+
+    // Marking leaves every original line exactly as long as it was, so the input's structure is untouched and
+    // only the refills could repeat something. A refill cannot duplicate an existing line - the move it adds
+    // is unmarked where every move the book had there is marked - but a cheap guard costs nothing.
+    std::set<std::string> existing;
+    for (const LineOutcome &outcome : outcomes)
+    {
+        existing.insert(JoinMoves(MoveTokensOf(outcome.kept_)));
+    }
+
+    // ---- Write ----
+    //
+    // This tool's record goes first, ahead of the generator's header, because that header says every line
+    // below came from the database and that is no longer the whole truth: the refilled lines end in a move
+    // this engine chose. A reader should meet the qualification before the claim it qualifies.
+    // The net by its file name, not the path as it was typed: a Windows invocation gives
+    // "nnue\\pawnstar-v20.bin" and a Linux one "nnue/pawnstar-v20.bin", and the book would then differ by
+    // platform in its own header - exactly what writing LF above is for. The name identifies the net; the
+    // path only says where it sat on one machine.
+    out << kBlockStart << "\n"
+        << "# SCREENED AGAINST THE ENGINE'S OWN JUDGEMENT by tools/filter_book, with "
+        << std::filesystem::path{net_path}.filename().string() << " at depth " << depth << ".\n"
+        << "#\n"
+        << "# Any move scoring more than " << margin << " cp below its position's reference carries a\n"
+        << "# trailing '?'. OpeningBook::ParseLineOfPlay replays such a move - so the rest of its line still\n"
+        << "# parses, and the engine keeps its reply to it - but never selects it. So the engine answers a\n"
+        << "# move it would not play itself, which is the whole reason for marking rather than deleting.\n"
+        << "#\n"
+        << "# The reference is the engine's own choice at that position, re-scored the same restricted way\n"
+        << "# every book move is, so that the two numbers are comparable; tools/filter_book.cpp says why that\n"
+        << "# matters more than it sounds.\n"
+        << "#\n"
+        << "# A marked move cannot be chosen, so a position whose every move is marked would have nothing to\n"
+        << "# play. Those positions were given the engine's own choice, unmarked - zero loss by construction,\n"
+        << "# being the move the margin is measured from. THOSE MOVES ARE THIS ENGINE'S, NOT THE DATABASE'S,\n"
+        << "# and each is the last move of a line in the marked section at the end of this file. Nothing else\n"
+        << "# here was added and nothing was taken away: every database line is still present in full.\n"
+        << kBlockEnd << "\n";
+    int  written          = 0;
+    bool inside_our_block = false;
+    for (size_t idx = 0; idx < outcomes.size(); ++idx)
+    {
+        const LineOutcome &outcome = outcomes[idx];
+        if (!outcome.has_moves_)
+        {
+            // A blank or comment-only line: the generator's own header, passed through - unless it is this
+            // tool's own block from an earlier run, which has just been rewritten above.
+            if (!IsOurOwnComment(input_lines[idx], inside_our_block))
+            {
+                out << input_lines[idx] << '\n';
+            }
+            continue;
+        }
+        out << JoinMoves(outcome.kept_);
+        if (!outcome.comment_.empty())
+        {
+            out << ' ' << outcome.comment_;
+        }
+        out << '\n';
+        ++written;
+    }
+    int refills_written = 0;
+    for (const auto &line : refills)
+    {
+        const std::string joined = JoinMoves(line);
+        if (existing.count(joined) != 0)
+        {
+            continue;
+        }
+        if (refills_written == 0)
+        {
+            out << kRefillMark << "\n"
+                << "# THE ENGINE'S OWN MOVES. Each line below ends in a move this engine chose, because every\n"
+                << "# database move at that position is marked '?' and so cannot be played. The moves before\n"
+                << "# it are the database's, exactly as above.\n";
+        }
+        out << joined << '\n';
+        ++refills_written;
+    }
+
+    std::cerr << "filter_book: done. " << input_lines.size() << " input lines, " << sh.moves_scored_.load()
+              << " move searches, " << sh.moves_flagged_.load() << " moves marked '?', " << refills_written
+              << " positions given the engine's own move because every move they had was marked, "
+              << (written + refills_written) << " lines written. Wrote " << out_path << "\n";
     return 0;
 }
