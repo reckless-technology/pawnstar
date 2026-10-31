@@ -1,7 +1,8 @@
 /// @file filter_book.cpp Offline opening-book filter: flag questionable book moves with a '?' suffix.
 ///
-/// For every move in the book, this searches the position *before* the move with the engine's own NNUE
-/// evaluation and compares the book move's value to the engine's best move. A move is "questionable" when it
+/// For every move in the book, this searches the position *before* the move twice with the engine's own NNUE
+/// evaluation - once unrestricted, once restricted to that one move - and compares the two scores, taken at the
+/// same depth from the same root. A move is "questionable" when it
 /// loses more than a margin (default 75 cp) relative to the best move; such moves get a trailing '?' in the
 /// output so the engine recognises and replays them (to stay in book as the defender) but never plays them
 /// itself (see opening_book.cpp).
@@ -18,7 +19,7 @@
 ///
 /// Usage:  filter_book <net.bin> <in.book> [out.book] [--depth N] [--margin CP] [--threads T]
 ///   out.book defaults to "<in.book>.filtered" so the input is never clobbered.
-///   --depth   fixed search depth for the parent position (default 12; the child is searched at depth-1).
+///   --depth   fixed search depth, used for both scores (default 12).
 ///   --margin  centipawn loss-vs-best threshold above which a move is flagged (default 75).
 ///   --threads number of book lines to process simultaneously (default: hardware concurrency). Each worker
 ///             holds its own ~80 MB of hash tables, so high thread counts cost memory.
@@ -38,7 +39,9 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <mutex>
+#include <optional>
 #include <ranges>
 #include <sstream>
 #include <string>
@@ -51,8 +54,9 @@ constexpr const char *kStartFen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w
 
 struct SearchResult
 {
-    bool found_;
-    int  score_; ///< Side-to-move-relative centipawns of the best move.
+    bool        found_;
+    int         score_; ///< Side-to-move-relative centipawns of the move below.
+    std::string move_;  ///< Coordinate notation of the move searched, so a caller can re-score it restricted.
 };
 
 /// @brief Search a position to a fixed depth and return its best move's score.
@@ -67,32 +71,94 @@ struct SearchResult
 /// side to move is better. Mates are returned as large near-±kMateScore values, so a missed mate shows up as
 /// a huge loss below.
 ///
-/// @param game  A worker-owned Game (its own TT/eval cache/net). Mutated: its position is reset to @p fen.
-/// @param fen   The position to search, in FEN.
-/// @param depth Fixed search depth.
+/// @param game      A worker-owned Game (its own TT/eval cache/net). Mutated: its position is reset to @p fen.
+/// @param fen       The position to search, in FEN.
+/// @param depth     Fixed search depth.
+/// @param only_move Coordinate notation of the single root move to allow, or empty for an unrestricted search.
+///                  This is UCI `go searchmoves` with one move: the engine searches that move to the same
+///                  depth as an unrestricted search, so the two scores are directly comparable.
 /// @return {found, score}. found is false only if the position has no legal move (mate/stalemate at the root).
-SearchResult Search(Game &game, const std::string &fen, int depth)
+SearchResult Search(Game &game, const std::string &fen, int depth, const std::string &only_move = {})
 {
     game.SetPosition(fen);
+    // SetPosition clears the eval cache but NOT the transposition table, and a stale table is not a mere
+    // speed-up here: the parent search writes fail-low bounds for every move it rejects, including the book
+    // move whose child we are about to search, and that child search then reads its own rejection back as a
+    // bound and confirms it. The verdict became a function of whatever the worker had searched before, so one
+    // (position, move) pair scored differently in different workers - 'f8g7' after 1.c4 g6 2.Nc3 came back at
+    // losses of 90, 98, 106, 111 and 126 cp in one run - and the cache below stored whichever arrived first.
+    // Clearing makes a search a pure function of (fen, depth), which is what the caching and the '?' set in a
+    // committed book both require.
+    game.transposition_table_.Clear();
     game.book_.Free(); // never return a book move - we want the engine's own judgement, not a canned reply
+    game.search_moves_.clear();
+    if (!only_move.empty())
+    {
+        game.search_moves_.push_back(only_move);
+    }
     game.time_control_.clock_type_ = ChessClock::kFixedDepth;
     game.time_control_.depth_      = depth;
     Move m                         = game.SearchRootNode();
-    return {m != Move::None(), m.score()};
+    return {m != Move::None(), m.score(), m.ToString()};
 }
 
 /// @brief State shared by all worker threads.
 struct Shared
 {
     int                         depth_;
-    int                         child_depth_;
     int                         margin_;
     std::map<std::string, bool> verdict_; ///< (position, move) -> questionable. Guarded by verdict_mtx.
     std::mutex                  verdict_mtx_;
+    std::map<zobrist_t, int>    reference_; ///< position -> the score its moves are measured against.
+    std::mutex                  reference_mtx_;
     std::mutex                  log_mtx_;         ///< Serialises stderr flag messages.
     std::atomic<int>            moves_scored_{0}; ///< Search pairs computed (may double-count racing duplicates).
     std::atomic<int>            moves_flagged_{0};
 };
+
+/// @brief The score to measure this position's book moves against: the engine's own preferred move, scored the
+/// same restricted way they are.
+///
+/// This exists because an unrestricted search's score and a restricted search's score are NOT comparable, and
+/// subtracting one from the other was flagging moves that are perfectly sound. After 1.Nf3 g6 the unrestricted
+/// depth-12 search reports `e2e4` at +190; searching `e2e4` alone at the same depth reports +102. One move, one
+/// position, one depth, 88 cp apart - because a root holding twenty-odd moves prunes, orders and re-searches
+/// quite differently from a root holding one, and "depth 12" does not mean the same effort in both. Measured
+/// against the +190, every one of the seven book replies to 1.Nf3 g6 came out more than 75 cp short and the
+/// position lost every move it had, which is an artefact of the instrument and not an opinion about chess.
+///
+/// So every number in the comparison now comes from a restricted search: the engine picks its move with an
+/// ordinary search, and that move is then re-scored alone, exactly as each book move is. Like against like.
+///
+/// One conservatism is left in deliberately. The reference is the engine's *chosen* move re-scored, not the
+/// highest score over all legal moves re-scored - that would be another ~30 searches per position for a
+/// reference that can only move up. Where some third move would have scored higher restricted, the reference
+/// is a little low and a borderline book move escapes the flag. Under-flagging is the right way to be wrong
+/// here: a '?' on a sound move costs the engine a line it should have played.
+///
+/// @return The reference score, or nullopt if the position has no legal move at all.
+std::optional<int> ReferenceScore(Game &game, const Position &pos, Shared &sh)
+{
+    {
+        std::lock_guard<std::mutex> lk{sh.reference_mtx_};
+        if (auto it = sh.reference_.find(pos.hash_); it != sh.reference_.end())
+        {
+            return it->second;
+        }
+    }
+    const std::string  fen    = pos.ToString();
+    const SearchResult chosen = Search(game, fen, sh.depth_);
+    if (!chosen.found_)
+    {
+        return std::nullopt;
+    }
+    const SearchResult reference = Search(game, fen, sh.depth_, chosen.move_);
+    {
+        std::lock_guard<std::mutex> lk{sh.reference_mtx_};
+        sh.reference_[pos.hash_] = reference.score_;
+    }
+    return reference.score_;
+}
 
 /// @brief Decide whether a book move is questionable, consulting/updating the shared verdict cache.
 ///
@@ -100,19 +166,31 @@ struct Shared
 /// playing something else. We measure that as the move's centipawn *loss versus the best move*, computed with
 /// two fixed-depth searches:
 ///
-///   * best  = score of the engine's best move from @p pos, searched to `depth`. This is what the engine
-///             would score the position at if it were free to choose.
-///   * child = score of the position *after* the book move, searched to `depth-1`. This is from the opponent's
-///             (the now-side-to-move's) perspective, so the book move's value to the mover is its negation.
-///             Using depth-1 keeps the two searches at the same leaf horizon (1 ply for the move + depth-1
-///             below it == depth), so the comparison is apples-to-apples.
+///   * best = score of the engine's best move from @p pos, searched to `depth`, unrestricted. This is what
+///            the engine scores the position at when it is free to choose.
+///   * book = score of @p mv from the SAME position at the SAME depth, with the root restricted to that one
+///            move (`searchmoves`). Both numbers are side-to-move relative at one root and come from the same
+///            kind of search, so `loss = best - book` is the sentence the margin states: how far below the
+///            best scoring move this move scores.
 ///
-/// Then loss = best - (-child). If the book move *is* the engine's best move, loss is ~0; the worse the book
-/// move, the larger the loss. We flag when loss exceeds the margin. Because mates score near ±kMateScore, a
-/// book move that walks past a forced mate shows up as an enormous loss and is (correctly) flagged.
+/// It used to search the position *after* the move at `depth - 1` and negate that. The leaf horizon is the
+/// same, but it is not the same measurement: a fresh search of the child reaches its score through its own
+/// iterative deepening and aspiration windows, and it disagreed with the restricted search at the parent by
+/// tens of centipawns. For `f8g7` after 1.e4 g6 2.f4, both runs agreeing that the best move scores +46: the
+/// child at depth 11 valued the move at -108, a loss of 154 cp, and the restricted search at depth 12 values
+/// it at -60, a loss of 106. The engine reproduces the restricted pair exactly when driven by hand with one
+/// thread (`go depth 12` then `go depth 12 searchmoves f8g7`), which the child route cannot be checked against
+/// so directly. On a 75 cp margin a 48 cp disagreement decides verdicts, so both scores now come from one
+/// root at one depth.
 ///
-/// Both searches share this worker's Game/TT but operate on freshly-set positions, so the result depends only
-/// on (@p pos, @p mv) and the fixed depth - never on neighbouring work. That makes the verdict cacheable.
+/// If the book move *is* the engine's best move, loss is ~0; the worse the move, the larger the loss. We flag
+/// when loss exceeds the margin. Because mates score near ±kMateScore, a book move that walks past a forced
+/// mate shows up as an enormous loss and is (correctly) flagged, while a mating move scores far above any
+/// alternative and never is.
+///
+/// Each search clears the transposition table (see Search), so a verdict depends only on (@p pos, @p mv) and
+/// the depth, never on what the worker searched before it. That is what makes it cacheable, and what makes a
+/// run reproducible: one book at one depth gives the same '?' set at any thread count.
 ///
 /// Threading: the cache is shared across all workers (common opening prefixes recur in many lines, so this is
 /// where most of the duplicate-work saving comes from). We hold verdict_mtx only for the two short lookups and
@@ -134,19 +212,18 @@ bool JudgeQuestionable(Game &game, const Position &pos, const Move &mv, Shared &
         }
     }
     // Cache miss: run the two scoring searches with no lock held (see threading note above).
-    const std::string  parent_fen = pos.ToString();
-    const std::string  child_fen  = pos.MakeMove(mv).ToString();
-    const SearchResult best       = Search(game, parent_fen, sh.depth_);
-    const SearchResult child      = Search(game, child_fen, sh.child_depth_);
+    const std::string        parent_fen = pos.ToString();
+    const std::optional<int> reference  = ReferenceScore(game, pos, sh);
+    const SearchResult       book       = Search(game, parent_fen, sh.depth_, mv.ToString());
 
     bool questionable = false;
-    // If the child has no legal move, the book move delivered mate or stalemate. A mating move is the best move
-    // there is and must never be flagged; a stalemating move is a rare opening curiosity. Either way we leave it
-    // unflagged rather than risk suffixing a strong move with '?'.
-    if (best.found_ && child.found_)
+    // Either search failing to find a move means the root has no legal move at all, so the book line has ended
+    // in mate or stalemate - a curiosity rather than a bad move. Leave it unflagged rather than risk suffixing
+    // a strong move with '?'.
+    if (reference.has_value() && book.found_)
     {
-        const int book_value = -child.score_;            // the book move's value from the mover's perspective
-        const int loss       = best.score_ - book_value; // how much worse than the engine's own best choice
+        const int book_value = book.score_;             // the book move's own score, restricted
+        const int loss       = *reference - book_value; // how far below the engine's own move, measured alike
         questionable         = loss > sh.margin_;
         sh.moves_scored_.fetch_add(1, std::memory_order_relaxed);
         if (questionable)
@@ -155,7 +232,7 @@ bool JudgeQuestionable(Game &game, const Position &pos, const Move &mv, Shared &
             // Log every flag so the run can be reviewed: the move, the two scores, the loss, and the FEN of the
             // position it was played from. log_mtx keeps concurrent messages from interleaving on stderr.
             std::lock_guard<std::mutex> lk{sh.log_mtx_};
-            std::cerr << "  flag " << mv.ToString() << "  best=" << best.score_ << " book=" << book_value
+            std::cerr << "  flag " << mv.ToString() << "  best=" << *reference << " book=" << book_value
                       << " loss=" << loss << "  " << parent_fen << "\n";
         }
     }
@@ -334,9 +411,8 @@ int main(int argc, char *argv[])
     threads = std::clamp<int>(threads, 1, (int)std::max<size_t>(1, input_lines.size()));
 
     Shared sh;
-    sh.depth_       = depth;
-    sh.child_depth_ = std::max(1, depth - 1);
-    sh.margin_      = margin;
+    sh.depth_  = depth;
+    sh.margin_ = margin;
 
     std::cerr << "filter_book: net=" << net_path << " depth=" << depth << " margin=" << margin
               << "cp threads=" << threads << " lines=" << input_lines.size() << "\n";
@@ -348,7 +424,12 @@ int main(int argc, char *argv[])
     // A single serial search here visits the hot search/eval/TT call sites first, so by the time workers start
     // those statics are populated and no concurrent map insertion happens. It also validates the net loads.
     {
-        Game warm;
+        // On the heap, like main.cpp's: a Game carries the net's weights by value, so sizeof(Game) is
+        // the architecture's payload plus change - 12 MB at 8 king buckets x 1024 - and a Game declared
+        // as a local overflows the stack before its first search. It overflows a 1 MB Windows thread and
+        // an 8 MB Linux one alike, so this is not a platform quirk to work around on one side.
+        auto  warm_ptr = std::make_unique<Game>();
+        Game &warm     = *warm_ptr;
         if (!warm.nnue_network_.Load(net_path))
         {
             std::cerr << "filter_book: failed to load net '" << net_path << "'\n";
@@ -364,9 +445,13 @@ int main(int argc, char *argv[])
     std::atomic<bool>        load_failed{false};
 
     auto worker = [&] {
-        // Each worker owns a Game (its own ~80 MB of hash tables + its own net), so the only state shared with
-        // other workers is the verdict cache/counters in `sh` - no contention on the hot search path.
-        Game game;
+        // Each worker owns a Game - its own hash tables, and its own copy of the net by value - so the
+        // only state shared with other workers is the verdict cache/counters in `sh`, and there is no
+        // contention on the hot search path. Heap-allocated for the reason above, and the reason it has
+        // to be counted: a worker costs the net's payload plus its tables, so --threads buys parallelism
+        // with memory.
+        auto  game_ptr = std::make_unique<Game>();
+        Game &game     = *game_ptr;
         if (!game.nnue_network_.Load(net_path))
         {
             load_failed.store(true);
