@@ -192,6 +192,7 @@ endif()
 add_executable(gen_data         tools/gen_data.cpp)
 add_executable(gen_openings     tools/gen_openings.cpp)
 add_executable(lichess_extract  tools/lichess_extract.cpp)
+add_executable(make_book        tools/make_book.cpp)
 add_executable(lc0_extract      tools/lc0_extract.cpp)
 add_executable(stamp_net        tools/stamp_net.cpp)
 add_executable(print_net_header tools/print_net_header.cpp)
@@ -213,6 +214,11 @@ set_source_files_properties(tools/gen_openings.cpp PROPERTIES
 # lichess_extract stamps the engine version into each shard's .meta provenance sidecar, the same reason
 # gen_data does, so it needs the generated version header force-included too.
 set_source_files_properties(tools/lichess_extract.cpp PROPERTIES
+  COMPILE_OPTIONS "-include;${PAWNSTAR_VERSION_HEADER}" OBJECT_DEPENDS "${PAWNSTAR_VERSION_HEADER}")
+
+# make_book stamps the engine version into the provenance header of the book it writes, so it needs the
+# generated version header force-included the same way gen_openings does.
+set_source_files_properties(tools/make_book.cpp PROPERTIES
   COMPILE_OPTIONS "-include;${PAWNSTAR_VERSION_HEADER}" OBJECT_DEPENDS "${PAWNSTAR_VERSION_HEADER}")
 
 # lc0_extract stamps the engine version into each shard's .meta provenance sidecar, the same reason gen_data
@@ -392,7 +398,7 @@ endif()
 
 set(PAWNSTAR_TEST_TARGETS ${PAWNSTAR_TESTS})
 list(TRANSFORM PAWNSTAR_TEST_TARGETS PREPEND test_)
-set(PAWNSTAR_TOOLS gen_data gen_openings lichess_extract lc0_extract stamp_net print_net_header filter_book
+set(PAWNSTAR_TOOLS gen_data gen_openings lichess_extract lc0_extract make_book stamp_net print_net_header filter_book
     nnue_quant_study dump_magics)
 set(PAWNSTAR_EXECUTABLES pawnstar ${PAWNSTAR_TOOLS} ${PAWNSTAR_TEST_TARGETS})
 

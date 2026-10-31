@@ -2,10 +2,17 @@
 """How much a finite opening set widens a pentanomial bar, measured from the games rather than asserted.
 
 `tools/pool_matches.py` is right about what it claims: its bar is the standard error of a mean over
-INDEPENDENT pairs. Every pawnstar match here draws its openings from `nnue/openings.epd`, which holds 306
-positions once its `#` header lines are stripped, so a long match replays each opening many times - about 13
-times over 4000 pairs, about 20 over 6000 - and two pairs that start from the same position are not
-independent. Some openings simply suit one net better than the other, and replaying them does not buy new
+INDEPENDENT pairs. Every pawnstar match here draws its openings from `nnue/openings.epd`, so a match with
+more pairs than that file has openings replays some of them, and two pairs that start from the same position
+are not independent.
+
+EVERY FIGURE IN THIS FILE WAS MEASURED WHEN `openings.epd` HELD 306 POSITIONS - which it did until
+2026-10-30, when the opening book it is built from was replaced (the book it had been built from was TSCP's,
+whose public-domain claim turned out to be false) and the set grew to thousands. At 306 a long match replayed
+each opening about 13 times over 4000 pairs and about 20 over 6000, and the measured ICC was 0.07-0.13. A
+wider set replays each opening proportionately less often, so the correction this tool applies is smaller
+than those figures - it is still worth applying, and the tool reads the set's real size out of the PGN rather
+than assuming any of this, but a reader should not take "13 replays" as current. Some openings simply suit one net better than the other, and replaying them does not buy new
 information about the engines at the rate the formula assumes.
 
 The cost is a design effect, from the intraclass correlation of pair scores grouped by opening:
@@ -43,7 +50,7 @@ FOUR THINGS THIS TOOL IS DELIBERATELY CAREFUL ABOUT, each one a way the first ve
  3. **Excluding zero is two-sided.** A corrected interval excludes zero when its LOW end is above zero or
     its HIGH end is below it. Testing only the low end calls every negative result "does not exclude zero".
  4. **What this does NOT measure.** It is a correlation correction and nothing else. It says nothing about
-    whether those 306 positions are REPRESENTATIVE of the positions the engine will meet - a bias the
+    whether the set's positions are REPRESENTATIVE of the positions the engine will meet - a bias the
     correction cannot see and more games cannot reduce - and nothing about chunk-to-chunk heterogeneity,
     which is `pool_matches.py`'s chunk-scatter block and a separate question (see the note below).
 
@@ -473,7 +480,7 @@ def format_correlation(correlation: IntraclassCorrelation) -> str:
     return "\n".join(
         [
             "opening replay:",
-            f"  openings drawn    {correlation.openings:,}   (of the 306 in nnue/openings.epd)",
+            f"  openings drawn    {correlation.openings:,}   (of those in nnue/openings.epd)",
             f"  pairs per opening {correlation.mean_group_size:.2f} mean"
             f"   (min {correlation.smallest_group}, max {correlation.largest_group})",
             f"  MS between/within {correlation.mean_square_between:.6f} / "

@@ -1,7 +1,8 @@
 # Third-party notices
 
 Pawnstar is distributed under the GNU General Public License, version 3 (see [LICENSE](LICENSE)). Two things
-in it carry a third party's notice, and both notices follow.
+in it carry a third party's notice, both notices follow, and a third thing is credited although nothing
+requires it.
 
 - **The shipped network.** `nnue/pawnstar-v20.bin` was trained entirely on a database published under the
   Open Database License, which obliges a notice naming the source wherever a work trained on it is
@@ -10,6 +11,9 @@ in it carry a third party's notice, and both notices follow.
 - **Two files of trainer source.** `tools/bullet/pawnstar.rs` and `tools/bullet/pawnstar_eval.rs` are adapted
   from MIT-licensed code, whose copyright and permission notice must accompany them. That is the second
   section.
+- **The shipped opening book.** `pawnstar.book` was built from the Lichess open database, which is released
+  under a CC0 public-domain dedication. **CC0 waives the attribution requirement**, so the third section is
+  not a notice Pawnstar owes; it is there because saying where the data came from is the right thing to do.
 
 ## Leela Chess Zero self-play training data
 
@@ -105,3 +109,30 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## Lichess open database (the opening book)
+
+**The shipped opening book `pawnstar.book` was built from the Lichess open database** — specifically the
+monthly export of standard rated games named in the book file's own header, which also records the filters
+used, the counts and the SHA-256 of exactly the bytes read. `tools/make_book.cpp` built it, and
+`nnue/openings.epd` (the match opening set, built by `tools/make_openings.sh`) is derived from the same book.
+
+- **Source:** Lichess open database, standard rated games, <https://database.lichess.org/>
+- **Dedication:** Creative Commons CC0 1.0 Universal (`CC0-1.0`),
+  <https://creativecommons.org/publicdomain/zero/1.0/>
+
+**This section is a courtesy, not an obligation, and it should not be read as one.** CC0 is a dedication of
+the work to the public domain so far as the law allows, and it explicitly waives attribution: whoever uses
+the data owes Lichess nothing, this project included. Saying where a book's lines came from is simply how a
+provenance claim is made checkable, and Lichess made the database freely available, so the credit is given
+because it is right. Nobody downstream of Pawnstar inherits a condition from this section — there is none to
+inherit, and the book carries no third party's restriction.
+
+That matters here for a reason worth recording. **The book this replaced did not have a licence anybody could
+point to.** It was derived from TSCP's `book.txt` and was described throughout this repository as public
+domain; TSCP is Copyright 1997 Tom Kerrigan, and the only permission ever located for it was an informal 2002
+email allowing use "as long as you're not making any money off of it" — a non-commercial permission, which is
+incompatible with the GPLv3 this engine is distributed under, and not a public-domain dedication at all. The
+material was removed rather than re-worded, because no wording could have made the claim true. CC0 was chosen
+for the replacement precisely because it is a dedication the rights holder actually made, so "this book
+carries no restriction" is now a statement that can be checked rather than believed.

@@ -313,8 +313,23 @@ void HandshakesAndDiagnostics(Game &game)
     // here, so the MIT notice is owed here. The rest of the text is that port's, line for line.
     Check(Contains(license, "tools/bullet/") && Contains(license, "MIT-licensed") &&
               Contains(license, "THIRD-PARTY-NOTICES.md") && Contains(license, "PlentyChess") &&
-              Contains(license, "Yoshie2000") && Contains(license, "TSCP"),
-          "license: names bullet's MIT notice, the withdrawn data and the book's source", license);
+              Contains(license, "Yoshie2000"),
+          "license: names bullet's MIT notice and the withdrawn training data", license);
+    // The opening book's provenance, which is the one claim in this notice that used to be WRONG: the book was
+    // derived from TSCP's book.txt and called public domain, and TSCP is Copyright 1997 Tom Kerrigan under an
+    // informal non-commercial permission - GPL-incompatible, and not a dedication at all. The book is now
+    // built from the Lichess open database, whose CC0 dedication makes the claim true. Two things are pinned
+    // here and both matter: that the new source and its dedication are named, and that the old claim is GONE.
+    // A notice that still said "TSCP" would be the exact defect this replaced.
+    Check(Contains(license, "Lichess open database") && Contains(license, "https://database.lichess.org/") &&
+              Contains(license, "CC0 1.0") && Contains(license, "https://creativecommons.org/publicdomain/zero/1.0/") &&
+              !Contains(license, "TSCP") && !Contains(license, "Kerrigan"),
+          "license: names the book's Lichess CC0 source, and no longer claims TSCP", license);
+    // CC0 asks for no attribution at all, so the notice must not imply that Pawnstar owes one: overstating an
+    // obligation is its own kind of false provenance claim, and this check is what stops a later edit quietly
+    // turning the courtesy back into a duty.
+    Check(Contains(license, "CC0 waives attribution"),
+          "license: says plainly that the Lichess credit is owed to nobody", license);
 
     const std::string dbg = Run(game, {"dbgclear", "dbg"});
 #if DEBUGX
