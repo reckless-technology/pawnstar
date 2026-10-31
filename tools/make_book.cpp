@@ -88,16 +88,25 @@
 /// ## What this does not write: the '?' marks
 ///
 /// `OpeningBook` understands a trailing `?` on a move - *questionable*: replayed so the rest of the line
-/// still parses, never chosen - and `tools/filter_book` is what puts them there, by searching every book
-/// move and flagging the ones that lose more than a margin against the engine's best. This tool writes none,
-/// and its own output has none: the frequency threshold is already a strong filter, a move that a dozen
-/// 2200+ players chose from the same position needing no second opinion. **The shipped book has since been
-/// through `filter_book` anyway** (2026-10-31, 100 cp against the engine's own choice with pawnstar-v20.bin
-/// at depth 12), so `pawnstar.book` does carry `?` marks even though nothing here wrote them - regenerating
-/// with this tool means running `filter_book` after it, and `test_opening_book` is what catches forgetting
-/// that second step.
-/// The filter preserves lines, comments and move numbers verbatim and only ever adds a `?` or, where a
-/// position's every move was marked, one line ending in the engine's own unmarked choice - and
+/// still parses, never chosen - and the book screener is what puts them there, by searching every book move
+/// and flagging the ones that lose more than a margin against the engine's best. This tool writes none, and
+/// its own output has none: the frequency threshold is already a strong filter, a move that a dozen 2200+
+/// players chose from the same position needing no second opinion. **The shipped book has since been
+/// screened anyway** (2026-10-31, 100 cp against the engine's own choice at depth 12 with pawnstar-v20.bin),
+/// so `pawnstar.book` does carry `?` marks even though nothing here wrote them - regenerating with this tool
+/// means screening it afterwards, and `test_opening_book` is what catches forgetting that second step:
+///
+/// ```sh
+/// amphitheater-cli screenbook -engine cmd=build/pawnstar -book pawnstar.book -depth 12 -margin 100
+/// ```
+///
+/// The screener is `screenbook` in the public `amphitheater-chess` repository, which drives any engine over
+/// UCI; its header comment (`src/match/BookScreener.h`) records why a weak move is marked rather than
+/// deleted, and what makes one move's score comparable with another's. The predecessor that lived here,
+/// `tools/filter_book.cpp`, was compiled against this engine's own evaluation - so it needed one copy per
+/// engine, and it had stopped compiling unnoticed when the eight-bucket net landed; it was retired on
+/// 2026-10-31. Screening preserves lines, comments and move numbers verbatim and only ever adds a `?` or,
+/// where a position's every move was marked, one line ending in the engine's own unmarked choice - and
 /// `tools/make_openings.sh` strips the mark either way.
 ///
 /// Build:  make tools   ->   build/make_book

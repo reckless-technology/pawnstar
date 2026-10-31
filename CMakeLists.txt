@@ -196,7 +196,6 @@ add_executable(make_book        tools/make_book.cpp)
 add_executable(lc0_extract      tools/lc0_extract.cpp)
 add_executable(stamp_net        tools/stamp_net.cpp)
 add_executable(print_net_header tools/print_net_header.cpp)
-add_executable(filter_book      tools/filter_book.cpp)
 add_executable(nnue_quant_study tools/nnue_quant_study.cpp)
 add_executable(dump_magics      tools/dump_magics.cpp)
 
@@ -398,7 +397,7 @@ endif()
 
 set(PAWNSTAR_TEST_TARGETS ${PAWNSTAR_TESTS})
 list(TRANSFORM PAWNSTAR_TEST_TARGETS PREPEND test_)
-set(PAWNSTAR_TOOLS gen_data gen_openings lichess_extract lc0_extract make_book stamp_net print_net_header filter_book
+set(PAWNSTAR_TOOLS gen_data gen_openings lichess_extract lc0_extract make_book stamp_net print_net_header
     nnue_quant_study dump_magics)
 set(PAWNSTAR_EXECUTABLES pawnstar ${PAWNSTAR_TOOLS} ${PAWNSTAR_TEST_TARGETS})
 

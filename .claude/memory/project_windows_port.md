@@ -22,8 +22,8 @@ engine/tools/tests on both OSes and registers `ctest` to mirror `make check`.
 - `embedded_net.S`/`embedded_book.S`: guard the ELF-only directives (`.rodata`, `.note.GNU-stack`, `@progbits`)
   behind `#if defined(__ELF__)`; COFF uses `.section .rdata,"dr"`. `.incbin` works on both via clang's
   integrated assembler.
-- `setenv` (POSIX) is in `test/bratko_kopec_nnue_test.cpp` + `tools/filter_book.cpp` (NOT the engine) →
-  `_putenv_s` on `_WIN32`.
+- `setenv` (POSIX) is in `test/bratko_kopec_nnue_test.cpp` (NOT the engine) → `_putenv_s` on `_WIN32`.
+  (`tools/filter_book.cpp` had the same pair; it was retired on 2026-10-31.)
 - attacks.h needed NOTHING — clang defines `__BMI2__`/`__GNUC__` with `-mbmi2`.
 
 **Cross-compile + validation (done from THIS Linux box, no Windows machine):**

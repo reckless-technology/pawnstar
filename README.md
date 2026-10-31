@@ -54,7 +54,7 @@ wrapper falls back to Unix Makefiles if Ninja is absent). Use whichever you pref
 make           # engine → build/pawnstar_<major>_<minor>_<build> (+ the build/pawnstar alias)
 make check     # build everything and run all test suites (ctest)
 make tests     # build the test executables without running them
-make tools     # build helper tools (gen_data, gen_openings, lichess_extract, lc0_extract, make_book, stamp_net, print_net_header, filter_book, nnue_quant_study, dump_magics)
+make tools     # build helper tools (gen_data, gen_openings, lichess_extract, lc0_extract, make_book, stamp_net, print_net_header, nnue_quant_study, dump_magics)
 make doc       # generate Doxygen HTML into doc/html
 make clean     # remove the build/ tree
 ```
@@ -112,7 +112,7 @@ The target is also the **coverage gate**: it fails when `src/`'s line coverage i
 `PAWNSTAR_COVERAGE_MIN_LINES`, 90 % - one number in `CMakeLists.txt`, which CI's coverage job and a developer's
 `make coverage` both read (`make coverage COVERAGE_MIN_LINES=95`, `tools\build.ps1 coverage -CoverageMinLines 95`;
 0 reports without gating). What is measured is `src/`: the engine and its UCI front end, every header and
-`main.cpp`. The developer tools in `tools/` (`make_book`, `stamp_net`, `print_net_header`, `filter_book`, `nnue_quant_study`, `dump_magics`), which
+`main.cpp`. The developer tools in `tools/` (`make_book`, `stamp_net`, `print_net_header`, `nnue_quant_study`, `dump_magics`), which
 no release ships and no ctest runs, and the tests themselves are not counted. The suites cover 98.0 % of `src/`'s
 lines on Windows (clang 22) and 95.2 % in CI on Linux (clang 18, measured 2026-10-31: 3478 of 3654 lines); what is left is unreachable (the fallbacks for a corrupt embedded book or net, switch defaults,
 the max-ply guards), machine-dependent (the AVX-VNNI kernel on a CPU without it) or timing-dependent.
@@ -658,7 +658,22 @@ The file is plain text, one opening line per row, with each move in **coordinate
 (from-square then to-square, e.g. `e2e4 e7e5 g1f3`). Tokens that begin with a digit are treated as
 move numbers and ignored, and a `#` begins a comment to end of line, so PGN-style numbered lines are
 also accepted. Each line is replayed from the standard start position and every move it visits is
-recorded.
+recorded. A move may carry a trailing `?`, marking it *questionable*: it is replayed so the rest of
+its line still parses and the engine keeps its prepared reply to it, but it is never selected.
+
+**The shipped book was screened against the engine's own judgement at depth 12 with a 100 cp
+margin**, which is where those marks come from: 555 of its 8,923 (position, move) pairs were marked,
+and 84 positions whose every move was marked were given the engine's own move, unmarked, so no
+position the book reaches is left with nothing to play. The screener lives in the public
+[amphitheater-chess](https://github.com/reckless-technology/amphitheater-chess) repository, drives any engine
+over UCI, and is run as:
+
+```sh
+amphitheater-cli screenbook -engine cmd=<engine> -book <book> [-out <book>] [-depth 12] [-margin 100] [-marks <file>]
+```
+
+`-out` defaults to the book that was read. `src/match/BookScreener.h` there records why a weak move is marked
+rather than deleted and what makes one move's score comparable with another's.
 
 Internally the book is a `std::map` from position Zobrist hash to a vector of legal `Move`s, *with
 repeats*: a move that appears in many lines is stored many times, so picking uniformly at random
@@ -741,7 +756,7 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 |---|---|
 | `src/` | Engine source and headers |
 | `test/` | Standalone test programs |
-| `tools/` | Bullet trainer sources, training/verify/SPRT scripts (`pawnstar-match.sh` to run a match, `pool_matches.py` to pool its chunks into one Elo with a correct 95% bar), the training-data generator (`gen_data`) and extractors (`lichess_extract`, `lc0_extract`), the opening-book builder (`make_book`), and helper tools (`gen_openings`, `stamp_net`, `print_net_header`, `filter_book`, `nnue_quant_study`, `dump_magics`) |
+| `tools/` | Bullet trainer sources, training/verify/SPRT scripts (`pawnstar-match.sh` to run a match, `pool_matches.py` to pool its chunks into one Elo with a correct 95% bar), the training-data generator (`gen_data`) and extractors (`lichess_extract`, `lc0_extract`), the opening-book builder (`make_book`), and helper tools (`gen_openings`, `stamp_net`, `print_net_header`, `nnue_quant_study`, `dump_magics`) |
 | `nnue/` | The shipped NNUE net (`pawnstar-v20.bin`) plus training-pipeline documentation |
 | `Doxyfile` | Doxygen configuration |
 | `LICENSE` | GNU General Public License v3 |
