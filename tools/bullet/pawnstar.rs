@@ -414,9 +414,12 @@ fn main() {
     // drops at 274/547/820) to 900 derives step 300 and puts superbatch 820 back on the SECOND-drop
     // rate it had just spent 273 superbatches at. Pinning 273 keeps `819 / 273 = 3` and `899 / 273 = 3`.
     let lr_step: usize = env_or("PAWNSTAR_LR_STEP", end_sb / 3);
-    // How much of each target is the game result rather than the eval sigmoid. 0.5 for the shipped nets,
-    // whose data is engine self-play where result and eval agree. Human games disagree far more often -
-    // a player loses a won position - so a human-game set may want this lower.
+    // How much of each target is the game result rather than the eval sigmoid. The 0.5 below is this
+    // trainer's default and NOT what the shipped nets used: v20 was trained at 0.0, the eval sigmoid
+    // alone (nnue/README.md 7, and the reproduction recipe there passes PAWNSTAR_WDL=0.0). Engine
+    // self-play has the result and the eval agreeing, so it bears a result weight; human games disagree
+    // far more often - a player loses a won position - so a human-game set wants less of the result.
+    // Choose it per run rather than inheriting the default.
     let wdl_weight: f32 = env_or("PAWNSTAR_WDL", 0.5);
     // Resume controls. PAWNSTAR_RESUME is a checkpoint directory and PAWNSTAR_START_SB the ABSOLUTE
     // superbatch to re-enter the schedule at; both the learning rate and the data position are indexed
