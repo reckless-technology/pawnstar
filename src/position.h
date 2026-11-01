@@ -56,8 +56,10 @@ class Position
     constexpr void      AddPiece(Color color, Piece piece, Square to);               ///< Place a piece on the board.
     constexpr void      RemovePiece(Color color, Piece piece, Square from);          ///< Remove a piece from the board.
     constexpr void      MovePiece(Color color, Piece piece, Square from, Square to); ///< Move a piece on the board.
-    constexpr zobrist_t ComputeHash() const;                    ///< Compute the Zobrist hash from scratch.
-    template <Color, bool> constexpr MoveList GenMoves() const; ///< Generate legal moves.
+    constexpr zobrist_t ComputeHash() const; ///< Compute the Zobrist hash from scratch.
+    constexpr bool      IsCastlingRightSupported(Color color, Square king_home,
+                                                 Square rook_home) const; ///< Whether both pieces are home.
+    template <Color, bool> constexpr MoveList GenMoves() const;           ///< Generate legal moves.
 };
 
 /// @brief Generate all legal moves. @return The legal move list.
@@ -213,6 +215,11 @@ template <Color color, bool do_all_moves> constexpr MoveList Position::GenMoves(
     // 3) King is not in check
     // 4) Squares between King and Rook are vacant
     // 5) Square King passes through is not attacked by the enemy.
+    // Conditions 1 and 2 are the rights themselves, and nothing here looks for the king and rook: a right
+    // implies they are home, because CastlingRights::AfterMove revokes it the moment one of their home
+    // squares is vacated or entered, and ParseFen keeps no right the board cannot support (issue #30 - a
+    // FEN claiming KQ with no rook on a1 had MakeMove move a rook that was not there). Any new way into a
+    // Position owes that invariant too.
     if constexpr (do_all_moves)
     {
         if (!IsInCheck())
@@ -585,6 +592,18 @@ constexpr bool Position::HasBothKings() const
     return !(kings & colors_[kWhite]).IsEmpty() && !(kings & colors_[kBlack]).IsEmpty();
 }
 
+/// @brief Whether the king and rook a castling right needs are both on their home squares.
+/// @param color The castling side.
+/// @param king_home That side's king's home square (e1 or e8).
+/// @param rook_home The castling rook's home square (a1, h1, a8 or h8).
+/// @return True if that side's king stands on king_home and one of its rooks on rook_home.
+constexpr bool Position::IsCastlingRightSupported(Color color, Square king_home, Square rook_home) const
+{
+    const Bitboard home_squares = Bitboard{king_home} | Bitboard{rook_home};
+    return squares_[king_home] == kKing && squares_[rook_home] == kRook &&
+           (colors_[color] & home_squares) == home_squares;
+}
+
 /// @brief Construct a position from a FEN string, falling back to the start position if the FEN does not
 /// describe a position the engine can represent.
 ///
@@ -659,10 +678,20 @@ inline Position Position::ParseFen(std::string_view fen_string)
     }
     position.king_location_[kWhite] = (position.pieces_[kKing] & position.colors_[kWhite]).Lsb();
     position.king_location_[kBlack] = (position.pieces_[kKing] & position.colors_[kBlack]).Lsb();
-    // Castling rights
+    // Castling rights. This field is untrusted too, and a right the board cannot support is the one bad
+    // input that reached the move generator: it tests the rights, the squares between and the squares the
+    // king crosses, but never looks for the rook, because within a game a right cannot outlive it (see the
+    // castling block of GenMoves). A FEN claiming `KQ` with White's rooks on c1 and g1 - which Leela's
+    // classical input format produces for a Chess960 game read as standard chess, the way issue #30 was
+    // found - let the search generate e1c1 once c1 emptied, and MakeMove then moved a rook from a1 that was
+    // not there, leaving a1 occupied by no piece and the search reading a position that cannot exist.
     string castling_rights;
     ss >> castling_rights;
-    position.castling_rights_ = CastlingRights::FromFen(castling_rights);
+    position.castling_rights_ = CastlingRights::FromFen(castling_rights)
+                                    .KeepSupported(position.IsCastlingRightSupported(kWhite, "E1", "H1"),
+                                                   position.IsCastlingRightSupported(kWhite, "E1", "A1"),
+                                                   position.IsCastlingRightSupported(kBlack, "E8", "H8"),
+                                                   position.IsCastlingRightSupported(kBlack, "E8", "A8"));
     // En passant capture square (the Square(const char *) constructor yields square 0 for a short string)
     string ep_square;
     ss >> ep_square;

@@ -391,6 +391,13 @@ void Positions(Game &game)
           "position fen <garbage>: falls back to the start position");
     Check(Run(game, {"position fen 8/8/8/8/8/8/8/8 w - - 0 1", "getboard"}) == std::format("{}\n", kStart),
           "position fen <no kings>: falls back to the start position");
+    // A right the board cannot support is dropped rather than carried into the search (issue #30): this FEN
+    // out of Leela's test80 archive is a Chess960 game read as standard chess, so it claims KQ while
+    // White's rooks stand on c1 and g1. Carried, the search generated e1c1 once c1 emptied and MakeMove
+    // moved a rook from an empty a1, which killed the engine on untrusted `position fen` input.
+    Check(Run(game, {"position fen b2rk3/p2p1nr1/1p2n1p1/1Np2p1p/2P2P1P/1P1BP1P1/P4N2/2R1K1R1 w KQ - 1 16",
+                     "getboard"}) == "b2rk3/p2p1nr1/1p2n1p1/1Np2p1p/2P2P1P/1P1BP1P1/P4N2/2R1K1R1 w - - 1 16\n",
+          "position fen <castling rights the board cannot support>: the rights are dropped");
     Run(game, {"position fen 4k3/8/8/8/8/8/8/4K3 w - - 0 1"});
     Check(Run(game, {"position nonsense", "getboard"}) == "4k3/8/8/8/8/8/8/4K3 w - - 0 1\n",
           "position <unknown source>: leaves the position alone");
@@ -763,6 +770,16 @@ void Searches(Game &game)
     Run(game, {"position startpos moves g1f3 g8f6 f3g1 f6g8 g1f3"});
     out = SearchToBestMove(game, "go depth 4", is_complete);
     Check(is_complete && IsLegal(game, BestMove(out)), "go after a move history with a repetition", out);
+
+    // The FEN of issue #30, searched on the table every search above has warmed, which is how it died: it
+    // claims KQ with White's rooks on c1 and g1, and once the search moved the c1 rook away the generator
+    // emitted e1c1 and MakeMove moved a rook from an empty a1 - an access violation at depth 8 on Windows,
+    // a SIGSEGV on Linux, three runs of three. The rights are dropped at the parse now, so what this asserts
+    // is the protocol's own promise: the search finishes and answers with a legal move.
+    Run(game, {"position fen b2rk3/p2p1nr1/1p2n1p1/1Np2p1p/2P2P1P/1P1BP1P1/P4N2/2R1K1R1 w KQ - 1 16"});
+    out = SearchToBestMove(game, "go depth 8", is_complete);
+    Check(is_complete && IsLegal(game, BestMove(out)),
+          "go depth 8 on a FEN claiming castling rights the board cannot support (issue #30)", out);
 }
 
 /// @brief Every command that stops a search, sent the instant after `go` with no pause, ends it with a bestmove.
