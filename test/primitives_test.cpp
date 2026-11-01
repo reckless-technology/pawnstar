@@ -30,6 +30,7 @@
 #include <iostream>
 #include <iterator>
 #include <set>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -123,6 +124,64 @@ void CastlingText()
     Check(CastlingRights::FromFen("Qk").ToFenString() == "Qk", "castling rights Qk read back");
     Check(CastlingRights::FromFen("-").ToFenString() == "-", "no castling rights read back as '-'");
     Check(CastlingRights::FromFen("KxZq").ToFenString() == "Kq", "stray characters in the castling field are skipped");
+}
+
+/// @brief The castling field of a FEN against what the board can support (issue #30).
+/// A right is the engine's only record that its king and rook are home - the move generator tests the
+/// rights, the squares between and the squares the king crosses, and never looks for the rook - so a FEN
+/// asserting one the board cannot support put a position into the search that no game can reach: the
+/// generator emitted e1c1 and MakeMove moved a rook from an empty a1. Every such right is dropped at the
+/// parse, which is where the invariant the generator relies on is established.
+void CastlingRightsAgainstTheBoard()
+{
+    struct Case
+    {
+        const char *fen;            ///< The FEN handed to FromString.
+        const char *expect_rights;  ///< The castling field it must read back as.
+        int         castling_moves; ///< How many castling moves the side to move must then have.
+        const char *what;           ///< What the case is about.
+    };
+
+    // The first is the position from issue #30, out of Leela's test80 archive: a Chess960 game read as
+    // standard chess, so the rights say KQ while White's rooks stand on c1 and g1.
+    static constexpr std::array<Case, 7> kCases{{
+        {"b2rk3/p2p1nr1/1p2n1p1/1Np2p1p/2P2P1P/1P1BP1P1/P4N2/2R1K1R1 w KQ - 1 16", "-", 0,
+         "issue #30: KQ with White's rooks on c1 and g1"},
+        {"4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1", "-", 0, "every right claimed with no rook on the board"},
+        {"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "KQkq", 2, "every right supported, and both White castlings legal"},
+        {"r3k3/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "KQq", 2, "Black's kingside right dropped, with no rook on h8"},
+        {"4k3/8/8/8/8/8/8/rn2K2R w KQ - 0 1", "K", 1,
+         "a rook of the other colour on a1 supports nothing, and the knight keeps it off the king"},
+        {"4k3/8/8/8/8/8/8/R2K3R w KQ - 0 1", "-", 0, "a king off its home square supports neither right"},
+        {"r3k2r/8/8/8/8/8/8/R3K1NR w KQkq - 0 1", "KQkq", 1,
+         "a right stands while a piece between king and rook blocks the move"},
+    }};
+    for (const Case &c : kCases)
+    {
+        const Position    position = Position::FromString(c.fen);
+        const std::string fen      = position.ToString();
+        // The castling field is the third of a FEN, and ToString writes all six.
+        std::istringstream fields{fen};
+        std::string        board, color_to_move, rights;
+        fields >> board >> color_to_move >> rights;
+        Check(rights == c.expect_rights,
+              std::format("{}: rights read back as {}, expected {}", c.what, rights, c.expect_rights));
+        int castling_moves = 0;
+        for (const Move &move : position.GenerateLegalMoves())
+        {
+            castling_moves += move.type() == Move::Type::kCastling;
+        }
+        Check(castling_moves == c.castling_moves,
+              std::format("{}: {} castling moves generated, expected {}", c.what, castling_moves, c.castling_moves));
+    }
+    // The board is what decides, so the same board with the rights spelled out and with them dropped parses
+    // to the same position, hash included - a position the search can be handed either way.
+    const Position from_bad_fen =
+        Position::FromString("b2rk3/p2p1nr1/1p2n1p1/1Np2p1p/2P2P1P/1P1BP1P1/P4N2/2R1K1R1 w KQ - 1 16");
+    const Position from_clean_fen =
+        Position::FromString("b2rk3/p2p1nr1/1p2n1p1/1Np2p1p/2P2P1P/1P1BP1P1/P4N2/2R1K1R1 w - - 1 16");
+    Check(from_bad_fen.hash_ == from_clean_fen.hash_, "the dropped rights leave the Zobrist hash of the real position");
+    Check(from_bad_fen.ToString() == from_clean_fen.ToString(), "both FENs read back as the same position");
 }
 
 void MaterialDraws()
@@ -389,6 +448,7 @@ int main()
     BitboardBasics();
     GeneratedTables();
     CastlingText();
+    CastlingRightsAgainstTheBoard();
     MaterialDraws();
     MovesAndText();
     HistoryAndTable();

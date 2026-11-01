@@ -21,6 +21,8 @@ class CastlingRights
     constexpr bool                  MayBlackCastleQueenside() const;
     constexpr zobrist_t             Hash() const;
     constexpr CastlingRights       &AfterMove(const Move &move);
+    constexpr CastlingRights       &KeepSupported(bool is_white_kingside_supported, bool is_white_queenside_supported,
+                                                  bool is_black_kingside_supported, bool is_black_queenside_supported);
     static constexpr CastlingRights FromFen(std::string_view fen);
     constexpr std::string           ToFenString() const;
 
@@ -111,6 +113,28 @@ constexpr zobrist_t CastlingRights::Hash() const
 constexpr CastlingRights &CastlingRights::AfterMove(const Move &move)
 {
     value_ &= kMoveMasks[move.from()] & kMoveMasks[move.to()];
+    return *this;
+}
+
+/// @brief Drop every right whose king and rook are not on the squares castling with them needs.
+/// Within a game the rights carry that themselves - AfterMove revokes a right the moment its king's or
+/// rook's home square is vacated or entered - so this is for a FEN, the one input that can assert a right
+/// the board cannot support. Position::ParseFen applies it; see the castling block of Position::GenMoves
+/// for what the generator relies on (issue #30).
+/// @param is_white_kingside_supported Whether a white king on e1 and a white rook on h1 are both there.
+/// @param is_white_queenside_supported Whether a white king on e1 and a white rook on a1 are both there.
+/// @param is_black_kingside_supported Whether a black king on e8 and a black rook on h8 are both there.
+/// @param is_black_queenside_supported Whether a black king on e8 and a black rook on a8 are both there.
+/// @return Reference to this updated castling-rights object.
+constexpr CastlingRights &CastlingRights::KeepSupported(bool is_white_kingside_supported,
+                                                        bool is_white_queenside_supported,
+                                                        bool is_black_kingside_supported,
+                                                        bool is_black_queenside_supported)
+{
+    value_ &= (uint8_t)((is_white_kingside_supported ? kWhiteKingside : 0) |
+                        (is_white_queenside_supported ? kWhiteQueenside : 0) |
+                        (is_black_kingside_supported ? kBlackKingside : 0) |
+                        (is_black_queenside_supported ? kBlackQueenside : 0));
     return *this;
 }
 
