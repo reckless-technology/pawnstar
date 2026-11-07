@@ -5,7 +5,7 @@ Pawnstar NNUE trainer: the shared Reckless architecture
 
 SCReLU, matching the in-engine inference in src/nnue.h. One network shape for all the Reckless chess
 engines (skill `reckless-nnue`): a net trained here loads in pawnstar, pawnstar-rs, pawnstar-go and
-zenith, and an architecture change here is a change owed to all of them.
+trebuchet, and an architecture change here is a change owed to all of them.
 
 Adapted from bullet's `simple` example (examples/simple.rs, https://github.com/jw1912/bullet, at the commit
 pinned by tools/setup_bullet.sh): Copyright (c) 2023 Jamie Whiting, MIT licence. The imports, the QA/QB/SCALE
@@ -13,11 +13,11 @@ constants, the save-format list, the loss function, the two-layer SCReLU network
 loader layout follow that example. Its licence text is reproduced in THIRD-PARTY-NOTICES.md at the root of
 this repository; this file as a whole is distributed under the repository's GPLv3.
 
-This is the shape every engine has shipped since release 2.0.0 (pawnstar 2.0.0 / zenith 3.0.0,
+This is the shape every engine has shipped since release 2.0.0 (pawnstar 2.0.0 / trebuchet (then numbered 3.0.0),
 2026-10-30), whose v20 net was trained entirely on Leela Chess Zero self-play data. Two things differ
 from the shape that produced the WITHDRAWN v12 net - which was trained on the PlentyChess bulletformat
 dataset, by Yoshie2000, data that is withdrawn and never to be trained on again (see
-pipeline/train_pipeline.sh's header) - each measured in zenith on this hardware and SPRT-gated:
+pipeline/train_pipeline.sh's header) - each measured in trebuchet on this hardware and SPRT-gated:
 
   * horizontal king mirroring          +14.3 Elo at fixed depth
   * 8 material output heads            +14.7 Elo at fixed depth

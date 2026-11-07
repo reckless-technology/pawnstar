@@ -598,7 +598,7 @@ short-circuit. The shipped net is loaded at startup, with a copy embedded in the
 is not there, and another can be loaded at run time — see [The NNUE net](#the-nnue-net) above.
 
 **The shape.** [nnue/pawnstar-v20.bin](nnue/pawnstar-v20.bin) is the shared Reckless NNUE shape, the same
-one [zenith](https://github.com/reckless-technology/zenith) and the two ports carry:
+one [trebuchet](https://github.com/reckless-technology/trebuchet) and the two ports carry:
 
 ```
 768 inputs per (perspective, king bucket)  ->  1024 feature transformer  (x2 perspectives)

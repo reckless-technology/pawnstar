@@ -121,7 +121,7 @@ the scalar one (verified by `test_nnue`).
 
 Five engines are being unified onto one NNUE evaluator (skill `reckless-nnue`), and the shared
 architecture - **the default here since release 2.0.0, and the shape the shipped net was trained for** -
-adds two things to the shape the retired v12 net needed. Both were measured in zenith on this hardware,
+adds two things to the shape the retired v12 net needed. Both were measured in trebuchet on this hardware,
 SPRT-gated, and both only paid past ~1.4B training positions - at 190M they were neutral or negative,
 which is why v12 had neither:
 
@@ -229,7 +229,7 @@ and the digest reports it only after the training run has been spent.
 ## 2. File format — the shared `RNNUE1` container
 
 Pawnstar's nets are in **`RNNUE1`**, the one container every reckless-technology chess engine reads —
-`pawnstar`, `pawnstar-rs`, `pawnstar-go`, `zenith` and `stoopid-chess` (skill `reckless-nnue`). A net
+`pawnstar`, `pawnstar-rs`, `pawnstar-go`, `trebuchet` and `stoopid-chess` (skill `reckless-nnue`). A net
 trained once loads in all five, and a change to the container is a change owed to all five. It replaced
 pawnstar's own 32-byte `PSN1` header on 2026-10-27; `src/nnue.h` is the authority for this build.
 
@@ -1016,7 +1016,7 @@ were never written. The 12+0.12 chunks' mild residual over-dispersion (chi-squar
 1.40) is a separate heterogeneity question and is **not** multiplied into the bar above — the two corrections
 act on the same pooled variance, and a Birge factor's baseline is not ICC-aware. Two variables moved
 together there, the training data and the shape, so that pair of numbers is the net-to-net verdict and not
-a measurement of either lever on its own; the shape's two additions were measured separately in zenith at
+a measurement of either lever on its own; the shape's two additions were measured separately in trebuchet at
 fixed depth, **+14.3 Elo** for mirroring and **+14.7** for the output heads.
 
 Its held-out loss is **0.012182 ± 0.000003** on the frozen 100,141,613-position validation set at lambda
@@ -1042,7 +1042,7 @@ are the verdict; the loss is here because it is what the run was stopped on.
 | v10 (1024 + 4 king buckets, file-pair) | **more data**: scale the pool 2.31B→3.82B (four more PlentyChess shards), same v9 arch, SBS 120→190 (~3 epochs) | **+16.3 ± 10.8 Elo at 8+0.08** over v9 (LLR 2.95, H1; 1944 games, 52.3%). More data again the single biggest lever. (later retired) |
 | **v11 (1024 + 4 king buckets, file-pair)** | **more data**: scale the pool 3.82B→6.05B (six more PlentyChess shards), same v10 arch, SBS 190→300 (~3 epochs) | **+9.28 ± 6.58 Elo at 8+0.08** over v10 (LOS 99.7%, LLR 2.48; 6102 games, 51.3%). More data again the single biggest lever — the per-step gain is shrinking (+16 for +1.5B → +9 for +2.2B) but stays clearly positive; v11's 6.05B was still a fraction of the pool available then. (later retired) |
 | **v12 (1024 + 8 king buckets, file-pair × board-half)** | **double the king buckets 4→8** at fixed data (same ~6B pool as v11): bank = `file/2`, plus 4 when the king is in its own advanced half (ranks 5–8, per-perspective oriented); SBS=300, final loss 0.0226 (v11 0.0228) | **+17.29 ± 8.68 Elo at 8+0.08** (3520 games, H1, LLR 2.96) and **+10.97 ± 6.57 at 12+0.12** (5610 games, H1, LLR 2.95) over v11 — single variable vs v11 = bucket count. **King buckets are NOT at diminishing returns**: the 4→8 step (+17/+11) is *bigger* than the 0→4 step (+11.4), the rank split capturing real own-half-vs-advanced king-safety signal. 8× the FT rows (1.58→12.6 MB, so the owning `Game` is heap-allocated). (later retired) |
-| **v20 (1024 + 8 MIRRORED king buckets, file × board-half, + 8 material output heads)** | **new training data and the shared shape, together**: a 6,143,698,748-position pool built entirely from Leela Chess Zero self-play (62.83% `test91`, 37.17% `test60`) in place of the retired dataset; horizontal king mirroring on, the bucket map per-*file* rather than per file-*pair*, and 8 output heads; 8 epochs at `PAWNSTAR_BPS=3662`, `PAWNSTAR_SBS=819`, `PAWNSTAR_WDL=0.0`, then 51 more superbatches with `PAWNSTAR_LR_STEP=273` so the schedule's third drop applied (held-out loss 0.012182, 0.879% better than superbatch 819) | **+9.99 Elo at 8+0.08** (8,000 games, 95% +2.42..+17.57 — an *estimate*) and **+1.13 at 12+0.12** (12,000 games, 95% −5.63..+7.89 — measured) over v12 — a gain at fast time controls, level at slower ones. Both bars are widened for the 306-opening replay by `tools/opening_icc.py`; the 12+0.12 one is measured directly from that arm's PGNs (ICC 0.0746, design effect 2.473) and the 8+0.08 one is bracketed from the ICC of 0.061 measured on the same machine at the same openings, because that arm's PGNs were never written. **Two variables at once** (data and shape), so this measures the net, not either lever; the shape's parts were measured separately in zenith at +14.3 (mirroring) and +14.7 (output heads) at fixed depth. **shipped** |
+| **v20 (1024 + 8 MIRRORED king buckets, file × board-half, + 8 material output heads)** | **new training data and the shared shape, together**: a 6,143,698,748-position pool built entirely from Leela Chess Zero self-play (62.83% `test91`, 37.17% `test60`) in place of the retired dataset; horizontal king mirroring on, the bucket map per-*file* rather than per file-*pair*, and 8 output heads; 8 epochs at `PAWNSTAR_BPS=3662`, `PAWNSTAR_SBS=819`, `PAWNSTAR_WDL=0.0`, then 51 more superbatches with `PAWNSTAR_LR_STEP=273` so the schedule's third drop applied (held-out loss 0.012182, 0.879% better than superbatch 819) | **+9.99 Elo at 8+0.08** (8,000 games, 95% +2.42..+17.57 — an *estimate*) and **+1.13 at 12+0.12** (12,000 games, 95% −5.63..+7.89 — measured) over v12 — a gain at fast time controls, level at slower ones. Both bars are widened for the 306-opening replay by `tools/opening_icc.py`; the 12+0.12 one is measured directly from that arm's PGNs (ICC 0.0746, design effect 2.473) and the 8+0.08 one is bracketed from the ICC of 0.061 measured on the same machine at the same openings, because that arm's PGNs were never written. **Two variables at once** (data and shape), so this measures the net, not either lever; the shape's parts were measured separately in trebuchet at +14.3 (mirroring) and +14.7 (output heads) at fixed depth. **shipped** |
 
 The data behind every net from v2 to v12 in that table was the **PlentyChess bulletformat dataset**, and
 the recipe was: `bullet-utils validate` each shard first (a corrupt shard trains silently wrong), `cat` a
