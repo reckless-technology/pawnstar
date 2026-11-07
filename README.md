@@ -54,7 +54,7 @@ wrapper falls back to Unix Makefiles if Ninja is absent). Use whichever you pref
 make           # engine → build/pawnstar_<major>_<minor>_<build> (+ the build/pawnstar alias)
 make check     # build everything and run all test suites (ctest)
 make tests     # build the test executables without running them
-make tools     # build helper tools (gen_data, gen_openings, lichess_extract, lc0_extract, make_book, stamp_net, print_net_header, nnue_quant_study, dump_magics)
+make tools     # build helper tools (gen_data, gen_openings, lichess_extract, lc0_extract, make_book, stamp_net, print_net_header, no_search_moves, nnue_quant_study, dump_magics)
 make doc       # generate Doxygen HTML into doc/html
 make clean     # remove the build/ tree
 ```
@@ -181,7 +181,7 @@ its latest result on `main`). Every job runs on a GitHub-hosted runner, on an im
 (`ubuntu-24.04`, `windows-2025`), and installs what it needs with pinned versions. The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
-  build through the wrapper and runs all nineteen suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  build through the wrapper and runs all twenty suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
   PyPI wheel in a venv of the job's own; apt has no `clang-format-22`). This is independent of the
@@ -687,9 +687,9 @@ prints the available book moves and their frequencies for the current position.
 make check
 ```
 
-builds and runs fifteen standalone test executables (plus a shell-driven UCI integration test,
+builds and runs sixteen standalone test executables (plus a shell-driven UCI integration test,
 `test/uci_test.sh`, run against `build/pawnstar`, and three Python suites, `test/pool_matches_test.py`,
-`test/opening_icc_test.py` and `test/pgn_nps_test.py` — nineteen
+`test/opening_icc_test.py` and `test/pgn_nps_test.py` — twenty
 suites in all; the shell script also checks where the engine finds its net and book at startup, the embedded
 copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of input):
 
@@ -710,9 +710,10 @@ copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of inpu
 | `build/test_lichess_extract` | `tools/lichess_extract.h`'s extraction rules, driven against PGN written by hand |
 | `build/test_lc0_extract` | `tools/lc0_extract.h`'s extraction rules, driven against Lc0 v6 records built from plane words copied out of a real `test80` tar |
 | `build/test_net_header` | `tools/net_header_report.h`, the `RNNUE1` header reader `build/print_net_header` wraps: every field decoded at its documented offset from hand-laid fixtures (8 and 4 king buckets, and a header with no two equal fields), both CRCs and the payload length verified, each kind of damage reported, and the build's own net decoded against its known values |
-| `test/pool_matches_test.py` | `tools/pool_matches.py`, the pentanomial pooling tool: three completed matches' `Ptnml(0-2)` vectors pooled to their measured Elo, 95% bar and LOS, the chunk-scatter diagnostics on a known case, and the two traps - a doubled 1.959964 in the bar, and a 95% bar compared against a one-sigma scatter. Run by ctest as `pool_matches` wherever a Python interpreter is found |
-| `test/opening_icc_test.py` | `tools/opening_icc.py`, the opening-replay correction: four hand-computed one-way ANOVA fixtures (perfect correlation, none at all, exactly a third, and an unbalanced case where the balanced-design shortcut understates the inflation), its PGN reader against a fixture holding one of each way a round fails to be a colour-reversed pair, and its nominal figures anchored to `pool_matches`' own match A. Run by ctest as `opening_icc` |
-| `test/pgn_nps_test.py` | `tools/pgn_nps.py`, the absolute-nps reader: hand-summed node and time totals, a Black-to-move opening, a book move carrying no node counts, and a game missing a comment altogether. Run by ctest as `pgn_nps` |
+| `build/test_no_search_moves` | `tools/no_search_moves.h`, which `build/no_search_moves` wraps: which moves in a match's PGN were played with no search and whether each was the only legal move, against two games worked by hand and a fixture of the games it must refuse |
+| `test/pool_matches_test.py` | `tools/pool_matches.py`, the pentanomial pooling tool: five completed matches' `Ptnml(0-2)` vectors pooled to their measured Elo, 95% bar and LOS, the chunk-scatter diagnostics on a known case, and the two traps - a doubled 1.959964 in the bar, and a 95% bar compared against a one-sigma scatter. Run by ctest as `pool_matches` wherever a Python interpreter is found |
+| `test/opening_icc_test.py` | `tools/opening_icc.py`, the opening-replay correction: four hand-computed one-way ANOVA fixtures (perfect correlation, none at all, exactly a third, and an unbalanced case where the balanced-design shortcut understates the inflation), its PGN reader against a fixture holding one of each way a round fails to be a colour-reversed pair, its nominal figures anchored to `pool_matches`' own match A, and the whole report against a sixteen-game match worked by hand. Run by ctest as `opening_icc` |
+| `test/pgn_nps_test.py` | `tools/pgn_nps.py`, the absolute-nps reader: hand-summed node and time totals, a Black-to-move opening, a book move carrying no node counts, an `n=0` move whose clock is not search time, and a game missing a comment altogether. Run by ctest as `pgn_nps` |
 
 `test_bench_golden` runs the `bench` recipe (`RunBench` in `src/input_handling.h`, the code the `bench` command
 runs: depth 13, single-threaded, book off, hash cleared) with the shipped net and checks it against the golden
@@ -756,7 +757,7 @@ The codebase is fully Doxygen-commented; `make doc` generates the browsable API 
 |---|---|
 | `src/` | Engine source and headers |
 | `test/` | Standalone test programs |
-| `tools/` | Bullet trainer sources, training/verify/SPRT scripts (`pawnstar-match.sh` to run a match, `pool_matches.py` to pool its chunks into one Elo with a correct 95% bar), the training-data generator (`gen_data`) and extractors (`lichess_extract`, `lc0_extract`), the opening-book builder (`make_book`), and helper tools (`gen_openings`, `stamp_net`, `print_net_header`, `nnue_quant_study`, `dump_magics`) |
+| `tools/` | Bullet trainer sources, training/verify/SPRT scripts (`pawnstar-match.sh` to run a match, `pool_matches.py` to pool its chunks into one Elo with a correct 95% bar, `opening_icc.py` to recount a whole match from its PGNs and correct that bar for opening replay, `pgn_nps.py` for each engine's rate in it), the training-data generator (`gen_data`) and extractors (`lichess_extract`, `lc0_extract`), the opening-book builder (`make_book`), and helper tools (`gen_openings`, `stamp_net`, `print_net_header`, `no_search_moves`, `nnue_quant_study`, `dump_magics`) |
 | `nnue/` | The shipped NNUE net (`pawnstar-v20.bin`) plus training-pipeline documentation |
 | `Doxyfile` | Doxygen configuration |
 | `LICENSE` | GNU General Public License v3 |

@@ -196,6 +196,7 @@ add_executable(make_book        tools/make_book.cpp)
 add_executable(lc0_extract      tools/lc0_extract.cpp)
 add_executable(stamp_net        tools/stamp_net.cpp)
 add_executable(print_net_header tools/print_net_header.cpp)
+add_executable(no_search_moves  tools/no_search_moves.cpp)
 add_executable(nnue_quant_study tools/nnue_quant_study.cpp)
 add_executable(dump_magics      tools/dump_magics.cpp)
 
@@ -229,16 +230,17 @@ set_source_files_properties(tools/lc0_extract.cpp PROPERTIES
 enable_testing()
 set(PAWNSTAR_TESTS perft see bratko_kopec_nnue nnue nnue_incremental eval_symmetry opening_book chess_clock
                    bench_golden uci_commands primitives principal_variation lichess_extract lc0_extract
-                   net_header)
+                   net_header no_search_moves)
 foreach(t IN LISTS PAWNSTAR_TESTS)
   add_executable(test_${t} test/${t}_test.cpp)
 endforeach()
 
-# The extraction rules live in headers under tools/ (the only tool headers a test drives directly), so that
-# directory goes on those two tests' include paths. Not added globally: nothing else should reach into tools/.
+# The extraction rules and the two report tools live in headers under tools/ (the only tool headers a test drives
+# directly), so that directory goes on those tests' include paths. Not added globally: nothing else should reach into tools/.
 target_include_directories(test_lichess_extract PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 target_include_directories(test_lc0_extract     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 target_include_directories(test_net_header      PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tools)
+target_include_directories(test_no_search_moves PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 
 # ctest registration mirrors `make check`. Resource-free suites first; run from the source tree so any
 # cwd-relative resource (e.g. the opening book) resolves.
@@ -266,7 +268,7 @@ if(NOT PAWNSTAR_SHIPPED_NET_IS_THIS_SHAPE)
   message(STATUS "Pawnstar NNUE shape: the shipped net is of another shape, so the shape-independent "
                  "suites run against ${PAWNSTAR_SHAPE_NET}")
 endif()
-foreach(t perft see opening_book chess_clock primitives lichess_extract lc0_extract)
+foreach(t perft see opening_book chess_clock primitives lichess_extract lc0_extract no_search_moves)
   add_test(NAME ${t} COMMAND test_${t} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endforeach()
 # The RNNUE1 header reader (tools/net_header_report.h, the print_net_header tool). Its fixtures are built in memory,
@@ -279,7 +281,7 @@ endif()
 add_test(NAME net_header COMMAND test_net_header ${PAWNSTAR_NET_HEADER_NET}
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
-# The three match-analysis tools in tools/ (pool_matches.py, opening_icc.py, pgn_nps.py), against measured
+# The three Python match-analysis tools in tools/ (pool_matches.py, opening_icc.py, pgn_nps.py), against measured
 # matches and hand-computed fixtures. Python rather than C++ suites because the tools themselves are
 # Python - one copy of each formula, run by its test, is the whole point: the pooling maths was
 # re-implemented in four throwaway scripts in one day and one of them applied the 95% deviate twice. A

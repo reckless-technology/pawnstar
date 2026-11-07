@@ -1,0 +1,120 @@
+[Event "Fixture"]
+[Site "?"]
+[Date "2026.11.01"]
+[Round "1"]
+[White "first"]
+[Black "second"]
+[Result "1/2-1/2"]
+[EngineWhiteName "First 1.0"]
+[EngineBlackName "Second 2.0"]
+[SetUp "1"]
+[FEN "rnbqkb1r/ppp2ppp/4pn2/3p4/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 0 1"]
+[GameStartTime "2026-11-01T10:10:00 -0800"]
+[GameEndTime "2026-11-01T10:11:00 -0800"]
+[PlyCount "2"]
+[Termination "adjudication"]
+[TimeControl "8+0.08"]
+
+1. Nf3 {+0.20/10 0.100s, n=1000, sd=12, nps=10000} Be7 {-0.15/11 0.100s, n=2000, sd=13, nps=20000}
+1/2-1/2
+
+[Event "Fixture"]
+[Site "?"]
+[Date "2026.11.01"]
+[Round "1"]
+[White "second"]
+[Black "first"]
+[Result "1/2-1/2"]
+[EngineWhiteName "Second 2.0"]
+[EngineBlackName "First 1.0"]
+[SetUp "1"]
+[FEN "rnbqkb1r/ppp2ppp/4pn2/3p4/2PP4/2N5/PP2PPPP/R1BQKBNR w KQkq - 0 1"]
+[GameStartTime "2026-11-01T10:11:00 -0800"]
+[GameEndTime "2026-11-01T10:12:00 -0800"]
+[PlyCount "2"]
+[Termination "adjudication"]
+[TimeControl "8+0.08"]
+
+1. Nf3 {+0.20/10 0.100s, n=1000, sd=12, nps=10000} Be7 {-0.15/11 0.100s, n=2000, sd=13, nps=20000}
+1/2-1/2
+
+[Event "Fixture"]
+[Site "?"]
+[Date "2026.11.01"]
+[Round "2"]
+[White "first"]
+[Black "second"]
+[Result "1/2-1/2"]
+[EngineWhiteName "First 1.0"]
+[EngineBlackName "Second 2.0"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"]
+[GameStartTime "2026-11-01T10:12:00 -0800"]
+[GameEndTime "2026-11-01T10:13:00 -0800"]
+[PlyCount "2"]
+[Termination "adjudication"]
+[TimeControl "8+0.08"]
+
+1... Nc6 {-0.10/10 0.100s, n=1000, sd=12, nps=10000} 2. Nc3 {+0.12/11 0.100s, n=2000, sd=13, nps=20000}
+1/2-1/2
+
+[Event "Fixture"]
+[Site "?"]
+[Date "2026.11.01"]
+[Round "2"]
+[White "second"]
+[Black "first"]
+[Result "1/2-1/2"]
+[EngineWhiteName "Second 2.0"]
+[EngineBlackName "First 1.0"]
+[SetUp "1"]
+[FEN "rnbqkbnr/pp1ppppp/8/2p5/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2"]
+[GameStartTime "2026-11-01T10:13:00 -0800"]
+[GameEndTime "2026-11-01T10:14:00 -0800"]
+[PlyCount "2"]
+[Termination "adjudication"]
+[TimeControl "8+0.08"]
+
+1... Nc6 {-0.10/10 0.100s, n=1000, sd=12, nps=10000} 2. Nc3 {+0.12/11 0.100s, n=2000, sd=13, nps=20000}
+1/2-1/2
+
+[Event "Fixture"]
+[Site "?"]
+[Date "2026.11.01"]
+[Round "3"]
+[White "first"]
+[Black "second"]
+[Result "0-1"]
+[EngineWhiteName "First 1.0"]
+[EngineBlackName "Second 2.0"]
+[SetUp "1"]
+[FEN "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 5 4"]
+[GameStartTime "2026-11-01T10:14:00 -0800"]
+[GameEndTime "2026-11-01T10:15:00 -0800"]
+[PlyCount "2"]
+[Termination "adjudication"]
+[TimeControl "8+0.08"]
+
+1... Nf6 {-0.30/10 0.100s, n=1000, sd=12, nps=10000} 2. d3 {+0.25/11 0.100s, n=2000, sd=13, nps=20000}
+0-1
+
+[Event "Fixture"]
+[Site "?"]
+[Date "2026.11.01"]
+[Round "3"]
+[White "second"]
+[Black "first"]
+[Result "1/2-1/2"]
+[EngineWhiteName "Second 2.0"]
+[EngineBlackName "First 1.0"]
+[SetUp "1"]
+[FEN "r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 5 4"]
+[GameStartTime "2026-11-01T10:15:00 -0800"]
+[GameEndTime "2026-11-01T10:16:00 -0800"]
+[PlyCount "2"]
+[Termination "adjudication"]
+[TimeControl "8+0.08"]
+
+1... Nf6 {-0.30/10 0.100s, n=1000, sd=12, nps=10000} 2. d3 {+0.25/11 0.100s, n=2000, sd=13, nps=20000}
+1/2-1/2
+

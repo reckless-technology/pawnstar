@@ -152,6 +152,27 @@ GAME_FIVE = f"""[Event "Fastchess Tournament"]
 """
 
 
+#: Game 6: the candidate's second move took 0.5 s of clock and searched nothing (n=0), and the baseline's first
+#: was a book move. The rate is over the moves that searched, so the candidate is 100,000 + 300,000 nodes in
+#: 1.0 + 1.0 s = 200,000 nps with mean depth (10 + 20) / 2 = 15, not 400,000 nodes in 2.5 s = 160,000 nps; the
+#: baseline is 600,000 nodes in 2.0 s at depth 30.
+GAME_SIX = f"""[Event "Fastchess Tournament"]
+[Round "6"]
+[White "candidate"]
+[Black "baseline"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "{WHITE_TO_MOVE_FEN}"]
+[PlyCount "6"]
+[TimeControl "8+0.08"]
+
+1. cxd5 {{+0.79/10 1.0s, n=100000, sd=12, nps=100000}} exd5 {{book}}
+2. Bg5 {{/0 0.5s, n=0, sd=0, nps=0}} Be7 {{-0.41/30 2.0s, n=600000, sd=33, nps=300000}}
+3. e3 {{+1.00/20 1.0s, n=300000, sd=25, nps=300000}} O-O {{/0 0.000s, n=0, sd=0, nps=0}} 1-0
+
+"""
+
+
 def write_pgn(directory: Path, name: str, text: str) -> str:
     """Write a PGN fixture. @param directory where. @param name the file name. @param text its content.
     @return the path as a string."""
@@ -207,6 +228,36 @@ def test_aggregate_rate_and_sides() -> None:
             candidate.nodes != baseline.nodes and candidate.seconds != baseline.seconds,
             "rate: the two engines' totals differ, so a swapped attribution cannot pass these checks",
         )
+
+
+def test_a_move_without_search_is_no_search_time() -> None:
+    """Game 6: an n=0 move and a book move are counted as no search, and n=0's clock is not search time.
+
+    candidate: 3 moves, 1 without search; 400,000 nodes in 2.0 s = 200,000 nps; depths 10 and 20, mean 15.
+    baseline:  3 moves, 2 without search; 600,000 nodes in 2.0 s = 300,000 nps; depth 30.
+    """
+    with tempfile.TemporaryDirectory() as directory:
+        path = write_pgn(Path(directory), "no-search.pgn", GAME_SIX)
+        report = pgn_nps.measure([path])
+        candidate, baseline = report.engines["candidate"], report.engines["baseline"]
+        check(report.games_inconsistent == 0, "no search: the game is used")
+        check(
+            candidate.moves == 3 and candidate.moves_without_search == 1,
+            f"no search: the candidate's n=0 move is counted (got {candidate.moves_without_search} of "
+            f"{candidate.moves})",
+        )
+        check(
+            baseline.moves == 3 and baseline.moves_without_search == 2,
+            f"no search: so are the baseline's book move and n=0 move (got {baseline.moves_without_search} of "
+            f"{baseline.moves})",
+        )
+        check_close(candidate.seconds, 2.0, 6, "no search: the 0.5 s on an n=0 move is not search time")
+        check_close(candidate.nodes_per_second, 200_000.0, 2, "no search: candidate 200,000 nps, not 160,000")
+        check_close(baseline.nodes_per_second, 300_000.0, 2, "no search: baseline 300,000 nps")
+        check_close(candidate.mean_depth, 15.0, 6, "no search: mean depth over the moves that searched, 15")
+        check_close(baseline.mean_depth, 30.0, 6, "no search: and 30 for the baseline")
+        printed = pgn_nps.format_report(report)
+        check("no search" in printed and "mean depth" in printed, "no search: both columns are printed")
 
 
 def test_side_order_reads_the_opening() -> None:
@@ -310,6 +361,7 @@ def test_no_games_is_an_error_not_a_zero() -> None:
 def main() -> int:
     """Run every case. @return 0 when every check passed, 1 otherwise."""
     test_aggregate_rate_and_sides()
+    test_a_move_without_search_is_no_search_time()
     test_side_order_reads_the_opening()
     test_a_book_comment_does_not_shift_the_attribution()
     test_a_missing_comment_refuses_the_game()

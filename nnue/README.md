@@ -152,7 +152,7 @@ engine`. That is the container working, not a fault: no net of that shape is shi
 which is what gives the non-default shape a net to test with at all.
 
 **The whole suite runs at either shape**, with one caveat worth knowing before you run it: at the
-non-default shape eighteen of the nineteen suites pass in about 20 seconds (22.0 s, measured 2026-10-31), and `principal_variation`
+non-default shape nineteen of the twenty suites pass in about 20 seconds (the eighteen there were then, 22.0 s, measured 2026-10-31), and `principal_variation`
 searches the **synthetic** net to depth 8, where random weights give the pruning heuristics no traction -
 measured on this machine, it had not finished in five minutes at the v12 shape. That is a property of
 random weights rather than of the shape (the same thing is recorded in `CMakeLists.txt` for a depth-12

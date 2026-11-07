@@ -1,0 +1,34 @@
+[Event "Fixture"]
+[Round "1"]
+[White "alpha"]
+[Black "beta"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "k7/8/2K5/8/8/8/8/7R w - - 0 1"]
+[PlyCount "4"]
+
+1. Kc7 {+9.00/10 0.100s, n=1000, sd=12, nps=10000} Ka7 {/0 0.000s, n=0, sd=0, nps=0}
+2. Qd4 {+9.10/10 0.100s, n=2000, sd=12, nps=20000} Ka6 {/0 0.000s, n=0, sd=0, nps=0}
+1-0
+
+[Event "Fixture"]
+[Round "2"]
+[Black "beta"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "k7/8/2K5/8/8/8/8/7R w - - 0 1"]
+[PlyCount "1"]
+
+1. Kc7 {+9.00/10 0.100s, n=1000, sd=12, nps=10000}
+1-0
+
+[Event "Fixture"]
+[Round "3"]
+[White "alpha"]
+[Black "beta"]
+[Result "*"]
+[SetUp "1"]
+[FEN "k7/8/2K5/8/8/8/8/7R w - - 0 1"]
+[PlyCount "2"]
+
+1. Kc7 {+9.00/10 0.100s, n=1000, sd=12, nps=10000} Ka7 {/0 0.000s, n=0, sd=0, nps=0}

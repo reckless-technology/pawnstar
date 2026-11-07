@@ -1,0 +1,27 @@
+[Event "Fixture"]
+[Round "1"]
+[White "alpha"]
+[Black "beta"]
+[Result "1/2-1/2"]
+[SetUp "1"]
+[FEN "k7/8/2K5/8/8/8/8/7R w - - 0 1"]
+[PlyCount "6"]
+
+1. Kc7 {+9.00/10 0.100s, n=1000, sd=12, nps=10000} Ka7 {/0 0.000s, n=0, sd=0, nps=0}
+2. Rh8 {+9.10/10 0.100s, n=2000, sd=12, nps=0} Ka6 {/0 0.081s, n=0, sd=0, nps=0}
+3. Ra8+ {/0 0.000s, n=0, sd=0, nps=0} Kb5 {/0 0.000s, n=0, sd=0, nps=0}
+1/2-1/2
+
+[Event "Fixture"]
+[Round "2"]
+[White "beta"]
+[Black "alpha"]
+[Result "1-0"]
+[SetUp "1"]
+[FEN "7k/8/5K2/8/8/8/8/6R1 b - - 0 1"]
+[PlyCount "4"]
+
+1... Kh7 {/0 0.000s, n=0, sd=0, nps=0} 2. Kf7 {+9.00/10 0.100s, n=3000, sd=12, nps=30000}
+Kh8 {book} 3. Rh1# {+M1/10 0.100s, n=4000, sd=12, nps=40000, White mates}
+1-0
+

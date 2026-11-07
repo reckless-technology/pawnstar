@@ -41,7 +41,9 @@ pentanomial formula.
 from __future__ import annotations
 
 import math
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # No `tools/__pycache__` left behind: a ctest run must not write into the source tree.
@@ -371,8 +373,6 @@ def test_correction_is_applied_to_an_interval() -> None:
 
 def test_pgn_is_parsed_into_pairs() -> None:
     """The PGN reader: three usable pairs, and one of each way a round fails to be one."""
-    import tempfile
-
     with tempfile.TemporaryDirectory() as directory:
         path = write_fixture_pgn(Path(directory))
         pairs, report = opening_icc.parse_pairs([str(path)])
@@ -445,6 +445,198 @@ def test_round_scoring() -> None:
     check(opening_icc.pair_score_of_round([(True, "*"), (False, "1-0")]) is None, "score: in either order")
 
 
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+MATCH_CHUNK_A = str(FIXTURES / "match_chunk_a.pgn")
+MATCH_CHUNK_B = str(FIXTURES / "match_chunk_b.pgn")
+
+
+def test_checked_in_match() -> None:
+    """test/fixtures/match_chunk_{a,b}.pgn, sixteen games written by hand, against figures worked by hand.
+
+    Scored for `first`, game by game, as White and then as Black:
+
+      chunk a  round 1 opening A  W W  1.0
+               round 2 opening A  W D  0.75
+               round 3 opening B  W L  0.5
+               round 4 opening C  D W  0.75
+               round 5 opening A  W D  0.75
+      chunk b  round 1 opening A  D D  0.5     (round numbers restart: each chunk is its own fastchess run)
+               round 2 opening B  D D  0.5
+               round 3 opening C  L D  0.25
+
+    W/D/L: +6 =8 -2 over 16 games, 10 points, p = 0.625; as White +4 =3 -1, as Black +2 =5 -1.
+    Ptnml(0-2) [0, 1, 3, 3, 1].  Elo = 400 log10(0.625 / 0.375) = +88.74.
+    E[x^2] = 3.5 / 8 = 0.4375, variance 0.4375 - 0.390625 = 0.046875, se = sqrt(0.046875 / 8) = 0.0765466.
+    Nominal: the Elo curve at 0.625 -+ 1.959964 * se is -17.41 .. +214.88, half-width 116.14.
+
+    Openings A [1, .75, .75, .5] mean .75; B [.5, .5] mean .5; C [.75, .25] mean .5; grand mean .625.
+      SSB = 4 * .125^2 + 2 * .125^2 + 2 * .125^2 = 0.125, df 2, MSB = 0.0625
+      SSW = (.25^2 + 0 + 0 + .25^2) + 0 + (.25^2 + .25^2) = 0.25, df 5, MSW = 0.05, F = 1.25
+      m_anova = (8 - (16 + 4 + 4) / 8) / 2 = 2.5, var_between = 0.0125 / 2.5 = 0.005, ICC = 0.005 / 0.055 = 1/11
+      m_effective = 24 / 8 = 3, Deff = 1 + 2 / 11 = 13/11, se x sqrt(13/11) = 0.0832149
+      Corrected: the Elo curve at 0.625 -+ 1.959964 * that = -26.52 .. +228.18, half-width 127.35.
+
+    The balanced shortcut, mean size m = 8/3:
+      ICC = 0.0125 / (0.0625 + (5/3) * 0.05) = 3/35, Deff = 1 + (5/3) * (3/35) = 8/7
+      half-width 116.14 * sqrt(8/7) = 124.16, so 88.74 -+ 124.16 = -35.42 .. +212.90
+
+    Cluster-robust: sums of deviations A +0.5, B -0.25, C -0.25; squares 0.375; times k / (k - 1) = 1.5 gives
+    0.5625; sqrt / 8 = 0.09375 exactly, so a design effect of (0.09375 / se)^2 = 1.5 exactly. The Elo curve at
+    0.625 -+ 1.959964 * 0.09375 has half-width 145.75, so 88.74 -+ 145.75 = -57.01 .. +234.49.
+
+    Chunk a alone: Ptnml [0, 0, 1, 3, 1], p = 0.75, +190.85, se = sqrt(0.025 / 5) = 0.0707107, bar +-140.99.
+    Chunk b alone: Ptnml [0, 1, 2, 0, 0], p = 1.25 / 3, -58.45, se = 0.0680414, bar +-98.05.
+    """
+    pairs, report = opening_icc.parse_pairs([MATCH_CHUNK_A, MATCH_CHUNK_B], candidate_name="first")
+    check(report.games_seen == 16 and report.pairs_kept == 8, "match: 16 games make 8 pairs, across both files")
+    check(report.rounds_dropped == 0, "match: nothing was dropped")
+    check(opening_icc.win_draw_loss(pairs) == (6, 8, 2), "match: +6 =8 -2 from the Result tags")
+    check(opening_icc.win_draw_loss(pairs, True) == (4, 3, 1), "match: +4 =3 -1 as White")
+    check(opening_icc.win_draw_loss(pairs, False) == (2, 5, 1), "match: +2 =5 -1 as Black")
+    check(
+        report.terminations == (("adjudication", 14), ("normal", 2)),
+        f"match: how the games ended is counted (got {report.terminations})",
+    )
+    check(
+        report.engine_identities == (("First 1.0", 16), ("Second 2.0", 16)),
+        f"match: which binaries played is counted (got {report.engine_identities})",
+    )
+    check_close(report.mean_ply_count, 2.0, 9, "match: mean PlyCount 2")
+    check(
+        report.first_game_start == "2026-11-01T10:00:00 -0800" and report.last_game_end == "2026-11-01T10:16:00 -0800",
+        f"match: first start and last end (got {report.first_game_start} .. {report.last_game_end})",
+    )
+
+    corrected = opening_icc.analyse_pairs(pairs)
+    nominal, correlation = corrected.nominal, corrected.correlation
+    check(nominal.counts == (0, 1, 3, 3, 1), f"match: Ptnml(0-2) [0, 1, 3, 3, 1] (got {nominal.counts})")
+    check_close(nominal.score_fraction, 0.625, 9, "match: p = 0.625")
+    check_close(nominal.elo, 88.74, 2, "match: Elo +88.74")
+    check_close(nominal.standard_error, 0.0765466, 7, "match: nominal se 0.0765466")
+    check_close(nominal.elo_low_95, -17.41, 2, "match: nominal low -17.41")
+    check_close(nominal.elo_high_95, 214.88, 2, "match: nominal high +214.88")
+    check_close(correlation.mean_square_between, 0.0625, 9, "match: MSB 0.0625")
+    check_close(correlation.mean_square_within, 0.05, 9, "match: MSW 0.05")
+    check_close(correlation.f_statistic, 1.25, 9, "match: F 1.25")
+    check_close(correlation.anova_coefficient, 2.5, 9, "match: m_anova 2.5")
+    check_close(correlation.icc, 1.0 / 11.0, 9, "match: ICC 1/11")
+    check_close(correlation.design_effect, 13.0 / 11.0, 9, "match: design effect 13/11")
+    check_close(corrected.standard_error, 0.0832149, 7, "match: corrected se 0.0832149")
+    check_close(corrected.elo_low_95, -26.52, 2, "match: corrected low -26.52")
+    check_close(corrected.elo_high_95, 228.18, 2, "match: corrected high +228.18")
+
+    check_close(correlation.icc_at_mean_size, 3.0 / 35.0, 9, "match: the shortcut's own ICC, 3/35, is not 1/11")
+    check_close(correlation.design_effect_at_mean_size, 8.0 / 7.0, 9, "match: the shortcut's design effect, 8/7")
+    checks = opening_icc.cross_checks(corrected, opening_icc.group_by_opening(pairs))
+    check_close(checks.balanced_half_width, 124.16, 2, "match: the shortcut's half-width, 124.16")
+    check_close(checks.cluster_robust_standard_error, 0.09375, 12, "match: cluster-robust se exactly 0.09375")
+    check_close(checks.cluster_robust_design_effect, 1.5, 9, "match: cluster-robust design effect exactly 1.5")
+    check_close(checks.cluster_robust_half_width, 145.75, 2, "match: cluster-robust half-width 145.75")
+    printed = opening_icc.format_cross_checks(corrected, checks)
+    check("-35.42 .. +212.90" in printed, f"match: the shortcut's interval is printed\n{printed}")
+    check("-57.01 .. +234.49" in printed, f"match: the cluster-robust interval is printed\n{printed}")
+
+    chunks = opening_icc.format_chunks([MATCH_CHUNK_A, MATCH_CHUNK_B], pairs)
+    check(
+        "match_chunk_a.pgn: 10 games  +6 =3 -1  Ptnml(0-2) [0, 0, 1, 3, 1]  Elo +190.85 +-140.99" in chunks,
+        f"match: chunk a's own line\n{chunks}",
+    )
+    check(
+        "match_chunk_b.pgn: 6 games  +0 =5 -1  Ptnml(0-2) [0, 1, 2, 0, 0]  Elo -58.45 +-98.05" in chunks,
+        f"match: chunk b's own line\n{chunks}",
+    )
+    check("chi-square" in chunks, "match: pool_matches' scatter follows the chunks")
+
+
+def run_tool(*arguments: str) -> subprocess.CompletedProcess:
+    """The tool as a user runs it. @param arguments its command line. @return the finished process."""
+    tool = Path(__file__).resolve().parent.parent / "tools" / "opening_icc.py"
+    return subprocess.run(
+        [sys.executable, "-I", "-B", str(tool), *arguments], capture_output=True, text=True, encoding="utf-8"
+    )
+
+
+def test_expect_games_refuses_a_partial_run() -> None:
+    """`--expect-games`: a whole run prints its figures, and anything short of one prints none of them."""
+    whole = run_tool("--candidate", "first", "--expect-games", "16", MATCH_CHUNK_A, MATCH_CHUNK_B)
+    check(whole.returncode == 0, f"expect: 16 games of 16 is accepted (exit {whole.returncode})\n{whole.stderr}")
+    check("+6 =8 -2" in whole.stdout and "Elo               +88.74" in whole.stdout, "expect: and reports the match")
+
+    short = run_tool("--candidate", "first", "--expect-games", "16", MATCH_CHUNK_A)
+    check(short.returncode == 1, f"expect: one chunk of two is refused (exit {short.returncode})")
+    check(
+        "REFUSED" in short.stdout and "10 games read, 16 expected" in short.stdout,
+        f"expect: and says why\n{short.stdout}",
+    )
+    check("Elo" not in short.stdout, "expect: with no figure in the output to quote")
+
+    with tempfile.TemporaryDirectory() as directory:
+        malformed = run_tool("--expect-games", "13", str(write_fixture_pgn(Path(directory))))
+        check(malformed.returncode == 1, "expect: the right game count with broken rounds is refused too")
+        for reason in ("1 rounds not two games", "1 rounds holding an unfinished game",
+                       "1 rounds whose colours were not reversed", "1 rounds whose two games differ in FEN"):
+            check(reason in malformed.stdout, f"expect: names each way a round failed: {reason}")
+
+    report = opening_icc.parse_pairs([MATCH_CHUNK_A, MATCH_CHUNK_B], candidate_name="first")[1]
+    check(opening_icc.integrity_problems(report, 16) == [], "expect: a whole run has no problems")
+    check(len(opening_icc.integrity_problems(report, 18)) == 1, "expect: a wrong count is one problem")
+
+
+def test_candidate_must_be_one_side_of_every_pair() -> None:
+    """A game the candidate is not in must not be scored as though it had Black, which the reader once did."""
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "third_engine.pgn"
+        path.write_text(
+            "".join(
+                [
+                    game_block("1", "candidate", "baseline", "1-0", OPENING_A),
+                    game_block("1", "baseline", "candidate", "0-1", OPENING_A),
+                    game_block("2", "baseline", "other", "1-0", OPENING_A),
+                    game_block("2", "other", "baseline", "1-0", OPENING_A),
+                    # The candidate is in both games here, but against two different engines.
+                    game_block("3", "candidate", "baseline", "1-0", OPENING_B),
+                    game_block("3", "other", "candidate", "1-0", OPENING_B),
+                ]
+            ),
+            encoding="utf-8",
+        )
+        pairs, report = opening_icc.parse_pairs([str(path)])
+        check([pair.round_label for pair in pairs] == ["1"], "sides: only the true pair is kept")
+        check(report.rounds_without_candidate == 1, "sides: the round the candidate is not in is counted")
+        check(report.rounds_same_colour == 1, "sides: and the round whose two games are not one pairing")
+
+
+def test_cluster_robust_standard_error() -> None:
+    """Two openings with hand-summed deviations, and the refusal below two.
+
+    groups [[0, 1], [1, 1]], grand mean 0.75; deviation sums -0.5 and +0.5; squares 0.5; times k / (k - 1) = 2
+    gives 1; sqrt / 4 = 0.25.
+    """
+    check_close(
+        opening_icc.cluster_robust_standard_error([[0.0, 1.0], [1.0, 1.0]]), 0.25, 12, "robust: hand-summed, 0.25"
+    )
+    check_raises(
+        lambda: opening_icc.cluster_robust_standard_error([[0.0, 1.0], []]),
+        "robust: one opening cannot be clustered on, and an empty group is not a second",
+    )
+
+
+def test_extreme_score() -> None:
+    """Past 97% either way the report states a limit. 50 wins of 50 give 0.025 ** (1 / 50) = 0.92888, +446.4 Elo."""
+    check(opening_icc.format_extreme_score(95, 2, 3) is None, "extreme: 96% is not extreme")
+    check(opening_icc.format_extreme_score(3, 2, 95) is None, "extreme: nor is 4%")
+    won = opening_icc.format_extreme_score(50, 0, 0)
+    check(won is not None and "0.92888" in won and "at least +446.4 Elo" in won, f"extreme: every game won\n{won}")
+    check(won is not None and "only the limit is reportable" in won, "extreme: and the point estimate is disowned")
+    lost = opening_icc.format_extreme_score(0, 0, 50)
+    check(
+        lost is not None and "other engine" in lost and "at most -446.4 Elo" in lost,
+        f"extreme: losing every game is as extreme, and the sign is the candidate's\n{lost}",
+    )
+    one_sided = opening_icc.format_extreme_score(98, 1, 1)
+    check(one_sided is not None and "98.5/100" in one_sided, "extreme: 98.5% is reported, on its own points")
+
+
 def test_input_is_validated() -> None:
     """A measurement that cannot be made stops the tool; it does not get a plausible design effect."""
     check_raises(
@@ -486,6 +678,11 @@ def main() -> int:
     test_correction_is_applied_to_an_interval()
     test_pgn_is_parsed_into_pairs()
     test_round_scoring()
+    test_checked_in_match()
+    test_expect_games_refuses_a_partial_run()
+    test_candidate_must_be_one_side_of_every_pair()
+    test_cluster_robust_standard_error()
+    test_extreme_score()
     test_input_is_validated()
     verdict = "[PASS]" if failure_count == 0 else "[FAIL]"
     print(f"{verdict} opening_icc: {failure_count} failed check(s)")

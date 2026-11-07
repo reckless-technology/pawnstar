@@ -95,7 +95,41 @@ and the lin-2 arm's 0.140 are a real difference between the two MACHINES, not an
 different sizes, and a match with no PGN of its own is best corrected with the ICC measured on the machine
 it ran on - at that match's own `m_effective`, never at the one the ICC was measured at.
 
+THE WHOLE RECOUNT OF A FIXED-GAMES MATCH lives here, so a match directory needs no analysis script of its own.
+This took in `analyze.py` from the Trebuchet 1.0 strength matches of 2026-11-07 and the `opening_icc.py` kept
+beside the net-swap games of 2026-10-30, neither of which was in a repository. Beside the correction the report
+gives W/D/L and how each game ended, recounted from the `Result` tags and so independent of fastchess's totals;
+each chunk's own figures and `pool_matches.py`'s scatter; `--expect-games`, which refuses a partial or malformed
+run rather than letting it print a quotable number; and, past 97%, a Clopper-Pearson limit on the win rate.
+
+Two cross-checks sit under the corrected interval, reported rather than substituted:
+
+  * **The balanced-design shortcut**, taken as those two scripts took it: `ICC = (MSB - MSW) / (MSB + (m - 1) MSW)`
+    and `Deff = 1 + (m - 1) ICC` at the mean group size, then the nominal half-width times `sqrt(Deff)` either
+    side of the Elo. It is here because figures were pre-registered and quoted that way, and a quoted figure has
+    to stay checkable; it is not the better estimate (trap 1 above).
+  * **The cluster-robust standard error** of the mean, clustering pairs by opening, which assumes no ICC model at
+    all: `se^2 = k / (k - 1) * sum_i (sum_j (x_ij - mean))^2 / N^2`. Its half-width is taken from the Elo curve at
+    `p -+ 1.959964 * se`, then laid either side of the Elo.
+
+The three disagree in a known way, and on the two matches that prompted this they were close. Measured, 95%:
+
+    Trebuchet vs Pawnstar 2.2.0, 4000 games, +144.30    Deff   interval
+        this tool's correction                          1.947  +134.35 .. +154.49
+        balanced shortcut, as quoted                    1.895  +134.37 .. +154.24
+        cluster-robust                                 (1.900) +134.36 .. +154.25
+    runF vs cap2, 4000 games, +9.82
+        this tool's correction                          1.798  +1.18 .. +18.47
+        balanced shortcut, as quoted                    1.758  +1.27 .. +18.36
+        cluster-robust                                 (1.778) +1.22 .. +18.41
+
+The cluster-robust design effect in brackets is its squared ratio to the nominal standard error. It falls between
+the other two both times, beside the shortcut on the first match and midway on the second, so these two matches do
+not by themselves show the shortcut to be too narrow: its fault is the one the unequal-sizes fixture pins, and here
+the sizes vary little, 4 to 15 pairs on a mean of 6.71.
+
     python3 tools/opening_icc.py chunk-a.pgn chunk-b.pgn ...
+    python3 tools/opening_icc.py --candidate trebuchet --expect-games 4000 chunk-*.pgn
     python3 tools/opening_icc.py --candidate candidate --label "12+0.12 pooled" ~/sprt/**/runF-*.pgn
     python3 tools/opening_icc.py --per-file chunk-a.pgn chunk-b.pgn
 """
@@ -106,7 +140,7 @@ import argparse
 import math
 import re
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -127,6 +161,9 @@ WHITE_SCORES = {"1-0": 1.0, "0-1": 0.0, "1/2-1/2": 0.5}
 #: What `tools/pawnstar-match.sh` names the engine under test.
 DEFAULT_CANDIDATE_NAME = "candidate"
 
+#: From this far to one side, the logistic Elo and a normal bar stop describing the score.
+EXTREME_SCORE_FRACTION = 0.97
+
 
 @dataclass(frozen=True)
 class PairObservation:
@@ -136,6 +173,9 @@ class PairObservation:
     round_label: str  #: the `Round` tag, which is what makes a pair within one fastchess run
     opening: str  #: the `FEN` tag, verbatim - the grouping key
     score: float  #: the candidate's share of the pair: 0, 0.25, 0.5, 0.75 or 1
+    #: `(candidate_is_white, candidate's score)` per game, which the pair score alone cannot give: 0.5 may be two
+    #: draws or a win and a loss.
+    games: tuple[tuple[bool, float], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -152,11 +192,23 @@ class ParseReport:
     rounds_same_colour: int  #: two games that did not swap colours, so not a colour-reversed pair
     rounds_mixed_opening: int  #: two games of one round that did not share a `FEN`
     engine_names: tuple[str, ...]  #: every name seen as White or Black, for diagnosing `--candidate`
+    rounds_without_candidate: int = 0  #: a game whose two sides were not the candidate and one other
+    terminations: tuple[tuple[str, int], ...] = ()  #: how many games ended each way, from `Termination`
+    engine_identities: tuple[tuple[str, int], ...] = ()  #: `EngineWhiteName` / `EngineBlackName`, per side played
+    mean_ply_count: float | None = None  #: over the games that state a `PlyCount`
+    first_game_start: str = ""  #: the earliest `GameStartTime`
+    last_game_end: str = ""  #: the latest `GameEndTime`
 
     @property
     def rounds_dropped(self) -> int:
         """Rounds that did not become a pair. @return the count."""
-        return self.rounds_not_two_games + self.rounds_unfinished + self.rounds_same_colour + self.rounds_mixed_opening
+        return (
+            self.rounds_not_two_games
+            + self.rounds_unfinished
+            + self.rounds_same_colour
+            + self.rounds_mixed_opening
+            + self.rounds_without_candidate
+        )
 
 
 @dataclass(frozen=True)
@@ -178,12 +230,18 @@ class IntraclassCorrelation:
     icc_raw: float  #: the estimate as it comes out, negative when openings are no more alike than chance
     icc: float  #: the same, floored at 0 - a negative correlation is not used to NARROW a bar
     design_effect: float  #: 1 + (m_effective - 1) * icc
+    icc_at_mean_size: float  #: the balanced-design shortcut's own ICC, floored at 0
     design_effect_at_mean_size: float  #: the balanced-design shortcut, reported only for comparison
 
     @property
     def bar_inflation(self) -> float:
         """What the nominal bar is multiplied by. @return sqrt(design effect)."""
         return math.sqrt(self.design_effect)
+
+    @property
+    def f_statistic(self) -> float:
+        """The ANOVA's F for openings. @return MSB / MSW, infinite when nothing varies within an opening."""
+        return self.mean_square_between / self.mean_square_within if self.mean_square_within > 0.0 else math.inf
 
     @property
     def variance_floor_fraction(self) -> float:
@@ -219,6 +277,16 @@ class CorrectedInterval:
         return not self.elo_low_95 <= elo <= self.elo_high_95
 
 
+@dataclass(frozen=True)
+class CrossChecks:
+    """The two other 95% half-widths, each laid symmetrically either side of the Elo - see the module docstring."""
+
+    balanced_half_width: float  #: the nominal half-width times the shortcut's sqrt(Deff)
+    cluster_robust_standard_error: float  #: of p, clustering pairs by opening
+    cluster_robust_half_width: float  #: half the Elo curve's width at p -+ 1.959964 * that standard error
+    cluster_robust_design_effect: float  #: that standard error's squared ratio to the nominal one
+
+
 def pair_score_of_round(games: Sequence[tuple[bool, str]]) -> float | None:
     """The candidate's share of one round's two games, or None when the round is not a usable pair.
 
@@ -232,6 +300,32 @@ def pair_score_of_round(games: Sequence[tuple[bool, str]]) -> float | None:
         white_score = WHITE_SCORES[result]
         total += white_score if candidate_is_white else 1.0 - white_score
     return total / len(games)
+
+
+def candidate_scores_of_round(games: Sequence[tuple[bool, str]]) -> tuple[tuple[bool, float], ...]:
+    """Each game of a round as the candidate's colour and score, for a round whose results are all results.
+
+    @param games `(candidate_is_white, result)` per game. @return `(candidate_is_white, score)` per game.
+    """
+    return tuple(
+        (candidate_is_white, WHITE_SCORES[result] if candidate_is_white else 1.0 - WHITE_SCORES[result])
+        for candidate_is_white, result in games
+    )
+
+
+def win_draw_loss(pairs: Iterable[PairObservation], is_white: bool | None = None) -> tuple[int, int, int]:
+    """The candidate's wins, draws and losses over the games of some pairs.
+
+    @param pairs the pairs. @param is_white count only the games it played as White (True) or Black (False).
+    @return wins, draws, losses.
+    """
+    scores = [
+        score
+        for pair in pairs
+        for candidate_is_white, score in pair.games
+        if is_white is None or candidate_is_white == is_white
+    ]
+    return scores.count(1.0), scores.count(0.5), scores.count(0.0)
 
 
 def pentanomial_counts(scores: Iterable[float]) -> tuple[int, int, int, int, int]:
@@ -290,11 +384,16 @@ def measure_intraclass_correlation(groups: Sequence[Sequence[float]]) -> Intracl
     total_variance = variance_between + mean_square_within
     icc_raw = variance_between / total_variance if total_variance != 0.0 else 0.0
     icc = max(0.0, icc_raw)
+    mean_group_size = pairs / openings
+    # The balanced-design shortcut: its own ICC, not the one above, so that it is the whole of that shortcut.
+    shortcut_denominator = mean_square_between + (mean_group_size - 1.0) * mean_square_within
+    icc_at_mean_size = (
+        max(0.0, (mean_square_between - mean_square_within) / shortcut_denominator) if shortcut_denominator else 0.0
+    )
 
     # The design effect of the grand mean weights each group by its size twice over, so the cluster size
     # that matters is the one an average PAIR sits in - larger than the mean whenever the sizes vary.
     effective_group_size = sum_of_squared_sizes / pairs
-    mean_group_size = pairs / openings
     return IntraclassCorrelation(
         pairs=pairs,
         openings=openings,
@@ -311,7 +410,8 @@ def measure_intraclass_correlation(groups: Sequence[Sequence[float]]) -> Intracl
         icc_raw=icc_raw,
         icc=icc,
         design_effect=1.0 + (effective_group_size - 1.0) * icc,
-        design_effect_at_mean_size=1.0 + (mean_group_size - 1.0) * icc,
+        icc_at_mean_size=icc_at_mean_size,
+        design_effect_at_mean_size=1.0 + (mean_group_size - 1.0) * icc_at_mean_size,
     )
 
 
@@ -344,6 +444,38 @@ def correct_interval(
     )
 
 
+def cluster_robust_standard_error(groups: Sequence[Sequence[float]]) -> float:
+    """The standard error of the grand mean of pair scores, clustered by opening, with no ICC model.
+
+    @param groups one list of pair scores per opening drawn; empty groups are ignored.
+    @return `sqrt(k / (k - 1) * sum_i (sum_j (x_ij - mean))^2) / N`. Raises ValueError with under two openings.
+    """
+    used = [group for group in groups if group]
+    if len(used) < 2:
+        raise ValueError(f"a cluster-robust standard error needs at least two openings, got {len(used)}")
+    pairs = sum(len(group) for group in used)
+    grand_mean = sum(sum(group) for group in used) / pairs
+    total = sum(sum(value - grand_mean for value in group) ** 2 for group in used)
+    return math.sqrt(total * len(used) / (len(used) - 1)) / pairs
+
+
+def cross_checks(corrected: CorrectedInterval, groups: Sequence[Sequence[float]]) -> CrossChecks:
+    """The two other half-widths for a corrected result. @param corrected the result.
+    @param groups the pair scores behind it, by opening. @return them."""
+    nominal = corrected.nominal
+    robust_error = cluster_robust_standard_error(groups)
+    robust_low = pool_matches.elo_of(nominal.score_fraction - pool_matches.Z_95 * robust_error)
+    robust_high = pool_matches.elo_of(nominal.score_fraction + pool_matches.Z_95 * robust_error)
+    return CrossChecks(
+        balanced_half_width=nominal.elo_bar_95 * math.sqrt(corrected.correlation.design_effect_at_mean_size),
+        cluster_robust_standard_error=robust_error,
+        cluster_robust_half_width=0.5 * (robust_high - robust_low),
+        cluster_robust_design_effect=(
+            (robust_error / nominal.standard_error) ** 2 if nominal.standard_error > 0.0 else math.inf
+        ),
+    )
+
+
 def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NAME) -> tuple[list[PairObservation], ParseReport]:
     """Every complete colour-reversed pair in a set of fastchess PGNs.
 
@@ -360,6 +492,11 @@ def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NA
     engine_names: set[str] = set()
     games_seen = 0
     games_missing_tags = 0
+    terminations: Counter = Counter()
+    identities: Counter = Counter()
+    ply_counts: list[int] = []
+    game_starts: list[str] = []
+    game_ends: list[str] = []
 
     for path in paths:
         with open(path, encoding="utf-8", errors="replace") as handle:
@@ -378,17 +515,27 @@ def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NA
                 engine_names.add(white)
             if black:
                 engine_names.add(black)
+            terminations[tags.get("Termination", "(none stated)")] += 1
+            identities.update(tags[tag] for tag in ("EngineWhiteName", "EngineBlackName") if tag in tags)
+            if tags.get("PlyCount", "").isdigit():
+                ply_counts.append(int(tags["PlyCount"]))
+            if tags.get("GameStartTime"):
+                game_starts.append(tags["GameStartTime"])
+            if tags.get("GameEndTime"):
+                game_ends.append(tags["GameEndTime"])
             round_label, result, opening = tags.get("Round"), tags.get("Result"), tags.get("FEN")
             if not (round_label and white and black and result and opening):
                 games_missing_tags += 1
                 continue
             key = (path, round_label)
             if key not in rounds:
-                rounds[key] = {"openings": set(), "games": [], "colours": []}
+                rounds[key] = {"openings": set(), "games": [], "sides": [], "has_candidate_twice_or_never": False}
                 order.append(key)
             rounds[key]["openings"].add(opening)
             rounds[key]["games"].append((white == candidate_name, result))
-            rounds[key]["colours"].append(white)
+            rounds[key]["sides"].append((white, black))
+            if (white == candidate_name) == (black == candidate_name):
+                rounds[key]["has_candidate_twice_or_never"] = True
 
     if candidate_name not in engine_names:
         raise ValueError(
@@ -397,7 +544,7 @@ def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NA
         )
 
     pairs: list[PairObservation] = []
-    not_two_games = unfinished = same_colour = mixed_opening = 0
+    not_two_games = unfinished = same_colour = mixed_opening = without_candidate = 0
     for key in order:
         info = rounds[key]
         if len(info["games"]) != 2:
@@ -406,7 +553,11 @@ def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NA
         if len(info["openings"]) != 1:
             mixed_opening += 1
             continue
-        if info["colours"][0] == info["colours"][1]:
+        if info["has_candidate_twice_or_never"]:
+            without_candidate += 1
+            continue
+        first_sides, second_sides = info["sides"]
+        if first_sides != second_sides[::-1]:
             same_colour += 1
             continue
         score = pair_score_of_round(info["games"])
@@ -415,7 +566,11 @@ def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NA
             continue
         pairs.append(
             PairObservation(
-                source=key[0], round_label=key[1], opening=next(iter(info["openings"])), score=score
+                source=key[0],
+                round_label=key[1],
+                opening=next(iter(info["openings"])),
+                score=score,
+                games=candidate_scores_of_round(info["games"]),
             )
         )
 
@@ -430,8 +585,40 @@ def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NA
         rounds_same_colour=same_colour,
         rounds_mixed_opening=mixed_opening,
         engine_names=tuple(sorted(engine_names)),
+        rounds_without_candidate=without_candidate,
+        terminations=tuple(sorted(terminations.items())),
+        engine_identities=tuple(sorted(identities.items())),
+        mean_ply_count=sum(ply_counts) / len(ply_counts) if ply_counts else None,
+        first_game_start=min(game_starts, default=""),
+        last_game_end=max(game_ends, default=""),
     )
     return pairs, report
+
+
+def integrity_problems(report: ParseReport, expected_games: int) -> list[str]:
+    """Why a run must not be quoted: a game count that is not the one planned, or anything that was dropped.
+
+    A partial chunk prints a well-formed Elo with an honest bar, so a dead run reads as a finished one unless the
+    count it should have reached is stated and checked.
+
+    @param report what was read. @param expected_games the games the run was to play.
+    @return one line per problem, empty when the run is whole.
+    """
+    problems = []
+    if report.games_seen != expected_games:
+        problems.append(f"{report.games_seen:,} games read, {expected_games:,} expected")
+    if report.games_missing_tags:
+        problems.append(f"{report.games_missing_tags:,} games without the Round/White/Black/Result/FEN tags")
+    for count, what in (
+        (report.rounds_not_two_games, "not two games"),
+        (report.rounds_unfinished, "holding an unfinished game"),
+        (report.rounds_same_colour, "whose colours were not reversed"),
+        (report.rounds_mixed_opening, "whose two games differ in FEN"),
+        (report.rounds_without_candidate, "with a game the candidate was not one side of"),
+    ):
+        if count:
+            problems.append(f"{count:,} rounds {what}")
+    return problems
 
 
 def group_by_opening(pairs: Iterable[PairObservation]) -> list[list[float]]:
@@ -454,6 +641,100 @@ def analyse_pairs(pairs: Sequence[PairObservation], label: str = "") -> Correcte
     return correct_interval(nominal, correlation)
 
 
+def format_extreme_score(wins: int, draws: int, losses: int) -> str | None:
+    """What to say about a score too one-sided for its Elo and normal bar to mean much.
+
+    @param wins the candidate's wins. @param draws its draws. @param losses its losses.
+    @return the block, or None when the score is not that far to either side. The limit is on the leader's WIN
+    rate with every draw treated as a non-win, so it is conservative, and it is what its Elo is read from.
+    """
+    games = wins + draws + losses
+    points = wins + 0.5 * draws
+    if EXTREME_SCORE_FRACTION > points / games > 1.0 - EXTREME_SCORE_FRACTION:
+        return None
+    is_candidate_leading = points / games >= EXTREME_SCORE_FRACTION
+    leader_wins = wins if is_candidate_leading else losses
+    limit = pool_matches.clopper_pearson_lower_limit(leader_wins, games)
+    elo = pool_matches.elo_of(limit)
+    lines = [
+        f"extreme score: {points}/{games}. The Elo at this score is ill-conditioned and a normal bar does not "
+        "describe it.",
+        f"  Clopper-Pearson 95% lower limit on the {'candidate' if is_candidate_leading else 'other engine'}'s win "
+        f"rate, every draw a non-win: {limit:.5f}, so the candidate is "
+        + (f"at least {elo:+.1f} Elo" if is_candidate_leading else f"at most {-elo:+.1f} Elo"),
+    ]
+    if leader_wins == games:
+        lines.append("  Every game went one way: the point estimate is infinite and only the limit is reportable.")
+    return "\n".join(lines)
+
+
+def format_win_draw_loss(pairs: Sequence[PairObservation], report: ParseReport, candidate_name: str) -> str:
+    """The recount from the `Result` tags and how the games went. @param pairs the pairs kept.
+    @param report what was read. @param candidate_name whose side the count is from. @return the block."""
+
+    def tally(is_white: bool | None = None) -> str:
+        wins, draws, losses = win_draw_loss(pairs, is_white)
+        return f"+{wins} ={draws} -{losses}"
+
+    lines = [
+        f"{candidate_name}, recounted from the Result tags:",
+        f"  overall           {tally()}",
+        f"  as White          {tally(True)}",
+        f"  as Black          {tally(False)}",
+        f"  terminations      {', '.join(f'{name} {count:,}' for name, count in report.terminations)}",
+    ]
+    if report.engine_identities:
+        lines.append(f"  identities        {', '.join(f'{name} {count:,}' for name, count in report.engine_identities)}")
+    if report.mean_ply_count is not None:
+        lines.append(f"  mean PlyCount     {report.mean_ply_count:.1f}")
+    if report.first_game_start and report.last_game_end:
+        lines.append(f"  played            {report.first_game_start} .. {report.last_game_end}")
+    return "\n".join(lines)
+
+
+def format_chunks(paths: Sequence[str], pairs: Sequence[PairObservation]) -> str:
+    """Each file's own figures and, from `pool_matches.py`, how far apart they are. @param paths the files.
+    @param pairs the pairs kept. @return the block."""
+    lines = ["chunks:"]
+    vectors = []
+    for path in paths:
+        of_file = [pair for pair in pairs if pair.source == path]
+        if not of_file:
+            lines.append(f"  {Path(path).name}: no complete pair")
+            continue
+        wins, draws, losses = win_draw_loss(of_file)
+        vector = pentanomial_counts(pair.score for pair in of_file)
+        vectors.append(vector)
+        result = pool_matches.analyse(vector)
+        lines.append(
+            f"  {Path(path).name}: {result.games:,} games  +{wins} ={draws} -{losses}  Ptnml(0-2) {list(vector)}  "
+            f"Elo {result.elo:+.2f} +-{result.elo_bar_95:.2f} (nominal 95%)"
+        )
+    if len(vectors) >= 2:
+        scatter = pool_matches.pool(vectors)[2]
+        if scatter is not None:
+            lines.append(pool_matches.format_scatter(scatter))
+    return "\n".join(lines)
+
+
+def format_cross_checks(corrected: CorrectedInterval, checks: CrossChecks) -> str:
+    """The two other intervals, under the corrected one. @param corrected the result.
+    @param checks its cross-checks. @return the block."""
+    elo = corrected.nominal.elo
+    correlation = corrected.correlation
+    return "\n".join(
+        [
+            "cross-checks, reported rather than substituted, as Elo +- half-width:",
+            f"  balanced shortcut ICC {correlation.icc_at_mean_size:.5f}, design effect "
+            f"{correlation.design_effect_at_mean_size:.4f}   95% +-{checks.balanced_half_width:.2f}   interval "
+            f"{elo - checks.balanced_half_width:+.2f} .. {elo + checks.balanced_half_width:+.2f}",
+            f"  cluster-robust    design effect {checks.cluster_robust_design_effect:.4f} (measured, no ICC model)   "
+            f"95% +-{checks.cluster_robust_half_width:.2f}   interval "
+            f"{elo - checks.cluster_robust_half_width:+.2f} .. {elo + checks.cluster_robust_half_width:+.2f}",
+        ]
+    )
+
+
 def format_parse_report(report: ParseReport) -> str:
     """The parse report as a block of lines, every drop counted. @param report it. @return the block."""
     lines = [
@@ -470,7 +751,8 @@ def format_parse_report(report: ParseReport) -> str:
         lines += [
             f"  rounds dropped    {report.rounds_dropped:,}"
             f"   (not two games {report.rounds_not_two_games:,}, unfinished {report.rounds_unfinished:,}, "
-            f"colours not swapped {report.rounds_same_colour:,}, openings differ {report.rounds_mixed_opening:,})"
+            f"colours not swapped {report.rounds_same_colour:,}, openings differ {report.rounds_mixed_opening:,}, "
+            f"candidate not one side {report.rounds_without_candidate:,})"
         ]
     return "\n".join(lines)
 
@@ -480,12 +762,17 @@ def format_correlation(correlation: IntraclassCorrelation) -> str:
     return "\n".join(
         [
             "opening replay:",
-            f"  openings drawn    {correlation.openings:,}   (of those in nnue/openings.epd)",
+            f"  openings drawn    {correlation.openings:,}",
             f"  pairs per opening {correlation.mean_group_size:.2f} mean"
             f"   (min {correlation.smallest_group}, max {correlation.largest_group})",
             f"  MS between/within {correlation.mean_square_between:.6f} / "
             f"{correlation.mean_square_within:.6f}   (df {correlation.degrees_of_freedom_between:,} / "
-            f"{correlation.degrees_of_freedom_within:,})",
+            f"{correlation.degrees_of_freedom_within:,}), F {correlation.f_statistic:.3f}"
+            + (
+                "   (few openings replayed, so this ICC is barely measured)"
+                if correlation.mean_group_size < 2.0
+                else ""
+            ),
             f"  ANOVA coefficient {correlation.anova_coefficient:.4f}   (m_anova, not the mean - the sizes "
             "are unequal)",
             f"  ICC (raw)         {correlation.icc_raw:+.5f}",
@@ -496,7 +783,7 @@ def format_correlation(correlation: IntraclassCorrelation) -> str:
             f"  design effect     {correlation.design_effect:.4f}   -> bar inflation x"
             f"{correlation.bar_inflation:.4f}",
             f"  same at mean size {correlation.design_effect_at_mean_size:.4f}   (the balanced-design "
-            "shortcut; it understates whenever the group sizes vary)",
+            "shortcut; the formula understates when the group sizes vary)",
             f"  variance floor    {100.0 * correlation.variance_floor_fraction:.4f} % of the pair-score "
             f"variance   (ICC / {correlation.openings} openings - more games in the same conditions "
             "cannot go below it)",
@@ -544,6 +831,13 @@ def main() -> int:
     )
     parser.add_argument("--label", default="pooled", help="what to call the pooled result in the report")
     parser.add_argument(
+        "--expect-games",
+        type=int,
+        metavar="GAMES",
+        help="the games the run was to play: any other count, or any round that is not a whole colour-reversed "
+        "pair, prints REFUSED and exits non-zero with no figures",
+    )
+    parser.add_argument(
         "--per-file",
         action="store_true",
         help="also measure each file on its own, before the pool (a short chunk replays an opening barely "
@@ -561,11 +855,27 @@ def main() -> int:
         pairs, report = parse_pairs(arguments.pgn, arguments.candidate)
     except (OSError, ValueError) as problem:
         sys.exit(f"opening_icc: {problem}")
+    if arguments.expect_games is not None:
+        problems = integrity_problems(report, arguments.expect_games)
+        if problems:
+            print("REFUSED: these PGNs are not the whole run:")
+            for problem in problems:
+                print(f"  {problem}")
+            return 1
     if not pairs:
         sys.exit("opening_icc: no complete colour-reversed pair in these files")
 
     print(format_parse_report(report))
     print()
+    print(format_win_draw_loss(pairs, report, arguments.candidate))
+    print()
+    if len(arguments.pgn) > 1:
+        print(format_chunks(arguments.pgn, pairs))
+        print()
+    extreme = format_extreme_score(*win_draw_loss(pairs))
+    if extreme is not None:
+        print(extreme)
+        print()
 
     if arguments.per_file:
         for path in arguments.pgn:
@@ -587,9 +897,14 @@ def main() -> int:
     try:
         pooled = analyse_pairs(pairs, label=arguments.label)
     except ValueError as problem:
-        sys.exit(f"opening_icc: {problem}")
+        # No replication is an answer rather than a failure: the nominal bar stands, and says so.
+        print(f"opening replay: not measurable - {problem}; the nominal bar stands")
+        counts = pentanomial_counts(pair.score for pair in pairs)
+        print(pool_matches.format_result(pool_matches.analyse(counts, label=arguments.label)))
+        return 0
     print(format_correlation(pooled.correlation))
     print(format_corrected(pooled))
+    print(format_cross_checks(pooled, cross_checks(pooled, group_by_opening(pairs))))
     if arguments.compare_elo is not None:
         verdict = "EXCLUDES" if pooled.excludes(arguments.compare_elo) else "contains"
         print(f"  vs {arguments.compare_elo:+.2f} Elo    the corrected interval {verdict} it")

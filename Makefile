@@ -92,11 +92,11 @@ ifdef COVERAGE_MIN_LINES
 endif
 
 TOOL_TARGETS := gen_data gen_openings lichess_extract lc0_extract make_book stamp_net print_net_header \
-                nnue_quant_study dump_magics
+                no_search_moves nnue_quant_study dump_magics
 TEST_TARGETS := test_perft test_see test_bratko_kopec_nnue test_nnue test_nnue_incremental \
                 test_eval_symmetry test_opening_book test_chess_clock test_bench_golden \
                 test_uci_commands test_primitives test_principal_variation test_lichess_extract \
-                test_lc0_extract test_net_header
+                test_lc0_extract test_net_header test_no_search_moves
 
 .PHONY: all tools tests check coverage doc clean configure
 
