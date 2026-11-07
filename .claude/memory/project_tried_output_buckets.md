@@ -52,7 +52,7 @@ heads, so "output buckets rejected" is no longer the state of the engine. What i
 stands exactly as measured: 8 output heads **on v11's shape, on v11's data, by themselves** regressed at
 both time controls. What changed is everything else around them - the training data is now Leela Chess
 Zero self-play rather than the PlentyChess dataset, and the heads arrived together with horizontal king
-mirroring as one shared architecture, measured in zenith at +14.7 (heads) and +14.3 (mirroring) at fixed
+mirroring as one shared architecture, measured in trebuchet at +14.7 (heads) and +14.3 (mirroring) at fixed
 depth on a multi-billion-position pool. v20 beat v12 by +9.99 Elo at 8+0.08 and +1.13 at 12+0.12, with
 the data and the shape moving together, so nothing in that result isolates the heads either. The lesson
 worth carrying is the one this entry already made: **an output-head gain is data-dependent**, it was

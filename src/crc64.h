@@ -1,7 +1,7 @@
 #pragma once
 /// @file crc64.h CRC-64/XZ — the integrity check the shared Reckless NNUE net container (`RNNUE1`) carries.
 ///
-/// One algorithm, five engines: `pawnstar`, `pawnstar-rs`, `pawnstar-go`, `zenith` and `stoopid-chess` all
+/// One algorithm, five engines: `pawnstar`, `pawnstar-rs`, `pawnstar-go`, `trebuchet` and `stoopid-chess` all
 /// stamp and verify a net with this same checksum, so an implementation that differs by a bit rejects every
 /// net the others accept. It is **CRC-64/XZ**, also called CRC-64/GO-ECMA:
 ///

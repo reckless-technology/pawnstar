@@ -25,7 +25,7 @@
 /// bar does not account for; the 12+0.12 bar is measured directly from that arm's PGNs (ICC 0.0746, design
 /// effect 2.473), while the 8+0.08 bar is an *estimate* bracketed from the ICC of 0.061 measured on the
 /// same machine at the same openings, because that arm's PGNs were never written. The two shape
-/// additions were measured separately in zenith at fixed depth, +14.3 Elo for mirroring and +14.7 for the
+/// additions were measured separately in trebuchet at fixed depth, +14.3 Elo for mirroring and +14.7 for the
 /// output heads; both only pay past ~1.4B training positions, which is why v12 had neither.
 ///
 /// **`kKingBucketMap` is the one place the bucketing is written down.** kNumKingBuckets is *derived* from it,
@@ -120,7 +120,7 @@ namespace nnue
 {
 
 /// @brief Whether a perspective whose own king stands on files e-h is horizontally mirrored (`square ^ 7`)
-/// before indexing. Measured in zenith at **+14.3 Elo** at fixed depth, and worth more than that number
+/// before indexing. Measured in trebuchet at **+14.3 Elo** at fixed depth, and worth more than that number
 /// suggests: halving the king-placement space gives twice the effective data per bucket at the same file
 /// size, so it is a data multiplier as much as an Elo add. It only paid past ~1.4B training positions,
 /// which is why v12 does not have it.
@@ -244,7 +244,7 @@ constexpr int kFeatureRows    = kInputSize * kNumKingBuckets; ///< Feature-trans
 constexpr int kHiddenSize     = 1024; ///< Feature-transformer / accumulator width per perspective.
 
 /// @brief Material output heads, selected by OutputBucket() from the piece count. Eight in the shared
-/// architecture, measured in zenith at **+14.7 Elo** at fixed depth; one in v12's shape. A compile-time
+/// architecture, measured in trebuchet at **+14.7 Elo** at fixed depth; one in v12's shape. A compile-time
 /// constant because it sizes the payload and is stamped into the header, so a net and a build can never
 /// disagree about it silently.
 constexpr int kNumOutputBuckets = PAWNSTAR_NNUE_OUTPUT_BUCKETS;
