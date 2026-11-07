@@ -20,6 +20,9 @@ Makefile   text eol=lf
 # and the position no longer parses. Keep them LF whatever core.autocrlf says.
 *.epd      text eol=lf
 
+# A match PGN is read line by line too, and the fixtures in test/fixtures are compared with figures worked by hand.
+*.pgn      text eol=lf
+
 # Data the engine embeds or a test reads byte for byte is checked out exactly as committed, with no line-ending
 # conversion: the build .incbin's pawnstar.book into the binary, so under autocrlf=true a Windows build would embed a
 # CRLF book where Linux and macOS embed LF - a byte-different binary for the same commit.

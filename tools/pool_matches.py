@@ -163,6 +163,43 @@ def chi_square_p_value(chi_square: float, degrees_of_freedom: int) -> float:
     return _gamma_q(0.5 * degrees_of_freedom, 0.5 * chi_square)
 
 
+def clopper_pearson_lower_limit(successes: int, trials: int, tail: float = 0.025) -> float:
+    """The exact binomial lower confidence limit on a rate - two-sided 95% with the default tail.
+
+    Beside a score so one-sided that the normal bar above stops describing it, where a bound is the honest
+    figure: the limit is the p whose chance of `successes` or more out of `trials` is exactly `tail`, found by
+    bisection on that upper tail. Every game won gives `tail ** (1 / trials)`, which the test pins by hand.
+
+    @param successes the successes seen. @param trials the trials. @param tail the probability in the tail.
+    @return the lower limit, 0 when there were no successes. Raises ValueError on an impossible count.
+    """
+    if not 0 <= successes <= trials or trials <= 0:
+        raise ValueError(f"{successes} successes out of {trials} trials is not a count")
+    if successes == 0:
+        return 0.0
+
+    def upper_tail(rate: float) -> float:
+        total = 0.0
+        for count in range(successes, trials + 1):
+            total += math.exp(
+                math.lgamma(trials + 1)
+                - math.lgamma(count + 1)
+                - math.lgamma(trials - count + 1)
+                + count * math.log(rate)
+                + (trials - count) * math.log1p(-rate)
+            )
+        return total
+
+    low, high = 1e-12, 1.0 - 1e-12
+    for _ in range(200):
+        middle = 0.5 * (low + high)
+        if upper_tail(middle) < tail:
+            low = middle
+        else:
+            high = middle
+    return low
+
+
 def analyse(counts: Iterable[int], label: str = "") -> MatchResult:
     """Everything derivable from one `Ptnml(0-2)` vector.
 

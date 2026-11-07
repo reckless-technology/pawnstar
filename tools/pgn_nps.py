@@ -49,7 +49,7 @@ TAG_PATTERN = re.compile(r'^\[(\w+)\s+"(.*)"\]\s*$')
 COMMENT_PATTERN = re.compile(r"\{[^{}]*\}")
 
 #: `{+1.02/16 0.459s, n=594048, sd=29, nps=1302736}`, and the same with a mate score or a negative eval.
-SEARCH_PATTERN = re.compile(r"([0-9]*\.?[0-9]+)s,\s*n=(\d+),\s*sd=(\d+),\s*nps=(\d+)")
+SEARCH_PATTERN = re.compile(r"(?:/(\d+)\s+)?([0-9]*\.?[0-9]+)s,\s*n=(\d+),\s*sd=(\d+),\s*nps=(\d+)")
 
 
 @dataclass
@@ -59,8 +59,11 @@ class EngineRate:
     name: str
     moves: int = 0  #: moves attributed to it
     moves_with_counts: int = 0  #: of those, the moves whose comment carried n= and nps=
+    moves_without_search: int = 0  #: of those, the moves with no counts or with n=0, so nothing was searched
     nodes: int = 0
-    seconds: float = 0.0
+    seconds: float = 0.0  #: time on the moves that searched; a reply made with no search is not search time
+    depth_total: int = 0  #: the depths of the moves that searched and stated one
+    moves_with_depth: int = 0
     peak_move_nps: int = 0
     deepest_seldepth: int = 0
 
@@ -68,6 +71,11 @@ class EngineRate:
     def nodes_per_second(self) -> float:
         """The aggregate rate - total nodes over total search seconds. @return it, or 0 with no time."""
         return self.nodes / self.seconds if self.seconds > 0.0 else 0.0
+
+    @property
+    def mean_depth(self) -> float:
+        """The mean depth stated by the moves that searched. @return it, or 0 when none did."""
+        return self.depth_total / self.moves_with_depth if self.moves_with_depth else 0.0
 
 
 @dataclass
@@ -142,11 +150,20 @@ def measure(paths: Sequence[str]) -> NpsReport:
                 rate.moves += 1
                 found = SEARCH_PATTERN.search(comment)
                 if not found:
+                    rate.moves_without_search += 1
                     continue
-                seconds, nodes, seldepth, move_nps = found.groups()
+                depth, seconds, nodes, seldepth, move_nps = found.groups()
                 rate.moves_with_counts += 1
+                if int(nodes) == 0:
+                    # The clock can run on a move that searched nothing, and a forced reply is the common case:
+                    # 0.081 s of it was seen on 2026-11-07. Counting that as search time would understate the rate.
+                    rate.moves_without_search += 1
+                    continue
                 rate.nodes += int(nodes)
                 rate.seconds += float(seconds)
+                if depth is not None:
+                    rate.depth_total += int(depth)
+                    rate.moves_with_depth += 1
                 rate.peak_move_nps = max(rate.peak_move_nps, int(move_nps))
                 rate.deepest_seldepth = max(rate.deepest_seldepth, int(seldepth))
 
@@ -170,14 +187,14 @@ def format_report(report: NpsReport) -> str:
         )
     lines.append("")
     lines.append(
-        f"{'engine':12} {'moves':>9} {'with counts':>12} {'total nodes':>17} {'search s':>12} "
-        f"{'ABSOLUTE nps':>14} {'peak move nps':>14} {'max seldepth':>13}"
+        f"{'engine':12} {'moves':>9} {'with counts':>12} {'no search':>10} {'total nodes':>17} {'search s':>12} "
+        f"{'ABSOLUTE nps':>14} {'peak move nps':>14} {'max seldepth':>13} {'mean depth':>11}"
     )
     for rate in report.engines.values():
         lines.append(
-            f"{rate.name:12} {rate.moves:>9,} {rate.moves_with_counts:>12,} {rate.nodes:>17,} "
-            f"{rate.seconds:>12,.1f} {rate.nodes_per_second:>14,.0f} {rate.peak_move_nps:>14,} "
-            f"{rate.deepest_seldepth:>13}"
+            f"{rate.name:12} {rate.moves:>9,} {rate.moves_with_counts:>12,} {rate.moves_without_search:>10,} "
+            f"{rate.nodes:>17,} {rate.seconds:>12,.1f} {rate.nodes_per_second:>14,.0f} {rate.peak_move_nps:>14,} "
+            f"{rate.deepest_seldepth:>13} {rate.mean_depth:>11.2f}"
         )
     if len(report.engines) == 2:
         first, second = report.engines.values()

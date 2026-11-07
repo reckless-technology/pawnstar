@@ -277,6 +277,37 @@ def test_vectors_are_read_back() -> None:
     check(pool_matches.vectors_from_log("no pentanomial here") == [], "input: a log with no vector yields none")
 
 
+def test_clopper_pearson_lower_limit() -> None:
+    """The exact binomial limit against the cases solvable by hand.
+
+    Every trial a success: P(all n) = p^n = 0.025, so p = 0.025^(1/n): 0.158114 for 2 of 2, 0.691503 for 10 of 10.
+    One success of one: p = 0.025. One of two: 1 - (1 - p)^2 = 0.025, so p = 1 - sqrt(0.975) = 0.012579.
+    """
+    check_close(pool_matches.clopper_pearson_lower_limit(2, 2), 0.158114, 6, "limit: 2 of 2")
+    check_close(pool_matches.clopper_pearson_lower_limit(10, 10), 0.691503, 6, "limit: 10 of 10")
+    check_close(pool_matches.clopper_pearson_lower_limit(1, 1), 0.025, 6, "limit: 1 of 1")
+    check_close(pool_matches.clopper_pearson_lower_limit(1, 2), 0.012579, 6, "limit: 1 of 2")
+    check_close(pool_matches.clopper_pearson_lower_limit(0, 10), 0.0, 9, "limit: no success has a limit of 0")
+    # Measured: Trebuchet 1.0.0 against Stoopid Chess 4.1.0, 292 wins in 300 games, on 2026-11-07. Checked against
+    # scipy.stats.beta.ppf(0.025, 292, 9), which is a route that shares no code with this one.
+    check_close(pool_matches.clopper_pearson_lower_limit(292, 300), 0.94813, 5, "limit: 292 of 300")
+    check_raises(lambda: pool_matches.clopper_pearson_lower_limit(3, 2), "limit: more successes than trials refused")
+    check_raises(lambda: pool_matches.clopper_pearson_lower_limit(0, 0), "limit: no trials refused")
+
+
+def test_strength_matches_of_2026_11_07() -> None:
+    """Two more completed matches, whose vectors were recounted from their PGNs on two routes and agree.
+
+    Trebuchet 1.0.0 vs Pawnstar 2.2.0 and runF vs cap2, 4000 games each at 8+0.08 on reckless-ci-lin-0.
+    """
+    trebuchet = pool_matches.analyse([2, 100, 590, 940, 368])
+    check_close(trebuchet.elo, 144.30, 2, "strength: Trebuchet vs Pawnstar 2.2.0 at +144.30")
+    check_close(trebuchet.elo_bar_95, 7.22, 2, "strength: nominal 95% bar +-7.22")
+    net_swap = pool_matches.analyse([54, 425, 950, 496, 75])
+    check_close(net_swap.elo, 9.82, 2, "strength: runF vs cap2 at +9.82")
+    check_close(net_swap.elo_bar_95, 6.44, 2, "strength: nominal 95% bar +-6.44")
+
+
 def main() -> int:
     """Run every case. @return 0 when every check passed, 1 otherwise."""
     test_single_chunk_matches()
@@ -289,6 +320,8 @@ def main() -> int:
     test_level_and_edges()
     test_input_is_validated()
     test_vectors_are_read_back()
+    test_clopper_pearson_lower_limit()
+    test_strength_matches_of_2026_11_07()
     verdict = "[PASS]" if failure_count == 0 else "[FAIL]"
     print(f"{verdict} pool_matches: {failure_count} failed check(s)")
     return 0 if failure_count == 0 else 1

@@ -467,8 +467,8 @@ jobs:
       # other shape and the engine rightly refuses it.
       #
       # The other reason it is targeted: `principal_variation` searches the SYNTHETIC net to depth 8, and
-      # random weights give the pruning heuristics no traction. Eighteen of the nineteen suites pass at
-      # this shape in about 20 seconds (22.0 s, measured locally 2026-10-31); that one had not finished in
+      # random weights give the pruning heuristics no traction. Nineteen of the twenty suites pass at
+      # this shape in about 20 seconds (the eighteen there were then, 22.0 s, measured locally 2026-10-31); that one had not finished in
       # five minutes when measured on 2026-10-30. It is the weights rather than the shape - this file
       # records the same effect for a depth-12 search above - but a full `make check` here would be an
       # open-ended job.
