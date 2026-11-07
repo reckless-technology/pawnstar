@@ -771,11 +771,13 @@ void Searches(Game &game)
     out = SearchToBestMove(game, "go depth 4", is_complete);
     Check(is_complete && IsLegal(game, BestMove(out)), "go after a move history with a repetition", out);
 
-    // The FEN of issue #30, searched on the table every search above has warmed, which is how it died: it
+    // The FEN of issue #30, searched on the table every search above has warmed, as it was first seen to die: it
     // claims KQ with White's rooks on c1 and g1, and once the search moved the c1 rook away the generator
     // emitted e1c1 and MakeMove moved a rook from an empty a1 - an access violation at depth 8 on Windows,
-    // a SIGSEGV on Linux, three runs of three. The rights are dropped at the parse now, so what this asserts
-    // is the protocol's own promise: the search finishes and answers with a legal move.
+    // a SIGSEGV on Linux, three runs of three. It needs no warm table: alone from a fresh process, the published
+    // 2.1.0 Windows binary died at go depth 8 in ten runs of ten, five with default threads and five with Threads 1
+    // (Legion5i, 2026-11-06). The rights are dropped at the parse now, so what this asserts is the protocol's own
+    // promise: the search finishes and answers with a legal move.
     Run(game, {"position fen b2rk3/p2p1nr1/1p2n1p1/1Np2p1p/2P2P1P/1P1BP1P1/P4N2/2R1K1R1 w KQ - 1 16"});
     out = SearchToBestMove(game, "go depth 8", is_complete);
     Check(is_complete && IsLegal(game, BestMove(out)),
