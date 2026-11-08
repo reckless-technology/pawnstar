@@ -167,17 +167,23 @@ inline void Game::SearchThreadEntry()
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
-    if (move != Move::None())
+    // No legal move at the root (checkmate or stalemate): UCI still owes the GUI a `bestmove`, and a host waits for
+    // ever without one. Answer the null move, as the Go engine does, and leave the game as it was. Like any other
+    // answer it comes after the ponder-wait above, so a `go ponder` is still held until `ponderhit` or `stop`, while
+    // `go infinite` answers at once: there is nothing to search, so there is nothing for `stop` to end.
+    if (move == Move::None())
     {
-        PlayMove(move);
-        if (ponder_move_ != Move::None())
-        {
-            std::cout << std::format("bestmove {} ponder {}\n", move.ToString(), ponder_move_.ToString());
-        }
-        else
-        {
-            std::cout << std::format("bestmove {}\n", move.ToString());
-        }
+        std::cout << "bestmove 0000\n";
+        return;
+    }
+    PlayMove(move);
+    if (ponder_move_ != Move::None())
+    {
+        std::cout << std::format("bestmove {} ponder {}\n", move.ToString(), ponder_move_.ToString());
+    }
+    else
+    {
+        std::cout << std::format("bestmove {}\n", move.ToString());
     }
 }
 

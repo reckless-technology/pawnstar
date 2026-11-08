@@ -979,13 +979,46 @@ void RootShortcuts(Game &game, const std::string &book_path)
     Check(is_complete && BestMove(out) == "a8b8" && !Contains(out, " ponder ") && !Contains(out, "info depth"),
           "a single legal move: bestmove a8b8 at once, with no search", out);
 
-    // No legal move (checkmated): the search ends without a bestmove.
+    // No legal move at the root, checkmate or stalemate: every `go` is answered `bestmove 0000`, as the Go engine
+    // answers, with no info line and no move played into the game. A host analysing a finished game's last
+    // position waited for ever when the engine said nothing, and went on waiting through `stop` and `isready`.
+    for (const char *position : {"position fen k7/1Q6/1K6/8/8/8/8/8 b - - 0 1",  // checkmated
+                                 "position fen 7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"}) // stalemated
     {
-        CapturedOutput output;
-        ProcessInput(game, "position fen k7/1Q6/1K6/8/8/8/8/8 b - - 0 1");
-        ProcessInput(game, "go depth 5");
-        game.StopThinking();
-        Check(!Contains(output.Text(), "bestmove"), "checkmated at the root: no bestmove");
+        Run(game, {position});
+        const std::size_t ply_count = game.positions_.size();
+        const auto        hash      = game.CurrentPosition().hash_;
+        for (const char *go_line : {"go depth 5", "go wtime 10000 btime 10000", "go movetime 500", "go nodes 1000",
+                                    "go searchmoves e2e4 depth 3", "go infinite"})
+        {
+            out = SearchToBestMove(game, go_line, is_complete);
+            Check(is_complete && LinesStartingWith(out, "bestmove ") == std::vector<std::string>{"bestmove 0000"} &&
+                      !Contains(out, "info "),
+                  std::string{position} + ", " + go_line + ": bestmove 0000 at once, with no info line", out);
+            Check(game.positions_.size() == ply_count && game.CurrentPosition().hash_ == hash,
+                  std::string{position} + ", " + go_line + ": no move is played into the game");
+        }
+        // A ponder search is still held until the GUI resolves it, then answered the same way.
+        for (const char *resolving_line : {"stop", "ponderhit"})
+        {
+            CapturedOutput output;
+            ProcessInput(game, "go ponder wtime 10000 btime 10000");
+            const bool is_held = !output.WaitFor("bestmove", std::chrono::milliseconds{200});
+            ProcessInput(game, resolving_line);
+            is_complete = output.WaitFor("bestmove", kSearchTimeout);
+            game.StopThinking();
+            out = output.Text();
+            Check(is_held && is_complete &&
+                      LinesStartingWith(out, "bestmove ") == std::vector<std::string>{"bestmove 0000"} &&
+                      !Contains(out, "info "),
+                  std::string{position} + ", go ponder + " + resolving_line +
+                      ": held until resolved, then bestmove 0000",
+                  out);
+        }
+        // And again after `stop` and `isready`: the engine answers every `go`, not only the first.
+        Run(game, {"stop", "isready"});
+        out = SearchToBestMove(game, "go depth 3", is_complete);
+        Check(is_complete && BestMove(out) == "0000", std::string{position} + ": a later go is answered too", out);
     }
 
     // Mate scores either way round, and a stalemating move inside the tree.
