@@ -20,9 +20,10 @@
 /// `Game` is a real search again once the caller clears the cancel flag the previous search left set.
 ///
 /// And it pins a third root contract, the one 2.2.0 broke: a cancel landing inside the root's depth-3 ordering
-/// pass never decides the move. The move played is the best of the root moves whose search completed, checked
-/// against the pass replayed by hand at every doubling node limit from 2048 until the pass completes, or, when the
-/// cancel beat every move, the root's table move if it is legal there and the first move generated otherwise.
+/// pass never decides the move. The move played is the root's table move when it is legal there and its entry is
+/// deeper than the pass; otherwise the best of the root moves whose search completed, checked against the pass
+/// replayed by hand at every doubling node limit from 2048 until the pass completes, or, when the cancel beat every
+/// move, the root's table move at any depth if it is legal there and the first move generated otherwise.
 ///
 /// With no net argument it is a no-op so `make check` stays green when no net is present.
 ///
@@ -202,8 +203,9 @@ OrderingPassReplay ReplayOrderingPass(Game &game, uint64_t node_limit)
 
 /// @brief A cancel that lands inside the root's ordering pass must not decide the move. The move it
 /// interrupts carries the negated cancel sentinel, which the 23-bit score field truncates to a huge positive
-/// score; 2.2.0 sorted that move first and played it. The move played must be the best of the moves whose
-/// search completed or, when none did, the root's table move if it is legal here, else the first generated.
+/// score; 2.2.0 sorted that move first and played it. The move played must be the root's table move when it is
+/// legal here and deeper than the pass; else the best of the moves whose search completed or, when none did, the
+/// root's table move at any depth if it is legal here, else the first generated.
 /// @param game Game to search (one thread).
 void CheckCancelledOrderingPass(Game &game)
 {
@@ -276,6 +278,53 @@ void CheckCancelledOrderingPass(Game &game)
                        std::format("cancelled before the pass with an illegal table move {}: plays the first generated "
                                    "move {} ({})",
                                    foreign_move.ToString(), root_moves[0].ToString(), played.ToString()));
+
+    // Cancelled part-way, with a table entry for the root deeper than the pass, as an earlier search of the game
+    // leaves one: its move is played, even one the pass never reached, ahead of the best completed move. An entry
+    // at the pass's own depth, or one whose move is not legal here, is passed over for the best completed move.
+    for (uint64_t node_limit = 2048; node_limit <= (uint64_t{1} << 24); node_limit *= 2)
+    {
+        const OrderingPassReplay replay = ReplayOrderingPass(game, node_limit);
+        if (!replay.was_cancelled)
+        {
+            test_report::Check(false, "a node limit cancels the ordering pass after a move has completed, for the "
+                                      "table-move cases");
+            break;
+        }
+        if (replay.completed_move_count == 0)
+        {
+            continue;
+        }
+        // A move the pass did not complete, so that playing it can only come from the table.
+        const Move unreached_move = root_moves[root_moves.size() - 1];
+        test_report::Check(replay.completed_move_count < (int)root_moves.size() - 1 &&
+                               unreached_move != replay.expected_move,
+                           std::format("nodes {}: the last generated move {} is not reached by the cancelled pass",
+                                       node_limit, unreached_move.ToString()));
+        const auto search_with_root_entry = [&](Move table_move, int depth) {
+            PrepareOrderingPassSearch(game, node_limit);
+            game.transposition_table_.RecordTransposition(
+                Transposition{root_hash, table_move, 0, depth, Transposition::NodeType::kPv});
+            return game.SearchRootNode();
+        };
+        played = search_with_root_entry(unreached_move, kStartDepth + 1);
+        test_report::Check(played == unreached_move,
+                           std::format("nodes {}: cancelled after {} of {} moves with a depth-{} table move {}: plays "
+                                       "it ({}), not the best completed move {}",
+                                       node_limit, replay.completed_move_count, replay.root_move_count, kStartDepth + 1,
+                                       unreached_move.ToString(), played.ToString(), replay.expected_move.ToString()));
+        played = search_with_root_entry(unreached_move, kStartDepth);
+        test_report::Check(played == replay.expected_move,
+                           std::format("nodes {}: cancelled part-way with a table move only as deep as the pass: plays "
+                                       "the best completed move {} ({})",
+                                       node_limit, replay.expected_move.ToString(), played.ToString()));
+        played = search_with_root_entry(foreign_move, kStartDepth + 1);
+        test_report::Check(played == replay.expected_move,
+                           std::format("nodes {}: cancelled part-way with a deep but illegal table move: plays the "
+                                       "best completed move {} ({})",
+                                       node_limit, replay.expected_move.ToString(), played.ToString()));
+        break;
+    }
 
     // With helper threads, which are launched after the pass: they must still be wound up and joined.
     const int thread_count = game.thread_count_;

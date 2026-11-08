@@ -379,12 +379,18 @@ inline Move Game::SearchRootNode()
     }
     SortMoves(move_list);
     Move best_move = move_list[0];
-    if (completed_move_count == 0)
+    if (completed_move_count < (int)move_list.size())
     {
-        // Cancelled before any move was scored: play the root's transposition-table move if the table holds
-        // one that is legal here, else the first move generated (which the stable sort left at the front).
+        // Cancelled inside the pass. The moves that finished first are the cheap ones, and their depth-3 scores
+        // miss what a deeper search sees, so prefer the root's table move when its entry is deeper than the pass:
+        // the root itself is never stored by this search (its moves are searched one by one, here and in
+        // IterativeDeepen), so such an entry is the root reached inside an earlier, deeper search. Otherwise play
+        // the best completed move; and if none completed, the table move at any depth, else the first generated
+        // (which the stable sort left at the front). The move must be legal here: a hash collision can leave a
+        // move from another position.
         const auto root_entry = game.transposition_table_.FindTransposition(game.CurrentPosition().hash_);
-        if (root_entry && root_entry->move_ != Move::None())
+        if (root_entry && root_entry->move_ != Move::None() &&
+            (root_entry->depth() > kStartDepth || completed_move_count == 0))
         {
             const auto table_move = std::ranges::find(move_list, root_entry->move_);
             if (table_move != move_list.end())
