@@ -50,6 +50,7 @@ constexpr int kDrawScore                 = 0;      ///< score for achieving a dr
 constexpr int kMaxPly                    = 64;     ///< terminate the search at this ply no matter what
 constexpr int kRankFlip                  = 0x38;   ///< used as an XOR mask to flip the board horizontally
 constexpr int kSearchCancelledScore      = -12345678; ///< illegal value returned when search is cancelled
+constexpr int kUnsearchedRootScore       = -32001;    ///< kAlpha - 1: root order of a move a cancel left unscored
 constexpr int kScoreInstabilityThreshold = 50;        ///< window of score variability
 constexpr int kStartDepth                = 3;         ///< depth to do full width search
 constexpr int kRfpMaxDepth               = 7;         ///< reverse-futility pruning: max depth to apply it

@@ -348,16 +348,45 @@ inline Move Game::SearchRootNode()
     game.transposition_table_.Age();
 
     // Shallow pass for initial move ordering (on a temporary state shared as the launch ordering).
+    // A cancel (the hard deadline, `stop` or the node limit) can land inside this pass. The move being searched
+    // then comes back carrying the negated cancel sentinel, which the 23-bit score field truncates to a huge
+    // positive score: unchecked, that move sorted first and was played, unscored, sometimes straight into mate.
+    // So once the cancel flag is up, neither that move nor any after it is trusted: each is marked unsearched,
+    // below every real score, and the stable sort leaves the unsearched moves last in generation order.
     SearchState state{game};
     Variation   shallow_pv{};
+    int         completed_move_count = 0;
     for (auto &move : move_list)
     {
         const int move_index = (int)(&move - &move_list[0]);
         const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score();
+        if (state.IsCancelled())
+        {
+            break;
+        }
         move.AssignScore(score);
+        ++completed_move_count;
+    }
+    for (int i = completed_move_count; i < (int)move_list.size(); ++i)
+    {
+        move_list[i].AssignScore(kUnsearchedRootScore);
     }
     SortMoves(move_list);
     Move best_move = move_list[0];
+    if (completed_move_count == 0)
+    {
+        // Cancelled before any move was scored: play the root's transposition-table move if the table holds
+        // one that is legal here, else the first move generated (which the stable sort left at the front).
+        const auto root_entry = game.transposition_table_.FindTransposition(game.CurrentPosition().hash_);
+        if (root_entry && root_entry->move_ != Move::None())
+        {
+            const auto table_move = std::ranges::find(move_list, root_entry->move_);
+            if (table_move != move_list.end())
+            {
+                best_move = *table_move;
+            }
+        }
+    }
 
     // Lazy SMP: each thread runs an independent iterative-deepening search of the same root, sharing only the
     // (lockless) transposition table (history/killers/etc. are per-thread on each SearchState). The main thread is
