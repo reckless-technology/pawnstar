@@ -382,12 +382,13 @@ inline Move Game::SearchRootNode()
     if (completed_move_count < (int)move_list.size())
     {
         // Cancelled inside the pass. The moves that finished first are the cheap ones, and their depth-3 scores
-        // miss what a deeper search sees, so prefer the root's table move when its entry is deeper than the pass:
-        // the root itself is never stored by this search (its moves are searched one by one, here and in
-        // IterativeDeepen), so such an entry is the root reached inside an earlier, deeper search. Otherwise play
-        // the best completed move; and if none completed, the table move at any depth, else the first generated
-        // (which the stable sort left at the front). The move must be legal here: a hash collision can leave a
-        // move from another position.
+        // miss what a deeper search sees, so prefer the root's table move when its entry is deeper than the pass.
+        // The root's own moves are searched one by one (here and in IterativeDeepen), but the pass can re-enter the
+        // root through a repetition and store it; such an entry is shallower than kStartDepth, so the depth test
+        // never prefers it, yet it can overwrite a deeper entry from an earlier search, in which case the rule falls
+        // back to the best completed move. Otherwise play the best completed move; and if none completed, the table
+        // move at any depth, else the first generated (which the stable sort left at the front). The move must be
+        // legal here: a hash collision can leave a move from another position.
         const auto root_entry = game.transposition_table_.FindTransposition(game.CurrentPosition().hash_);
         if (root_entry && root_entry->move_ != Move::None() &&
             (root_entry->depth() > kStartDepth || completed_move_count == 0))
