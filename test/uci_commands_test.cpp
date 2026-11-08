@@ -732,16 +732,20 @@ void Searches(Game &game)
     Check(is_complete && IsLegal(game, BestMove(out)), "go ponder + ponderhit: the ponder search becomes timed", out);
 
     // A ponder search that finishes on its own must hold its bestmove until the GUI resolves the ponder.
+    // Checked once the capture is gone, or its result line would be captured with the engine's output.
     {
         Run(game, {"position startpos"});
-        CapturedOutput output;
-        ProcessInput(game, "go ponder depth 2");
-        std::this_thread::sleep_for(500ms);
-        const bool is_held = !Contains(output.Text(), "bestmove");
-        ProcessInput(game, "stop");
-        is_complete = output.WaitFor("bestmove", kSearchTimeout);
-        game.StopThinking();
-        out = output.Text();
+        bool is_held = false;
+        {
+            CapturedOutput output;
+            ProcessInput(game, "go ponder depth 2");
+            std::this_thread::sleep_for(500ms);
+            is_held = !Contains(output.Text(), "bestmove");
+            ProcessInput(game, "stop");
+            is_complete = output.WaitFor("bestmove", kSearchTimeout);
+            game.StopThinking();
+            out = output.Text();
+        }
         Check(is_held && is_complete, "go ponder depth 2: the finished search waits for stop before its bestmove", out);
     }
 
@@ -998,16 +1002,20 @@ void RootShortcuts(Game &game, const std::string &book_path)
             Check(game.positions_.size() == ply_count && game.CurrentPosition().hash_ == hash,
                   std::string{position} + ", " + go_line + ": no move is played into the game");
         }
-        // A ponder search is still held until the GUI resolves it, then answered the same way.
+        // A ponder search is still held until the GUI resolves it, then answered the same way. The check is made
+        // once the capture is gone: while it is alive, std::cout is its buffer, and the result line would vanish.
         for (const char *resolving_line : {"stop", "ponderhit"})
         {
-            CapturedOutput output;
-            ProcessInput(game, "go ponder wtime 10000 btime 10000");
-            const bool is_held = !output.WaitFor("bestmove", std::chrono::milliseconds{200});
-            ProcessInput(game, resolving_line);
-            is_complete = output.WaitFor("bestmove", kSearchTimeout);
-            game.StopThinking();
-            out = output.Text();
+            bool is_held = false;
+            {
+                CapturedOutput output;
+                ProcessInput(game, "go ponder wtime 10000 btime 10000");
+                is_held = !output.WaitFor("bestmove", std::chrono::milliseconds{200});
+                ProcessInput(game, resolving_line);
+                is_complete = output.WaitFor("bestmove", kSearchTimeout);
+                game.StopThinking();
+                out = output.Text();
+            }
             Check(is_held && is_complete &&
                       LinesStartingWith(out, "bestmove ") == std::vector<std::string>{"bestmove 0000"} &&
                       !Contains(out, "info "),
