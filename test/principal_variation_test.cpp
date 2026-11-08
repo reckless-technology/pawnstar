@@ -19,6 +19,11 @@
 /// searching (a forced move) publishes no PV and reports no nodes, and a second search through the same
 /// `Game` is a real search again once the caller clears the cancel flag the previous search left set.
 ///
+/// And it pins a third root contract, the one 2.2.0 broke: a cancel landing inside the root's depth-3 ordering
+/// pass never decides the move. The move played is the best of the root moves whose search completed, checked
+/// against the pass replayed by hand at every doubling node limit from 2048 until the pass completes, or, when the
+/// cancel beat every move, the root's table move if it is legal there and the first move generated otherwise.
+///
 /// With no net argument it is a no-op so `make check` stays green when no net is present.
 ///
 /// Usage:  test_principal_variation [net.bin]
@@ -134,6 +139,156 @@ int CheckHarvest(const Game &game, const Position &root, int white_score)
     }
     return plies_walked;
 }
+
+/// @brief The position in which 2.2.0 played an unscored move out of a cancelled ordering pass. Black's
+/// promotion searches are large, so a cancel lands inside the root's depth-3 pass at every small node limit; at
+/// 8+0.08 the hard deadline did, and the engine played an underpromotion with no `info` line.
+constexpr const char *kOrderingPassFen = "3k3b/3P1KP1/8/5B2/7p/7P/1p6/8 b - - 0 92";
+
+/// @brief What the root's ordering pass ought to leave as the move to play, worked out independently of
+/// SearchRootNode by running the same depth-3 searches in the same order and stopping where the cancel lands.
+struct OrderingPassReplay
+{
+    Move expected_move;        ///< the first best-scoring completed move, or the first generated if none completed
+    int  completed_move_count; ///< root moves whose depth-3 search finished before the cancel
+    int  root_move_count;      ///< legal root moves
+    bool was_cancelled;        ///< whether the cancel landed inside the pass at all
+    Move interrupted_move;     ///< the move being searched when the cancel landed (Move::None if it did not)
+};
+
+/// @brief Set up a node-limited search of kOrderingPassFen from a cold table, as `go nodes` does.
+/// @param game Game to prepare. @param node_limit The `go nodes` budget (0 = none).
+void PrepareOrderingPassSearch(Game &game, uint64_t node_limit)
+{
+    game.SetPosition(kOrderingPassFen); // also clears the cancel flag and resets the clock
+    game.transposition_table_.Clear();
+    game.time_control_.clock_type_ = ChessClock::kInfinite;
+    game.time_control_.max_nodes_  = node_limit;
+}
+
+/// @brief Run the root's ordering pass by hand: each legal move searched to kStartDepth on one fresh
+/// SearchState, in generation order, with the node limit armed exactly as SearchRootNode arms it.
+/// @param game Game to search. @param node_limit The node budget.
+/// @return Where the cancel landed and which move should be played as a result.
+OrderingPassReplay ReplayOrderingPass(Game &game, uint64_t node_limit)
+{
+    PrepareOrderingPassSearch(game, node_limit);
+    game.time_control_.StartSearch(ChessClock::Duration::zero(), ChessClock::Duration::zero());
+    game.transposition_table_.Age();
+    const MoveList     moves = game.CurrentPosition().GenerateLegalMoves();
+    OrderingPassReplay replay{moves[0], 0, (int)moves.size(), false, Move::None()};
+    SearchState        state{game};
+    Variation          pv{};
+    int                best_score = 0;
+    for (int i = 0; i < (int)moves.size(); ++i)
+    {
+        const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, moves[i], pv, i).score();
+        if (state.IsCancelled())
+        {
+            replay.was_cancelled    = true;
+            replay.interrupted_move = moves[i];
+            break;
+        }
+        // Strictly greater, so the first of equal scores wins, as the stable sort leaves it.
+        if (replay.completed_move_count == 0 || score > best_score)
+        {
+            best_score           = score;
+            replay.expected_move = moves[i];
+        }
+        ++replay.completed_move_count;
+    }
+    return replay;
+}
+
+/// @brief A cancel that lands inside the root's ordering pass must not decide the move. The move it
+/// interrupts carries the negated cancel sentinel, which the 23-bit score field truncates to a huge positive
+/// score; 2.2.0 sorted that move first and played it. The move played must be the best of the moves whose
+/// search completed or, when none did, the root's table move if it is legal here, else the first generated.
+/// @param game Game to search (one thread).
+void CheckCancelledOrderingPass(Game &game)
+{
+    // A node limit lands where Search polls it, every 2048 nodes, so double from there until the pass completes.
+    // With the shipped net the first move's depth-3 search is under 2048 nodes, so no node limit lands before a
+    // move has completed (the synthetic net's first limit does); that case is pinned below by a cancel set
+    // before the search starts, which reaches it with any net.
+    int landed_after_a_completed_move = 0; // limits that cancel the pass part-way, with at least one move scored
+    int interrupted_move_would_play   = 0; // of those, the ones where the interrupted move is not the answer
+    for (uint64_t node_limit = 2048; node_limit <= (uint64_t{1} << 24); node_limit *= 2)
+    {
+        const OrderingPassReplay replay = ReplayOrderingPass(game, node_limit);
+        if (!replay.was_cancelled)
+        {
+            break; // the pass completed within this budget; iterative deepening decides from here on
+        }
+        PrepareOrderingPassSearch(game, node_limit);
+        const Move played = game.SearchRootNode();
+        test_report::Check(
+            played == replay.expected_move,
+            std::format("nodes {}: cancelled in the ordering pass after {} of {} moves, interrupting {}; plays {}, "
+                        "expected {}",
+                        node_limit, replay.completed_move_count, replay.root_move_count,
+                        replay.interrupted_move.ToString(), played.ToString(), replay.expected_move.ToString()));
+        if (replay.completed_move_count != 0)
+        {
+            ++landed_after_a_completed_move;
+            interrupted_move_would_play += replay.interrupted_move != replay.expected_move ? 1 : 0;
+        }
+    }
+    // Without these the loop above could pass having tested nothing: a limit must land part-way through the
+    // pass, and at least one must be a case the old code (which played the interrupted move) got wrong.
+    test_report::Check(landed_after_a_completed_move != 0,
+                       "a node limit cancels the ordering pass after a move has completed");
+    test_report::Check(interrupted_move_would_play != 0,
+                       "a node limit interrupts a move other than the one the completed moves choose");
+
+    // Cancelled before the search begins (a `stop` that beats the worker to the pass): no move is scored, so
+    // the move is the root's table move when it is one of the legal moves, and the first generated otherwise.
+    const MoveList  root_moves = Position::FromString(kOrderingPassFen).GenerateLegalMoves();
+    const Move      last_move  = root_moves[root_moves.size() - 1];
+    const zobrist_t root_hash  = Position::FromString(kOrderingPassFen).hash_;
+
+    PrepareOrderingPassSearch(game, 0);
+    game.is_cancel_pending_.store(true, std::memory_order_relaxed);
+    Move played = game.SearchRootNode();
+    test_report::Check(played == root_moves[0], std::format("cancelled before the pass with a cold table: plays the "
+                                                            "first generated move {} ({})",
+                                                            root_moves[0].ToString(), played.ToString()));
+
+    PrepareOrderingPassSearch(game, 0);
+    game.transposition_table_.RecordTransposition(
+        Transposition{root_hash, last_move, 0, kStartDepth, Transposition::NodeType::kPv});
+    game.is_cancel_pending_.store(true, std::memory_order_relaxed);
+    played = game.SearchRootNode();
+    test_report::Check(played == last_move,
+                       std::format("cancelled before the pass with a table move: plays the table move {} ({})",
+                                   last_move.ToString(), played.ToString()));
+
+    // A table move that is not legal here (as a hash collision would leave) is ignored: a White move from the
+    // start position.
+    const Move foreign_move =
+        Position::FromString("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1").GenerateLegalMoves()[0];
+    PrepareOrderingPassSearch(game, 0);
+    game.transposition_table_.RecordTransposition(
+        Transposition{root_hash, foreign_move, 0, kStartDepth, Transposition::NodeType::kPv});
+    game.is_cancel_pending_.store(true, std::memory_order_relaxed);
+    played = game.SearchRootNode();
+    test_report::Check(played == root_moves[0],
+                       std::format("cancelled before the pass with an illegal table move {}: plays the first generated "
+                                   "move {} ({})",
+                                   foreign_move.ToString(), root_moves[0].ToString(), played.ToString()));
+
+    // With helper threads, which are launched after the pass: they must still be wound up and joined.
+    const int thread_count = game.thread_count_;
+    game.thread_count_     = 4;
+    PrepareOrderingPassSearch(game, 0);
+    game.is_cancel_pending_.store(true, std::memory_order_relaxed);
+    played             = game.SearchRootNode();
+    game.thread_count_ = thread_count;
+    test_report::Check(played == root_moves[0],
+                       std::format("cancelled before the pass with four threads: the helpers are joined and the first "
+                                   "generated move {} is played ({})",
+                                   root_moves[0].ToString(), played.ToString()));
+}
 } // namespace
 
 int main(int argc, char **argv)
@@ -202,6 +357,8 @@ int main(int argc, char **argv)
     test_report::Check(forced != Move::None(), "the forced move is returned");
     test_report::Check(game.last_search_node_count_ == 0, "a forced move reports no nodes");
     test_report::Check(game.principal_variation_.empty(), "a forced move publishes no principal variation");
+
+    CheckCancelledOrderingPass(game);
 
     return test_report::Summary(
         std::format("PRINCIPAL VARIATION: {} published pv plies replayed, evaluated and signed", total_plies));
