@@ -788,6 +788,29 @@ void Searches(Game &game)
           "go depth 8 on a FEN claiming castling rights the board cannot support (issue #30)", out);
 }
 
+/// @brief Under a hard limit a completed search decides the move even where the depth-3 ordering pass cannot finish.
+/// From a cold table 2.3.0's depth-3 pass took 276,020 nodes on this FEN, so under any node limit up to that, and
+/// at 8+0.08 with an 80 ms hard budget, it answered with no `info` line: no search had completed. A hard limit (a
+/// deadline or a node limit) now runs a depth-1 pass first, 1,982 nodes here, which completes and reports itself.
+/// With no limit the depth-3 pass runs alone, as before, so fixed-depth searches and the bench are unchanged.
+void OrderingPassUnderAHardLimit(Game &game)
+{
+    bool is_complete = false;
+    Run(game, {"setoption name OwnBook value false", "setoption name Threads value 1"});
+    constexpr std::string_view kPosition = "position fen 3k3b/3P1KP1/8/5B2/7p/7P/1p6/8 b - - 0 92";
+    for (const char *go_line : {"go nodes 4096", "go nodes 65536", "go wtime 664 btime 1110 winc 80 binc 80"})
+    {
+        Run(game, {"ucinewgame", kPosition});
+        const std::string out = SearchToBestMove(game, go_line, is_complete);
+        Check(is_complete && IsLegal(game, BestMove(out)) && Contains(out, "info depth  1 "),
+              std::format("{}: the depth-1 pass completes and reports itself before the bestmove", go_line), out);
+    }
+    Run(game, {"ucinewgame", kPosition});
+    const std::string out = SearchToBestMove(game, "go depth 3", is_complete);
+    Check(is_complete && IsLegal(game, BestMove(out)) && !Contains(out, "info depth"),
+          "go depth 3: no hard limit, so the depth-3 pass runs alone and prints nothing, as before", out);
+}
+
 /// @brief Every command that stops a search, sent the instant after `go` with no pause, ends it with a bestmove.
 /// The root search once cleared the cancel flag as it began, so a `stop` (or `quit`, a new `go`, `ucinewgame`) that
 /// reached StopThinking before the worker got that far was lost: the search ran on and StopThinking waited in join()
@@ -1128,6 +1151,7 @@ int main(int argc, char **argv)
     NetLoading(game, net_path);
     StopRaces(game); // first: its watchdog turns a lost stop into a failure, where a later search would just hang
     Searches(game);
+    OrderingPassUnderAHardLimit(game);
     MalformedGoValues(game);
     RootShortcuts(game, "pawnstar.book");
     BookCommands(game);

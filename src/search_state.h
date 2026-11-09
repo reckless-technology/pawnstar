@@ -63,12 +63,17 @@ class SearchState
 
   public:
     // State variables
-    Game                 &game_;       ///< Shared state: TT, clock, cancellation flag.
-    HistoryTable          history_;    ///< Per-thread history heuristic counts (no sharing).
-    KillerArray           killers_;    ///< Killer moves indexed by ply.
-    uint64_t              node_count_; ///< Cumulative nodes this thread searched.
-    int                   seldepth_;   ///< Max ply reached this search (selective depth, for `info`).
-    std::vector<Position> positions_;  ///< Position stack.
+    Game        &game_;       ///< Shared state: TT, clock, cancellation flag.
+    HistoryTable history_;    ///< Per-thread history heuristic counts (no sharing).
+    KillerArray  killers_;    ///< Killer moves indexed by ply.
+    uint64_t     node_count_; ///< Cumulative nodes this thread searched.
+    int          seldepth_;   ///< Max ply reached this search (selective depth, for `info`).
+    /// Set only while the root's depth-1 ordering pass runs (SearchRootNode, under a hard limit): a table hit on a
+    /// PV entry then does not extend the depth. On a table warm from deeper searches every such hit adds the ply
+    /// the move took away, so along the stored lines the depth never falls and even a depth-1 search ran on to
+    /// kMaxPly, taking up to ~750k nodes where it otherwise takes about 2,000.
+    bool                  is_pv_extension_suppressed_ = false;
+    std::vector<Position> positions_; ///< Position stack.
     mutable std::vector<nnue::Accumulator>
                                 acc_stack_;    ///< Per-ply NNUE accumulators (copy-make; see CurrentAccumulator).
     mutable std::vector<bool>   acc_valid_;    ///< acc_stack_[i] is up to date iff acc_valid_[i].
@@ -89,6 +94,7 @@ class SearchState
     Move SearchSingleMove(int depth, int ply, int alpha, int beta, Move move, Variation &pv, int move_index);
     int  SearchQuiescent(int depth, int ply, int alpha, int beta);
     Move IterativeDeepen(MoveList move_list, Move best_move, int thread_id);
+    void PrintSearchInfo(int depth, int score, const std::string &pv_string) const;
     bool IsDrawByRepetition() const;
     bool IsDrawByFiftyMoves() const;
     bool IsCancelled() const;
@@ -595,7 +601,10 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
 
         case Transposition::NodeType::kPv:
             INCREMENT("table hit pv node");
-            ++depth; // extend depth if we think we are on the PV
+            if (!is_pv_extension_suppressed_)
+            {
+                ++depth; // extend depth if we think we are on the PV
+            }
             break;
         }
     }
@@ -965,31 +974,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
                         pv_string.push_back(' ');
                     }
                     pv_string.pop_back();
-                    // Report a forced mate as `score mate <moves>` (positive = we mate, negative = we get
-                    // mated) rather than a huge `cp` value; otherwise the centipawn score. Mate scores are
-                    // +/-(kMateValue - plies_to_mate), so plies_to_mate = kMateValue - |score| and the move
-                    // count rounds up (+1)/2.
-                    constexpr int kMateValue = -kCheckmatedScore; // 31900
-                    std::string   score_string;
-                    if (alpha >= kWinThreshold)
-                    {
-                        score_string = std::format("mate {:2}", (kMateValue - alpha + 1) / 2);
-                    }
-                    else if (alpha <= kLoseThreshold)
-                    {
-                        score_string = std::format("mate {:2}", -((kMateValue + alpha + 1) / 2));
-                    }
-                    else
-                    {
-                        score_string = std::format("cp {:4}", alpha);
-                    }
-                    const long long elapsed_ms = game_.time_control_.ElapsedSinceSearchStart().count();
-                    const long long nps =
-                        static_cast<long long>(node_count_) * 1000 / std::max<long long>(1, elapsed_ms);
-                    std::cout << std::format(
-                        "info depth {:2} seldepth {:2} score {} time {:5} nodes {:8} nps {:7} hashfull {:3} pv {}\n",
-                        depth, seldepth_, score_string, elapsed_ms, node_count_, nps,
-                        game_.transposition_table_.HashfullPermille(), pv_string);
+                    PrintSearchInfo(depth, alpha, pv_string);
                 }
             }
         }
@@ -1027,6 +1012,36 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
         }
     }
     return best_move;
+}
+
+/// @brief Print one `info depth` line: the depth, this thread's seldepth, the score, the time since the search
+/// started, this thread's node count, its speed, the table's fill and the principal variation given.
+/// @param depth The depth searched. @param score The score of the line, from the side to move.
+/// @param pv_string The principal variation, its moves separated by single spaces.
+inline void SearchState::PrintSearchInfo(int depth, int score, const std::string &pv_string) const
+{
+    // Report a forced mate as `score mate <moves>` (positive = we mate, negative = we get mated) rather than a huge
+    // `cp` value; otherwise the centipawn score. Mate scores are +/-(kMateValue - plies_to_mate), so plies_to_mate =
+    // kMateValue - |score| and the move count rounds up (+1)/2.
+    constexpr int kMateValue = -kCheckmatedScore; // 31900
+    std::string   score_string;
+    if (score >= kWinThreshold)
+    {
+        score_string = std::format("mate {:2}", (kMateValue - score + 1) / 2);
+    }
+    else if (score <= kLoseThreshold)
+    {
+        score_string = std::format("mate {:2}", -((kMateValue + score + 1) / 2));
+    }
+    else
+    {
+        score_string = std::format("cp {:4}", score);
+    }
+    const long long elapsed_ms = game_.time_control_.ElapsedSinceSearchStart().count();
+    const long long nps        = static_cast<long long>(node_count_) * 1000 / std::max<long long>(1, elapsed_ms);
+    std::cout << std::format(
+        "info depth {:2} seldepth {:2} score {} time {:5} nodes {:8} nps {:7} hashfull {:3} pv {}\n", depth, seldepth_,
+        score_string, elapsed_ms, node_count_, nps, game_.transposition_table_.HashfullPermille(), pv_string);
 }
 
 // ---- EvaluatePosition (defined here; needs SearchState + Game complete) ----
