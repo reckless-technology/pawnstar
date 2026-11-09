@@ -353,45 +353,91 @@ inline Move Game::SearchRootNode()
     DebugXClear();
     game.transposition_table_.Age();
 
-    // Shallow pass for initial move ordering (on a temporary state shared as the launch ordering).
-    // A cancel (the hard deadline, `stop` or the node limit) can land inside this pass. The move being searched
-    // then comes back carrying the negated cancel sentinel, which the 23-bit score field truncates to a huge
-    // positive score: unchecked, that move sorted first and was played, unscored, sometimes straight into mate.
-    // So once the cancel flag is up, neither that move nor any after it is trusted: each is marked unsearched,
-    // below every real score, and the stable sort leaves the unsearched moves last in generation order.
+    // Shallow pass for initial move ordering (on a temporary state shared as the launch ordering): every root move
+    // searched to kStartDepth with the full window, in list order. A cancel (the hard deadline, `stop` or the node
+    // limit) can land inside a pass. The move being searched then comes back carrying the negated cancel sentinel,
+    // which the 23-bit score field truncates to a huge positive score: unchecked, that move sorted first and was
+    // played, unscored, sometimes straight into mate. So once the cancel flag is up, neither that move nor any
+    // after it is trusted.
     SearchState state{game};
     Variation   shallow_pv{};
-    int         completed_move_count = 0;
-    for (auto &move : move_list)
-    {
-        const int move_index = (int)(&move - &move_list[0]);
-        const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score();
-        if (state.IsCancelled())
+    const auto  run_ordering_pass = [&](int depth) {
+        int completed = 0;
+        for (auto &move : move_list)
         {
-            break;
+            const int move_index = (int)(&move - &move_list[0]);
+            const int score = state.SearchSingleMove(depth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score();
+            if (state.IsCancelled())
+            {
+                break;
+            }
+            move.AssignScore(score);
+            ++completed;
         }
-        move.AssignScore(score);
-        ++completed_move_count;
-    }
-    for (int i = completed_move_count; i < (int)move_list.size(); ++i)
+        return completed;
+    };
+    // Under a hard limit the depth-3 pass can outlast the whole budget: on positions from 8+0.08 games it took up to
+    // 369k nodes from a cold table and 464 ms on a warm one, against an 80 ms budget (~115k nodes), so no search
+    // result existed when the deadline landed. A depth-1 pass, run with the PV extension off (see SearchState),
+    // costs about 2% of the depth-3 pass, and finishing it first means a completed search decides the move unless
+    // even that is cut. Without a limit (fixed depth, infinite, bench) the depth-3 pass runs alone, as before.
+    const bool has_hard_limit       = max_search_time > Duration::zero() || game.time_control_.max_nodes_ != 0;
+    bool       has_limited_ordering = false; // whether the depth-1 pass completed
+    MoveList   limited_ordering;             // its moves, sorted by its scores
+    int        completed_move_count = 0;     // moves of the last pass run whose search completed
+    if (has_hard_limit)
     {
-        move_list[i].AssignScore(kUnsearchedRootScore);
+        state.is_pv_extension_suppressed_ = true; // see SearchState: else a warm table makes this pass unbounded
+        completed_move_count              = run_ordering_pass(kLimitedOrderingDepth);
+        state.is_pv_extension_suppressed_ = false;
+        has_limited_ordering              = completed_move_count == (int)move_list.size();
+        if (has_limited_ordering)
+        {
+            SortMoves(move_list);
+            limited_ordering = move_list;
+            state.PrintSearchInfo(kLimitedOrderingDepth, move_list[0].score(), move_list[0].ToString());
+        }
     }
-    SortMoves(move_list);
+    if (!has_hard_limit || has_limited_ordering)
+    {
+        completed_move_count = run_ordering_pass(kStartDepth);
+    }
+    if (has_limited_ordering && completed_move_count < (int)move_list.size())
+    {
+        move_list = limited_ordering; // the depth-3 pass was cut: order by the completed depth-1 pass
+    }
+    else
+    {
+        // Each move the last pass run did not complete (the depth-3 pass, or the depth-1 pass when even that was
+        // cut) is marked unsearched, below every real score, and the stable sort leaves the unsearched moves last
+        // in list order.
+        for (int i = completed_move_count; i < (int)move_list.size(); ++i)
+        {
+            move_list[i].AssignScore(kUnsearchedRootScore);
+        }
+        SortMoves(move_list);
+        if (has_hard_limit && completed_move_count == (int)move_list.size())
+        {
+            state.PrintSearchInfo(kStartDepth, move_list[0].score(), move_list[0].ToString());
+        }
+    }
     Move best_move = move_list[0];
     if (completed_move_count < (int)move_list.size())
     {
-        // Cancelled inside the pass. The moves that finished first are the cheap ones, and their depth-3 scores
-        // miss what a deeper search sees, so prefer the root's table move when its entry is deeper than the pass.
-        // The root's own moves are searched one by one (here and in IterativeDeepen), but the pass can re-enter the
-        // root through a repetition and store it; such an entry is shallower than kStartDepth, so the depth test
-        // never prefers it, yet it can overwrite a deeper entry from an earlier search, in which case the rule falls
-        // back to the best completed move. Otherwise play the best completed move; and if none completed, the table
-        // move at any depth, else the first generated (which the stable sort left at the front). The move must be
-        // legal here: a hash collision can leave a move from another position.
-        const auto root_entry = game.transposition_table_.FindTransposition(game.CurrentPosition().hash_);
+        // Cancelled inside a pass. The moves that finished first are the cheap ones, and their depth-3 scores miss
+        // what a deeper search sees (the depth-1 pass sees less still), so prefer the root's table move when its
+        // entry is deeper than the pass. The root's own moves are searched one by one (here and in
+        // IterativeDeepen), but a pass can re-enter the root through a repetition and store it; such an entry is
+        // shallower than kStartDepth, so the depth test never prefers it, yet it can overwrite a deeper entry from
+        // an earlier search, in which case the rule falls back to the best completed move. Otherwise play the best
+        // move of the completed depth-1 pass when there is one (a cut depth-3 pass is then set aside whole), else
+        // the best completed move of the pass that was cut; and if no move's search completed at all, the table
+        // move at any depth, else the first generated (which the stable sort left at the front).
+        // The move must be legal here: a hash collision can leave a move from another position.
+        const bool has_completed_search = has_limited_ordering || completed_move_count != 0;
+        const auto root_entry           = game.transposition_table_.FindTransposition(game.CurrentPosition().hash_);
         if (root_entry && root_entry->move_ != Move::None() &&
-            (root_entry->depth() > kStartDepth || completed_move_count == 0))
+            (root_entry->depth() > kStartDepth || !has_completed_search))
         {
             const auto table_move = std::ranges::find(move_list, root_entry->move_);
             if (table_move != move_list.end())

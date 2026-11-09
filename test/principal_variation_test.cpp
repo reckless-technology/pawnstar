@@ -146,16 +146,50 @@ int CheckHarvest(const Game &game, const Position &root, int white_score)
 /// 8+0.08 the hard deadline did, and the engine played an underpromotion with no `info` line.
 constexpr const char *kOrderingPassFen = "3k3b/3P1KP1/8/5B2/7p/7P/1p6/8 b - - 0 92";
 
-/// @brief What the root's ordering pass ought to leave as the move to play, worked out independently of
-/// SearchRootNode by running the same depth-3 searches in the same order and stopping where the cancel lands.
+/// @brief What the root's ordering passes ought to leave as the move to play, worked out independently of
+/// SearchRootNode by running the same searches in the same order and stopping where the cancel lands.
 struct OrderingPassReplay
 {
-    Move expected_move;        ///< the first best-scoring completed move, or the first generated if none completed
-    int  completed_move_count; ///< root moves whose depth-3 search finished before the cancel
+    Move expected_move;        ///< the move a cancelled pass should leave to be played (with a cold table)
+    int  completed_move_count; ///< root moves whose search finished, in the pass the cancel landed in
     int  root_move_count;      ///< legal root moves
-    bool was_cancelled;        ///< whether the cancel landed inside the pass at all
+    bool was_cancelled;        ///< whether the cancel landed inside a pass at all
+    bool has_limited_ordering; ///< whether the depth-1 pass that a node limit runs first completed
     Move interrupted_move;     ///< the move being searched when the cancel landed (Move::None if it did not)
+    Move unreached_move;       ///< the last move in the cancelled pass's order, which it never reached
 };
+
+/// @brief Search every move of a list to one depth, in list order, stopping at the cancel, as a pass does.
+/// @param state Search state. @param moves The root moves; each completed move takes its score.
+/// @param depth Pass depth. @param replay Records where the cancel landed.
+/// @return The first best-scoring completed move (strictly greater wins, as the stable sort leaves equal scores),
+/// or Move::None if no move completed.
+Move ReplayPass(SearchState &state, MoveList &moves, int depth, OrderingPassReplay &replay)
+{
+    Variation pv{};
+    Move      best_move         = Move::None();
+    int       best_score        = 0;
+    replay.completed_move_count = 0;
+    for (int i = 0; i < (int)moves.size(); ++i)
+    {
+        const int score = state.SearchSingleMove(depth, 0, kAlpha, kBeta, moves[i], pv, i).score();
+        if (state.IsCancelled())
+        {
+            replay.was_cancelled    = true;
+            replay.interrupted_move = moves[i];
+            replay.unreached_move   = moves[moves.size() - 1];
+            break;
+        }
+        moves[i].AssignScore(score);
+        if (best_move == Move::None() || score > best_score)
+        {
+            best_score = score;
+            best_move  = moves[i];
+        }
+        ++replay.completed_move_count;
+    }
+    return best_move;
+}
 
 /// @brief Set up a node-limited search of kOrderingPassFen from a cold table, as `go nodes` does.
 /// @param game Game to prepare. @param node_limit The `go nodes` budget (0 = none).
@@ -167,52 +201,50 @@ void PrepareOrderingPassSearch(Game &game, uint64_t node_limit)
     game.time_control_.max_nodes_  = node_limit;
 }
 
-/// @brief Run the root's ordering pass by hand: each legal move searched to kStartDepth on one fresh
-/// SearchState, in generation order, with the node limit armed exactly as SearchRootNode arms it.
-/// @param game Game to search. @param node_limit The node budget.
+/// @brief Run the root's ordering passes by hand on one fresh SearchState, with the node limit armed exactly as
+/// SearchRootNode arms it. A node limit is a hard limit, so a depth-1 pass over the moves in generation order, with
+/// the PV extension off, comes first; if it completes, the moves are stably sorted by its scores and the depth-3 pass
+/// searches them in that order. A cancelled depth-3 pass is then set aside whole for the depth-1 pass's best move; a
+/// cancel inside the depth-1 pass leaves its best completed move, or the first generated if none completed.
+/// @param game Game to search. @param node_limit The node budget (non-zero).
 /// @return Where the cancel landed and which move should be played as a result.
 OrderingPassReplay ReplayOrderingPass(Game &game, uint64_t node_limit)
 {
     PrepareOrderingPassSearch(game, node_limit);
     game.time_control_.StartSearch(ChessClock::Duration::zero(), ChessClock::Duration::zero());
     game.transposition_table_.Age();
-    const MoveList     moves = game.CurrentPosition().GenerateLegalMoves();
-    OrderingPassReplay replay{moves[0], 0, (int)moves.size(), false, Move::None()};
+    MoveList           moves = game.CurrentPosition().GenerateLegalMoves();
+    OrderingPassReplay replay{moves[0], 0, (int)moves.size(), false, false, Move::None(), Move::None()};
     SearchState        state{game};
-    Variation          pv{};
-    int                best_score = 0;
-    for (int i = 0; i < (int)moves.size(); ++i)
+    state.is_pv_extension_suppressed_ = true; // as SearchRootNode runs the depth-1 pass
+    const Move limited_best           = ReplayPass(state, moves, kLimitedOrderingDepth, replay);
+    state.is_pv_extension_suppressed_ = false;
+    if (replay.was_cancelled)
     {
-        const int score = state.SearchSingleMove(kStartDepth, 0, kAlpha, kBeta, moves[i], pv, i).score();
-        if (state.IsCancelled())
-        {
-            replay.was_cancelled    = true;
-            replay.interrupted_move = moves[i];
-            break;
-        }
-        // Strictly greater, so the first of equal scores wins, as the stable sort leaves it.
-        if (replay.completed_move_count == 0 || score > best_score)
-        {
-            best_score           = score;
-            replay.expected_move = moves[i];
-        }
-        ++replay.completed_move_count;
+        replay.expected_move = limited_best != Move::None() ? limited_best : moves[0];
+        return replay;
     }
+    replay.has_limited_ordering = true;
+    SortMoves(moves);
+    ReplayPass(state, moves, kStartDepth, replay);
+    replay.expected_move = limited_best;
     return replay;
 }
 
-/// @brief A cancel that lands inside the root's ordering pass must not decide the move. The move it
+/// @brief A cancel that lands inside the root's ordering passes must not decide the move. The move it
 /// interrupts carries the negated cancel sentinel, which the 23-bit score field truncates to a huge positive
 /// score; 2.2.0 sorted that move first and played it. The move played must be the root's table move when it is
-/// legal here and deeper than the pass; else the best of the moves whose search completed or, when none did, the
-/// root's table move at any depth if it is legal here, else the first generated.
+/// legal here and deeper than the pass; else the best move of the completed depth-1 pass that a hard limit runs
+/// first, else the best of the moves whose search completed or, when none did, the root's table move at any depth
+/// if it is legal here, else the first generated.
 /// @param game Game to search (one thread).
 void CheckCancelledOrderingPass(Game &game)
 {
     // A node limit lands where Search polls it, every 2048 nodes, so double from there until the pass completes.
-    // With the shipped net the first move's depth-3 search is under 2048 nodes, so no node limit lands before a
-    // move has completed (the synthetic net's first limit does); that case is pinned below by a cancel set
-    // before the search starts, which reaches it with any net.
+    // With the shipped net the depth-1 pass a node limit runs first is under 2048 nodes, so every limit lands in
+    // the depth-3 pass, and the first lands before any of its moves has completed (the synthetic net's first
+    // limit may land in the depth-1 pass instead). The case of no completed search at all is pinned below by a
+    // cancel set before the search starts, which reaches it with any net.
     int landed_after_a_completed_move = 0; // limits that cancel the pass part-way, with at least one move scored
     int interrupted_move_would_play   = 0; // of those, the ones where the interrupted move is not the answer
     for (uint64_t node_limit = 2048; node_limit <= (uint64_t{1} << 24); node_limit *= 2)
@@ -296,10 +328,10 @@ void CheckCancelledOrderingPass(Game &game)
             continue;
         }
         // A move the pass did not complete, so that playing it can only come from the table.
-        const Move unreached_move = root_moves[root_moves.size() - 1];
+        const Move unreached_move = replay.unreached_move;
         test_report::Check(replay.completed_move_count < (int)root_moves.size() - 1 &&
                                unreached_move != replay.expected_move,
-                           std::format("nodes {}: the last generated move {} is not reached by the cancelled pass",
+                           std::format("nodes {}: the last move {} of the cancelled pass's order is not reached by it",
                                        node_limit, unreached_move.ToString()));
         const auto search_with_root_entry = [&](Move table_move, int depth) {
             PrepareOrderingPassSearch(game, node_limit);

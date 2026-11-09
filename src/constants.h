@@ -53,6 +53,7 @@ constexpr int kSearchCancelledScore      = -12345678; ///< illegal value returne
 constexpr int kUnsearchedRootScore       = -32001;    ///< kAlpha - 1: root order of a move a cancel left unscored
 constexpr int kScoreInstabilityThreshold = 50;        ///< window of score variability
 constexpr int kStartDepth                = 3;         ///< depth to do full width search
+constexpr int kLimitedOrderingDepth      = 1;         ///< the pass run first under a hard deadline or node limit
 constexpr int kRfpMaxDepth               = 7;         ///< reverse-futility pruning: max depth to apply it
 constexpr int kRfpMargin                 = 80;        ///< reverse-futility pruning: centipawn margin per ply
 constexpr int kLmpMaxDepth               = 8;         ///< late-move (move-count) pruning: max depth to apply it
