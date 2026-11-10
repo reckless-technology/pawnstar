@@ -815,9 +815,12 @@ Pawnstar has no official CCRL rating. The figures currently tracked are:
   early nets: ~2900 Elo (CCRL-ballpark) for the v4–v7 nets (fastchess against CCRL-rated engines from Arena, one
   thread, 8+0.08 for v4 and v6, 40 moves in 60 s for v7 on 2026-06-16), against ~2350 for the since-removed
   hand-crafted eval (8+0.08, single thread). The shipped `nnue/pawnstar-v20.bin` has **not** been rated against
-  rated engines; it is the strongest shipped net, each step in the net lineage adding measured Elo over its
-  predecessor (v20 over v12: +9.99 at 8+0.08, 8,000 games, an estimate because that arm's PGNs were not written; +1.13 at
-  12+0.12, 12,000 games, level within error — see [nnue/README.md](nnue/README.md)). The CCRL-ballpark figures
+  rated engines; it is the net now shipped, and **non-inferior** to the v12 it replaced, not shown stronger: against v12 it measured
+  +9.99 Elo at 8+0.08 (8,000 games, on lin-0, 2026-10-30; 95% +2.42..+17.57, widened for opening replay and an
+  estimate, since that arm's PGNs were not written; biased upward, as the run was extended because its first stage looked
+  good) and +1.13 at 12+0.12 (12,000 games on lin-0 and lin-2, 2026-10-30; 95% −5.63..+7.89 widened for opening replay,
+  −3.17..+5.43 nominal), i.e. a gain at fast time controls and level at slower ones — see
+  [nnue/README.md](nnue/README.md) §7. The CCRL-ballpark figures
   anchor only as well as their opponents. At equal *time*, the incremental accumulator is
   worth ~+80 Elo over a full refresh and the AVX2 SIMD kernels a further ~+180 Elo over the scalar
   versions (both by SPRT).
