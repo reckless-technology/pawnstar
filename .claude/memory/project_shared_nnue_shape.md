@@ -1,7 +1,9 @@
 # The shared NNUE shape: mirroring, output heads, and the one silent trap
 
-2026-10-27. Five engines (`pawnstar`, `pawnstar-rs`, `pawnstar-go`, `trebuchet`, `stoopid-chess`) moved onto
-one NNUE evaluator so a new evaluation function is developed once rather than five times. The
+2026-10-27. Five engines (`pawnstar`, `pawnstar-rs`, `pawnstar-go`, `trebuchet`, `stoopid-chess`) were to move onto
+one NNUE evaluator so a new evaluation function is developed once rather than five times. **Superseded
+2026-11-10 (Jonny: "Leave NNUE out of Stoopid chess"): four engines read nets; Stoopid Chess keeps its
+hand-crafted evaluation.** The
 specification is the `reckless-nnue` skill; this note is only what is specific to this codebase.
 
 ## What landed, in order

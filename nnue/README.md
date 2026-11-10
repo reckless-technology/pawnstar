@@ -119,7 +119,7 @@ the scalar one (verified by `test_nnue`).
 
 ### The two network shapes, and the build knob that picks one
 
-Five engines are being unified onto one NNUE evaluator (skill `reckless-nnue`), and the shared
+Four engines are being unified onto one NNUE evaluator (skill `reckless-nnue`), and the shared
 architecture - **the default here since release 2.0.0, and the shape the shipped net was trained for** -
 adds two things to the shape the retired v12 net needed. Both were measured in trebuchet on this hardware,
 SPRT-gated, and both only paid past ~1.4B training positions - at 190M they were neutral or negative,
@@ -229,8 +229,9 @@ and the digest reports it only after the training run has been spent.
 ## 2. File format — the shared `RNNUE1` container
 
 Pawnstar's nets are in **`RNNUE1`**, the one container every reckless-technology chess engine reads —
-`pawnstar`, `pawnstar-rs`, `pawnstar-go`, `trebuchet` and `stoopid-chess` (skill `reckless-nnue`). A net
-trained once loads in all five, and a change to the container is a change owed to all five. It replaced
+`pawnstar`, `pawnstar-rs`, `pawnstar-go` and `trebuchet` (skill `reckless-nnue`). Stoopid Chess keeps its
+hand-crafted evaluation and reads no net (Jonny, 2026-11-10). A net trained once loads in all four, and a
+change to the container is a change owed to all four. It replaced
 pawnstar's own 32-byte `PSN1` header on 2026-10-27; `src/nnue.h` is the authority for this build.
 
 Little-endian throughout: a **64-byte header**, then the weight payload, and nothing after it.

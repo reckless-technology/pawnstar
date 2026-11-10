@@ -483,7 +483,7 @@ class Network
     alignas(64) std::array<int8_t, kOutputWeightCount> output_weights_i8_{};
     int output_w_scale_ = 1; ///< Divisor mapping the int16 output weights into int8 range.
     /// @brief Output bias per output bucket, in QA*QB units. int32 in the container even though the trained
-    /// values comfortably fit int16: the width is part of RNNUE1, shared by all five engines.
+    /// values comfortably fit int16: the width is part of RNNUE1, shared by all four engines that read a net.
     std::array<std::int32_t, kOutputBiasCount> output_bias_{};
 
   public:
