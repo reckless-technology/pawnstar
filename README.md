@@ -8,7 +8,7 @@ a lockless transposition table, and a perspective NNUE evaluation. The engine is
 class lives entirely in its `src/*.h` header as `inline` definitions, so only `main.cpp` is compiled and
 linked (each test/tool is a single self-contained translation unit), and the build needs no LTO.
 
-Legal move generation runs at roughly 600 million moves per second on a modern laptop.
+Legal move generation (perft) ran at roughly 600 million moves per second on one thread of an Intel i9-13900HX laptop (June 2026), and at about 437 million on an Apple M1 Pro.
 
 ## Features
 
@@ -397,6 +397,20 @@ moves are re-sorted by their scores from the previous iteration, so the prior be
 next time. The root searches a full `[kAlpha, kBeta]` window (no aspiration windows); alpha is raised
 in place as root moves beat it.
 
+**Root ordering passes.** Before iterative deepening, `SearchRootNode` searches every root move to `kStartDepth` (3)
+with the full window and sorts the list by those scores, so deepening starts at depth 4. Under a **hard limit** — a
+positive hard deadline (the time left to the move, less `Move Overhead`) or a `go nodes` limit — that depth-3 pass can
+outlast the whole budget (on 67 positions from 8+0.08 games, 2.2.0 had no search result at all when the deadline fell
+inside it), so since **2.3.1** a **depth-1 pass** runs first: it orders the list, prints an `info depth 1` line and,
+if the depth-3 pass is then cut, its order is kept and the move is chosen from it. In that depth-1 pass only, a
+transposition-table hit on a PV entry does not add a ply (see the PV extension below), which keeps it to about 2% of the
+depth-3 pass. If a pass is cut anyway, a cancel never decides the move by itself: the root's table move is played if
+its entry is deeper than `kStartDepth`, else the best move of the completed depth-1 pass, else the best move the cut
+pass completed. With no hard limit (fixed depth, `go infinite`, `bench`) the depth-3 pass runs alone and prints
+nothing, exactly as before, so the `bench` signature (5,617,906) is unchanged. Measured for the C++ engine on one of the project's Linux match machines (lin-0), 2026-11-08, 2.3.1's change against 2.3.0, with the Elo as measured match scores and 95% intervals: +3.65 (−8.24..+15.53) Elo at 1+0.01, with 0 against 24
+moves played with no search that were not forced; +1.74 (−11.65..+15.13) at 8+0.08, 0 against 22 — a fix for
+unsearched moves, not a measured strength gain.
+
 Under a standard (time-budgeted) clock the engine can stop *before* the allotted time is spent, using
 the stability of the result across iterations:
 
@@ -422,7 +436,9 @@ UCI thread can retarget the running search). It is covered by the `test_chess_cl
 
 #### Recursive search
 
-`SearchState::Search` ([src/search_state.h](src/search_state.h)) applies, at each node:
+`SearchState::Search` ([src/search_state.h](src/search_state.h)) applies, at each node. (The SPRT figures below are
+development-time results from 2026-06-16 to 2026-06-20, fastchess at the time control named, each against the engine
+as it stood that day with the net of that day; they were not re-measured on later releases.)
 
 - **Transposition table** probe/store with CUT / ALL / PV node types; a TT cutoff or TT move ordering
   hint is taken before any moves are generated.
@@ -453,7 +469,11 @@ UCI thread can retarget the running search). It is covered by the `test_chess_cl
   past the `3 + depth²`-th move the remaining **quiet, non-checking** moves are skipped entirely (captures,
   promotions and checks are never pruned). Where LMR *reduces* late quiets, LMP *drops* them. SPRT-tested
   **+18.6 ± 9.0 Elo at 8+0.08** on top of RFP.
-- **Search extensions** for checks, promotions and en passant captures.
+- **Search extensions** for checks, promotions and en passant captures, and a **PV extension**: a transposition-table
+  hit on a PV entry adds one ply, switched off only in the root's depth-1 ordering pass (above). On a table warm from
+  earlier, deeper searches it is **unbounded** — every such hit gives back the ply the move took, so along stored
+  lines the depth never falls and `seldepth` reaches up to 62 (the ceiling is `kMaxPly`, 64). This is known and
+  deliberately unchanged, because changing it changes the `bench` signature and so all three ports.
 - **Move ordering** — the TT move first, then winning/equal captures and promotions by static exchange
   evaluation, then the two killer moves for the ply, then the **countermove** (the best quiet refutation
   to the previous move), then quiet moves scored by the **main history** count (a butterfly table
@@ -789,11 +809,16 @@ A few deliberate choices shape the codebase:
 
 Pawnstar has no official CCRL rating. The figures currently tracked are:
 
-- **Move generation** — roughly 600 million legal moves per second on a modern laptop core.
+- **Move generation** — roughly 600 million legal moves per second (perft, one thread, Intel i9-13900HX laptop, June 2026); about 437 million on an Apple M1 Pro. Not re-measured since.
 - **Bratko-Kopec** — `test_bratko_kopec_nnue` solves 24/24 at each depth 8–11 with the shipped net (depth 8 runs in `make check`).
-- **Strength (rough).** `nnue/pawnstar-v20.bin` measures roughly ~2900+ Elo (CCRL-ballpark, anchored
-  against reference engines at a fast time control) — far above the since-removed hand-crafted eval (~2350);
-  v20 is the strongest shipped net, each step in the lineage above adding measured Elo over its predecessor. At equal *time*, the incremental accumulator is
+- **Strength (rough, and not of the shipped net).** The only absolute estimates are from June 2026, on the
+  early nets: ~2900 Elo (CCRL-ballpark) for the v4–v7 nets (fastchess against CCRL-rated engines from Arena, one
+  thread, 8+0.08 for v4 and v6, 40 moves in 60 s for v7 on 2026-06-16), against ~2350 for the since-removed
+  hand-crafted eval (8+0.08, single thread). The shipped `nnue/pawnstar-v20.bin` has **not** been rated against
+  rated engines; it is the strongest shipped net, each step in the net lineage adding measured Elo over its
+  predecessor (v20 over v12: +9.99 at 8+0.08, 8,000 games, an estimate because that arm's PGNs were not written; +1.13 at
+  12+0.12, 12,000 games, level within error — see [nnue/README.md](nnue/README.md)). The CCRL-ballpark figures
+  anchor only as well as their opponents. At equal *time*, the incremental accumulator is
   worth ~+80 Elo over a full refresh and the AVX2 SIMD kernels a further ~+180 Elo over the scalar
   versions (both by SPRT).
 
@@ -810,6 +835,9 @@ the published node counts for the standard positions.
 - **Thread count** is set by the `Threads` UCI option (Lazy SMP, 1–256); its default comes from the
   `PAWNSTAR_THREADS` environment variable if set, otherwise `hardware_concurrency()`.
 - **No syzygy/tablebase** support.
+- **The PV extension is unbounded on a warm transposition table** (`seldepth` up to 62 of `kMaxPly` 64; see
+  [Recursive search](#recursive-search)). Known, and unchanged on purpose, since changing it moves the `bench`
+  signature in all three ports.
 - **NNUE is the only evaluator.** The engine loads the shipped net at startup, falls back to a copy
   embedded in the binary if the file is **not there**, and **exits** if that copy is refused too (there is no
   hand-crafted fallback); a net file that is read and **refused** is fatal with no fallback. The accumulator is maintained incrementally and **lazily** across make/undo (the
