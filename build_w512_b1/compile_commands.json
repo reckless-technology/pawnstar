@@ -1,0 +1,134 @@
+[
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -include C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/generated/pawnstar_version.h -o CMakeFiles\\pawnstar.dir\\src\\main.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\src\\main.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src/main.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/pawnstar.dir/src/main.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -DEMBED_NET_PATH=\\\"C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/nnue/pawnstar-v12.bin\\\" -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\pawnstar.dir\\src\\embedded_net.S.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\src\\embedded_net.S",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src/embedded_net.S",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/pawnstar.dir/src/embedded_net.S.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -DEMBED_BOOK_PATH=\\\"C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/pawnstar.book\\\" -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\pawnstar.dir\\src\\embedded_book.S.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\src\\embedded_book.S",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src/embedded_book.S",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/pawnstar.dir/src/embedded_book.S.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -include C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/generated/pawnstar_version.h -o CMakeFiles\\gen_data.dir\\tools\\gen_data.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\tools\\gen_data.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/tools/gen_data.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/gen_data.dir/tools/gen_data.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -include C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/generated/pawnstar_version.h -o CMakeFiles\\gen_openings.dir\\tools\\gen_openings.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\tools\\gen_openings.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/tools/gen_openings.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/gen_openings.dir/tools/gen_openings.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -include C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/generated/pawnstar_version.h -o CMakeFiles\\lichess_extract.dir\\tools\\lichess_extract.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\tools\\lichess_extract.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/tools/lichess_extract.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/lichess_extract.dir/tools/lichess_extract.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\stamp_net.dir\\tools\\stamp_net.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\tools\\stamp_net.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/tools/stamp_net.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/stamp_net.dir/tools/stamp_net.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\filter_book.dir\\tools\\filter_book.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\tools\\filter_book.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/tools/filter_book.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/filter_book.dir/tools/filter_book.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\nnue_quant_study.dir\\tools\\nnue_quant_study.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\tools\\nnue_quant_study.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/tools/nnue_quant_study.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/nnue_quant_study.dir/tools/nnue_quant_study.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\dump_magics.dir\\tools\\dump_magics.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\tools\\dump_magics.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/tools/dump_magics.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/dump_magics.dir/tools/dump_magics.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_perft.dir\\test\\perft_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\perft_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/perft_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_perft.dir/test/perft_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_see.dir\\test\\see_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\see_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/see_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_see.dir/test/see_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_bratko_kopec_nnue.dir\\test\\bratko_kopec_nnue_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\bratko_kopec_nnue_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/bratko_kopec_nnue_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_bratko_kopec_nnue.dir/test/bratko_kopec_nnue_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_nnue.dir\\test\\nnue_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\nnue_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/nnue_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_nnue.dir/test/nnue_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_nnue_incremental.dir\\test\\nnue_incremental_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\nnue_incremental_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/nnue_incremental_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_nnue_incremental.dir/test/nnue_incremental_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_opening_book.dir\\test\\opening_book_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\opening_book_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/opening_book_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_opening_book.dir/test/opening_book_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_chess_clock.dir\\test\\chess_clock_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\chess_clock_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/chess_clock_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_chess_clock.dir/test/chess_clock_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_bench_golden.dir\\test\\bench_golden_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\bench_golden_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/bench_golden_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_bench_golden.dir/test/bench_golden_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_uci_commands.dir\\test\\uci_commands_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\uci_commands_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/uci_commands_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_uci_commands.dir/test/uci_commands_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_primitives.dir\\test\\primitives_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\primitives_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/primitives_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_primitives.dir/test/primitives_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_principal_variation.dir\\test\\principal_variation_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\principal_variation_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/principal_variation_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_principal_variation.dir/test/principal_variation_test.cpp.obj"
+},
+{
+  "directory": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1",
+  "command": "C:\\PROGRA~1\\MICROS~1\\18\\COMMUN~1\\VC\\Tools\\Llvm\\x64\\bin\\CLANG_~1.EXE -DDEBUGX=1 -D_CRT_SECURE_NO_WARNINGS -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/src -IC:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/tools -O3 -DNDEBUG -std=c++23 -Xclang -flto-visibility-public-std -D_MT -Xclang --dependent-lib=libcmt -mbmi2 -mavx2 -Wall -Wextra -Wpedantic -O3 -g -o CMakeFiles\\test_lichess_extract.dir\\test\\lichess_extract_test.cpp.obj -c C:\\Users\\jonny\\Documents\\git\\.worktrees\\pawnstar-arch\\test\\lichess_extract_test.cpp",
+  "file": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/lichess_extract_test.cpp",
+  "output": "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build_w512_b1/CMakeFiles/test_lichess_extract.dir/test/lichess_extract_test.cpp.obj"
+}
+]
