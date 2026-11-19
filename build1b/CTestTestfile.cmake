@@ -1,0 +1,32 @@
+# CMake generated Testfile for 
+# Source directory: C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch
+# Build directory: C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b
+# 
+# This file includes the relevant testing commands required for 
+# testing this directory and lists subdirectories to be tested as well.
+add_test([=[perft]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_perft.exe")
+set_tests_properties([=[perft]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;190;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[see]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_see.exe")
+set_tests_properties([=[see]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;190;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[opening_book]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_opening_book.exe")
+set_tests_properties([=[opening_book]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;190;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[chess_clock]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_chess_clock.exe")
+set_tests_properties([=[chess_clock]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;190;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[primitives]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_primitives.exe")
+set_tests_properties([=[primitives]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;190;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[lichess_extract]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_lichess_extract.exe")
+set_tests_properties([=[lichess_extract]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;190;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[bratko_kopec_nnue]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_bratko_kopec_nnue.exe" "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/nnue/pawnstar-v12.bin")
+set_tests_properties([=[bratko_kopec_nnue]=] PROPERTIES  ENVIRONMENT "PAWNSTAR_THREADS=1" WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;195;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[nnue]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_nnue.exe" "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/nnue/pawnstar-v12.bin" "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/nnue_reference.txt")
+set_tests_properties([=[nnue]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;197;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[nnue_incremental]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_nnue_incremental.exe" "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/nnue/pawnstar-v12.bin")
+set_tests_properties([=[nnue_incremental]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;199;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[principal_variation]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_principal_variation.exe" "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/nnue/pawnstar-v12.bin")
+set_tests_properties([=[principal_variation]=] PROPERTIES  ENVIRONMENT "PAWNSTAR_THREADS=1" WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;203;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[bench_golden]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_bench_golden.exe" "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/nnue/pawnstar-v12.bin")
+set_tests_properties([=[bench_golden]=] PROPERTIES  ENVIRONMENT "PAWNSTAR_THREADS=1" WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;207;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[uci_commands]=] "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/test_uci_commands.exe" "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/nnue/pawnstar-v12.bin")
+set_tests_properties([=[uci_commands]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;213;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")
+add_test([=[uci]=] "C:/Program Files/Git/bin/bash.exe" "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/test/uci_test.sh" "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/build1b/pawnstar_1_2_14.exe")
+set_tests_properties([=[uci]=] PROPERTIES  WORKING_DIRECTORY "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch" _BACKTRACE_TRIPLES "C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;236;add_test;C:/Users/jonny/Documents/git/.worktrees/pawnstar-arch/CMakeLists.txt;0;")

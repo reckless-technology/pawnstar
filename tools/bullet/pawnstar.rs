@@ -33,14 +33,14 @@ const QB: i16 = 64;
 // own king square — bullet orients our_ksq/opp_ksq per perspective, matching the engine's white/black.
 #[rustfmt::skip]
 const KING_BUCKETS: [usize; 64] = [
-    0, 0, 1, 1, 2, 2, 3, 3,
-    0, 0, 1, 1, 2, 2, 3, 3,
-    0, 0, 1, 1, 2, 2, 3, 3,
-    0, 0, 1, 1, 2, 2, 3, 3,
-    4, 4, 5, 5, 6, 6, 7, 7,
-    4, 4, 5, 5, 6, 6, 7, 7,
-    4, 4, 5, 5, 6, 6, 7, 7,
-    4, 4, 5, 5, 6, 6, 7, 7,
+    0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 
+    0, 0, 0, 0, 0, 0, 0, 0, 
 ];
 const NUM_BUCKETS: usize = get_num_buckets(&KING_BUCKETS);
 

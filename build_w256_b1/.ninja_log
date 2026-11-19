@@ -1,0 +1,7 @@
+# ninja log v7
+200	1024	8147861426172428	CMakeFiles/pawnstar.dir/src/embedded_book.S.obj	3b9592f1a1a6da2b
+195	1139	8147861426117329	CMakeFiles/pawnstar.dir/src/embedded_net.S.obj	3da77cfb6859b773
+205	13589	8147861426222429	CMakeFiles/stamp_net.dir/tools/stamp_net.cpp.obj	ce6d7bfeef2b4c83
+13593	16610	8147861560104630	stamp_net.exe	c9f6cc6ada40a5a1
+50	38154	8147861424671960	CMakeFiles/pawnstar.dir/src/main.cpp.obj	f804ec79a8ac4a34
+38155	43809	8147861805725806	pawnstar_1_2_14.exe	46a23d28c3928683
