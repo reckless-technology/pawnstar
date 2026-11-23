@@ -63,7 +63,7 @@ on:
         default: '2'
       hash_mb:
         description: 'Transposition table per engine, MB'
-        default: '16'
+        default: '64'
       first_opening:
         description: 'First position of nnue/openings.epd to play (1-based; the chunks take consecutive slices)'
         default: '1'
@@ -296,20 +296,21 @@ jobs:
             free -m | sed -n 1,2p
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
+          mkdir -p out
+          echo "$(lscpu | sed -n 's/^Model name: *//p')" > out/machine-${{ matrix.index }}.txt
       # The Pawnstar-specific step: the RNNUE1 net preflight lives in this script. Another engine's chunk
       # would replace this one command and keep everything around it.
       - name: Play the slice (openings ${{ matrix.start }}.., ${{ matrix.games }} games)
         env:
           FASTCHESS: ${{ github.workspace }}/inputs/fastchess
         run: |
-          mkdir -p out
           tools/pawnstar-match.sh --repo "$PWD" \
             --candidate inputs/candidate.bin --baseline inputs/baseline.bin \
             --candidate-binary inputs/candidate/pawnstar --baseline-binary inputs/baseline/pawnstar \
             --openings inputs/openings.epd --opening-start ${{ matrix.start }} \
             --games ${{ matrix.games }} \
             ${{ needs.plan.outputs.clock_flag }} '${{ needs.plan.outputs.clock_value }}' \
-            --concurrency ${{ matrix.concurrency }} --hash ${{ inputs.hash_mb || '16' }} \
+            --concurrency ${{ matrix.concurrency }} --hash ${{ inputs.hash_mb || '64' }} \
             --label chunk-${{ matrix.index }} --log-dir out \
             --pgn out/chunk-${{ matrix.index }}.pgn \
             --allow-busy-runner
@@ -370,7 +371,22 @@ jobs:
           fi
           {
             echo '```'
-            echo '### Speed (tools/pgn_nps.py) and time losses'
+            echo '### Per chunk: CPU model and absolute nps (tools/pgn_nps.py) - a mixed-hardware match shows here'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf '%-8s %-44s %14s %14s\n' chunk 'CPU model' 'candidate nps' 'baseline nps' | tee -a "$GITHUB_STEP_SUMMARY"
+          for pgn in "${pgns[@]}"; do
+            name=$(basename "$pgn" .pgn); index=${name#chunk-}
+            model=$(cat "chunks/machine-${index}.txt" 2>/dev/null || echo unknown)
+            rows=$(python3 tools/pgn_nps.py "$pgn" 2>/dev/null)
+            cand=$(printf '%s\n' "$rows" | awk '$1=="candidate"{print $7}')
+            base=$(printf '%s\n' "$rows" | awk '$1=="baseline"{print $7}')
+            printf '%-8s %-44s %14s %14s\n' "$index" "$model" "$cand" "$base" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          echo "distinct CPU models: $(cat chunks/machine-*.txt 2>/dev/null | sort | uniq -c | sed 's/^ *//' | tr '\n' ';')" | tee -a "$GITHUB_STEP_SUMMARY"
+          {
+            echo '```'
+            echo '### Speed over all chunks (tools/pgn_nps.py) and time losses'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           if [ "${#pgns[@]}" -gt 0 ]; then
