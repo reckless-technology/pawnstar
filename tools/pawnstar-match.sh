@@ -64,6 +64,10 @@
 #                                speed cost of a wider net, and is fully deterministic.
 #   --time-control <spec>        A time control instead of fixed depth, e.g. "8+0.08". Measures real
 #                                strength, speed cost included. Mutually exclusive with --depth.
+#   --baseline-time-control <spec>  Give the BASELINE its own time control (e.g. "4+0.04" against a
+#                                --time-control of "8+0.08"): a time-odds match, which is a known strength
+#                                gap between two otherwise identical engines. Only with --time-control.
+#                                It is how a harness is checked against a gap it did not make by chance.
 #   --games <n>                  Play exactly n games (rounded up to a whole colour-reversed pair).
 #   --sprt <elo0>:<elo1>         Run an SPRT with those bounds instead, alpha = beta = 0.05.
 #                                Default when neither is given: --sprt 0:10.
@@ -130,7 +134,7 @@ set -uo pipefail
 readonly kProbeDepth=4
 readonly kProbeTimeoutSeconds=60
 # The comment block above, as --help. One constant so an edit to the block is one edit here.
-readonly kHelpLineRange='3,127p'
+readonly kHelpLineRange='3,130p'
 
 candidate_net=""
 baseline_net=""
@@ -139,6 +143,7 @@ baseline_binary=""
 stamp_tool=""
 search_depth=""
 time_control=""
+baseline_time_control=""
 game_count=""
 sprt_bounds=""
 concurrency=""
@@ -184,6 +189,7 @@ while [ $# -gt 0 ]; do
         --stamp-raw-with)       stamp_tool="${2:?}"; shift 2 ;;
         --depth)                search_depth="${2:?}"; shift 2 ;;
         --time-control|--tc)    time_control="${2:?}"; shift 2 ;;
+        --baseline-time-control) baseline_time_control="${2:?}"; shift 2 ;;
         --games)                game_count="${2:?}"; shift 2 ;;
         --sprt)                 sprt_bounds="${2:?}"; shift 2 ;;
         --concurrency)          concurrency="${2:?}"; shift 2 ;;
@@ -358,6 +364,9 @@ if [ -n "$search_depth" ] && [ -n "$time_control" ]; then
     die "--depth and --time-control are alternatives; give one"
 fi
 [ -n "$search_depth" ] || [ -n "$time_control" ] || search_depth=8
+if [ -n "$baseline_time_control" ] && [ -z "$time_control" ]; then
+    die "--baseline-time-control gives the baseline its own clock, so it needs --time-control for the candidate's"
+fi
 
 if [ -n "$game_count" ] && [ -n "$sprt_bounds" ]; then
     die "--games and --sprt are alternatives; give one"
@@ -709,6 +718,7 @@ fi
 if [ -n "$time_control" ]; then
     clock_arguments=(tc="$time_control")
     clock_description="time control $time_control"
+    [ -z "$baseline_time_control" ] || clock_description="$clock_description (baseline: $baseline_time_control)"
 else
     clock_arguments=(depth="$search_depth")
     clock_description="fixed depth $search_depth"
@@ -766,11 +776,22 @@ if [ -n "$opening_start" ]; then
     note "openings $opening_start..$last_opening of $opening_count, in file order (one per pair)"
 fi
 
+# A per-engine clock must be given on the engine and NOT in -each: fastchess applies -each to every engine
+# after the ones before it, so an -each clock would overwrite the baseline's own.
+candidate_clock_arguments=()
+baseline_clock_arguments=()
+each_clock_arguments=("${clock_arguments[@]}")
+if [ -n "$baseline_time_control" ]; then
+    candidate_clock_arguments=("${clock_arguments[@]}")
+    baseline_clock_arguments=(tc="$baseline_time_control")
+    each_clock_arguments=()
+fi
+
 fastchess_command=(
     "$fastchess_binary"
-    -engine cmd="$candidate_wrapper" name=candidate option.EvalFile="$candidate_net"
-    -engine cmd="$baseline_wrapper"  name=baseline  option.EvalFile="$baseline_net"
-    -each proto=uci option.Threads=1 option.Hash="$hash_megabytes" option.OwnBook="$own_book_setting" "${clock_arguments[@]}"
+    -engine cmd="$candidate_wrapper" name=candidate option.EvalFile="$candidate_net" "${candidate_clock_arguments[@]}"
+    -engine cmd="$baseline_wrapper"  name=baseline  option.EvalFile="$baseline_net" "${baseline_clock_arguments[@]}"
+    -each proto=uci option.Threads=1 option.Hash="$hash_megabytes" option.OwnBook="$own_book_setting" "${each_clock_arguments[@]}"
     "${stop_arguments[@]}"
     -games 2 -repeat
     -openings "file=$openings_file" format=epd "${opening_order_arguments[@]}"
