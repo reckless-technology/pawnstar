@@ -79,7 +79,8 @@ def make_inputs(root: Path, probe_expect: str = "") -> Path:
         write_executable(inputs / role / "engine", FAKE_ENGINE)
         (inputs / f"{role}.bin").write_text(role)
     text = "# header\n\nfen one\nfen two\nfen three\n"
-    (inputs / "openings.epd").write_text(text)
+    with open(inputs / "openings.epd", "w", newline="\n") as handle:  # the SHA-256 is of these exact bytes
+        handle.write(text)
     side = lambda role: {"name": role, "command": "{inputs}/%s/engine" % role,
                          "options": {"EvalFile": "{inputs}/%s.bin" % role},
                          "env": {"TEST_NET": "{inputs}/%s.bin" % role, "TEST_THREADS": "1"}}
@@ -205,10 +206,15 @@ def test_chunk_and_probe() -> None:
 def main() -> int:
     """Run every case. @return 0 when every check passed, 1 otherwise."""
     test_matrix()
-    for case in (test_plan, test_command_and_wrapper):
+    with tempfile.TemporaryDirectory() as directory:
+        test_plan(Path(directory))
+    if sys.platform == "win32":
+        # The chunk runs only on the Linux runners and generates /bin/sh wrappers; its cases execute shell scripts.
+        print("match_core: the wrapper, command and probe cases are skipped on Windows")
+    else:
         with tempfile.TemporaryDirectory() as directory:
-            case(Path(directory))
-    test_chunk_and_probe()
+            test_command_and_wrapper(Path(directory))
+        test_chunk_and_probe()
     verdict = "[PASS]" if failure_count == 0 else "[FAIL]"
     print(f"{verdict} match_core: {failure_count} failed check(s)")
     return 0 if failure_count == 0 else 1
