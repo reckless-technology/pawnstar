@@ -11,7 +11,7 @@
 ///     3. Ra8+ n=0, NOT forced: 20 legal moves, the rook's 14 and the king's 6 (not b6 or b7, beside a6).
 ///        Kb5  n=0, the only legal move: the a-file is the rook's and the king takes b6 and b7.
 ///   Game 2, from a BLACK-to-move position, beta White and alpha Black, so attribution has to read the FEN and the
-///   tags rather than assume White moves first or that a name keeps one colour:
+///   tags rather than assume White moves first or that a name keeps one color:
 ///     1... Kh7 n=0, the only legal move: the rook takes the g-file and the king takes g7.
 ///     2. Kf7  searched
 ///        Kh8  `{book}`, no node count, NOT forced: 2 legal moves, h6 and h8.

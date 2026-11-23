@@ -1,5 +1,5 @@
 #pragma once
-/// @file eval_cache.h Small lockless cache memoising NNUE evaluations by Zobrist hash.
+/// @file eval_cache.h Small lockless cache memoizing NNUE evaluations by Zobrist hash.
 
 #include "generated_data.h" // zobrist_t
 
@@ -9,7 +9,7 @@
 
 /// @brief Lockless cache of NNUE evaluation results, keyed by Zobrist hash.
 ///
-/// An NNUE evaluation is a pure function of the position, so memoising it across the search tree (and
+/// An NNUE evaluation is a pure function of the position, so memoizing it across the search tree (and
 /// across transpositions) lets a cache hit skip the per-node forward pass. Each entry is a single 64-bit
 /// atomic packing a 48-bit key check (the top 48 bits of the hash) and a 16-bit score, so loads/stores
 /// are atomic with no torn values and no locks — shared freely by all Lazy SMP threads. A foreign or
@@ -46,7 +46,7 @@ inline EvalCache::EvalCache(int megabytes) : mask_(0)
         pow2 *= 2;
     }
     mask_  = pow2 - 1;
-    table_ = std::vector<std::atomic<uint64_t>>(pow2); // value-initialised (all zero)
+    table_ = std::vector<std::atomic<uint64_t>>(pow2); // value-initialized (all zero)
 }
 
 /// @brief Probe the cache for a position. @param hash Position Zobrist hash.

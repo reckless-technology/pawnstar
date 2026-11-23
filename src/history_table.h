@@ -44,9 +44,9 @@ inline void ApplyGravity(int32_t &entry, int32_t bonus)
 /// @brief Butterfly history table tracking which moves raised alpha or caused a beta cutoff.
 /// Moves are indexed by side to move and from/to square, pooling statistics across all plies (which
 /// concentrates the signal where positions repeat across branches and transpositions; the explicit
-/// colour dimension replaces the accidental colour proxy that per-ply indexing provided). The table
+/// color dimension replaces the accidental color proxy that per-ply indexing provided). The table
 /// is per-thread (owned by SearchState) under Lazy SMP — each search thread has its own — so the
-/// counts are plain (non-atomic): there is no cross-thread access to synchronise.
+/// counts are plain (non-atomic): there is no cross-thread access to synchronize.
 ///
 /// Storage is signed (int32_t) because the main search updates entries with a depth-weighted
 /// bonus/malus and a gravity term (ApplyBonus): a good move is credited, the quiet moves that failed

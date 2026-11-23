@@ -151,7 +151,7 @@ void CastlingRightsAgainstTheBoard()
         {"r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "KQkq", 2, "every right supported, and both White castlings legal"},
         {"r3k3/8/8/8/8/8/8/R3K2R w KQkq - 0 1", "KQq", 2, "Black's kingside right dropped, with no rook on h8"},
         {"4k3/8/8/8/8/8/8/rn2K2R w KQ - 0 1", "K", 1,
-         "a rook of the other colour on a1 supports nothing, and the knight keeps it off the king"},
+         "a rook of the other color on a1 supports nothing, and the knight keeps it off the king"},
         {"4k3/8/8/8/8/8/8/R2K3R w KQ - 0 1", "-", 0, "a king off its home square supports neither right"},
         {"r3k2r/8/8/8/8/8/8/R3K1NR w KQkq - 0 1", "KQkq", 1,
          "a right stands while a piece between king and rook blocks the move"},
@@ -199,8 +199,8 @@ void MaterialDraws()
         {"8/8/4k3/8/8/4KN2/8/8 b - - 0 1", true, "king and knight against king"},
         {"8/8/4k3/8/8/4KR2/8/8 w - - 0 1", false, "king and rook against king"},
         {"8/8/4kp2/8/8/4K3/8/8 w - - 0 1", false, "king and pawn against king"},
-        {"8/8/4k1b1/8/8/4KB2/8/8 w - - 0 1", true, "bishops on the same colour (f3, g6)"},
-        {"8/8/4kb2/8/8/4KB2/8/8 w - - 0 1", false, "bishops on opposite colours (f3, f6)"},
+        {"8/8/4k1b1/8/8/4KB2/8/8 w - - 0 1", true, "bishops on the same color (f3, g6)"},
+        {"8/8/4kb2/8/8/4KB2/8/8 w - - 0 1", false, "bishops on opposite colors (f3, f6)"},
         {"8/8/4kn2/8/8/4KN2/8/8 w - - 0 1", false, "a knight each"},
         {"8/8/4kn2/8/8/3BKN2/8/8 w - - 0 1", false, "five pieces"},
     };
@@ -335,12 +335,12 @@ void NetHeaderLayout()
     // The two CRCs a stamping tool fills, over a payload short enough to write out here.
     const std::array<std::uint8_t, 4> payload{1, 2, 3, 4};
     nnue::NetHeader                   stamped = header;
-    nnue::FinaliseNetHeader(stamped, payload.data(), payload.size());
+    nnue::FinalizeNetHeader(stamped, payload.data(), payload.size());
     Check(stamped.payload_crc_ == crc64::Checksum(payload.data(), payload.size()),
-          "RNNUE1 header: FinaliseNetHeader writes the payload's CRC");
+          "RNNUE1 header: FinalizeNetHeader writes the payload's CRC");
     Check(stamped.header_crc_ ==
               crc64::Checksum(reinterpret_cast<const std::uint8_t *>(&stamped), nnue::kNetHeaderCrcBytes),
-          "RNNUE1 header: FinaliseNetHeader writes the CRC of the header's first 56 bytes");
+          "RNNUE1 header: FinalizeNetHeader writes the CRC of the header's first 56 bytes");
 }
 
 /// @brief The king-bucket map the **trainer** uses must be the same 32 numbers the engine does.

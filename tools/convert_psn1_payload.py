@@ -63,7 +63,7 @@ def main() -> int:
     payload = image[PSN1_HEADER_BYTES:]
     if len(payload) < psn1_payload_bytes:
         sys.exit(f"{arguments.psn1_net}: {len(payload)} payload bytes, expected at least {psn1_payload_bytes}")
-    # bullet pads its quantised output up to a 64-byte boundary with repeats of the word "bullet"; PSN1
+    # bullet pads its quantized output up to a 64-byte boundary with repeats of the word "bullet"; PSN1
     # kept that tail, RNNUE1 records an exact length and drops it.
     tail = payload[psn1_payload_bytes:]
     if tail and set(tail) - set(b"bullet"):

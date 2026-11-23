@@ -74,7 +74,7 @@ constexpr MoveList Position::GenerateLegalCaptures() const
     return color_to_move_ == kWhite ? GenMoves<kWhite, false>() : GenMoves<kBlack, false>();
 }
 
-/// @brief Whether a square is attacked by a colour. @param s Target square. @param c Attacking colour. @return true
+/// @brief Whether a square is attacked by a color. @param s Target square. @param c Attacking color. @return true
 /// if attacked.
 constexpr bool Position::IsAttacked(Square s, Color c) const
 {
@@ -639,9 +639,9 @@ inline Position Position::ParseFen(std::string_view fen_string)
     Position              position{};
     constexpr string_view piece_names{"PNBRQKpnbrqk"}; // white then black, in Piece order (kPawn..kKing)
     istringstream         ss{string{fen_string}};
-    //  Pieces on the board. The board field is untrusted, so every placement is validated: an unrecognised
+    //  Pieces on the board. The board field is untrusted, so every placement is validated: an unrecognized
     //  character, or a file/rank that has run off the board, aborts the parse and yields a kingless position
-    //  (which FromString rejects in favour of the start position). Without this, `position fen garbage` ran x
+    //  (which FromString rejects in favor of the start position). Without this, `position fen garbage` ran x
     //  past 7 and wrote past the end of the 64-entry squares_ array.
     string pieces;
     ss >> pieces;

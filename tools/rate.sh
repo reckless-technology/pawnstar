@@ -53,7 +53,7 @@ for anchor in "$@"; do
         continue
     fi
     log="$OUT/vs_$name.log"
-    # Play GAMES games as paired rounds (-games 2 -repeat = each opening played once with each colour, so
+    # Play GAMES games as paired rounds (-games 2 -repeat = each opening played once with each color, so
     # GAMES/2 rounds). The opponent is pinned to 1 thread / 64 MB hash for a fair, reproducible-ish match.
     fastchess -engine cmd="$ENGINE" name=pawnstar "${cand_opts[@]}" \
               -engine cmd="$cmd" name="$name" option.Threads=1 option.Hash=64 \

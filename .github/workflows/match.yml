@@ -1,6 +1,6 @@
 name: Match
 
-# A long engine-versus-engine match, played on GitHub-hosted runners instead of on lin-0 (the organisation's one
+# A long engine-versus-engine match, played on GitHub-hosted runners instead of on lin-0 (the organization's one
 # self-hosted Linux machine, which is also where the hand-run matches used to go - and while one ran there, no
 # private repository could push without biasing it). Manual only: nothing here runs on a push or a pull request.
 #
@@ -17,7 +17,7 @@ name: Match
 # its file is on the default branch, so edits are dispatched from their own branch with
 # `gh workflow run match.yml --ref <branch>`.
 #
-# Capacity: the organisation is on GitHub's Team plan, so every public repository's CI shares about 60 concurrent
+# Capacity: the organization is on GitHub's Team plan, so every public repository's CI shares about 60 concurrent
 # hosted jobs; match-core.yml keeps max-parallel at 40. GitHub's Actions terms allow use for testing the
 # repository's own project, which strength-testing Pawnstar is.
 
@@ -52,7 +52,7 @@ on:
         description: 'Fixed search depth instead of a time control (empty = use the time control)'
         default: ''
       games:
-        description: 'Total games (rounded up to whole colour-reversed pairs; at most 2 x the openings left)'
+        description: 'Total games (rounded up to whole color-reversed pairs; at most 2 x the openings left)'
         default: '4000'
       chunks:
         description: 'Number of chunk jobs'

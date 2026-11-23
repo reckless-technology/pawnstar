@@ -1,6 +1,6 @@
 /// @file opening_book_test.cpp Unit tests for the opening book.
 ///
-/// A questionable move (written "f2f4?" in the book) must be recognised and replayed so the rest of the line
+/// A questionable move (written "f2f4?" in the book) must be recognized and replayed so the rest of the line
 /// parses, but must never be returned by GetMove. The move that follows it in the line must still be recorded
 /// and selectable. These tests build a tiny book in a temp file and assert exactly that. Then the loading rules
 /// (a missing file, the in-memory form the engine's embedded copy uses, move numbers, comments, an illegal move),
@@ -197,7 +197,7 @@ int main()
 
         Check(shipped_lines > 385, "the shipped book is wider than the 385-line book it replaced");
 
-        // The book has been screened against the engine's own judgement, at depth 12 with a 100 cp margin: a
+        // The book has been screened against the engine's own judgment, at depth 12 with a 100 cp margin: a
         // move scoring far enough below its position's best carries a '?', which is replayed but never
         // chosen. Pinned for the same reason as the line count above - an unscreened book loads perfectly and
         // plays every move the database offered, including the ones this engine evaluates as losing a pawn,

@@ -3,8 +3,8 @@
 /// Verifies that the in-engine NNUE forward pass reproduces the trainer's evaluation. The trainer-side
 /// reference evals are produced by bullet (examples/pawnstar_eval.rs, see nnue/README.md), which feeds the
 /// same net through bullet's own Chess768 feature extraction and `simple`-example inference. Agreement to
-/// within a couple of centipawns (quantisation rounding) confirms our feature indexing, SCReLU activation,
-/// dequantisation and file format all match bullet.
+/// within a couple of centipawns (quantization rounding) confirms our feature indexing, SCReLU activation,
+/// dequantization and file format all match bullet.
 ///
 /// Usage:  test_nnue <net.bin> <reference.txt>
 ///   where reference.txt has one "<fen> | <expected_cp>" line per position.
@@ -27,7 +27,7 @@
 
 namespace
 {
-/// @brief Allowed engine-vs-reference deviation in centipawns (integer-quantisation rounding only).
+/// @brief Allowed engine-vs-reference deviation in centipawns (integer-quantization rounding only).
 constexpr int kTolerance = 2;
 } // namespace
 
@@ -60,14 +60,14 @@ int main(int argc, char **argv)
 
     // Two checks per position:
     //  (1) the exact int16 reference (EvaluateExact) matches bullet within ±kTolerance — verifies feature
-    //      indexing, SCReLU and dequantisation; and
+    //      indexing, SCReLU and dequantization; and
     //  (2) the shipped int8 Evaluate stays within kInt8Bound cp of that reference — guards the int8 kernel
     //      (the int8 output layer deliberately differs from bullet by the SCReLU-into-8-bits requant).
     //
     // kInt8Bound is 40, which is EXACTLY what this set measures: **40 cp over v20's 250 reference positions,
     // 2026-10-30**, and the same 40 in all three ports (C++, Rust and Go each report it). It was 26-28 cp
     // with v12, and the rise is not drift: ONE int8 scale is shared across all eight output heads, so the
-    // head carrying the largest weight sets the scale every other head is then requantised against.
+    // head carrying the largest weight sets the scale every other head is then requantized against.
     //
     // A bound sitting exactly on the measured maximum is deliberate here, because this is integer
     // arithmetic: the deviation is exactly 40 on every platform, deterministically, so there is no marginal

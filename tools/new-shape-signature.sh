@@ -34,7 +34,7 @@
 # every node count. Table size changes the collision pattern and so the node count at a fixed depth, so a
 # node count with no table size next to it is not a number anybody can compare — and the harness that first
 # produced the table below set no Hash at all, which is exactly what let the 512-vs-64 default through. A
-# default here would be a number the caller did not choose, i.e. another silent normalisation. The header
+# default here would be a number the caller did not choose, i.e. another silent normalization. The header
 # also prints the build's OWN advertised default, so a reader can see when the two differ; the ports'
 # advertised defaults are gated separately (each repo's UCI suite pins the line, and
 # reckless-nnue/scripts/hash-default-parity.sh compares all three), because this script pins the value and

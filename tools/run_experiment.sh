@@ -27,6 +27,6 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 OPENINGS="${OPENINGS:?set OPENINGS=<openings.epd>}"
 
 # The three pipeline stages, in order. Any failure aborts the run (set -e), so a bad net never reaches SPRT.
-bash "$REPO/tools/train_pipeline.sh" "$DATA_IN" "$NET" "$SBS"   # train + quantise + export
+bash "$REPO/tools/train_pipeline.sh" "$DATA_IN" "$NET" "$SBS"   # train + quantize + export
 bash "$REPO/tools/verify_net.sh" "$NET"                         # gate: engine eval == trainer eval
 bash "$REPO/tools/run_sprt.sh" "$NET" "$OPENINGS" "$ROUNDS" "$DEPTH"  # net-vs-baseline SPRT

@@ -12,7 +12,7 @@ example.
 | job | what |
 |---|---|
 | `fastchess` | builds fastchess v1.8.2-alpha at commit `f618e34` with `build=release` (`-march=x86-64`; the default `-march=native` binary dies with SIGILL on another hosted CPU model), cached. Callers never build or pin it. |
-| `plan` | unpacks the caller's artifact, verifies the opening set's SHA-256, strips `#` comments from it, and writes a matrix of **disjoint opening slices**, one position per colour-reversed pair, so no opening is replayed. A match that would run off the end of the set is refused. |
+| `plan` | unpacks the caller's artifact, verifies the opening set's SHA-256, strips `#` comments from it, and writes a matrix of **disjoint opening slices**, one position per color-reversed pair, so no opening is replayed. A match that would run off the end of the set is refused. |
 | `chunk` (matrix, `max-parallel: 40`) | runs the caller's optional `preflight`, otherwise a generic start-and-search probe of each engine, then `fastchess` on its slice; uploads its PGN, log and CPU model. |
 | `pool` | `tools/opening_icc.py` (opening-corrected Elo with a 95% bar, recounts the games and **fails when the count is short**), `tools/pool_matches.py`, `tools/pgn_nps.py`, a per-chunk CPU-and-nps table, time forfeits; all in the job summary. |
 
@@ -152,6 +152,6 @@ A private caller may use this workflow because this repository is public. The ca
   comparable with lin-0. Read the per-chunk table. A fixed-depth match is deterministic across machines.
 * The openings: a set shorter than `first_opening + games/2 - 1` is refused. Duplicates *inside* a set are not
   detected (Pawnstar's `nnue/openings.epd` has some within its first 200 lines).
-* `max-parallel` is 40 (the organisation's public repositories share about 60 hosted jobs).
+* `max-parallel` is 40 (the organization's public repositories share about 60 hosted jobs).
 * `-sprt` is not offered: a sequential test cannot be split across chunks. A serial SPRT stays a single job, capped
   at 6 hours.

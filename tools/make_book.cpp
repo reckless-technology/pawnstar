@@ -6,7 +6,7 @@
 /// be in the public domain. **It was not.** TSCP is Copyright 1997 Tom Kerrigan; the only permission anyone
 /// has ever located for it is an informal 2002 email allowing use "as long as you're not making any money
 /// off of it", and a non-commercial permission is incompatible with the GPLv3 this engine is distributed
-/// under. The repository the documents linked to carries no licence file at all. So the material had to go,
+/// under. The repository the documents linked to carries no license file at all. So the material had to go,
 /// and no rewording of the claim could have fixed it: what was needed was a book whose provenance claim is
 /// true.
 ///
@@ -128,12 +128,12 @@
 
 namespace
 {
-/// @brief The Lichess open database's licence, as tools/lichess_extract.cpp records it in every shard.
-constexpr const char *kSourceLicence     = "CC0-1.0";
-constexpr const char *kSourceLicenceUrl  = "https://creativecommons.org/publicdomain/zero/1.0/";
+/// @brief The Lichess open database's license, as tools/lichess_extract.cpp records it in every shard.
+constexpr const char *kSourceLicense     = "CC0-1.0";
+constexpr const char *kSourceLicenseUrl  = "https://creativecommons.org/publicdomain/zero/1.0/";
 constexpr const char *kSourceName        = "Lichess open database (standard rated games)";
 constexpr const char *kSourceHomeUrl     = "https://database.lichess.org/";
-constexpr const char *kSourceLicenceName = "Creative Commons CC0 1.0 Universal public-domain dedication";
+constexpr const char *kSourceLicenseName = "Creative Commons CC0 1.0 Universal public-domain dedication";
 
 /// @brief What the run was asked for.
 struct Options
@@ -552,8 +552,8 @@ int main(int argc, char **argv)
         << "#\n"
         << "# SOURCE AND LICENCE. Every line below was built from the " << kSourceName << ",\n"
         << "# " << kSourceHomeUrl << ", which is published under the\n"
-        << "# " << kSourceLicenceName << " (" << kSourceLicence << ",\n"
-        << "# " << kSourceLicenceUrl << "). CC0 places the work in the public\n"
+        << "# " << kSourceLicenseName << " (" << kSourceLicense << ",\n"
+        << "# " << kSourceLicenseUrl << "). CC0 places the work in the public\n"
         << "# domain as far as the law allows and asks for no attribution, so this book carries no\n"
         << "# restriction of its own and no third party's. Lichess is credited in THIRD-PARTY-NOTICES.md\n"
         << "# anyway, because it is the right thing to do and not because anything obliges it.\n"

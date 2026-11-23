@@ -2,8 +2,8 @@
 /// src/generated_data.h (kBishopMagicNumbers / kRookMagicNumbers).
 ///
 /// The engine itself does NOT search for magics at startup — it fills its attack tables from the constants
-/// in generated_data.h. This tool runs the one-off randomised search that found those constants and prints
-/// them as ready-to-paste C++ array initialisers. Regenerate (and paste the output back into
+/// in generated_data.h. This tool runs the one-off randomized search that found those constants and prints
+/// them as ready-to-paste C++ array initializers. Regenerate (and paste the output back into
 /// generated_data.h) only if the occupancy-mask or attack generators change; the search is deterministic
 /// (fixed seed), so an unchanged engine reproduces byte-identical magics.
 ///
@@ -41,7 +41,7 @@ uint64_t SparseMagicCandidate(std::mt19937_64 &rng)
     return rng() & rng() & rng();
 }
 
-/// @brief Find a collision-free magic for one square by randomised search.
+/// @brief Find a collision-free magic for one square by randomized search.
 uint64_t FindMagic(uint8_t sq, MaskFn mask_fn, AttFn attack_fn, std::mt19937_64 &rng)
 {
     const uint64_t mask  = mask_fn(sq);

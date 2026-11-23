@@ -1,19 +1,19 @@
 /*
 Reference evaluator for cross-checking the in-engine NNUE inference (src/nnue.h) against bullet.
 
-Reads a trained net (bullet's native quantised .bin, NOT a stamped RNNUE1 net) and a list of FENs (one per
+Reads a trained net (bullet's native quantized .bin, NOT a stamped RNNUE1 net) and a list of FENs (one per
 line, on stdin or a file argument), and prints "<fen> | <eval_cp>" using the SAME horizontally-mirrored
 king-bucketed ChessBucketsMirrored feature formula bullet trains with, the SAME MaterialCount output-head
 selection and the SAME SCReLU inference. test_nnue compares the engine's eval to this; agreement within
 rounding confirms feature indexing, king bucketing, mirroring, orientation, head selection and
-dequantisation all match.
+dequantization all match.
 
 Adapted from bullet (https://github.com/jw1912/bullet, at the commit pinned by tools/setup_bullet.sh):
 Copyright (c) 2023 Jamie Whiting, MIT licence. The SCReLU inference, the Net field layout and the
-dequantisation order follow bullet's `simple` example (examples/simple.rs); the per-piece feature index, the
+dequantization order follow bullet's `simple` example (examples/simple.rs); the per-piece feature index, the
 king-bucket offset and the mirror flip are those of bullet's `Chess768` and `ChessBucketsMirrored` input
 types (crates/bullet_lib/src/game/inputs), and the head selection is that of `MaterialCount`
-(crates/bullet_lib/src/game/outputs.rs). Its licence text is reproduced in THIRD-PARTY-NOTICES.md at the
+(crates/bullet_lib/src/game/outputs.rs). Its license text is reproduced in THIRD-PARTY-NOTICES.md at the
 root of this repository; this file as a whole is distributed under the repository's GPLv3.
 
 Usage:  cargo run --release --example pawnstar_eval -- <net.bin> [fens.txt]

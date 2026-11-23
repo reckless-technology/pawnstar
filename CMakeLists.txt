@@ -41,7 +41,7 @@ else()
   add_compile_options(-mbmi2 -mavx2)
 endif()
 add_compile_options(-Wall -Wextra -Wpedantic)
-# Optimisation/debug flavours matching the Makefile: Release is -O3 with debug info kept (the Makefile's
+# Optimization/debug flavors matching the Makefile: Release is -O3 with debug info kept (the Makefile's
 # default `-g -O3 -DNDEBUG`; CMake defines NDEBUG for Release), Debug is `-Og -g` with asserts on (-DDEBUG).
 add_compile_options($<$<CONFIG:Release>:-O3>)
 add_compile_options($<$<CONFIG:Release>:-g>)
@@ -63,7 +63,7 @@ endif()
 # link. The Makefile pairs this with a Debug build; the Makefile wrapper sets Debug + PAWNSTAR_SANITIZE together.
 option(PAWNSTAR_SANITIZE "Build with AddressSanitizer + UndefinedBehaviorSanitizer" OFF)
 if(PAWNSTAR_SANITIZE)
-  # -fno-sanitize-recover=undefined: UBSan reports undefined behaviour and then aborts, so a finding fails the test;
+  # -fno-sanitize-recover=undefined: UBSan reports undefined behavior and then aborts, so a finding fails the test;
   # by default it prints and carries on, and the process still exits 0.
   add_compile_options(-fsanitize=undefined -fsanitize=address -fno-sanitize-recover=undefined)
   add_link_options(-fsanitize=undefined -fsanitize=address)
@@ -343,7 +343,7 @@ if(EXISTS "${EMBED_NET}")
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
   add_test(NAME nnue_incremental COMMAND test_nnue_incremental "${PAWNSTAR_SHAPE_NET}"
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
-  # The one net-independent check on the engine's USE of a net's weights: a position and its colour-flipped
+  # The one net-independent check on the engine's USE of a net's weights: a position and its color-flipped
   # vertical mirror must evaluate EQUAL, not equal and opposite - Evaluate is side-to-move-relative, so the flip
   # swaps the side to move and the sign is already in the convention. No absolute score can state it, and a
   # mirroring, perspective or bucketing defect breaks while the training loss stays perfect

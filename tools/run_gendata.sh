@@ -6,7 +6,7 @@
 # Each process writes its own shard (data_<g>.txt, plus the data_<g>.txt.meta provenance sidecar) with a
 # distinct seed and runs a single-threaded search (gen_data forces PAWNSTAR_THREADS=1), so N processes use N
 # cores. Everything after the third argument is passed through to gen_data unchanged, so the campaign's
-# labelling settings live in one command line:
+# labeling settings live in one command line:
 #
 #   tools/run_gendata.sh ~/pawnstar_nnue/selfplay 30 400 \
 #       --openings nnue/openings-selfplay.epd --play-nodes 20000 --label-nodes 220000 --label-interval 4 \
@@ -150,7 +150,7 @@ fi
 echo "run_gendata.sh: pids: ${pids[*]}"
 
 # Progress while the shards run: each worker's own stderr progress lines go to its log, so one line here
-# per interval summarising the whole run is enough to see it is alive and how fast it is going. The loop
+# per interval summarizing the whole run is enough to see it is alive and how fast it is going. The loop
 # runs until every worker has gone, not just the first one to finish.
 started="$(date +%s)"
 report_progress() {

@@ -9,7 +9,7 @@
 // hash slot (hash = (occupancy & mask) * magic >> shift); the slot's 1-byte indices_ entry then selects
 // the de-duplicated attack set in attacks_. This is a plain 64-bit multiply — portable and fast on every
 // x86-64 CPU (unlike pext, which is microcoded/slow on AMD Zen 1/2). The functions are marked constexpr
-// for use in constexpr contexts (e.g. AttacksTo); since they read a runtime-initialised global table they
+// for use in constexpr contexts (e.g. AttacksTo); since they read a runtime-initialized global table they
 // are never actually constant-evaluated, so suppress the -Winvalid-constexpr diagnostic.
 #if __GNUC__
 #pragma GCC diagnostic push

@@ -1,5 +1,5 @@
-# Authenticode-sign the release's Windows files with the organisation's code-signing certificate, held in SSL.com's cloud
-# (eSigner), through SSL.com's CodeSignTool. The organisation's apps sign the same way, with the same organisation
+# Authenticode-sign the release's Windows files with the organization's code-signing certificate, held in SSL.com's cloud
+# (eSigner), through SSL.com's CodeSignTool. The organization's apps sign the same way, with the same organization
 # secrets (vst-plugins' tools/esigner-sign.ps1, which this mirrors; that repository is private, so the steps are written
 # again here).
 #
@@ -11,8 +11,8 @@
 #                                                                 Jonathan Reckless's name, timestamped
 #
 # Every signing spends the SSL.com account's allowance: the release signs only in a run that publishes, and only the
-# files it ships. The environment, the organisation secrets: ESIGNER_USERNAME, ESIGNER_PASSWORD, ESIGNER_TOTP_SECRET
-# (the enrolment's OTP secret, so no one need be at a phone) and, where the account holds several certificates,
+# files it ships. The environment, the organization secrets: ESIGNER_USERNAME, ESIGNER_PASSWORD, ESIGNER_TOTP_SECRET
+# (the enrollment's OTP secret, so no one need be at a phone) and, where the account holds several certificates,
 # ESIGNER_CREDENTIAL_ID; RECKLESS_CODESIGNTOOL is the folder the release unpacked CodeSignTool into. The tool's own Java
 # runs its jar from that folder - not CodeSignTool.bat, since cmd.exe mangles a password holding % ^ & ! or a quote.
 param([switch] $Check, [Parameter(ValueFromRemainingArguments = $true)] [string[]] $Files)

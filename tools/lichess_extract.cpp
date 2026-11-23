@@ -51,7 +51,7 @@
 ///
 /// Each shard gets a `<shard>.meta` beside it, in the same `key value` shape tools/gen_data.cpp writes (so
 /// tools/check_duplicates.sh reads the `games_completed` line out of either without caring which tool wrote
-/// it). It carries the licence, the source URL and month, the filter settings in full, the counts, and the
+/// it). It carries the license, the source URL and month, the filter settings in full, the counts, and the
 /// SHA-256 of the exact input prefix the shard's records came from.
 ///
 /// That digest is the part worth being careful about. The input is a pipe, so it can never be re-read to
@@ -61,7 +61,7 @@
 /// records the byte range it covers as well. A digest over a slightly different prefix than the records came
 /// from could not be checked against anything, which would make the whole sidecar decorative.
 ///
-/// The licence is recorded because we owe the Lichess database an attribution line when a net trained on it
+/// The license is recorded because we owe the Lichess database an attribution line when a net trained on it
 /// ships, and the sidecar is meant to be the thing that line is written from without going back to the web:
 /// `source_licence`, `source_licence_url` and a ready-made `attribution` line are all there.
 ///
@@ -87,10 +87,10 @@
 
 namespace
 {
-/// @brief The Lichess open database's licence. The monthly exports are a CC0 public-domain dedication,
+/// @brief The Lichess open database's license. The monthly exports are a CC0 public-domain dedication,
 /// which is what makes them usable here at all - so it is recorded in every shard rather than assumed.
-constexpr const char *kSourceLicence    = "CC0-1.0";
-constexpr const char *kSourceLicenceUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
+constexpr const char *kSourceLicense    = "CC0-1.0";
+constexpr const char *kSourceLicenseUrl = "https://creativecommons.org/publicdomain/zero/1.0/";
 constexpr const char *kSourceName       = "Lichess open database (standard rated games)";
 constexpr const char *kSourceHomeUrl    = "https://database.lichess.org/";
 
@@ -152,7 +152,7 @@ struct SourceDescription
 ///
 /// The dedup is **per shard**, which is gen_data's rule and the reason RecordSink exists as an interface at
 /// all: only whoever owns the shards knows what is in the current one. tools/check_duplicates.sh is what
-/// measures duplication across an assembled pool, and it needs the per-shard behaviour to be this way round
+/// measures duplication across an assembled pool, and it needs the per-shard behavior to be this way round
 /// to be meaningful - a globally deduplicated pool would always measure as perfectly unique and the gate
 /// would never fire.
 ///
@@ -311,10 +311,10 @@ bool ShardWriter::CloseShard()
          << "source_home " << kSourceHomeUrl << '\n'
          << "source_url " << (source_.url.empty() ? "unrecorded" : source_.url) << '\n'
          << "source_month " << (source_.month.empty() ? "unrecorded" : source_.month) << '\n'
-         << "source_licence " << kSourceLicence << '\n'
-         << "source_licence_url " << kSourceLicenceUrl << '\n'
+         << "source_licence " << kSourceLicense << '\n'
+         << "source_licence_url " << kSourceLicenseUrl << '\n'
          << "attribution Game data from the " << kSourceName << " (" << kSourceHomeUrl << "), "
-         << (source_.month.empty() ? std::string{"monthly export"} : source_.month) << ", used under " << kSourceLicence
+         << (source_.month.empty() ? std::string{"monthly export"} : source_.month) << ", used under " << kSourceLicense
          << ".\n"
          << "input_sha256 " << reader_.Digest() << '\n'
          << "input_sha256_covers bytes 0.." << input_bytes_end << " (to the end of the last complete game)\n"

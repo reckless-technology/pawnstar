@@ -119,7 +119,7 @@ def fixture_pgn() -> str:
     """A PGN holding three usable pairs and one of each way a round is not a pair.
 
     Rounds 1 and 2 share opening A (so A carries two pairs), round 3 is on opening B. Round 4 holds a single
-    game, round 5 an unfinished one, round 6 two games that never swapped colours, and round 7 two games
+    game, round 5 an unfinished one, round 6 two games that never swapped colors, and round 7 two games
     whose `FEN` tags differ. @return the PGN text.
     """
     return "".join(
@@ -138,7 +138,7 @@ def fixture_pgn() -> str:
             # Round 5: one game unfinished
             game_block("5", "candidate", "baseline", "1-0", OPENING_C),
             game_block("5", "baseline", "candidate", "*", OPENING_C),
-            # Round 6: colours never swapped
+            # Round 6: colors never swapped
             game_block("6", "candidate", "baseline", "1-0", OPENING_C),
             game_block("6", "candidate", "baseline", "1-0", OPENING_C),
             # Round 7: the two games are not on the same opening
@@ -265,7 +265,7 @@ def test_nominal_figures_are_pool_matches() -> None:
     """2000 pair scores summing to match A of test/pool_matches_test.py: Elo -4.08, 95% bar +-7.87.
 
     The pair scores are built from that committed vector and then spread over 306 openings in order, so the
-    nominal block must reproduce `pool_matches.analyse([160, 482, 732, 497, 129])` to the decimal place -
+    nominal block must reproduce `pool_matches.analyze([160, 482, 732, 497, 129])` to the decimal place -
     which is the point of importing `pool_matches` instead of carrying a second pentanomial formula.
     """
     match_a = (160, 482, 732, 497, 129)
@@ -285,7 +285,7 @@ def test_nominal_figures_are_pool_matches() -> None:
         )
         for index, score in enumerate(scores)
     ]
-    corrected = opening_icc.analyse_pairs(pairs, label="anchor")
+    corrected = opening_icc.analyze_pairs(pairs, label="anchor")
     nominal = corrected.nominal
     check(nominal.pairs == 2000 and nominal.games == 4000, "anchor: 2000 pairs, 4000 games")
     check_close(nominal.elo, -4.08, 2, "anchor: nominal Elo -4.08, as pool_matches pins it")
@@ -319,7 +319,7 @@ def test_nominal_figures_are_pool_matches() -> None:
         )
         for index, score in enumerate(scores)
     ]
-    clustered = opening_icc.analyse_pairs(blocked, label="anchor clustered")
+    clustered = opening_icc.analyze_pairs(blocked, label="anchor clustered")
     check_close(clustered.nominal.elo, -4.08, 2, "anchor: regrouping does not change the nominal Elo")
     check_close(clustered.nominal.elo_bar_95, 7.87, 2, "anchor: nor the nominal bar - only the correction")
     check_close(correlation_floor := corrected.correlation.icc, 0.0, 9, "anchor: round robin floors the ICC at 0")
@@ -343,7 +343,7 @@ def test_nominal_figures_are_pool_matches() -> None:
 
 def test_correction_is_applied_to_an_interval() -> None:
     """The corrected interval, its LOS, and the two-sided zero and point-estimate tests."""
-    nominal = pool_matches.analyse([160, 482, 732, 497, 129], label="interval")
+    nominal = pool_matches.analyze([160, 482, 732, 497, 129], label="interval")
     doubling = opening_icc.measure_intraclass_correlation([[0.0, 0.0], [0.5, 0.5], [1.0, 1.0]])
     corrected = opening_icc.correct_interval(nominal, doubling)
     check_close(corrected.correlation.design_effect, 2.0, 9, "interval: a design effect of exactly 2 applied")
@@ -359,9 +359,9 @@ def test_correction_is_applied_to_an_interval() -> None:
     check(not corrected.excludes(-4.08), "interval: and contains its own point estimate")
 
     # The two-sided test, which the first version of this tool got wrong by checking only the low end.
-    behind = pool_matches.analyse([400, 500, 200, 500, 400], label="behind")
+    behind = pool_matches.analyze([400, 500, 200, 500, 400], label="behind")
     far_behind = opening_icc.correct_interval(
-        pool_matches.analyse([900, 600, 200, 200, 100], label="far behind"),
+        pool_matches.analyze([900, 600, 200, 200, 100], label="far behind"),
         opening_icc.measure_intraclass_correlation([[0.0, 1.0], [0.0, 1.0], [0.0, 1.0]]),
     )
     check(behind.score_fraction == 0.5, "interval: the symmetric vector is level, as a control")
@@ -382,7 +382,7 @@ def test_pgn_is_parsed_into_pairs() -> None:
         check(report.pairs_kept == 3, f"pgn: 3 complete pairs kept (got {report.pairs_kept})")
         check(report.rounds_not_two_games == 1, "pgn: the single-game round is counted, not silently lost")
         check(report.rounds_unfinished == 1, "pgn: the round holding a `*` result is counted")
-        check(report.rounds_same_colour == 1, "pgn: the round that never swapped colours is counted")
+        check(report.rounds_same_color == 1, "pgn: the round that never swapped colors is counted")
         check(report.rounds_mixed_opening == 1, "pgn: the round whose two games differ in FEN is counted")
         check(report.rounds_dropped == 4, "pgn: four rounds dropped in all")
         check(
@@ -507,7 +507,7 @@ def test_checked_in_match() -> None:
         f"match: first start and last end (got {report.first_game_start} .. {report.last_game_end})",
     )
 
-    corrected = opening_icc.analyse_pairs(pairs)
+    corrected = opening_icc.analyze_pairs(pairs)
     nominal, correlation = corrected.nominal, corrected.correlation
     check(nominal.counts == (0, 1, 3, 3, 1), f"match: Ptnml(0-2) [0, 1, 3, 3, 1] (got {nominal.counts})")
     check_close(nominal.score_fraction, 0.625, 9, "match: p = 0.625")
@@ -574,7 +574,7 @@ def test_expect_games_refuses_a_partial_run() -> None:
         malformed = run_tool("--expect-games", "13", str(write_fixture_pgn(Path(directory))))
         check(malformed.returncode == 1, "expect: the right game count with broken rounds is refused too")
         for reason in ("1 rounds not two games", "1 rounds holding an unfinished game",
-                       "1 rounds whose colours were not reversed", "1 rounds whose two games differ in FEN"):
+                       "1 rounds whose colors were not reversed", "1 rounds whose two games differ in FEN"):
             check(reason in malformed.stdout, f"expect: names each way a round failed: {reason}")
 
     report = opening_icc.parse_pairs([MATCH_CHUNK_A, MATCH_CHUNK_B], candidate_name="first")[1]
@@ -603,7 +603,7 @@ def test_candidate_must_be_one_side_of_every_pair() -> None:
         pairs, report = opening_icc.parse_pairs([str(path)])
         check([pair.round_label for pair in pairs] == ["1"], "sides: only the true pair is kept")
         check(report.rounds_without_candidate == 1, "sides: the round the candidate is not in is counted")
-        check(report.rounds_same_colour == 1, "sides: and the round whose two games are not one pairing")
+        check(report.rounds_same_color == 1, "sides: and the round whose two games are not one pairing")
 
 
 def test_cluster_robust_standard_error() -> None:

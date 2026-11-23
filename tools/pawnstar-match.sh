@@ -68,7 +68,7 @@
 #                                --time-control of "8+0.08"): a time-odds match, which is a known strength
 #                                gap between two otherwise identical engines. Only with --time-control.
 #                                It is how a harness is checked against a gap it did not make by chance.
-#   --games <n>                  Play exactly n games (rounded up to a whole colour-reversed pair).
+#   --games <n>                  Play exactly n games (rounded up to a whole color-reversed pair).
 #   --sprt <elo0>:<elo1>         Run an SPRT with those bounds instead, alpha = beta = 0.05.
 #                                Default when neither is given: --sprt 0:10.
 #   --concurrency <n>            Concurrent games. Default: (cores - 2), at least 1, which leaves the
@@ -78,7 +78,7 @@
 #                                header is stripped into a scratch copy (fastchess would read those
 #                                lines as positions).
 #   --opening-start <n>          Take the openings IN FILE ORDER, starting at the n-th position (1-based,
-#                                counted AFTER the '#' header is stripped), one per colour-reversed
+#                                counted AFTER the '#' header is stripped), one per color-reversed
 #                                pair: pair k plays position n+k-1. Default: not given, and the openings
 #                                are drawn in a random order. Its purpose is the split match: chunk i of
 #                                a match run as several jobs on different machines takes the slice

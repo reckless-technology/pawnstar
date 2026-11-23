@@ -1,13 +1,13 @@
 /// @file gen_openings.cpp Balanced opening-position generator, from Pawnstar's own play.
 ///
 /// Writes an EPD opening set for self-play data generation (tools/gen_data.cpp `--openings`), built from
-/// nothing but this engine's own move generation and its own network: short randomised lines are played from
+/// nothing but this engine's own move generation and its own network: short randomized lines are played from
 /// the start position, and a position is kept when the static NNUE evaluation says it is roughly level and
 /// no cheap tactic says otherwise. No book, no third party's data, no provenance to carry.
 ///
 /// The file is a valid SPRT opening file too (tools/run_sprt.sh `OPENINGS=`), but the book-derived set from
 /// tools/make_openings.sh stays the match set: its positions are opening-book lines, and a match wants
-/// openings a player would recognise rather than randomised ones. Training data wants the opposite - the
+/// openings a player would recognize rather than randomized ones. Training data wants the opposite - the
 /// wider the distribution the labels cover, the better, which is what makes random lines right here.
 ///
 /// **Why this exists beside tools/make_openings.sh.** That script harvests the opening book, and a book is
@@ -27,7 +27,7 @@
 /// a large pool is for. Lines are cheap (a few microseconds each), so independence is worth the extra ones.
 ///
 /// **Balance is measured against the engine's own evaluation of the START POSITION**, not against zero: the
-/// net scores the initial position at about +158 cp, so a zero-centred filter would reject normal positions
+/// net scores the initial position at about +158 cp, so a zero-centered filter would reject normal positions
 /// and keep the ones it mildly dislikes. The baseline is read from the net at run time, so this stays right
 /// when the net changes. The static evaluation is used rather than a search: it costs microseconds instead
 /// of milliseconds, and "is this roughly level" does not need search depth.
@@ -35,7 +35,7 @@
 /// **What the static filter cannot see is a tactic, so a second filter looks for one.** A position level by
 /// material can be lost to a one-move tactic, and a self-play game started from such a position is over
 /// before it teaches anything: 6.5 % of games from the first version of this pool were already past the
-/// resign threshold at their first labelling search, against none of 3,040 games from the sound
+/// resign threshold at their first labeling search, against none of 3,040 games from the sound
 /// book-derived set (nnue/README.md §6). `--tactical-see-cp` closes that: a candidate is rejected when
 /// **either side** has a capture that wins at least that many centipawns by static exchange evaluation.
 /// Either side, not just the mover - a piece hanging to the side to move makes the position winning for
@@ -142,7 +142,7 @@ constexpr int kDefaultProgressPositions = 5000;
 /// @brief Transposition table (MB) the optional shallow search runs with.
 ///
 /// Small on purpose. The table is cleared before every candidate so that each verdict is an independent
-/// search of that position rather than a search coloured by the previous candidates' entries, and clearing
+/// search of that position rather than a search colored by the previous candidates' entries, and clearing
 /// the engine's default 64 MB thirty thousand times would cost more than the searches do. One megabyte
 /// clears in tens of microseconds against a search of several milliseconds, and a few thousand nodes have
 /// nothing like 64 MB of distinct positions to store anyway.
@@ -275,7 +275,7 @@ bool IsShallowScoreDisagreeing(Game &game, const Position &position, int static_
 {
     game.SetPosition(position.ToString());
     game.transposition_table_.Clear();
-    game.use_own_book_ = false; // the engine's own judgement only, and the book's pick is random
+    game.use_own_book_ = false; // the engine's own judgment only, and the book's pick is random
     game.is_cancel_pending_.store(false, std::memory_order_relaxed);
     game.time_control_.clock_type_ = ChessClock::kInfinite;
     game.time_control_.max_nodes_  = node_budget;
@@ -397,7 +397,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            std::cerr << "gen_openings: unrecognised option '" << flag << "'\n";
+            std::cerr << "gen_openings: unrecognized option '" << flag << "'\n";
             return 1;
         }
     }
@@ -496,7 +496,7 @@ int main(int argc, char **argv)
         }
         // Dedup on the Zobrist key rather than on the FEN text: it is the position's identity, and it
         // excludes the clock fields the output drops anyway. The tactical filters come after it so that a
-        // position they reject is tested once and then recognised as already seen, rather than being
+        // position they reject is tested once and then recognized as already seen, rather than being
         // searched again every time a line reaches it.
         if (!seen.insert(ended.hash_).second)
         {

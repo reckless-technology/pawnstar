@@ -25,7 +25,7 @@
 #                        on purpose when the search and the static evaluation disagree (--disagreement-copies),
 #                        and those copies are adjacent, so collapsing them measures diversity rather than the
 #                        deliberate weighting.
-#   distinct positions   distinct FEN (everything before the first " | "). The same position labelled by two
+#   distinct positions   distinct FEN (everything before the first " | "). The same position labeled by two
 #                        different games counts once: it is one training input either way.
 #
 # The headline is distinct / collapsed. A healthy pool from the current defaults measures about 0.98 (1.0000

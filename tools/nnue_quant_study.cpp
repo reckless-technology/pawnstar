@@ -1,4 +1,4 @@
-/// @file nnue_quant_study.cpp  int16 -> int8 NNUE quantisation feasibility study (offline).
+/// @file nnue_quant_study.cpp  int16 -> int8 NNUE quantization feasibility study (offline).
 ///
 /// This is a measurement tool, not part of the engine. It answers two questions the int8 plan hinges on,
 /// using the *shipped* net and the checked-in reference FENs (no retrain, no engine change):
@@ -7,7 +7,7 @@
 ///     - Histograms of the live accumulator values (int16) and the SCReLU activations clamp(x,0,QA)^2.
 ///     - The static distribution of the output-layer weights.
 ///     - The magnitude of the int64 output dot product (does an int32 accumulator suffice for a VNNI path?).
-///     - The centipawn error of an Option-1 int8 emulation (requantise the SCReLU activation to uint8 via a
+///     - The centipawn error of an Option-1 int8 emulation (requantize the SCReLU activation to uint8 via a
 ///       right shift, round the output weights to int8) versus the engine's int16 evaluation, swept over the
 ///       activation shift S.
 ///     - How often an AVX2 `pmaddubsw` (uint8 x int8 -> int16, *saturating*) adjacent-pair sum would

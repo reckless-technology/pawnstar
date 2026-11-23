@@ -1,5 +1,5 @@
 #pragma once
-/// @file transposition_table.h Lockless transposition table (Hyatt XOR trick) memoising search results.
+/// @file transposition_table.h Lockless transposition table (Hyatt XOR trick) memoizing search results.
 #include <atomic>
 #include <memory>
 #include <optional>
@@ -108,7 +108,7 @@ class TranspositionTable
 
     static_assert(sizeof(AtomicEntry) == 16);
 
-    std::unique_ptr<AtomicEntry[]> table_;      ///< Indexed using Zobrist hash; value-initialised to 0.
+    std::unique_ptr<AtomicEntry[]> table_;      ///< Indexed using Zobrist hash; value-initialized to 0.
     std::size_t                    size_;       ///< Number of cells in table_ (a power of two).
     std::size_t                    mask_;       ///< size_ - 1; index = hash & mask_ (avoids a runtime modulo).
     uint8_t                        generation_; ///< Current generation; bumped by Age().
@@ -148,7 +148,7 @@ inline void TranspositionTable::Resize(std::size_t megabytes)
         size_ <<= 1;
     }
     mask_       = size_ - 1;
-    table_      = std::make_unique<AtomicEntry[]>(size_); // value-initialises every word to 0.
+    table_      = std::make_unique<AtomicEntry[]>(size_); // value-initializes every word to 0.
     generation_ = 0;
 }
 

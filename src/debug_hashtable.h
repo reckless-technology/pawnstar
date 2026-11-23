@@ -42,7 +42,7 @@ inline DebugTable debug_dictionary;
 /// erasing nodes, so the returned pointer is valid for the program's lifetime. Each INCREMENT call site
 /// caches this pointer in a function-local static, so after the first hit a counter update is a single
 /// pointer increment — no string hashing and no map lookup on the hot path.
-/// Creation is serialised so concurrent first-time creations from worker threads don't race on the map.
+/// Creation is serialized so concurrent first-time creations from worker threads don't race on the map.
 inline int64_t *DebugSlot(std::string_view name)
 {
     static std::mutex           slot_mutex;

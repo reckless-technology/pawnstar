@@ -35,7 +35,7 @@ TWO TRAPS, both of which cost real work on 2026-10-28:
     `95%` or `1 sigma` on the same line, and scatter_from_95_bars divides by Z_95 before it compares anything.
  2. **Double-applying the 1.959964.** Taking an already-95% se and multiplying by 1.959964 again inflates
     every bar by that factor, silently, in a figure that still looks plausible. The one place `Z_95` is
-    applied to a standard error here is `analyse`, where the two interval ends are taken, and the test
+    applied to a standard error here is `analyze`, where the two interval ends are taken, and the test
     asserts the bars to two decimal places against measured matches, so re-applying it anywhere else turns
     those assertions red.
 """
@@ -115,7 +115,7 @@ def normal_cdf(z: float) -> float:
 
 
 def _gamma_q(a: float, x: float) -> float:
-    """Regularised upper incomplete gamma Q(a, x) = 1 - P(a, x), to machine precision.
+    """Regularized upper incomplete gamma Q(a, x) = 1 - P(a, x), to machine precision.
 
     Numerical Recipes' two branches: the series for P below the crossover, Lentz's continued fraction for Q
     above it. Here only to put a p-value beside the chi-square - a dispersion number with no p-value beside
@@ -200,7 +200,7 @@ def clopper_pearson_lower_limit(successes: int, trials: int, tail: float = 0.025
     return low
 
 
-def analyse(counts: Iterable[int], label: str = "") -> MatchResult:
+def analyze(counts: Iterable[int], label: str = "") -> MatchResult:
     """Everything derivable from one `Ptnml(0-2)` vector.
 
     @param counts five pair counts, in `Ptnml(0-2)` order.
@@ -301,8 +301,8 @@ def pool(chunk_counts: Iterable[Sequence[int]]) -> tuple[MatchResult, list[Match
     vectors = [validated_counts(counts) for counts in chunk_counts]
     if not vectors:
         raise ValueError("no chunks given")
-    chunks = [analyse(vector, label=f"chunk {index}") for index, vector in enumerate(vectors, start=1)]
-    pooled = analyse([sum(column) for column in zip(*vectors)], label="pooled")
+    chunks = [analyze(vector, label=f"chunk {index}") for index, vector in enumerate(vectors, start=1)]
+    pooled = analyze([sum(column) for column in zip(*vectors)], label="pooled")
     scatter = None
     if len(chunks) >= 2 and all(chunk.elo_bar_95 > 0.0 and math.isfinite(chunk.elo) for chunk in chunks):
         scatter = scatter_from_95_bars([chunk.elo for chunk in chunks], [chunk.elo_bar_95 for chunk in chunks])
@@ -355,7 +355,7 @@ def format_result(result: MatchResult) -> str:
 
 
 def format_scatter(scatter: Scatter) -> str:
-    """The scatter diagnostics as a block of lines, every figure one sigma and labelled so."""
+    """The scatter diagnostics as a block of lines, every figure one sigma and labeled so."""
     elos = ", ".join(f"{elo:+.2f}" for elo in scatter.chunk_elos)
     sigmas = ", ".join(f"{sigma:.2f}" for sigma in scatter.chunk_sigmas_1)
     verdict = "ordinary"
@@ -410,7 +410,7 @@ def main() -> int:
         sys.exit("--elos and --bars-95 go together")
     if arguments.elos is not None:
         if arguments.vectors or arguments.log:
-            sys.exit("--elos/--bars-95 describe chunks already summarised; give no vectors or logs with them")
+            sys.exit("--elos/--bars-95 describe chunks already summarized; give no vectors or logs with them")
         try:
             scatter = scatter_from_95_bars(
                 [float(value) for value in arguments.elos.replace(",", " ").split()],

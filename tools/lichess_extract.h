@@ -60,8 +60,8 @@
 ///
 /// The one thing gen_data does that is **not** mirrored is the disagreement reweighting
 /// (`--disagreement-cp` / `--disagreement-copies`, which writes a record twice when the search and the net's
-/// static eval disagree). It needs the labelling net's static eval, and this tool loads no net - it is an
-/// extractor, not a labeller. It drops no position either way, so the two pools stay comparable in content;
+/// static eval disagree). It needs the labeling net's static eval, and this tool loads no net - it is an
+/// extractor, not a labeler. It drops no position either way, so the two pools stay comparable in content;
 /// only the weighting differs.
 
 #include "constants.h"
@@ -106,7 +106,7 @@ inline constexpr std::string_view kStartPositionFen = "rnbqkbnr/pppppppp/8/8/8/8
 
 /// @brief Which move the quiet filter judges.
 ///
-/// tools/gen_data.cpp judges quietness on the move **out** of the labelled position (`best.IsQuiet()`, the
+/// tools/gen_data.cpp judges quietness on the move **out** of the labeled position (`best.IsQuiet()`, the
 /// search's best move there; its principal-variation harvest says so explicitly - "the move *out* of this
 /// position is the next PV move, so quietness is judged on that"). Here the position is reached by the
 /// annotated move, so there are two candidates and they are not the same filter: kPlayedMove asks whether
@@ -161,7 +161,7 @@ struct Options
 /// @brief What the run counted - the yield report, and the per-shard provenance.
 ///
 /// Every drop has a reason of its own, because the reasons are what size the real run: a yield that is
-/// mostly `dropped_no_eval` means the Elo filter is picking games Lichess did not analyse, while one that is
+/// mostly `dropped_no_eval` means the Elo filter is picking games Lichess did not analyze, while one that is
 /// mostly `dropped_duplicate` means `skip_plies` is too low.
 ///
 /// **The denominator of `games_with_evals` and `games_passing_elo` is not `games_seen`.** Both are counted
@@ -179,7 +179,7 @@ struct Statistics
     uint64_t games_without_result    = 0; ///< Games whose Result is `*` (unfinished), which has no label.
     uint64_t games_with_evals        = 0; ///< Games carrying at least one [%eval] comment (see note below).
     uint64_t games_passing_elo       = 0; ///< Games where both players are at or above --min-elo (ditto).
-    uint64_t games_used              = 0; ///< Games actually walked (standard, finished, analysed, in Elo).
+    uint64_t games_used              = 0; ///< Games actually walked (standard, finished, analyzed, in Elo).
     uint64_t games_with_unparsed_san = 0; ///< Games abandoned part-way at a SAN token that did not resolve.
     uint64_t games_contributing      = 0; ///< Games that emitted at least one record.
     uint64_t plies_seen              = 0; ///< Plies replayed.

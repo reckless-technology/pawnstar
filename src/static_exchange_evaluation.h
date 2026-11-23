@@ -165,7 +165,7 @@ inline std::pair<int, bool> EvaluateStaticExchangeReference(const Position &src_
 
 /// @brief Compute the static exchange evaluation of a capture, resolving the full capture sequence.
 ///
-/// SEE only needs the post-move piece/colour bitboards and occupancy, so rather than a full Position
+/// SEE only needs the post-move piece/color bitboards and occupancy, so rather than a full Position
 /// MakeMove (which also recomputes the Zobrist hash, castling rights, en passant and the checkers
 /// bitboard, then copies squares_[64]) this applies just the capturing move to a lightweight SeeBoard.
 /// The check flag is derived directly: a move gives check iff the side that just moved now attacks the

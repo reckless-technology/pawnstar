@@ -7,16 +7,16 @@
 /// caught. The SPRT harness's depth-4 probe proves each engine loaded its own net. Held-out loss catches
 /// garbage weights. **Nothing checks symmetry.** This architecture mirrors: a perspective whose own king
 /// stands on files e–h is reflected across the d/e boundary (`square ^ kFileFlip`), the king square selects
-/// one of eight input banks, and the black perspective flips both colour and rank (`square ^ kRankFlip`).
-/// A defect in any of that — the file mirror, the bank selection, the perspective swap, the colour feature
+/// one of eight input banks, and the black perspective flips both color and rank (`square ^ kRankFlip`).
+/// A defect in any of that — the file mirror, the bank selection, the perspective swap, the color feature
 /// mapping — leaves the *training* loss looking perfect whenever the trainer shares the defect, and the
 /// engine's evaluation silently wrong. `test/nnue_reference.txt` cannot stand in: its 250 expected scores
 /// are v12's own, so a new net legitimately disagrees with every one of them, which is exactly why that
 /// suite has never gated a new net.
 ///
-/// **The invariant.** For a perspective network a position and its colour-flipped vertical mirror are the
+/// **The invariant.** For a perspective network a position and its color-flipped vertical mirror are the
 /// same position seen from the other chair. `flip` reflects every square vertically (`sq ^ kRankFlip`),
-/// swaps every piece's colour, swaps the side to move, mirrors the castling rights and mirrors any
+/// swaps every piece's color, swaps the side to move, mirrors the castling rights and mirrors any
 /// en-passant square. `Network::Evaluate` returns a **side-to-move-relative** score, so here the invariant
 /// reads
 ///
@@ -24,7 +24,7 @@
 ///
 /// which is the same statement as the White-relative `eval(P) == -eval(flip(P))`: flipping swaps the side
 /// to move, so the sign the White-relative form carries is already in the convention. The evaluation is
-/// integer and quantised and the computation is symmetric by construction — the flipped position's black
+/// integer and quantized and the computation is symmetric by construction — the flipped position's black
 /// perspective reads byte-identical feature rows to the original's white perspective, and the piece count,
 /// hence the output head, is unchanged — so this asserts **exact equality, not a tolerance.** Any non-zero
 /// difference is a defect. Both kernels are asserted: the shipped int8 `Evaluate` and the int16 reference
@@ -34,12 +34,12 @@
 /// expected score is pinned anywhere in this file, so it gates v12, the net training now, and every future
 /// net without being rewritten. It therefore takes whichever net the build's shape-independent suites take
 /// (the shipped net at its own shape, the synthetic net at any other) and runs at both shapes CI builds. At
-/// v12's shape mirroring is off, so what it checks there is the perspective and colour mapping; at the
+/// v12's shape mirroring is off, so what it checks there is the perspective and color mapping; at the
 /// shared shape (`KING_MIRRORING=1`) the file mirror is live and checked too.
 ///
 /// **The flip itself is tested, not trusted.** A wrong flip would make the whole suite either vacuous or
 /// falsely red, so `FlipFen` is checked against hand-computed literals, for involution
-/// (`flip(flip(P)) == P`) on every case, and for the legal-move count — which a colour-flipped vertical
+/// (`flip(flip(P)) == P`) on every case, and for the legal-move count — which a color-flipped vertical
 /// mirror must preserve exactly, castling and en passant included.
 ///
 /// **The position set is accounted for, not assumed.** The suite tallies which input bank each perspective
@@ -81,7 +81,7 @@ struct Case
 };
 
 /// @brief The positions, chosen so that between them (and their flips, which this suite also evaluates)
-/// every input bank is selected by both colours' perspectives, every output head is chosen, the file mirror
+/// every input bank is selected by both colors' perspectives, every output head is chosen, the file mirror
 /// is both inactive and active, the two kings fall on the same and on opposite sides of the d/e boundary,
 /// and castling rights and an en-passant square are each present — those last two because the flip has to
 /// mirror both for the flipped position to be the same position at all. The seventeen taken from
@@ -167,8 +167,8 @@ char SwapCase(char c)
     return c;
 }
 
-/// @brief The colour-flipped vertical mirror of a FEN: every square reflected across the 4/5 rank boundary,
-/// every piece's colour swapped, the side to move swapped, the castling rights mirrored (and re-emitted in
+/// @brief The color-flipped vertical mirror of a FEN: every square reflected across the 4/5 rank boundary,
+/// every piece's color swapped, the side to move swapped, the castling rights mirrored (and re-emitted in
 /// the canonical KQkq order) and any en-passant square reflected with the rest. The clocks are unchanged,
 /// being properties of the game rather than the board. A missing clock field is filled in, so a four-field
 /// FEN flips too.
@@ -181,7 +181,7 @@ std::string FlipFen(std::string_view fen)
         fields.push_back(fields.size() == 4 ? "0" : "1");
     }
 
-    // The board: the ranks in reverse order, each piece in the other colour.
+    // The board: the ranks in reverse order, each piece in the other color.
     std::vector<std::string> ranks;
     {
         std::istringstream stream{fields[0]};
@@ -364,7 +364,7 @@ int main(int argc, char **argv)
         const std::string round_trip = Position::FromString(FlipFen(flipped_fen)).ToString();
         bool              sound = Require(round_trip == canonical,
                                           std::format("flip(flip(P)) != P: '{}' became '{}'", canonical, round_trip));
-        // A colour-flipped vertical mirror is an isomorphism of the game, so it preserves the legal move
+        // A color-flipped vertical mirror is an isomorphism of the game, so it preserves the legal move
         // count exactly - castling and en passant included. This is the assertion that would catch a flip
         // which dropped a right or put the en-passant square on the wrong rank, either of which would
         // otherwise leave the evaluations equal (the features carry neither) and the suite green.
@@ -401,7 +401,7 @@ int main(int argc, char **argv)
         worst_exact = std::max(worst_exact, std::abs(exact_difference));
 
         // Coverage. Both positions count: the flip's white perspective reads the oriented king square of
-        // the original's black perspective, so evaluating both is what gives each colour all eight banks.
+        // the original's black perspective, so evaluating both is what gives each color all eight banks.
         for (const Position &p : {position, flipped})
         {
             white_banks.insert(BankOf(p, false));

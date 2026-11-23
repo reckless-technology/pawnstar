@@ -2,7 +2,7 @@
 /// @file generated_data.h Precomputed lookup tables (attack/ray bitboards, magic sliding-attack tables,
 /// intervening-squares masks and Zobrist hashes) used by pawnstar for hashing, move generation and attack
 /// detection. The tables are `inline const` globals defined in this header and computed once at startup
-/// (dynamic initialisation), so there is no build-time code-generation step.
+/// (dynamic initialization), so there is no build-time code-generation step.
 #include "bitboard.h"
 #include <algorithm>
 #include <array>
@@ -316,7 +316,7 @@ constexpr MultiDimArray<Bitboard, 64, 64>::type MakeInterveningSquares()
 
 /// @brief The Zobrist tables are filled from this single fixed-seed PRNG. The three table globals below
 /// are defined in the historical draw order (piece-square, then castling rights, then en passant); within
-/// this translation unit they are dynamically initialised in definition order, so the PRNG is drawn in
+/// this translation unit they are dynamically initialized in definition order, so the PRNG is drawn in
 /// that order. A 64-bit xorshift* generator (rather than std::mt19937_64) so the Go port
 /// (engine/tables.go initZobrist) can reproduce the exact same sequence — and hence bit-identical Zobrist
 /// hashes — from a trivially portable algorithm. No table is stored twice.
@@ -373,7 +373,7 @@ inline std::array<zobrist_t, 64> MakeEnPassantHashes()
 }
 
 // ── Precomputed magic multipliers ───────────────────────────────────────────────────────────────────
-// Known-good collision-free magics for the occupancy masks below, found once by an offline randomised
+// Known-good collision-free magics for the occupancy masks below, found once by an offline randomized
 // search (see tools/dump_magics for the generator) and baked in here so startup just fills the attack
 // tables — no per-launch search. If the occupancy-mask or attack generators change, regenerate these.
 // clang-format off
@@ -415,7 +415,7 @@ inline constexpr std::array<uint64_t, 64> kRookMagicNumbers = {{
 }};
 // clang-format on
 
-// ── The precomputed tables, computed once at program startup (dynamic initialisation). ──────────────
+// ── The precomputed tables, computed once at program startup (dynamic initialization). ──────────────
 // clang-format off
 inline const std::array<Bitboard, 64>     kEastWest            = MakeBitboards([](uint8_t sq) { return RayFrom(sq, kEast) | RayFrom(sq, kWest); });
 inline const std::array<Bitboard, 64>     kPawnAttacksWhite    = MakeBitboards([](uint8_t sq) { return ShiftNorthwest(SqBB(sq)) | ShiftNortheast(SqBB(sq)); });

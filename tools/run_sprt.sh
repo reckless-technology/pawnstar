@@ -81,7 +81,7 @@ unset PAWNSTAR_NNUE PAWNSTAR_EVALFILE
 # rejects that net and fatal-exits during the UCI handshake — before fastchess can send setoption EvalFile.
 # Set CAND_STARTUP_NET=<net for BIN_A> to wrap the candidate so it loads a compatible net at *startup* (via
 # PAWNSTAR_EVALFILE); the per-engine EvalFile below still applies normally. The baseline (BIN_B) is assumed
-# to start fine on its own embedded/default net. Unset => behaviour is unchanged.
+# to start fine on its own embedded/default net. Unset => behavior is unchanged.
 CAND_CMD="$BIN_A"
 if [ -n "${CAND_STARTUP_NET:-}" ]; then
     CAND_CMD="$(mktemp "${TMPDIR:-/tmp}/sprt_cand_wrapper.XXXXXX.sh")"
@@ -254,7 +254,7 @@ probe_engine candidate "$CAND_CMD" "$NET"
 probe_engine baseline "$BIN_B" "$BASELINE_NET"
 
 # The two engines differ ONLY by their EvalFile (the net). -games 2 -repeat plays each opening twice with
-# colours reversed; the draw/resign adjudication ends decided games early to save time without biasing the
+# colors reversed; the draw/resign adjudication ends decided games early to save time without biasing the
 # result; -sprt stops as soon as elo0 vs elo1 is decided at the given alpha/beta error rates.
 fastchess \
     -engine cmd="$CAND_CMD" name=cand option.EvalFile="$NET" \
