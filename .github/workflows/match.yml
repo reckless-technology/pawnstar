@@ -67,10 +67,6 @@ on:
       first_opening:
         description: 'First position of nnue/openings.epd to play (1-based; the chunks take consecutive slices)'
         default: '1'
-  # TEMPORARY, removed before this merges: a push to the working branch runs the smoke test with its defaults, since a
-  # workflow that is not yet on main cannot be dispatched.
-  push:
-    branches: [match-ci]
 
 permissions:
   contents: read
@@ -100,7 +96,6 @@ jobs:
       - name: Plan the chunks
         id: plan
         env:
-          IS_SMOKE: ${{ github.event_name == 'push' }}
           IN_CANDIDATE: ${{ inputs.candidate_ref || 'main' }}
           IN_BASELINE: ${{ inputs.baseline_ref }}
           IN_TC: ${{ inputs.time_control || '8+0.08' }}
@@ -117,8 +112,6 @@ jobs:
               return subprocess.run(args, check=True, capture_output=True, text=True).stdout.strip()
 
           env = os.environ
-          if env["IS_SMOKE"] == "true":          # the temporary push trigger: 2 chunks of 20 games
-              env["IN_GAMES"], env["IN_CHUNKS"] = "40", "2"
           # Refs: resolved to commits here, once, so every job builds exactly what the plan named.
           sh("git", "fetch", "--tags", "--force", "origin", "+refs/heads/*:refs/remotes/origin/*")
           def resolve(ref):
