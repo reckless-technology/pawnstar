@@ -64,7 +64,7 @@
 ///   output_bias     : int32[kNumOutputBuckets]                                                 , scale QA*QB
 ///
 /// where kFeatureRows = 768 * kNumKingBuckets (the bucket banks are laid out bucket-major). The
-/// activation and dequantisation mirror bullet's example exactly so that an engine evaluation reproduces
+/// activation and dequantization mirror bullet's example exactly so that an engine evaluation reproduces
 /// the trainer's eval (verified by test_nnue).
 ///
 /// The loader makes exactly two checks, in this order, and **refuses loudly without falling back** on any
@@ -252,7 +252,7 @@ static_assert(kNumOutputBuckets >= 1 && kNumOutputBuckets <= 32,
               "PAWNSTAR_NNUE_OUTPUT_BUCKETS must be between 1 and 32: bullet's MaterialCount<N> divides the "
               "piece count by ceil(32 / N), so more than 32 heads would leave heads no position can select");
 
-// Quantisation constants. These MUST match the bullet trainer configuration that produced the net.
+// Quantization constants. These MUST match the bullet trainer configuration that produced the net.
 constexpr int kQA    = 255; ///< Feature-transformer weight/activation scale (SCReLU clamp).
 constexpr int kQB    = 64;  ///< Output-layer weight scale.
 constexpr int kScale = 400; ///< Maps the raw network output to centipawns.
@@ -263,7 +263,7 @@ constexpr std::size_t kFeatureBiasCount   = kHiddenSize;
 constexpr std::size_t kOutputWeightCount  = static_cast<std::size_t>(kNumOutputBuckets) * 2 * kHiddenSize;
 constexpr std::size_t kOutputBiasCount    = kNumOutputBuckets;
 
-/// @brief Exact size of the quantised weight payload: three int16 sections then an int32 bias per output
+/// @brief Exact size of the quantized weight payload: three int16 sections then an int32 bias per output
 /// bucket, tightly packed and little-endian. This is what the header's payload_bytes must equal, and the
 /// file carries nothing after it — bullet's 64-byte "bullet" tail padding is dropped at stamping time,
 /// because an exact length is what lets a truncated or overlong file be told apart from a sound one.
@@ -335,7 +335,7 @@ consteval std::uint64_t KingBucketMapCrc()
 }
 
 /// @brief The architecture this engine was compiled for, as a header. payload_crc_ and header_crc_ are left
-/// zero: only a stamping tool, which has the payload in hand, can fill them (see FinaliseNetHeader).
+/// zero: only a stamping tool, which has the payload in hand, can fill them (see FinalizeNetHeader).
 /// @return A NetHeader populated from the compile-time NNUE constants.
 inline NetHeader ExpectedNetHeader()
 {
@@ -366,14 +366,14 @@ inline NetHeader ExpectedNetHeader()
 /// @param header Header to complete, already populated by ExpectedNetHeader.
 /// @param payload First byte of the weight payload. @param payload_bytes Payload length; must equal
 /// header.payload_bytes_.
-inline void FinaliseNetHeader(NetHeader &header, const std::uint8_t *payload, std::size_t payload_bytes)
+inline void FinalizeNetHeader(NetHeader &header, const std::uint8_t *payload, std::size_t payload_bytes)
 {
     header.payload_crc_ = crc64::Checksum(payload, payload_bytes);
     header.header_crc_  = crc64::Checksum(reinterpret_cast<const std::uint8_t *>(&header), kNetHeaderCrcBytes);
 }
 
-/// @brief Everything one perspective needs to turn a (colour, piece, square) into a feature row: which
-/// weight bank it reads, and how a square and a colour are oriented into its own view.
+/// @brief Everything one perspective needs to turn a (color, piece, square) into a feature row: which
+/// weight bank it reads, and how a square and a color are oriented into its own view.
 ///
 /// **The whole point of gathering these three into one value is the refresh rule.** A perspective can only
 /// be updated incrementally while all three stay put; if any changes, every feature row it reads moves and
@@ -387,7 +387,7 @@ struct Perspective
 {
     int bank_;        ///< First feature row of this perspective's bank: bucket * kInputSize.
     int square_flip_; ///< XOR applied to a square: kRankFlip for black's view, plus kFileFlip if mirrored.
-    int color_flip_;  ///< XOR applied to a piece's colour: 0 for white's view, 1 for black's.
+    int color_flip_;  ///< XOR applied to a piece's color: 0 for white's view, 1 for black's.
 
     constexpr bool operator==(const Perspective &) const = default;
 };
@@ -400,19 +400,19 @@ struct Accumulator
     alignas(64) std::array<int16_t, kHiddenSize> black_; ///< Black-perspective accumulator.
 };
 
-/// @brief A loaded, quantised NNUE network plus its accumulator/evaluation operations.
+/// @brief A loaded, quantized NNUE network plus its accumulator/evaluation operations.
 /// Owned by the Game; read-only after Load() and shared by all Lazy SMP threads (only const methods are
 /// called concurrently). Default-constructed instances are unloaded (loaded_ == false); the weight
-/// arrays are left uninitialised until Load() fills them, so construction is cheap.
+/// arrays are left uninitialized until Load() fills them, so construction is cheap.
 class Network
 {
   public:
-    /// @brief Load quantised weights from a bullet native .bin file. On failure logs to stderr and stays
+    /// @brief Load quantized weights from a bullet native .bin file. On failure logs to stderr and stays
     /// unloaded. Reads the file into memory and defers to LoadFromMemory.
     /// @param path Path to the net file. @return true on success.
     bool Load(const std::string &path);
 
-    /// @brief Load quantised weights from an in-memory image of a net file (stamped or raw), using the same
+    /// @brief Load quantized weights from an in-memory image of a net file (stamped or raw), using the same
     /// header detection and architecture validation as Load. Used for the engine's embedded fallback net.
     /// @param data Pointer to the net image. @param size Image size in bytes.
     /// @param origin Label for log messages (e.g. a path or "embedded"). @return true on success.
@@ -457,14 +457,14 @@ class Network
     /// @brief Rebuild a single perspective from scratch (bias + every piece) through its indexing.
     /// @param side The perspective accumulator to rebuild (acc.white_ or acc.black_).
     /// @param position Position to read pieces from.
-    /// @param perspective That perspective's bank, square flip and colour flip.
+    /// @param perspective That perspective's bank, square flip and color flip.
     void RefreshSide(std::array<int16_t, kHiddenSize> &side, const Position &position,
                      const Perspective &perspective) const;
 
     /// @brief Apply the piece-placement delta from @p from to @p to to a single perspective, whose indexing
     /// is unchanged across the move. @param side Perspective accumulator.
     /// @param from Position before the move. @param to Position after it.
-    /// @param perspective That perspective's (unchanged) bank, square flip and colour flip.
+    /// @param perspective That perspective's (unchanged) bank, square flip and color flip.
     void DiffSide(std::array<int16_t, kHiddenSize> &side, const Position &from, const Position &to,
                   const Perspective &perspective) const;
 
@@ -475,11 +475,11 @@ class Network
     /// @brief Output weights, bucket-major: bucket * 2 * kHiddenSize + i, the first kHiddenSize of each
     /// bucket weighting the side-to-move accumulator and the next kHiddenSize the other.
     alignas(64) std::array<int16_t, kOutputWeightCount> output_weights_;
-    /// @brief Output weights requantised to int8 for the shipped int8 forward pass (Network::Evaluate).
+    /// @brief Output weights requantized to int8 for the shipped int8 forward pass (Network::Evaluate).
     /// w8 = round(output_weight / output_w_scale_) clamped to [-127,127]; the scale keeps the largest output
     /// weight in int8 range (1 for nets whose |weight| <= 127, e.g. the shipped net). Populated by Load so the
     /// int8 kernel needs no per-eval setup; the int16 reference (EvaluateExact) uses output_weights_ instead.
-    /// One scale across every bucket, not one per bucket, so the dequantisation tail stays bucket-agnostic.
+    /// One scale across every bucket, not one per bucket, so the dequantization tail stays bucket-agnostic.
     alignas(64) std::array<int8_t, kOutputWeightCount> output_weights_i8_{};
     int output_w_scale_ = 1; ///< Divisor mapping the int16 output weights into int8 range.
     /// @brief Output bias per output bucket, in QA*QB units. int32 in the container even though the trained
@@ -648,7 +648,7 @@ inline int32_t HsumI32(__m256i v)
 
 /// @brief Whether to use the AVX-VNNI output-dot kernel. Detected once at static init (via platform::
 /// HasAvxVnni, which handles the GCC/Clang vs MSVC cpuid difference) and read-only afterwards, so the Lazy
-/// SMP threads share it without synchronisation.
+/// SMP threads share it without synchronization.
 inline const bool kCpuHasAvxVnni = platform::HasAvxVnni();
 #endif // __AVX2__
 
@@ -669,7 +669,7 @@ inline Perspective PerspectiveFor(const Position &position, bool black)
 }
 
 /// @brief Feature row for a piece in one perspective's bank:
-/// `bank + (colour ^ colour_flip)*384 + (type - 1)*64 + (square ^ square_flip)`.
+/// `bank + (color ^ color_flip)*384 + (type - 1)*64 + (square ^ square_flip)`.
 inline int FeatureRow(const Perspective &perspective, int color, int piece, int sq)
 {
     return perspective.bank_ + (color ^ perspective.color_flip_) * 384 + (piece - kPawn) * 64 +
@@ -822,7 +822,7 @@ inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, 
     // still loaded and still the one playing. Clearing it up front was its own trap: a mismatched net set
     // through `setoption name EvalFile` left the network unloaded while the engine still answered `readyok`,
     // and the first `go` then read weight arrays that Load had never filled. A refused net must change
-    // nothing, not leave the engine in a state it has no defined behaviour for.
+    // nothing, not leave the engine in a state it has no defined behavior for.
 
     // --- Check 1: the header. 64 bytes; magic, then its own CRC, then every architecture field against
     // this build's compile-time constants, then the king-bucket map's digest. An unstamped (raw bullet)
@@ -926,7 +926,7 @@ inline bool Network::LoadFromMemory(const std::uint8_t *data, std::size_t size, 
     p += output_weights_.size() * sizeof(int16_t);
     std::memcpy(output_bias_.data(), p, output_bias_.size() * sizeof(std::int32_t));
 
-    // Requantise the output weights to int8 for the optional int8 forward pass. The scale keeps the
+    // Requantize the output weights to int8 for the optional int8 forward pass. The scale keeps the
     // largest-magnitude output weight inside [-127, 127]; for nets whose weights already fit (|w| <= 127,
     // e.g. the shipped net) the scale is 1 and the int8 copy is lossless. (Always computed — it is one-time,
     // ~2 KB, and lets the int8 kernel skip per-eval setup; the int16 path ignores it.)
@@ -969,13 +969,13 @@ inline void Network::Update(Accumulator &acc, const Position &from, const Positi
     const Perspective bf = PerspectiveFor(from, /*black=*/true), bt = PerspectiveFor(to, /*black=*/true);
 
     // Common case (~98%): neither king changed bucket. Find the changed squares directly from the two
-    // colour bitboards (a move touches only 2-4 squares — quiet, capture, en passant, castling and
-    // promotion are all handled uniformly) instead of scanning all 12 piece types. For each square a colour
+    // color bitboards (a move touches only 2-4 squares — quiet, capture, en passant, castling and
+    // promotion are all handled uniformly) instead of scanning all 12 piece types. For each square a color
     // vacated we subtract the piece that was there (read from `from`); for each it now occupies we add the
     // piece now there (read from `to`) — so a promotion's pawn->queen and a capture's two pieces fall out
     // for free. Both perspectives are updated together. A null move (identical placements) does no work.
     // This is bit-identical to a per-piece-type diff: the same set of feature columns is added/subtracted,
-    // and int16 accumulator add/sub is order-independent. (No square keeps a colour while changing piece
+    // and int16 accumulator add/sub is order-independent. (No square keeps a color while changing piece
     // type without moving, so reading the type from `from`/`to` is exact.)
     if (wf == wt && bf == bt)
     {
@@ -1019,8 +1019,8 @@ inline void Network::Update(Accumulator &acc, const Position &from, const Positi
     }
 }
 
-/// @brief Shared dequantisation tail: SCReLU leaves the dot in QA*QA*QB units; reduce one QA, add the bias
-/// (QA*QB units), apply the eval scale, then remove the remaining QA*QB quantisation -> centipawns. The
+/// @brief Shared dequantization tail: SCReLU leaves the dot in QA*QA*QB units; reduce one QA, add the bias
+/// (QA*QB units), apply the eval scale, then remove the remaining QA*QB quantization -> centipawns. The
 /// result is clamped to +/-kMaxEvaluation: pathological max-material positions (e.g. many promoted queens)
 /// can push the raw net output past int16, which would wrap when stored in the int16 eval cache and could
 /// collide with the mate band. Clamping keeps |eval| below kWinThreshold so eval and mate scores never mix.
@@ -1035,7 +1035,7 @@ inline int Dequant(int64_t output, std::int32_t bias)
 
 inline int Network::Evaluate(const Accumulator &acc, const Position &position) const
 {
-    // The engine's evaluation: the **int8** output layer (the shipped default). Activations are requantised
+    // The engine's evaluation: the **int8** output layer (the shipped default). Activations are requantized
     // to uint8 (SCReLU >> kInt8Shift) and the output weights to int8; the dot accumulates in int32 (the
     // Phase-1 study showed |dot| <= 86M << 2^31). This is ~1.86x faster than the exact int16 dot (a measured
     // +31.8 Elo at 8+0.08) at a bounded 40 cp deviation from EvaluateExact (v20's measured maximum,
@@ -1079,7 +1079,7 @@ inline int Network::Evaluate(const Accumulator &acc, const Position &position) c
 inline int Network::EvaluateExact(const Accumulator &acc, const Position &position) const
 {
     // Exact int16 SCReLU forward pass mirroring bullet's `simple` example. This is the **reference**
-    // evaluator: it reproduces the trainer's eval within quantisation rounding (test_nnue, ±2 cp) and is the
+    // evaluator: it reproduces the trainer's eval within quantization rounding (test_nnue, ±2 cp) and is the
     // baseline the int8 Evaluate above approximates. Not used on the search hot path.
     const bool                              white_to_move = position.color_to_move_ == kWhite;
     const std::array<int16_t, kHiddenSize> &stm_acc       = white_to_move ? acc.white_ : acc.black_;

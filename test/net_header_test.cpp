@@ -172,7 +172,7 @@ const Fields kEightBuckets{
     .header_crc          = 0x217476A2E6F04700ULL,
 };
 
-// Four king buckets: the header the old script mislabelled.
+// Four king buckets: the header the old script mislabeled.
 const Fields kFourBuckets{
     .format_version      = 2,
     .header_bytes        = 64,
@@ -418,7 +418,7 @@ void TestThisBuildsShapeReadsAsMatch()
 {
     nnue::NetHeader header = nnue::ExpectedNetHeader();
     Bytes           payload(nnue::kNetPayloadBytes, 0);
-    nnue::FinaliseNetHeader(header, payload.data(), payload.size());
+    nnue::FinalizeNetHeader(header, payload.data(), payload.size());
     Bytes bytes(sizeof(header) + payload.size());
     std::memcpy(bytes.data(), &header, sizeof(header));
     std::memcpy(bytes.data() + sizeof(header), payload.data(), payload.size());

@@ -72,11 +72,11 @@
 ///
 /// Each shard gets a `<shard>.meta` beside it, in the same `key value` shape tools/gen_data.cpp and
 /// tools/lichess_extract.cpp write (so tools/check_duplicates.sh reads the `games_completed` line out of
-/// any of them without caring which tool wrote it). It carries the licence, the source URL and run, the
+/// any of them without caring which tool wrote it). It carries the license, the source URL and run, the
 /// filter settings in full, the counts, and the SHA-256 of the exact input prefix the shard's records came
 /// from.
 ///
-/// The licence line is the point of the file. The archive is **ODbL 1.0** with its contents under **DbCL
+/// The license line is the point of the file. The archive is **ODbL 1.0** with its contents under **DbCL
 /// 1.0**, and ODbL obliges a notice naming the source whenever a Produced Work - a trained net - is
 /// distributed. The sidecar is meant to be the thing that notice is written from without going back to the
 /// web: `source_licence`, `source_licence_url`, `contents_licence`, `contents_licence_url` and a ready-made
@@ -115,13 +115,13 @@
 
 namespace
 {
-/// @brief The archive's licence, taken from the `LICENSE` member every test80 tar carries. It is recorded
+/// @brief The archive's license, taken from the `LICENSE` member every test80 tar carries. It is recorded
 /// in every shard rather than assumed, because ODbL obliges a notice naming it when a net trained on these
 /// positions is distributed - see the file comment.
-constexpr const char *kSourceLicence      = "ODbL-1.0";
-constexpr const char *kSourceLicenceUrl   = "http://opendatacommons.org/licenses/odbl/1.0/";
-constexpr const char *kContentsLicence    = "DbCL-1.0";
-constexpr const char *kContentsLicenceUrl = "http://opendatacommons.org/licenses/dbcl/1.0/";
+constexpr const char *kSourceLicense      = "ODbL-1.0";
+constexpr const char *kSourceLicenseUrl   = "http://opendatacommons.org/licenses/odbl/1.0/";
+constexpr const char *kContentsLicense    = "DbCL-1.0";
+constexpr const char *kContentsLicenseUrl = "http://opendatacommons.org/licenses/dbcl/1.0/";
 constexpr const char *kSourceName         = "Leela Chess Zero self-play training data";
 constexpr const char *kSourceHomeUrl      = "https://storage.lczero.org/files/training_data/";
 
@@ -169,7 +169,7 @@ struct SourceDescription
 ///
 /// The dedup is **per shard**, which is gen_data's rule and the reason RecordSink exists as an interface at
 /// all: only whoever owns the shards knows what is in the current one. tools/check_duplicates.sh is what
-/// measures duplication across an assembled pool, and it needs the per-shard behaviour to be this way round
+/// measures duplication across an assembled pool, and it needs the per-shard behavior to be this way round
 /// to be meaningful - a globally deduplicated pool would always measure as perfectly unique and the gate
 /// would never fire.
 ///
@@ -325,12 +325,12 @@ bool ShardWriter::CloseShard()
          << "source_run " << source_.run << '\n'
          << "source_url " << (source_.url.empty() ? "unrecorded" : source_.url) << '\n'
          << "source_tar_sha256 " << (source_.sha256.empty() ? "unrecorded" : source_.sha256) << '\n'
-         << "source_licence " << kSourceLicence << '\n'
-         << "source_licence_url " << kSourceLicenceUrl << '\n'
-         << "contents_licence " << kContentsLicence << '\n'
-         << "contents_licence_url " << kContentsLicenceUrl << '\n'
+         << "source_licence " << kSourceLicense << '\n'
+         << "source_licence_url " << kSourceLicenseUrl << '\n'
+         << "contents_licence " << kContentsLicense << '\n'
+         << "contents_licence_url " << kContentsLicenseUrl << '\n'
          << "attribution Position data from the " << kSourceName << " (" << kSourceHomeUrl << "), run " << source_.run
-         << ", used under the Open Database License 1.0 (" << kSourceLicenceUrl << ").\n"
+         << ", used under the Open Database License 1.0 (" << kSourceLicenseUrl << ").\n"
          << "record_format lc0 v" << (reader_.record_bytes() == lc0::kRecordBytesV7 ? 7 : 6) << " ("
          << reader_.record_bytes() << " bytes, input format " << lc0::kInputFormatClassical << ")\n"
          << "input_sha256 " << reader_.Digest() << '\n'

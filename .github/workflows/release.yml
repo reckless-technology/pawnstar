@@ -6,18 +6,18 @@
 # since it. The workflow creates the
 # three-component tag itself; only two-component tags are version marks. A version already released is refused.
 #
-# A dry run (workflow_dispatch with dry_run, from any branch) builds, tests, signs and notarises the macOS binary -
+# A dry run (workflow_dispatch with dry_run, from any branch) builds, tests, signs and notarizes the macOS binary -
 # which costs nothing - and publishes nothing; it leaves the Windows binary unsigned, since every eSigner signing spends
 # the SSL.com account's allowance. With no vMAJOR.MINOR tag reachable a dry run carries on as 0.0.0
 # (cmake/version.cmake's fallback); a publishing run refuses.
 #
-# The organisation's other apps (vst-plugins, ir-capture) are released the same way, with the same organisation secrets
+# The organization's other apps (vst-plugins, ir-capture) are released the same way, with the same organization secrets
 # for signing:
 #   - Windows: the engine is Authenticode-signed through SSL.com's eSigner (CodeSignTool pinned by version and hash,
 #     fetched by the job; tools/sign-windows.ps1), the account checked before the build, which spends no signing.
 #     Only a publishing run signs, and only the one file it ships.
 #   - macOS: the engine is signed with the Developer ID Application identity, the hardened runtime and a secure
-#     timestamp on a keychain of the job's own (tools/sign-macos.sh), and notarised by Apple. A bare binary can carry no
+#     timestamp on a keychain of the job's own (tools/sign-macos.sh), and notarized by Apple. A bare binary can carry no
 #     stapled ticket, so it ships in a zip - which keeps its executable bit through a browser's download - and
 #     Gatekeeper finds its ticket online, as the release checks it does.
 #   A publishing run that would ship an unsigned binary fails instead.
@@ -129,7 +129,7 @@ jobs:
               echo
               echo "- **Windows (x86-64, AVX2):** \`pawnstar-$version-windows-x86_64.exe\`, Authenticode-signed (Jonathan Reckless)."
               echo "- **macOS (Apple silicon):** the binary in \`pawnstar-$version-macos-arm64.zip\`, signed with a"
-              echo "  Developer ID and notarised by Apple."
+              echo "  Developer ID and notarized by Apple."
               echo "- **Linux (x86-64, AVX2):** \`pawnstar-$version-linux-x86_64\`; \`chmod +x\` it."
               echo
               echo "$changes"
@@ -283,7 +283,7 @@ jobs:
           MACOS_SIGNING_P12_PASSWORD: ${{ secrets.MACOS_SIGNING_P12_PASSWORD }}
           MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}
         run: tools/sign-macos.sh open
-      - name: Sign and notarise (macOS)
+      - name: Sign and notarize (macOS)
         if: runner.os == 'macOS'
         env:
           MACOS_TEAM_ID: ${{ secrets.MACOS_TEAM_ID }}

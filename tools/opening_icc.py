@@ -91,7 +91,7 @@ the lin-2 arm's own chunks, taken two, four, six and eight at a time - the same 
 the same stream of games - the ICC measures 0.188, 0.144, 0.144 and 0.140 as the pairs per opening go 3.4,
 7.0, 10.5 and 13.9. Flat from about seven pairs an opening upward, which is what the model says it should
 be: the ICC is a property of the conditions and `m_effective` carries the growth. So the lin-0 arm's 0.061
-and the lin-2 arm's 0.140 are a real difference between the two MACHINES, not an artefact of their
+and the lin-2 arm's 0.140 are a real difference between the two MACHINES, not an artifact of their
 different sizes, and a match with no PGN of its own is best corrected with the ICC measured on the machine
 it ran on - at that match's own `m_effective`, never at the one the ICC was measured at.
 
@@ -167,7 +167,7 @@ EXTREME_SCORE_FRACTION = 0.97
 
 @dataclass(frozen=True)
 class PairObservation:
-    """One colour-reversed pair of games: the opening it started from and the candidate's share of it."""
+    """One color-reversed pair of games: the opening it started from and the candidate's share of it."""
 
     source: str  #: the file it was read from
     round_label: str  #: the `Round` tag, which is what makes a pair within one fastchess run
@@ -189,7 +189,7 @@ class ParseReport:
     pairs_kept: int
     rounds_not_two_games: int  #: a round with one game, or more than two
     rounds_unfinished: int  #: a round holding a game whose result is not one of the three
-    rounds_same_colour: int  #: two games that did not swap colours, so not a colour-reversed pair
+    rounds_same_color: int  #: two games that did not swap colors, so not a color-reversed pair
     rounds_mixed_opening: int  #: two games of one round that did not share a `FEN`
     engine_names: tuple[str, ...]  #: every name seen as White or Black, for diagnosing `--candidate`
     rounds_without_candidate: int = 0  #: a game whose two sides were not the candidate and one other
@@ -205,7 +205,7 @@ class ParseReport:
         return (
             self.rounds_not_two_games
             + self.rounds_unfinished
-            + self.rounds_same_colour
+            + self.rounds_same_color
             + self.rounds_mixed_opening
             + self.rounds_without_candidate
         )
@@ -303,7 +303,7 @@ def pair_score_of_round(games: Sequence[tuple[bool, str]]) -> float | None:
 
 
 def candidate_scores_of_round(games: Sequence[tuple[bool, str]]) -> tuple[tuple[bool, float], ...]:
-    """Each game of a round as the candidate's colour and score, for a round whose results are all results.
+    """Each game of a round as the candidate's color and score, for a round whose results are all results.
 
     @param games `(candidate_is_white, result)` per game. @return `(candidate_is_white, score)` per game.
     """
@@ -329,7 +329,7 @@ def win_draw_loss(pairs: Iterable[PairObservation], is_white: bool | None = None
 
 
 def pentanomial_counts(scores: Iterable[float]) -> tuple[int, int, int, int, int]:
-    """Pair scores as a `Ptnml(0-2)` vector, so `pool_matches.analyse` computes the nominal figures.
+    """Pair scores as a `Ptnml(0-2)` vector, so `pool_matches.analyze` computes the nominal figures.
 
     @param scores pair scores, each one of 0, 0.25, 0.5, 0.75, 1.
     @return the five counts. Raises ValueError on a score that is not one of the five, rather than rounding
@@ -420,7 +420,7 @@ def correct_interval(
 ) -> CorrectedInterval:
     """Widen a pooled result's standard error by a measured design effect.
 
-    @param nominal the result `pool_matches.analyse` produced from the same pairs.
+    @param nominal the result `pool_matches.analyze` produced from the same pairs.
     @param correlation the design effect to apply.
     @return the corrected interval, its bar, and the LOS the widened standard error implies.
     """
@@ -477,9 +477,9 @@ def cross_checks(corrected: CorrectedInterval, groups: Sequence[Sequence[float]]
 
 
 def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NAME) -> tuple[list[PairObservation], ParseReport]:
-    """Every complete colour-reversed pair in a set of fastchess PGNs.
+    """Every complete color-reversed pair in a set of fastchess PGNs.
 
-    A pair is one `Round` within one file - two games, opposite colours, the same `FEN`. Rounds are keyed by
+    A pair is one `Round` within one file - two games, opposite colors, the same `FEN`. Rounds are keyed by
     file as well as by number, because each chunk is its own fastchess run and numbers its rounds from one.
 
     @param paths the PGN files, read in the order given.
@@ -544,7 +544,7 @@ def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NA
         )
 
     pairs: list[PairObservation] = []
-    not_two_games = unfinished = same_colour = mixed_opening = without_candidate = 0
+    not_two_games = unfinished = same_color = mixed_opening = without_candidate = 0
     for key in order:
         info = rounds[key]
         if len(info["games"]) != 2:
@@ -558,7 +558,7 @@ def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NA
             continue
         first_sides, second_sides = info["sides"]
         if first_sides != second_sides[::-1]:
-            same_colour += 1
+            same_color += 1
             continue
         score = pair_score_of_round(info["games"])
         if score is None:
@@ -582,7 +582,7 @@ def parse_pairs(paths: Sequence[str], candidate_name: str = DEFAULT_CANDIDATE_NA
         pairs_kept=len(pairs),
         rounds_not_two_games=not_two_games,
         rounds_unfinished=unfinished,
-        rounds_same_colour=same_colour,
+        rounds_same_color=same_color,
         rounds_mixed_opening=mixed_opening,
         engine_names=tuple(sorted(engine_names)),
         rounds_without_candidate=without_candidate,
@@ -612,7 +612,7 @@ def integrity_problems(report: ParseReport, expected_games: int) -> list[str]:
     for count, what in (
         (report.rounds_not_two_games, "not two games"),
         (report.rounds_unfinished, "holding an unfinished game"),
-        (report.rounds_same_colour, "whose colours were not reversed"),
+        (report.rounds_same_color, "whose colors were not reversed"),
         (report.rounds_mixed_opening, "whose two games differ in FEN"),
         (report.rounds_without_candidate, "with a game the candidate was not one side of"),
     ):
@@ -629,7 +629,7 @@ def group_by_opening(pairs: Iterable[PairObservation]) -> list[list[float]]:
     return list(grouped.values())
 
 
-def analyse_pairs(pairs: Sequence[PairObservation], label: str = "") -> CorrectedInterval:
+def analyze_pairs(pairs: Sequence[PairObservation], label: str = "") -> CorrectedInterval:
     """The whole measurement: nominal figures from `pool_matches`, then the measured correction.
 
     @param pairs the pairs to pool. @param label what to call the result.
@@ -637,7 +637,7 @@ def analyse_pairs(pairs: Sequence[PairObservation], label: str = "") -> Correcte
     """
     groups = group_by_opening(pairs)
     correlation = measure_intraclass_correlation(groups)
-    nominal = pool_matches.analyse(pentanomial_counts(pair.score for pair in pairs), label=label or "pooled")
+    nominal = pool_matches.analyze(pentanomial_counts(pair.score for pair in pairs), label=label or "pooled")
     return correct_interval(nominal, correlation)
 
 
@@ -705,7 +705,7 @@ def format_chunks(paths: Sequence[str], pairs: Sequence[PairObservation]) -> str
         wins, draws, losses = win_draw_loss(of_file)
         vector = pentanomial_counts(pair.score for pair in of_file)
         vectors.append(vector)
-        result = pool_matches.analyse(vector)
+        result = pool_matches.analyze(vector)
         lines.append(
             f"  {Path(path).name}: {result.games:,} games  +{wins} ={draws} -{losses}  Ptnml(0-2) {list(vector)}  "
             f"Elo {result.elo:+.2f} +-{result.elo_bar_95:.2f} (nominal 95%)"
@@ -751,7 +751,7 @@ def format_parse_report(report: ParseReport) -> str:
         lines += [
             f"  rounds dropped    {report.rounds_dropped:,}"
             f"   (not two games {report.rounds_not_two_games:,}, unfinished {report.rounds_unfinished:,}, "
-            f"colours not swapped {report.rounds_same_colour:,}, openings differ {report.rounds_mixed_opening:,}, "
+            f"colors not swapped {report.rounds_same_color:,}, openings differ {report.rounds_mixed_opening:,}, "
             f"candidate not one side {report.rounds_without_candidate:,})"
         ]
     return "\n".join(lines)
@@ -834,7 +834,7 @@ def main() -> int:
         "--expect-games",
         type=int,
         metavar="GAMES",
-        help="the games the run was to play: any other count, or any round that is not a whole colour-reversed "
+        help="the games the run was to play: any other count, or any round that is not a whole color-reversed "
         "pair, prints REFUSED and exits non-zero with no figures",
     )
     parser.add_argument(
@@ -863,7 +863,7 @@ def main() -> int:
                 print(f"  {problem}")
             return 1
     if not pairs:
-        sys.exit("opening_icc: no complete colour-reversed pair in these files")
+        sys.exit("opening_icc: no complete color-reversed pair in these files")
 
     print(format_parse_report(report))
     print()
@@ -885,7 +885,7 @@ def main() -> int:
                 print()
                 continue
             try:
-                corrected = analyse_pairs(of_file, label=path)
+                corrected = analyze_pairs(of_file, label=path)
             except ValueError as problem:
                 print(f"{path}: {problem}")
                 print()
@@ -895,12 +895,12 @@ def main() -> int:
             print()
 
     try:
-        pooled = analyse_pairs(pairs, label=arguments.label)
+        pooled = analyze_pairs(pairs, label=arguments.label)
     except ValueError as problem:
         # No replication is an answer rather than a failure: the nominal bar stands, and says so.
         print(f"opening replay: not measurable - {problem}; the nominal bar stands")
         counts = pentanomial_counts(pair.score for pair in pairs)
-        print(pool_matches.format_result(pool_matches.analyse(counts, label=arguments.label)))
+        print(pool_matches.format_result(pool_matches.analyze(counts, label=arguments.label)))
         return 0
     print(format_correlation(pooled.correlation))
     print(format_corrected(pooled))

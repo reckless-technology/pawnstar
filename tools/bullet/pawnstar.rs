@@ -10,7 +10,7 @@ trebuchet, and an architecture change here is a change owed to all of them.
 Adapted from bullet's `simple` example (examples/simple.rs, https://github.com/jw1912/bullet, at the commit
 pinned by tools/setup_bullet.sh): Copyright (c) 2023 Jamie Whiting, MIT licence. The imports, the QA/QB/SCALE
 constants, the save-format list, the loss function, the two-layer SCReLU network and the schedule and
-loader layout follow that example. Its licence text is reproduced in THIRD-PARTY-NOTICES.md at the root of
+loader layout follow that example. Its license text is reproduced in THIRD-PARTY-NOTICES.md at the root of
 this repository; this file as a whole is distributed under the repository's GPLv3.
 
 This is the shape every engine has shipped since release 2.0.0 (pawnstar 2.0.0 / trebuchet (then numbered 3.0.0),
@@ -72,14 +72,14 @@ drop and all of it within about 30. A drop's tail does not need to be long, but 
 So this trainer PRINTS the schedule it will follow and REFUSES to start one whose last drop cannot
 apply, naming the arithmetic and the fix; it also prints the rate it applies at every superbatch,
 which bullet itself does not (it prints the scheduler's description instead, which is the
-configuration and not the behaviour). PAWNSTAR_LR_STEP pins the step independently of the run
+configuration and not the behavior). PAWNSTAR_LR_STEP pins the step independently of the run
 length, which is both how a truncated schedule is fixed and how a resume holds the lowest rate.
 PAWNSTAR_LR_ALLOW_UNREACHABLE_DROP=1 downgrades the refusal to a warning, for reproducing a
 historical run on its original schedule and for nothing else.
 
 The default step is deliberately still PAWNSTAR_SBS / 3. Changing it would move all three drops and
 so make every past run's schedule unreproducible from this file, and one measurement says only that
-the tail must exist and that ~30 superbatches realises it - not what the best spacing is.
+the tail must exist and that ~30 superbatches realizes it - not what the best spacing is.
 
 **Resuming is this trainer, not a second trainer.** PAWNSTAR_RESUME names a checkpoint directory -
 one of the `<out>/pawnstar-<n>` directories a run writes every PAWNSTAR_SAVE_RATE superbatches - and
@@ -94,7 +94,7 @@ as a copy of this file with the LoggedLR printing but no guard, defaulting lr_st
 default is the defect that cost five runs their last drop, and a copy is where a guard goes to drift.
 There is one trainer here and both entry points go through it.
 
-The final quantised net is written to <out>/pawnstar-<sbs>/pawnstar-<sbs>.bin in bullet's native
+The final quantized net is written to <out>/pawnstar-<sbs>/pawnstar-<sbs>.bin in bullet's native
 headerless format. **Stamp it before the engine will load it**: `build/stamp_net <raw> <out.bin>` wraps
 it in the RNNUE1 container, writing the header from the stamping build's own compiled constants and
 dropping the padding bullet appends. See nnue/README.md section 2.
@@ -127,12 +127,12 @@ const OUTPUT_BUCKETS: usize = 8;
 const LR_START: f32 = 0.001;
 const LR_GAMMA: f32 = 0.3;
 
-/// Superbatches at the lowest rate that measurement showed is enough to realise a drop.
+/// Superbatches at the lowest rate that measurement showed is enough to realize a drop.
 ///
 /// The 819-superbatch run was resumed with its step pinned at 273, so superbatch 820 was its first at
 /// `0.001 * 0.3^3`. Held-out loss on a fixed 100,141,613-position validation set: 0.012300 at 819,
 /// 0.012229 at 820 (**66%** of the whole step in one superbatch), 0.012202 at 830, 0.012197 at 840,
-/// 0.012193 at 850, and flat at 860 and 870. The second drop had the same shape: -2.31% realised within
+/// 0.012193 at 850, and flat at 860 and 870. The second drop had the same shape: -2.31% realized within
 /// ~40 superbatches, then 239 superbatches that moved nothing. So a schedule that reaches its last drop
 /// with fewer than this many superbatches left has paid for a stage it will not collect.
 const USEFUL_TAIL_SUPERBATCHES: usize = 30;
@@ -304,7 +304,7 @@ fn check_lr_schedule(end_sb: usize, step: usize, start_sb: usize) {
     println!("  {reached}/{intended} drops apply; {tail} superbatch(es) at lr {reached_rate:.8}.");
     if tail < USEFUL_TAIL_SUPERBATCHES {
         println!("  WARNING: that tail is shorter than the ~{USEFUL_TAIL_SUPERBATCHES} superbatches a drop");
-        println!("  needs to be realised, so most of the last drop will not be collected. Lower");
+        println!("  needs to be realized, so most of the last drop will not be collected. Lower");
         println!("  PAWNSTAR_LR_STEP or raise PAWNSTAR_SBS to spend the stage you have paid for.");
     }
 }
@@ -316,7 +316,7 @@ fn check_lr_schedule(end_sb: usize, step: usize, start_sb: usize) {
 /// Four ways a resume goes wrong while reading in the log exactly like a resume that went right:
 ///
 ///  * PAWNSTAR_START_SB without PAWNSTAR_RESUME re-enters the schedule at a mid-run learning rate and
-///    a mid-pool data position with FRESHLY INITIALISED weights, which continues nothing.
+///    a mid-pool data position with FRESHLY INITIALIZED weights, which continues nothing.
 ///  * PAWNSTAR_START_SB past PAWNSTAR_SBS leaves no superbatches to train, which bullet reports as
 ///    `InvalidSchedule` after the device is up and without naming which field is wrong.
 ///  * PAWNSTAR_RESUME without PAWNSTAR_START_SB loads the checkpoint and then runs the whole schedule
@@ -342,7 +342,7 @@ fn check_resume(resume_from: &str, start_sb: usize, end_sb: usize) {
     if resume_from.is_empty() {
         if start_sb > 1 {
             eprintln!("RESUME REFUSED: PAWNSTAR_START_SB={start_sb} without PAWNSTAR_RESUME would train a");
-            eprintln!("  freshly initialised net from superbatch {start_sb}: a mid-schedule rate and a");
+            eprintln!("  freshly initialized net from superbatch {start_sb}: a mid-schedule rate and a");
             eprintln!("  mid-pool data position applied to random weights. Set PAWNSTAR_RESUME to the");
             eprintln!("  checkpoint directory to continue, or PAWNSTAR_START_SB=1 to train from scratch.");
             std::process::exit(1);
@@ -351,7 +351,7 @@ fn check_resume(resume_from: &str, start_sb: usize, end_sb: usize) {
     }
 
     // bullet appends `/optimiser_state` to the path it is given, and the AdamW state there is three
-    // files: the weights, and the optimiser's own momentum and velocity.
+    // files: the weights, and the optimizer's own momentum and velocity.
     let state_dir = format!("{resume_from}/optimiser_state");
     let missing: Vec<&str> = ["weights.bin", "momentum.bin", "velocity.bin"]
         .into_iter()
@@ -361,8 +361,8 @@ fn check_resume(resume_from: &str, start_sb: usize, end_sb: usize) {
         let missing = missing.join(", ");
         eprintln!("RESUME REFUSED: {state_dir} is missing {missing}.");
         eprintln!("  PAWNSTAR_RESUME names the checkpoint DIRECTORY, e.g. checkpoints/pawnstar-819 - not");
-        eprintln!("  the optimiser_state inside it, and not a quantised .bin net, which carries no");
-        eprintln!("  optimiser state at all and so cannot be resumed from.");
+        eprintln!("  the optimiser_state inside it, and not a quantized .bin net, which carries no");
+        eprintln!("  optimizer state at all and so cannot be resumed from.");
         std::process::exit(1);
     }
 
@@ -377,7 +377,7 @@ fn check_resume(resume_from: &str, start_sb: usize, end_sb: usize) {
 /// Wraps the real scheduler and prints the learning rate at the first batch of every superbatch.
 ///
 /// bullet prints the scheduler's *description* in its preamble but never the rate it applies, so the
-/// log of a finished run records the configuration and not the behaviour - and on a resume there is
+/// log of a finished run records the configuration and not the behavior - and on a resume there is
 /// nothing in it showing whether the scheduler was fed the ABSOLUTE superbatch number or one relative
 /// to `start_superbatch`. At `step` 273 a resume at 541 must read 0.0003 (one drop already taken) if
 /// the index is absolute and 0.001 if it is relative, and a relative index would move the second drop
@@ -397,8 +397,8 @@ impl<T: LrScheduler> LrScheduler for LoggedLR<T> {
         rate
     }
 
-    fn colourful(&self) -> String {
-        self.0.colourful()
+    fn colorful(&self) -> String {
+        self.0.colorful()
     }
 }
 
@@ -432,7 +432,7 @@ fn main() {
          QA={QA} QB={QB} SCALE={SCALE}"
     );
 
-    // Before the GPU, the data file or the optimiser: a schedule whose last drop cannot apply is a
+    // Before the GPU, the data file or the optimizer: a schedule whose last drop cannot apply is a
     // run whose final stage is silently missing, and the run costs hours. A resume goes through the
     // same guard - it is the entry point most likely to break the schedule's shape, since raising
     // PAWNSTAR_SBS to continue a run moves the derived step's drops rather than extending past them.
@@ -444,7 +444,7 @@ fn main() {
         .optimiser(AdamW)
         .inputs(ChessBucketsMirrored::new(KING_BUCKETS_HALF))
         .output_buckets(MaterialCount::<OUTPUT_BUCKETS>)
-        // Save order and quantisation must match the RNNUE1 payload src/nnue.h reads:
+        // Save order and quantization must match the RNNUE1 payload src/nnue.h reads:
         //   l0w  int16[768 * NUM_BUCKETS][HIDDEN_SIZE]  bucket-major rows, QA
         //   l0b  int16[HIDDEN_SIZE]                                        QA
         //   l1w  int16[OUTPUT_BUCKETS][2 * HIDDEN_SIZE]  stm half first,   QB
@@ -455,7 +455,7 @@ fn main() {
         // wants bucket-major so selecting a head is a pointer offset. It is a no-op at one bucket, which
         // is why the v12 trainer could leave it out.
         //
-        // l1b is quantised to **i32**, not i16. The trained values fit i16 comfortably, but the width is
+        // l1b is quantized to **i32**, not i16. The trained values fit i16 comfortably, but the width is
         // part of the shared container - every engine reads int32[output_buckets] - so emitting i16 here
         // would produce a payload two bytes short per head and a net every engine refuses.
         .save_format(&[
@@ -478,13 +478,13 @@ fn main() {
         });
 
     // After the net is built and before the schedule runs: this loads the weights and the AdamW
-    // momentum and velocity out of <resume_from>/optimiser_state. Resuming without the optimiser state
+    // momentum and velocity out of <resume_from>/optimiser_state. Resuming without the optimizer state
     // would restart Adam's moments at zero and take a few hundred batches to recover them, which is
-    // why this is a checkpoint directory and not a quantised net.
+    // why this is a checkpoint directory and not a quantized net.
     if !resume_from.is_empty() {
-        println!("RESUME: loading optimiser state from {resume_from}/optimiser_state");
+        println!("RESUME: loading optimizer state from {resume_from}/optimiser_state");
         trainer.load_from_checkpoint(&resume_from);
-        println!("RESUME: optimiser state loaded; starting at superbatch {start_sb}");
+        println!("RESUME: optimizer state loaded; starting at superbatch {start_sb}");
     }
 
     let schedule = TrainingSchedule {

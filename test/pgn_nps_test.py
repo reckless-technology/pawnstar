@@ -24,7 +24,7 @@ WHAT THE ASSERTIONS CATCH, deliberately:
     node-bearing comments credited that game's remaining three moves as if they were moves 1, 2 and 3 -
     1,000,000 nodes to the candidate and 500,000 to the baseline, where the truth is 500,000 and 1,000,000.
     The fixture asserts the right way round, so that bug cannot pass; and the two numbers are the swap of
-    each other, which is the signature to recognise.
+    each other, which is the signature to recognize.
   * **a comment that is missing altogether is refused, not guessed.** The fifth game declares four plies and
     carries three comments, so there is no way to know which move lost its comment and the alternation
     cannot be trusted. That game is counted as inconsistent and contributes nothing, and the count is

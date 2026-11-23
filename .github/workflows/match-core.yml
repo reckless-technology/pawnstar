@@ -49,7 +49,7 @@ on:
         type: string
         default: ''
       games:
-        description: 'Total games (rounded up to whole colour-reversed pairs)'
+        description: 'Total games (rounded up to whole color-reversed pairs)'
         type: string
         default: '4000'
       chunks:
@@ -90,7 +90,7 @@ permissions:
 
 env:
   # fastchess, built from source at this commit (the tag v1.8.2-alpha). The same release the Stoopid Chess repository
-  # pins in tools/tuning-tools.txt, so one fastchess serves the organisation.
+  # pins in tools/tuning-tools.txt, so one fastchess serves the organization.
   FASTCHESS_TAG: v1.8.2-alpha
   FASTCHESS_COMMIT: f618e34540f94f4719ad3817950618dabe441318
 

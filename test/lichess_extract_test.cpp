@@ -135,8 +135,8 @@ void AfterTheMoveRule()
 
     // The off-by-one this suite exists to catch: had the eval been paired with the position the move was
     // played from, ply 1's record would be the start position and ply 2's would be kAfterE4.
-    Check(sink.records[0].fen != lichess::kStartPositionFen, "ply 1 is not labelled with the start position");
-    Check(sink.records[1].fen != kAfterE4, "ply 2 is not labelled with ply 1's position");
+    Check(sink.records[0].fen != lichess::kStartPositionFen, "ply 1 is not labeled with the start position");
+    Check(sink.records[1].fen != kAfterE4, "ply 2 is not labeled with ply 1's position");
 }
 
 void ResultMapping()
@@ -227,7 +227,7 @@ void EvalCommentParsing()
 
     // A value that is not a number must make the ply unannotated rather than mislabel it as 0.00, which
     // would look exactly like a drawn position.
-    Check(!lichess::ParseEvalComment("[%eval banana]").has_eval, "an unparseable eval leaves the ply unlabelled");
+    Check(!lichess::ParseEvalComment("[%eval banana]").has_eval, "an unparseable eval leaves the ply unlabeled");
 }
 
 void MateHandling()
@@ -256,7 +256,7 @@ void MateHandling()
     Check(lichess::AdjudicationScore(lichess::ParseEvalComment("[%clk 0:01:00]")) == 0,
           "an unannotated ply is neutral for the adjudication");
 
-    // Skipping is visible in the statistics as its own reason, so a run can tell "Lichess did not analyse
+    // Skipping is visible in the statistics as its own reason, so a run can tell "Lichess did not analyze
     // this" from "we refused the label".
     CollectingSink      sink;
     lichess::Statistics statistics;
@@ -573,5 +573,5 @@ int main()
     ReaderAndProvenance();
     MovetextTolerance();
     return test_report::Summary(
-        "LICHESS EXTRACT: after-the-move labelling, result mapping, White-relative sign, SAN, filters, provenance");
+        "LICHESS EXTRACT: after-the-move labeling, result mapping, White-relative sign, SAN, filters, provenance");
 }

@@ -156,7 +156,7 @@ inline void handle_uci(Game &game, std::span<std::string>)
 }
 
 /// @brief Handle the "setoption" command: "setoption name <Name> value <Value>".
-/// Recognises EvalFile (load a different NNUE net file; NNUE is the only evaluator — a net the loader
+/// Recognizes EvalFile (load a different NNUE net file; NNUE is the only evaluator — a net the loader
 /// refuses leaves the net already loaded playing, and says so on both streams, naming it), Hash (transposition
 /// table size in MB, 1..4096), Threads (Lazy SMP search threads, 1..kMaxSearchThreads), Clear Hash (a
 /// button that empties the transposition table), Move Overhead (ms reserved from each deadline, 0..5000) and
@@ -367,7 +367,7 @@ inline void handle_bench(Game &game, std::span<std::string> args)
 /// @brief Handle the "go" command: parse time controls and start searching.
 /// Parsed as a small state machine alternating between a keyword and its integer argument, rather than
 /// scanning with `args[++i]` look-ahead (which also read out of bounds when a value keyword ended the
-/// input). Recognised keywords: the flags `infinite`/`ponder`, and the value-taking `wtime`/`btime`/
+/// input). Recognized keywords: the flags `infinite`/`ponder`, and the value-taking `wtime`/`btime`/
 /// `winc`/`binc`/`movetime`/`depth`/`movestogo`/`nodes`, and `searchmoves` with its moves; any other token is
 /// ignored. A value-taking keyword whose value is missing or not an integer (ParseInteger) is ignored with it.
 /// @param game Game to act on.
@@ -399,7 +399,7 @@ inline void handle_go(Game &game, std::span<std::string> args)
         const std::string &token = args[i];
         if (state == State::kCollectMoves)
         {
-            // Collect coordinate-notation moves until the next recognised keyword (searchmoves is usually
+            // Collect coordinate-notation moves until the next recognized keyword (searchmoves is usually
             // last, but tolerate a keyword following it).
             if (token == "ponder" || token == "infinite" || token == "wtime" || token == "btime" || token == "winc" ||
                 token == "binc" || token == "movetime" || token == "depth" || token == "movestogo" ||
@@ -432,7 +432,7 @@ inline void handle_go(Game &game, std::span<std::string> args)
                 pending = token; // a value-taking keyword: its argument is the next token
                 state   = State::kAwaitValue;
             }
-            // else: ignore unrecognised tokens (nodes, searchmoves and its move list, …)
+            // else: ignore unrecognized tokens (nodes, searchmoves and its move list, …)
         }
         else // kAwaitValue: token is the integer argument for `pending`
         {
@@ -593,7 +593,7 @@ inline void handle_position(Game &game, std::span<std::string> args)
     }
 }
 
-/// @brief The text the "license" command prints: this engine's licence, then every third-party notice the
+/// @brief The text the "license" command prints: this engine's license, then every third-party notice the
 /// material it distributes obliges. Condensed from THIRD-PARTY-NOTICES.md, which is the full text.
 ///
 /// **The same notice the sibling ports print**, line for line with pawnstar-rs's `LICENSE_NOTICE`
@@ -653,7 +653,7 @@ inline constexpr std::array kLicenseNotice = {
     "(https://github.com/jw1912/bullet), MIT-licensed: see THIRD-PARTY-NOTICES.md for the\n",
     "copyright and permission notice that accompanies them.\n"};
 
-/// @brief Handle the "license" command: print the engine's licence and the third-party notices a
+/// @brief Handle the "license" command: print the engine's license and the third-party notices a
 /// distributed copy of it owes - above all the Open Database License attribution the shipped network
 /// carries. ODbL wants the notice to accompany the Produced Work, and a user who downloads only a release
 /// binary gets no file from this repository at all, so the engine has to be able to say it itself.

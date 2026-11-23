@@ -1,6 +1,6 @@
-# int16 → int8 NNUE quantisation — feasibility study & plan
+# int16 → int8 NNUE quantization — feasibility study & plan
 
-Measured investigation of switching Pawnstar's NNUE quantisation from 16-bit to 8-bit: where the time
+Measured investigation of switching Pawnstar's NNUE quantization from 16-bit to 8-bit: where the time
 goes, what int8 can actually accelerate, and what it costs in eval accuracy / dynamic range. The figures
 below were measured on `pawnstar-v8.bin` (since retired); the methodology reproduces on the shipped net
 with the bundled tool (the figures are net-specific, so they shift slightly):
@@ -38,7 +38,7 @@ runs on VNNI CPUs while the single binary still loads on AVX2-only ones — see 
    **int8's reachable target is therefore large.** This is the finding that flips the recommendation.
 2. **The FT accumulator must stay ≥ int16** (live values reach −4840; int8 would overflow instantly). int8
    does *not* speed up the dominant-by-count `Update` path. So int8 is an **output-layer** play, not an FT play.
-3. **int8 output layer is clean to quantise.** Output weights already fit int8 (`max|w|=127`, scale `WS=1`),
+3. **int8 output layer is clean to quantize.** Output weights already fit int8 (`max|w|=127`, scale `WS=1`),
    and **S=8** maps SCReLU's `[0, 65025]` onto `uint8 [0,254]` with no extra clamp — the natural operating
    point. Emulated eval error vs int16: **mean 3.1 cp, max 13 cp** over the 250 positions.
 4. **VNNI is the right kernel** and is viable: the int64 dot never exceeds 86M, so an int32 `vpdpbusd`
@@ -67,7 +67,7 @@ Static weights: `feature_weights max|w|=505` (QA=255 units), `output_weights max
 - The accumulator's −4840 floor is the hard reason the **feature transformer can't go int8**; this matches
   every top engine keeping an int16 FT accumulator even for int8 nets.
 
-### int8 output-layer emulation (Option 1: requantise SCReLU `>>S`, int8 weights), error vs int16 eval
+### int8 output-layer emulation (Option 1: requantize SCReLU `>>S`, int8 weights), error vs int16 eval
 
 | S | mean \|Δcp\| | max \|Δcp\| | AVX2 pmaddubsw int16 overflow |
 |---|---|---|---|
@@ -133,8 +133,8 @@ currently on the table**, ahead of a wider net.
 (`tools/run_sprt.sh`). The question is whether 3 cp mean eval error is strength-neutral while the clock gain
 is real. Ship only on a non-regression (Elo) with a measured nps win.
 
-**Phase 4 — (conditional) requantise-aware retrain.** If the static `>>8` error costs Elo, retrain in bullet
-with the int8 output quantisation in the loss (quantisation-aware), or trim QA so activations need less shift.
+**Phase 4 — (conditional) requantize-aware retrain.** If the static `>>8` error costs Elo, retrain in bullet
+with the int8 output quantization in the loss (quantization-aware), or trim QA so activations need less shift.
 Follow the full ship checklist in [nnue/README.md](README.md) §7.
 
 **Portability note.** The shipped binary targets AVX2. An AVX2-only int8 path must avoid `pmaddubsw`
@@ -149,7 +149,7 @@ i.e. int8 is gated on a VNNI target, which the dev/cloud box now provides.
 Implemented the int8 output forward pass as `nnue::Network::Evaluate` (`src/nnue.h`) — **the engine's
 default evaluator** as of this work. The exact int16 SCReLU dot is retained as `Network::EvaluateExact`, the
 reference that `test_nnue` cross-checks against bullet (±2 cp) and that the int8 path is checked against
-(≤40 cp). Output weights are requantised to int8 at load (`output_weights_i8_`); SCReLU activations to uint8
+(≤40 cp). Output weights are requantized to int8 at load (`output_weights_i8_`); SCReLU activations to uint8
 via `>> kInt8Shift`. The dot uses `vpdpbusd` (selected at runtime by cpuid) where VNNI is present and AVX2
 `pmaddubsw`+`madd` otherwise — bit-identical. (Earlier this lived behind an `INT8=1` flag; it is now
 unconditional, and the Bratko-Kopec accepted-move sets were regenerated for the int8 eval.)
@@ -199,7 +199,7 @@ Yes for speed, but with a sharp accuracy catch the output layer didn't have.
 - **The catch — it's lossy, unlike the output layer.** `feature_weights max|w| = 505`, which does **not** fit
   int8 (±127). Storing them int8 needs a scale `FS = ⌈505/127⌉ = 4`, i.e. dividing every feature weight by 4
   and **losing ~2 bits of precision on the most numerous, most strength-critical parameters**. The output
-  layer was free (`max|w|=127`, `WS=1`, lossless); the FT is not. Doing it well needs a **quantisation-aware
+  layer was free (`max|w|=127`, `WS=1`, lossless); the FT is not. Doing it well needs a **quantization-aware
   retrain** in bullet (train feature weights clipped into int8 range, then export `i8`), not a post-hoc ÷4.
 
 **Verdict (initial):** int8 feature weights looked like a real *second* speed lever (~1.5× on the
@@ -208,7 +208,7 @@ Yes for speed, but with a sharp accuracy catch the output layer didn't have.
 ### Prototype measurement (engine, behind `INT8_FT=1`) — the optimism didn't survive contact
 
 Implemented int8 FT storage in the engine (`PAWNSTAR_INT8_FT`): the weight table is int8, `Load`
-requantises the int16 net on the fly (scale = `⌈max|w|/127⌉` = **4** for v8), and the column-add
+requantizes the int16 net on the fly (scale = `⌈max|w|/127⌉` = **4** for v8), and the column-add
 reconstructs ~original scale via `*feature_w_scale_`, leaving the accumulator/SCReLU/output untouched.
 Two results, both discouraging for the *post-hoc* path:
 
@@ -225,19 +225,19 @@ can't settle it. `test_nnue_incremental` still passes (the reconstruct is determ
 
 **Revised verdict:** int8 feature weights are **not** a clear win like the output layer.
 - The **÷4 post-hoc prototype is dead** (182 cp ≫ the output layer's 26; it would shed Elo badly).
-- A **quantisation-aware retrain** (train feature weights clipped to ±127 → scale 1) is *required* — it
+- A **quantization-aware retrain** (train feature weights clipped to ±127 → scale 1) is *required* — it
   makes the FT lossless **and** drops the reconstruct `mullo` (just widen+add), the best case for speed.
-- Even then the speedup is **regime-dependent**: it only materialises if real search is memory-bound on the
+- Even then the speedup is **regime-dependent**: it only materializes if real search is memory-bound on the
   FT column loads. That needs a real-search measurement (confounded by eval), not a per-call microbench.
 
 So before spending GPU time on the retrain, the open question is **"is the FT `Update` memory-bound in real
 search?"** If not, even a lossless int8-FT is neutral-to-slower and isn't worth it. The output-layer int8
 (Phase 2/3, +31.8 Elo) remains the clear, shippable win; int8-FT is speculative. The engine support is
-committed (off by default, `INT8_FT=1`) so a future quantisation-aware net can be measured directly.
+committed (off by default, `INT8_FT=1`) so a future quantization-aware net can be measured directly.
 
-### Quantisation-aware retrain — DONE, definitive **REJECT** (−8 Elo)
+### Quantization-aware retrain — DONE, definitive **REJECT** (−8 Elo)
 
-Closed the open question. Trained a quantisation-aware net (bullet `set_params_for_weight("l0w",
+Closed the open question. Trained a quantization-aware net (bullet `set_params_for_weight("l0w",
 AdamWParams{ min_weight: -127/QA, max_weight: 127/QA })`, 1024-wide single-bank, ~750M positions of the PlentyChess dataset), which
 clips the exported FT weights to **`max|w| = 127` → `scale = 1`** — verified on the net (0 weights > 127).
 At scale 1 the int8-FT column-add is just widen+add (no `mullo`; the engine has a hoisted `scale==1` fast
@@ -253,7 +253,7 @@ so an SPRT is a **pure speed test**.
 So even the *best case* (lossless scale=1, no reconstruct multiply) is a **~8 Elo regression**: the FT
 `Update` is **not** memory-bound at 1024×1 in real search, and the int8→int16 widening (`cvtepi8_epi16`)
 in the column-add costs more than halving the weight-table bytes saves. **int8 feature weights are a closed
-door, not an open lever** — the quantisation-aware caveat that kept it alive is now ruled out. After this
+door, not an open lever** — the quantization-aware caveat that kept it alive is now ruled out. After this
 result the engine `INT8_FT` support, the `INT8_FT=1` build flag, and the trainer FT-weight clipping were
 **removed** (the feature transformer is unconditionally int16 again); this document is the record. Don't
 reintroduce it.

@@ -1,14 +1,14 @@
 #pragma once
 /// @file sha256.h FIPS 180-4 SHA-256, for the provenance sidecars the training-data tools write.
 ///
-/// A data shard's lineage has to be auditable later - which net labelled it, or which input bytes it was
+/// A data shard's lineage has to be auditable later - which net labeled it, or which input bytes it was
 /// extracted from - and a filename says nothing about contents. This is the whole of SHA-256 in one header
 /// with no dependency: the engine links no crypto library and should not start now for one hash of one file.
 ///
 /// Two forms, because the two tools need different ones. `Hasher` is incremental, for a stream that is
 /// consumed once and never seekable (tools/lichess_extract.cpp reads its PGN from stdin, so the only chance
 /// to hash the input is as it goes past). `OfFile` is the one-shot form for a file on disk
-/// (tools/gen_data.cpp hashes the labelling net).
+/// (tools/gen_data.cpp hashes the labeling net).
 ///
 /// tools/gen_data.cpp still carries its own copy of this algorithm inline; it should be switched over to
 /// this header, which was not done here only because that file was being edited concurrently.

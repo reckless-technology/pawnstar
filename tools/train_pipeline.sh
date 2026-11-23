@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end NNUE training pipeline. Trains a quantised net and exports it to a path the engine loads.
+# End-to-end NNUE training pipeline. Trains a quantized net and exports it to a path the engine loads.
 #
 # Two input modes (auto-detected from the first argument):
 #   * a DIRECTORY of text shards (data_*.txt / seed*.txt in bullet's "FEN | eval | wdl" text format)
@@ -138,7 +138,7 @@ cd "$BULLET/crates/bullet_lib"
 PAWNSTAR_DATA="$SHUF_DATA" PAWNSTAR_BPS="$BPS" PAWNSTAR_SBS="$END_SB" PAWNSTAR_OUT="$CKPT" \
     cargo run --release $FEATURES --example pawnstar
 
-# [4/4] bullet writes a checkpoint dir per superbatch; the final one holds the quantised net we ship.
+# [4/4] bullet writes a checkpoint dir per superbatch; the final one holds the quantized net we ship.
 echo "[4/4] exporting net -> $OUT_NET"
 cp "$CKPT/pawnstar-$END_SB/quantised.bin" "$OUT_NET"
 ls -la "$OUT_NET"

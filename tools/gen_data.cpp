@@ -65,7 +65,7 @@
 ///   seed       RNG seed, for the opening order and the random opening plies; distinct seeds give
 ///              distinct shards, and the same seed replays the same games.
 ///
-/// Labelling options (each independently switchable, so they can be A/B tested one at a time):
+/// Labeling options (each independently switchable, so they can be A/B tested one at a time):
 ///   --play-depth N        fixed depth for the game-playing search (default 8).
 ///   --play-nodes N        node budget for the game-playing search instead of a fixed depth. A budget is
 ///                         exact at one thread and, unlike a depth, costs the same on a quiet and on a
@@ -73,14 +73,14 @@
 ///   --label-depth N       fixed depth for the second-stage re-label (default: unset, see --label-nodes).
 ///   --label-nodes N       node budget for the second-stage re-label (default 220000, about depth 12 on this
 ///                         engine). Only one of --label-depth / --label-nodes applies; the last one wins.
-///   --label-interval N    two-stage labelling: re-label and emit every Nth kept quiet position with the
+///   --label-interval N    two-stage labeling: re-label and emit every Nth kept quiet position with the
 ///                         much larger label budget (1 = every one, 4 = every fourth). 0 (the default)
 ///                         is single-stage: every kept quiet position is emitted with the play search's own
 ///                         score. Two-stage decouples the cost of playing the game from the cost of the
 ///                         label, which is the whole point of the mode.
-///   --pv-plies N          harvest the first N plies of the labelling search's principal variation as extra
+///   --pv-plies N          harvest the first N plies of the labeling search's principal variation as extra
 ///                         records, each carrying the backed-up root score (default 4, 0 = off, max 8).
-///                         Up to N+1 labelled positions per search instead of one - measured about three
+///                         Up to N+1 labeled positions per search instead of one - measured about three
 ///                         times the records per deep search at N=4, since the quiet filter drops some.
 ///   --disagreement-cp N   emit a record --disagreement-copies times when |search score - static eval|
 ///                         exceeds N centipawns (default 150).
@@ -113,10 +113,10 @@
 ///   --no-dedup            keep repeated positions. By default a position whose Zobrist hash was already
 ///                         written to this shard is dropped: self-play repeats openings heavily.
 ///   --hash MB             transposition-table size per process (default: the engine's own 64 MB).
-///   --net PATH            the labelling net (default: $PAWNSTAR_EVALFILE, else nnue/pawnstar-v20.bin).
+///   --net PATH            the labeling net (default: $PAWNSTAR_EVALFILE, else nnue/pawnstar-v20.bin).
 ///   --progress N          games between progress lines on stderr (default 50, 0 = silent).
 ///
-/// Each run also writes `<out_file>.meta`, a provenance sidecar naming the engine version, the labelling
+/// Each run also writes `<out_file>.meta`, a provenance sidecar naming the engine version, the labeling
 /// net and its SHA-256, every budget, the seed and the record count (§6 of nnue/README.md). It is a separate
 /// file rather than a header line because `bullet-utils convert --from text` reads one record per line and
 /// would try to parse a comment as a position.
@@ -215,13 +215,13 @@ struct Options
     SearchBudget             play_budget;                      ///< Budget for the game-playing search.
     SearchBudget             label_budget;                     ///< Budget for the second-stage re-label.
     int                      label_interval            = 0;    ///< 0 = single-stage; else re-label every Nth.
-    int                      principal_variation_plies = 4;    ///< PV plies harvested per labelling search.
+    int                      principal_variation_plies = 4;    ///< PV plies harvested per labeling search.
     int                      disagreement_centipawns   = 150;  ///< |search - static| above which to reweight.
     int                      disagreement_copies       = 2;    ///< Copies written for a disagreeing record.
     int                      random_plies              = 8;    ///< Random opening plies per game.
     bool                     does_deduplicate          = true; ///< Drop positions already written this shard.
     std::size_t              hash_megabytes            = 0;    ///< 0 = leave the engine's default size.
-    std::string              net_path;                         ///< Labelling net.
+    std::string              net_path;                         ///< Labeling net.
     std::string              openings_file;                    ///< EPD opening set, or empty for the start position.
     std::vector<std::string> openings;                         ///< The parsed opening FENs.
     std::size_t              worker_index         = 0;         ///< Index in this machine's own fan.
@@ -346,7 +346,7 @@ struct Candidate
 // ---------------------------------------------------------------------------
 // SHA-256, for the provenance sidecar. A net's filename says nothing about its contents, and the lineage of
 // a net trained on this data has to be auditable later: only a net two or more generations removed from the
-// retired v12 may ship, which means knowing exactly which net labelled which shard. FIPS 180-4, no
+// retired v12 may ship, which means knowing exactly which net labeled which shard. FIPS 180-4, no
 // dependency - the engine links no crypto library and should not start now for one hash of one file.
 // ---------------------------------------------------------------------------
 
@@ -487,7 +487,7 @@ constexpr int WhiteRelativeScore(int side_to_move_score, Color color_to_move)
 ///    for the UCI path, Game::SetPosition for `bench` and the tests, which set a position per search). A
 ///    tool that plays a whole game through one Game therefore has to clear it per move, or every search
 ///    after the first returns from its first cancellation check - which looks exactly like a working run,
-///    just with one labelled position per game instead of eighty.
+///    just with one labeled position per game instead of eighty.
 ///
 /// @param game Game to prepare. @param budget The budget to apply.
 void PrepareSearch(Game &game, const SearchBudget &budget)
@@ -552,7 +552,7 @@ bool IsGameOver(const Game &game, double &white_result)
 }
 
 /// @brief Append one position's records, applying the disagreement weighting and the shard-wide dedup.
-/// @param options The run's options. @param network The labelling net, for the static eval.
+/// @param options The run's options. @param network The labeling net, for the static eval.
 /// @param position The position to record. @param white_score Its label, White's perspective.
 /// @param seen Zobrist hashes already written to this shard (updated); ignored when dedup is off.
 /// @param records Output records.
@@ -581,13 +581,13 @@ void AppendRecord(const Options &options, const nnue::Network &network, const Po
     records.push_back({position.ToString(), white_score, copies});
 }
 
-/// @brief Record a labelled position and the first few plies of the line the label came from.
+/// @brief Record a labeled position and the first few plies of the line the label came from.
 ///
 /// The root score is what the search backed up through the whole principal variation, so every position
 /// along that line shares it - in White's perspective it is literally the same number, which is why no
 /// per-ply sign flip appears here: `white_score` is already White-relative, and White-relative scores do
 /// not depend on whose turn it is. (A side-to-move-relative harvest would have to negate on every ply.)
-/// That is what makes the harvest cheap: one deep search yields up to pv_plies + 1 labelled positions.
+/// That is what makes the harvest cheap: one deep search yields up to pv_plies + 1 labeled positions.
 ///
 /// The line is replayed on a copy of the position, never on the Game or a SearchState, so neither the game
 /// history nor any NNUE accumulator is touched - there is nothing to undo. Each move is checked against the
@@ -596,14 +596,14 @@ void AppendRecord(const Options &options, const nnue::Network &network, const Po
 /// not legal in the position it is reached at. The harvest stops at the first such move rather than
 /// corrupting the line.
 ///
-/// @param options The run's options. @param network The labelling net.
+/// @param options The run's options. @param network The labeling net.
 /// @param root The position that was searched. @param white_score Its label, White's perspective.
-/// @param principal_variation The labelling search's PV (may be empty).
+/// @param principal_variation The labeling search's PV (may be empty).
 /// @param seen Zobrist hashes already written to this shard (updated).
 /// @param records Output records.
-void AppendLabelledLine(const Options &options, const nnue::Network &network, const Position &root, int white_score,
-                        const std::vector<Move> &principal_variation, std::unordered_set<zobrist_t> &seen,
-                        std::vector<Record> &records)
+void AppendLabeledLine(const Options &options, const nnue::Network &network, const Position &root, int white_score,
+                       const std::vector<Move> &principal_variation, std::unordered_set<zobrist_t> &seen,
+                       std::vector<Record> &records)
 {
     AppendRecord(options, network, root, white_score, seen, records);
     Position  position = root;
@@ -647,7 +647,7 @@ void AppendLabelledLine(const Options &options, const nnue::Network &network, co
 
 /// @brief Play one self-play game and write its records, with the final result baked into every one.
 /// @param options The run's options.
-/// @param game A Game with the labelling net loaded; reset to the start position here and reused.
+/// @param game A Game with the labeling net loaded; reset to the start position here and reused.
 /// @param openings This worker's opening schedule, advanced by this call; empty for the start position.
 /// @param rng Opening-ply RNG, advanced by this call.
 /// @param seen Zobrist hashes already written to this shard (updated).
@@ -666,7 +666,7 @@ void PlayGame(const Options &options, Game &game, OpeningSchedule &openings, std
     {
         game.SetPosition(openings.Next());
     }
-    game.use_own_book_ = false; // the engine's own judgement only, and the book's pick is random
+    game.use_own_book_ = false; // the engine's own judgment only, and the book's pick is random
 
     // Random opening plies for diversity (not recorded).
     for (int i = 0; i < options.random_plies; ++i)
@@ -702,7 +702,7 @@ void PlayGame(const Options &options, Game &game, OpeningSchedule &openings, std
         const Move best        = game.SearchRootNode();
         const int  white_score = WhiteRelativeScore(best.score(), position.color_to_move_);
         // A root that returned without searching - a forced move, or a book move - carries no score (the
-        // node count is the engine's own marker for that), so it is played but never labelled.
+        // node count is the engine's own marker for that), so it is played but never labeled.
         const bool was_searched = game.last_search_node_count_ != 0;
 
         // Was the game already decided before it was played? A random opening line can reach a position one
@@ -745,7 +745,7 @@ void PlayGame(const Options &options, Game &game, OpeningSchedule &openings, std
         game.PlayMove(best);
     }
 
-    // The game is over, so the Game is free for the second-stage labelling searches: each one resets it to a
+    // The game is over, so the Game is free for the second-stage labeling searches: each one resets it to a
     // candidate's FEN. Nothing below reads the game history any more.
     std::vector<Record> records;
     for (std::size_t i = 0; i < candidates.size(); ++i)
@@ -754,13 +754,13 @@ void PlayGame(const Options &options, Game &game, OpeningSchedule &openings, std
         if (options.label_interval <= 0)
         {
             // Single-stage: the play search's own score is the label.
-            AppendLabelledLine(options, game.nnue_network_, Position::FromString(candidate.fen), candidate.white_score,
-                               candidate.principal_variation, seen, records);
+            AppendLabeledLine(options, game.nnue_network_, Position::FromString(candidate.fen), candidate.white_score,
+                              candidate.principal_variation, seen, records);
             continue;
         }
         if (i % (std::size_t)options.label_interval != 0)
         {
-            continue; // sampled out: played for free, never labelled
+            continue; // sampled out: played for free, never labeled
         }
         // Two-stage: re-search this position with the much larger label budget and use *that* score. The
         // filter is applied again to the deeper verdict, which can see that the position is not quiet after
@@ -778,8 +778,7 @@ void PlayGame(const Options &options, Game &game, OpeningSchedule &openings, std
         {
             continue;
         }
-        AppendLabelledLine(options, game.nnue_network_, position, white_score, game.principal_variation_, seen,
-                           records);
+        AppendLabeledLine(options, game.nnue_network_, position, white_score, game.principal_variation_, seen, records);
     }
 
     const char *result_text = white_result > 0.75 ? "1.0" : (white_result < 0.25 ? "0.0" : "0.5");
@@ -1022,7 +1021,7 @@ int main(int argc, char **argv)
         }
         else
         {
-            std::cerr << "gen_data: unrecognised option '" << flag << "'\n";
+            std::cerr << "gen_data: unrecognized option '" << flag << "'\n";
             return 1;
         }
     }

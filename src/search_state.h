@@ -97,7 +97,7 @@ class SearchState
     void PrintSearchInfo(int depth, int score, const std::string &pv_string) const;
     bool IsDrawByRepetition() const;
     bool IsDrawByFiftyMoves() const;
-    bool IsCancelled() const;
+    bool IsCanceled() const;
     void RecordKiller(int ply, Move move);
     int  ContinuationHistScore(Move prev, Move move) const;
     bool IsCountermove(Move prev, Move move) const;
@@ -224,12 +224,12 @@ inline SearchState::SearchState(Game &g)
     : game_(g), history_(), node_count_(0), seldepth_(0),
       continuation_history_(std::make_unique<int16_t[]>(kContKeys * kContKeys))
 {
-    // Initialise the killer and countermove tables to "no move". Their Move elements are default-constructed
-    // (Move's default constructor deliberately leaves val_ uninitialised, kept cheap so per-node MoveLists
+    // Initialize the killer and countermove tables to "no move". Their Move elements are default-constructed
+    // (Move's default constructor deliberately leaves val_ uninitialized, kept cheap so per-node MoveLists
     // need not zero 256 moves), so they must be set explicitly here; the never-recorded slots would
     // otherwise hold garbage that ScoreAndSortMoves reads in its killer / countermove `==` comparisons. That
-    // stray read perturbed move ordering and was the long-standing uninitialised-stack read that made bench
-    // node counts differ across compiler optimisation levels (benign: legal moves and evals were unaffected,
+    // stray read perturbed move ordering and was the long-standing uninitialized-stack read that made bench
+    // node counts differ across compiler optimization levels (benign: legal moves and evals were unaffected,
     // only ordering). Move::None() is Move{0} — a value no legal move equals.
     for (auto &ply_killers : killers_)
     {
@@ -423,7 +423,7 @@ inline bool SearchState::IsDrawByRepetition() const
 
 /// @brief Check whether this thread should abort (the shared stop flag is set).
 /// @return true if the search should be abandoned.
-inline bool SearchState::IsCancelled() const
+inline bool SearchState::IsCanceled() const
 {
     return game_.is_cancel_pending_.load(std::memory_order_relaxed);
 }
@@ -510,9 +510,9 @@ inline int SearchState::AttemptNullMove(int depth, int ply, int alpha, int beta,
         MakeNullMove();
         int score = -Search(depth - 4, ply + 1, -beta, -alpha, dummy, Move::None());
         UndoMove();
-        if (IsCancelled())
+        if (IsCanceled())
         {
-            return kSearchCancelledScore;
+            return kSearchCanceledScore;
         }
         if (score >= beta)
         {
@@ -542,7 +542,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
          (game_.time_control_.max_nodes_ != 0 && node_count_ >= game_.time_control_.max_nodes_)))
     {
         game_.is_cancel_pending_.store(true, std::memory_order_relaxed);
-        return kSearchCancelledScore;
+        return kSearchCanceledScore;
     }
     if (CurrentPosition().IsDrawByMaterial())
     {
@@ -640,9 +640,9 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         }
         // Null move pruning, reusing the static eval.
         const int null_move_score = AttemptNullMove(depth, ply, alpha, beta, eval_score);
-        if (IsCancelled())
+        if (IsCanceled())
         {
-            return kSearchCancelledScore;
+            return kSearchCanceledScore;
         }
         if (null_move_score >= beta)
         {
@@ -657,7 +657,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
     bool      has_raised_alpha = false;
 
     // quiets_tried collects the quiet moves searched at this node (TT move included) so a later beta cutoff
-    // can penalise the ones that failed (the history malus in RecordGood). Stack-backed to avoid a per-node
+    // can penalize the ones that failed (the history malus in RecordGood). Stack-backed to avoid a per-node
     // heap allocation; capped at 64 (deeper is rare and the tail matters least).
     std::array<Move, 64> quiets_buffer;
     int                  quiets_count = 0;
@@ -669,9 +669,9 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
         pv.clear(); // child writes its line here only if it is a PV node; clear so a terminal/cutoff child leaves it
                     // empty
         const int score = SearchSingleMove(depth, ply, alpha, beta, transposition->move_, pv, 0).score();
-        if (IsCancelled())
+        if (IsCanceled())
         {
-            return kSearchCancelledScore;
+            return kSearchCanceledScore;
         }
         if (score >= beta)
         {
@@ -682,7 +682,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
                        std::span<const Move>{quiets_buffer.data(), static_cast<std::size_t>(quiets_count)});
             return score;
         }
-        // Record the TT move as tried (after its own cutoff check) so a later sibling's cutoff penalises it.
+        // Record the TT move as tried (after its own cutoff check) so a later sibling's cutoff penalizes it.
         if (transposition->move_.IsQuiet())
         {
             quiets_buffer[quiets_count++] = transposition->move_;
@@ -753,7 +753,7 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             }
         }
 
-        // Record this quiet move as tried before searching it, so a later sibling's cutoff penalises it (the
+        // Record this quiet move as tried before searching it, so a later sibling's cutoff penalizes it (the
         // eventual cutoff move is IN the list and excluded inside RecordGood). After LMP so pruned moves are
         // not recorded — matching the Go engine.
         if (move.IsQuiet() && quiets_count < 64)
@@ -768,9 +768,9 @@ inline int SearchState::Search(int depth, int ply, int alpha, int beta, Variatio
             INCREMENT("late move reduction fails");
             score = SearchSingleMove(depth, ply, alpha, beta, move, pv, move_index).score();
         }
-        if (IsCancelled())
+        if (IsCanceled())
         {
-            return kSearchCancelledScore;
+            return kSearchCanceledScore;
         }
         if (score >= beta)
         {
@@ -862,9 +862,9 @@ inline int SearchState::SearchQuiescent(int depth, int ply, int alpha, int beta)
         PlayMove(move);
         score = -SearchQuiescent(depth - 1, ply + 1, -beta, -alpha);
         UndoMove();
-        if (IsCancelled())
+        if (IsCanceled())
         {
-            return kSearchCancelledScore;
+            return kSearchCanceledScore;
         }
         if (score >= beta)
         {
@@ -948,7 +948,7 @@ inline Move SearchState::IterativeDeepen(MoveList move_list, Move best_move, int
             child_pv.clear(); // clear per move so a terminal/non-PV-node child leaves no stale tail
             const int score = SearchSingleMove(depth, 0, alpha, kBeta, move, child_pv, move_index).score();
             move.AssignScore(score);
-            if (IsCancelled())
+            if (IsCanceled())
             {
                 return best_move;
             }
@@ -1072,7 +1072,7 @@ inline int ScaleByRule50(int score, int rule50)
 
 /// @brief Evaluate the current position, assuming neither king is in check and the position is quiet.
 /// NNUE is the only evaluator: after the draw short-circuit this returns the network's score for the
-/// (incrementally maintained) accumulator, memoised by Zobrist hash in the net-specific eval cache, then
+/// (incrementally maintained) accumulator, memoized by Zobrist hash in the net-specific eval cache, then
 /// scaled toward draw by the fifty-move clock (see ScaleByRule50).
 /// @param state Per-thread search state providing the current position, accumulator and draw-detection.
 /// @return Score from the perspective of the side to move.
@@ -1084,7 +1084,7 @@ inline int EvaluatePosition(const SearchState &state)
         return kDrawScore;
     }
     const Position &position = state.CurrentPosition();
-    // Memoise the (net-specific) NNUE eval by Zobrist hash: a cache hit skips the forward pass. The
+    // Memoize the (net-specific) NNUE eval by Zobrist hash: a cache hit skips the forward pass. The
     // accumulator is maintained incrementally by SearchState make/undo; the cache only saves the
     // dot-product. The cache is cleared whenever the net changes (SetPosition / EvalFile load).
     //

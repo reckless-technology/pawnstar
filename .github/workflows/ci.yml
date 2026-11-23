@@ -45,7 +45,7 @@ jobs:
 
   # Style gate: the whole tree must be clang-format-clean. clang-format is version-sensitive - a different
   # major restyles code that is already correct - so the version is pinned, and since 2026-09-26 it is pinned
-  # to the same 22.1.8 across the whole organisation (see reckless-technology/claude-skills, skill
+  # to the same 22.1.8 across the whole organization (see reckless-technology/claude-skills, skill
   # reckless-working-practice). It was 18 here until that day. Not apt: Ubuntu 24.04 carries no
   # clang-format-22, and the PyPI wheel is what the development machines run, so CI and a developer's
   # pre-commit hook agree. The wheel goes into a venv of the job's own, under the image's python3.
@@ -523,7 +523,7 @@ jobs:
 
   # The single required check for the branch ruleset. `main` takes pull requests and requires this one context,
   # so the jobs above can be renamed, split or added to without editing the ruleset on the server. `if: always()`
-  # runs it even when a dependency failed, was skipped or was cancelled, and it is green only when every one of
+  # runs it even when a dependency failed, was skipped or was canceled, and it is green only when every one of
   # them succeeded — anything other than success fails it, naming the jobs that were not green.
   ci:
     name: CI

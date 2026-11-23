@@ -9,7 +9,7 @@
 ///    mirrors every position left-to-right and leaves a perfectly legal FEN carrying another position's
 ///    label.
 ///  * **the orientation.** lc0 keeps every position from the mover's point of view, so a black-to-move
-///    record's planes are rank-flipped *and* colour-swapped. Missing that turns Black's position into a
+///    record's planes are rank-flipped *and* color-swapped. Missing that turns Black's position into a
 ///    different White one.
 ///  * **the White-relative sign.** `best_q` and `result_q` are side-to-move relative and bulletformat's
 ///    text parser flips both columns itself for a black-to-move FEN, so the extractor must flip them once -
@@ -124,7 +124,7 @@ void WriteFloat(std::vector<unsigned char> &bytes, std::size_t offset, float val
     WriteUint32(bytes, offset, bits);
 }
 
-/// @brief Build one record. @param planes The plane words, as stored (index 0 is the labelled position's
+/// @brief Build one record. @param planes The plane words, as stored (index 0 is the labeled position's
 /// first bitboard). @param fields Everything else.
 /// @param version The version to stamp: 6 by default, or 7 for lc0's `V7TrainingData`, which inherits the
 ///        v6 layout and appends forty bytes this tool never reads. Those trailing bytes are left zero,
@@ -162,7 +162,7 @@ std::vector<unsigned char> BuildRecord(const std::vector<uint64_t> &planes, cons
 /// @brief Encode a FEN's placement the way lc0's writer would: the mover's orientation, bits reversed
 /// within every byte. Trusted only because PlaneDecodingAgainstTheRealArchive pins the convention.
 /// @param fen Any FEN; only its placement and side-to-move fields are read.
-/// @return The 13 planes of the labelled position.
+/// @return The 13 planes of the labeled position.
 std::vector<uint64_t> PlanesFromFen(const std::string &fen)
 {
     const std::size_t     space         = fen.find(' ');
@@ -289,7 +289,7 @@ void PlaneDecodingAgainstTheRealArchive()
         const lc0::DecodedPosition decoded = lc0::DecodePosition(lc0::RecordView{bytes.data()}, 0);
         Check(decoded.fen == "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
               "the real archive's ply-0 planes decode to the start position: " + decoded.fen);
-        Check(decoded.is_standard_start, "and are recognised as a standard start");
+        Check(decoded.is_standard_start, "and are recognized as a standard start");
         Check(decoded.piece_count == 32 && decoded.pawn_count == 16, "with 32 pieces, 16 of them pawns");
         Check(decoded.is_castling_consistent, "and all four rights are consistent with the placement");
     }

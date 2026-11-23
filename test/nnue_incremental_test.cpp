@@ -116,8 +116,8 @@ std::vector<std::uint8_t> SyntheticNetImage()
     {
         write_int16(static_cast<std::int16_t>(static_cast<int>(next_value() >> 56) - 128));
     }
-    // output_weights: inside [-127, 127] so Load's int8 requantisation scale comes out 1 and the int8
-    // output layer is lossless, which keeps this test about the accumulator and not about requantisation.
+    // output_weights: inside [-127, 127] so Load's int8 requantization scale comes out 1 and the int8
+    // output layer is lossless, which keeps this test about the accumulator and not about requantization.
     for (std::size_t i = 0; i < nnue::kOutputWeightCount; ++i)
     {
         write_int16(static_cast<std::int16_t>(static_cast<int>(next_value() >> 56) - 128 + 1));
@@ -131,7 +131,7 @@ std::vector<std::uint8_t> SyntheticNetImage()
     }
 
     nnue::NetHeader header = nnue::ExpectedNetHeader();
-    nnue::FinaliseNetHeader(header, image.data() + sizeof(nnue::NetHeader), nnue::kNetPayloadBytes);
+    nnue::FinalizeNetHeader(header, image.data() + sizeof(nnue::NetHeader), nnue::kNetPayloadBytes);
     std::memcpy(image.data(), &header, sizeof(header));
     return image;
 }

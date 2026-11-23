@@ -367,7 +367,7 @@ inline Move Game::SearchRootNode()
         {
             const int move_index = (int)(&move - &move_list[0]);
             const int score = state.SearchSingleMove(depth, 0, kAlpha, kBeta, move, shallow_pv, move_index).score();
-            if (state.IsCancelled())
+            if (state.IsCanceled())
             {
                 break;
             }
@@ -424,7 +424,7 @@ inline Move Game::SearchRootNode()
     Move best_move = move_list[0];
     if (completed_move_count < (int)move_list.size())
     {
-        // Cancelled inside a pass. The moves that finished first are the cheap ones, and their depth-3 scores miss
+        // Canceled inside a pass. The moves that finished first are the cheap ones, and their depth-3 scores miss
         // what a deeper search sees (the depth-1 pass sees less still), so prefer the root's table move when its
         // entry is deeper than the pass. The root's own moves are searched one by one (here and in
         // IterativeDeepen), but a pass can re-enter the root through a repetition and store it; such an entry is

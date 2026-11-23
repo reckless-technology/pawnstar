@@ -32,7 +32,7 @@ artifact. Every other path is the caller's to make absolute. Threads=1 and Hash=
 by this tool (-each), as are the clock and the adjudication.
 
 THE FLAGS are the ones tools/pawnstar-match.sh plays Pawnstar's matches with, so a result from either route is the
-same measurement: `-games 2 -repeat`, `order=sequential start=N` (one position per colour-reversed pair, in file
+same measurement: `-games 2 -repeat`, `order=sequential start=N` (one position per color-reversed pair, in file
 order), `-draw movenumber=40 movecount=8 score=20 -resign movecount=3 score=600`, and a PGN with nodes, seldepth
 and nps in the move comments, which tools/pgn_nps.py reads.
 """

@@ -60,7 +60,7 @@ class ChessClock
 };
 
 /// @brief Construct with default time control (5-minute sudden death), no search armed. Mirrors what the
-/// previous default member initialisers set; Reset() restores these same values for a new game.
+/// previous default member initializers set; Reset() restores these same values for a new game.
 inline ChessClock::ChessClock()
     : clock_type_(kStandard), remaining_time_(std::chrono::minutes{5}), increment_(Duration::zero()), moves_to_go_(0),
       depth_(10), max_nodes_(0), search_start_time_(Clock::now()), hard_deadline_(kNoDeadline),

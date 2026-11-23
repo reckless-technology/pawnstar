@@ -47,7 +47,7 @@ std::filesystem::path ExecutablePath()
     {
         return {}; // buffer too small (PATH_MAX is ample in practice, so this is effectively unreachable)
     }
-    // _NSGetExecutablePath may yield a non-canonical path (symlinks, .., relative); canonicalise it so the
+    // _NSGetExecutablePath may yield a non-canonical path (symlinks, .., relative); canonicalize it so the
     // resource lookup resolves, but fall back to the raw path if canonical() fails.
     std::error_code       ec;
     std::filesystem::path raw(buf);

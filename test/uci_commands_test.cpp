@@ -308,7 +308,7 @@ void HandshakesAndDiagnostics(Game &game)
               Contains(license, "Leela Chess Zero self-play training data") && Contains(license, "run test91") &&
               Contains(license, "run test60") && Contains(license, "http://opendatacommons.org/licenses/odbl/1.0/") &&
               Contains(license, "http://opendatacommons.org/licenses/dbcl/1.0/") && Contains(license, "Produced Work"),
-          "license: names the engine's licence and the training data's, both runs and both ODbL URLs", license);
+          "license: names the engine's license and the training data's, both runs and both ODbL URLs", license);
     // The two notices this repository owes that the Rust port does not: the bullet-adapted trainer sources are
     // here, so the MIT notice is owed here. The rest of the text is that port's, line for line.
     Check(Contains(license, "tools/bullet/") && Contains(license, "MIT-licensed") &&
@@ -522,7 +522,7 @@ void Options(Game &game)
 void NetLoading(Game &game, const std::string &net_path)
 {
     // The no-net diagnostics, on a Game that never loaded one. They used to be reached by refusing a net
-    // on the loaded Game, which only worked because a refusal cleared `loaded_` — the very behaviour that
+    // on the loaded Game, which only worked because a refusal cleared `loaded_` — the very behavior that
     // left the engine answering readyok with weight arrays Load had never filled. A fresh Game reaches the
     // same two lines without asking a refusal to break anything.
     {
@@ -548,7 +548,7 @@ void NetLoading(Game &game, const std::string &net_path)
 
     // **A refused net changes nothing.** Not "leaves no net loaded" — that was the trap. Every check the
     // loader makes happens before a weight is written, so the net that was playing is still playing, and
-    // the engine stays in a state it has defined behaviour for.
+    // the engine stays in a state it has defined behavior for.
     const int         evaluation_before = game.nnue_network_.Evaluate(game.CurrentPosition());
     const std::string origin_before     = game.nnue_network_.loaded_net_origin_;
     Check(!origin_before.empty(), "a loaded net names where it came from");
@@ -1007,7 +1007,7 @@ void RootShortcuts(Game &game, const std::string &book_path)
           "a single legal move: bestmove a8b8 at once, with no search", out);
 
     // No legal move at the root, checkmate or stalemate: every `go` is answered `bestmove 0000`, as the Go engine
-    // answers, with no info line and no move played into the game. A host analysing a finished game's last
+    // answers, with no info line and no move played into the game. A host analyzing a finished game's last
     // position waited for ever when the engine said nothing, and went on waiting through `stop` and `isready`.
     for (const char *position : {"position fen k7/1Q6/1K6/8/8/8/8/8 b - - 0 1",  // checkmated
                                  "position fen 7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"}) // stalemated

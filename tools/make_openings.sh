@@ -4,13 +4,13 @@
 # FOR SELF-PLAY DATA GENERATION, USE tools/gen_openings.cpp INSTEAD. The engine is deterministic at a fixed
 # budget with its book off, so a data campaign started from this set could produce no more distinct games
 # than it has openings, and a 500M-position pool wants far more openings than any opening book holds.
-# gen_openings plays short randomised lines of our own instead and filters them the same way, so its count is
+# gen_openings plays short randomized lines of our own instead and filters them the same way, so its count is
 # a parameter rather than a ceiling; nnue/openings-selfplay.epd is the committed 30,000-position set it wrote.
 # This set remains the MATCH set: its positions are book lines, which is what an SPRT wants.
 #
 # The source is pawnstar.book, in coordinate notation, which tools/make_book.cpp built from the Lichess open
 # database - released under the Creative Commons CC0 1.0 public-domain dedication, so the result carries no
-# licence restriction of its own and no third party's data. (CC0 waives attribution; Lichess is credited in
+# license restriction of its own and no third party's data. (CC0 waives attribution; Lichess is credited in
 # THIRD-PARTY-NOTICES.md because it is right, not because it is owed. The book file's own header records the
 # monthly export, the filters and the SHA-256 of the bytes it was built from.) Every book line is replayed
 # from the start position; each position it reaches inside the ply window is a candidate. The engine then
@@ -20,7 +20,7 @@
 #
 # "Roughly balanced" is measured against the engine's own evaluation of the START POSITION, not against
 # zero: a net that scores the initial position well away from zero - the shipped v20 net puts it at about
-# +62 cp, and the retired v12 put it at +158 - would have a zero-centred filter reject normal openings and
+# +62 cp, and the retired v12 put it at +158 - would have a zero-centered filter reject normal openings and
 # keep only the ones it mildly dislikes. The baseline is read from the engine at run time, so this stays
 # right when the net changes, and the figure it used is recorded in the output's header.
 #

@@ -17,7 +17,7 @@ WHAT THE ASSERTIONS CATCH, deliberately:
   * the bars, to two decimal places. Applying the 95% deviate twice - the bug that was actually written on
     2026-10-28, in a scratchpad script - inflates every one of them by 1.959964x, so each `95% bar` check
     below goes red at once (verified: injecting it turned exactly those three red and left the Elos and the
-    pair counts green, which is the signature to recognise);
+    pair counts green, which is the signature to recognize);
   * the 95%-to-one-sigma conversion in the scatter diagnostics. Dropping it makes a nominal sigma 1.959964x
     too large and the dispersion ratio that much too small - an ordinary 0.85 reads as 0.43, which is how a
     perfectly normal spread got called "2.3x under-dispersed" that day. `nominal 1 sigma` and
@@ -88,14 +88,14 @@ def check_raises(call, summary: str) -> bool:
 
 def test_single_chunk_matches() -> None:
     """The two completed 2000-pair matches, each one vector, each figure measured."""
-    first = pool_matches.analyse([160, 482, 732, 497, 129])
+    first = pool_matches.analyze([160, 482, 732, 497, 129])
     check(first.pairs == 2000 and first.games == 4000, "match A: 2000 pairs, 4000 games")
     check_close(100.0 * first.score_fraction, 49.4125, 4, "match A: score 49.4125 %")
     check_close(first.elo, -4.08, 2, "match A: Elo -4.08")
     check_close(first.elo_bar_95, 7.87, 2, "match A: 95% bar +-7.87")
     check_close(100.0 * first.los, 15.45, 2, "match A: LOS 15.45 %")
 
-    second = pool_matches.analyse([208, 455, 704, 493, 140])
+    second = pool_matches.analyze([208, 455, 704, 493, 140])
     check(second.pairs == 2000 and second.games == 4000, "match B: 2000 pairs, 4000 games")
     check_close(second.elo, -8.51, 2, "match B: Elo -8.51")
     # +-8.23, not the +-8.41 this fixture arrived with: see the module docstring. LOS, below, is what pins it.
@@ -174,8 +174,8 @@ def test_scatter_diagnostics() -> None:
 
 
 def test_the_two_bars_are_distinguishable() -> None:
-    """Every bar the tool carries is labelled, and the two differ by exactly the 95% deviate."""
-    result = pool_matches.analyse([160, 482, 732, 497, 129])
+    """Every bar the tool carries is labeled, and the two differ by exactly the 95% deviate."""
+    result = pool_matches.analyze([160, 482, 732, 497, 129])
     check_close(
         result.elo_sigma_1 * pool_matches.Z_95,
         result.elo_bar_95,
@@ -205,7 +205,7 @@ def test_bar_by_an_independent_route() -> None:
     but it is nowhere near 1.959964x, so it catches a doubled deviate on its own.
     """
     for counts in ([160, 482, 732, 497, 129], [208, 455, 704, 493, 140], [97, 244, 377, 240, 42]):
-        result = pool_matches.analyse(counts)
+        result = pool_matches.analyze(counts)
         probability = result.score_fraction
         slope = 400.0 / (math.log(10.0) * probability * (1.0 - probability))
         linear_bar = slope * pool_matches.Z_95 * result.standard_error
@@ -227,7 +227,7 @@ def test_chi_square_tail() -> None:
 
 def test_level_and_edges() -> None:
     """A level match, and the scores the Elo formula cannot express."""
-    level = pool_matches.analyse([100, 200, 400, 200, 100])
+    level = pool_matches.analyze([100, 200, 400, 200, 100])
     check_close(level.score_fraction, 0.5, 9, "level: a symmetric vector scores exactly 50 %")
     check_close(level.elo, 0.0, 9, "level: Elo 0")
     check_close(100.0 * level.los, 50.0, 6, "level: LOS 50 %")
@@ -237,10 +237,10 @@ def test_level_and_edges() -> None:
 
 def test_input_is_validated() -> None:
     """A malformed vector stops the tool; it does not get a plausible Elo."""
-    check_raises(lambda: pool_matches.analyse([1, 2, 3, 4]), "validation: four counts is not a Ptnml(0-2) vector")
-    check_raises(lambda: pool_matches.analyse([1, 2, 3, 4, 5, 6]), "validation: six counts is refused")
-    check_raises(lambda: pool_matches.analyse([1, -2, 3, 4, 5]), "validation: a negative count is refused")
-    check_raises(lambda: pool_matches.analyse([0, 0, 0, 0, 0]), "validation: no pairs at all is refused")
+    check_raises(lambda: pool_matches.analyze([1, 2, 3, 4]), "validation: four counts is not a Ptnml(0-2) vector")
+    check_raises(lambda: pool_matches.analyze([1, 2, 3, 4, 5, 6]), "validation: six counts is refused")
+    check_raises(lambda: pool_matches.analyze([1, -2, 3, 4, 5]), "validation: a negative count is refused")
+    check_raises(lambda: pool_matches.analyze([0, 0, 0, 0, 0]), "validation: no pairs at all is refused")
     check_raises(lambda: pool_matches.parse_vector("160,482,732,497"), "validation: a short command-line vector")
     check_raises(
         lambda: pool_matches.scatter_from_95_bars([-7.64, -10.08], [15.8]),
@@ -300,10 +300,10 @@ def test_strength_matches_of_2026_11_07() -> None:
 
     Trebuchet 1.0.0 vs Pawnstar 2.2.0 and runF vs cap2, 4000 games each at 8+0.08 on reckless-ci-lin-0.
     """
-    trebuchet = pool_matches.analyse([2, 100, 590, 940, 368])
+    trebuchet = pool_matches.analyze([2, 100, 590, 940, 368])
     check_close(trebuchet.elo, 144.30, 2, "strength: Trebuchet vs Pawnstar 2.2.0 at +144.30")
     check_close(trebuchet.elo_bar_95, 7.22, 2, "strength: nominal 95% bar +-7.22")
-    net_swap = pool_matches.analyse([54, 425, 950, 496, 75])
+    net_swap = pool_matches.analyze([54, 425, 950, 496, 75])
     check_close(net_swap.elo, 9.82, 2, "strength: runF vs cap2 at +9.82")
     check_close(net_swap.elo_bar_95, 6.44, 2, "strength: nominal 95% bar +-6.44")
 

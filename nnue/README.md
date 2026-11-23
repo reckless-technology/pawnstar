@@ -35,7 +35,7 @@ SCReLU,  concat[side-to-move | opponent] = 2048  ->  8 output heads  ->  1  (cen
 Constants (must match the trainer): `kInputSize=768` (features per bucket), `kNumKingBuckets=8`,
 `kFeatureRows=768*8=6144`, `kHiddenSize=1024`, `kNumOutputBuckets=8`, `kQA=255`, `kQB=64`, `kScale=400`.
 
-**Features.** The 768 base inputs per perspective are `colour (2) × piece type (6) × square (64)`. The
+**Features.** The 768 base inputs per perspective are `color (2) × piece type (6) × square (64)`. The
 shipped net has 8 weight banks selected by king file × board-half, *after* horizontal mirroring
 (`kKingBucketMap` = `min(file, 7 - file)`, plus 4 when the king is in its own advanced half, ranks 5–8 in
 that perspective's orientation: ranks 1–4 → `0,1,2,3,3,2,1,0`, ranks 5–8 → `4,5,6,7,7,6,5,4`), so the
@@ -44,17 +44,17 @@ feature row offsets into that bank. With N banks each perspective selects one by
 
 **Mirroring.** A perspective whose own king stands on files e–h is mirrored: every one of *that*
 perspective's feature indices is `^ 7`, which flips the file. So each perspective carries three things
-that must stay put for an incremental update to be valid — its bank, its square flip and its colour flip
+that must stay put for an incremental update to be valid — its bank, its square flip and its color flip
 — and `nnue::Perspective` holds them together and compares them whole (see *Why mirroring needs its own
 refresh rule*, below).
 
-For a piece of `colour` (0=white, 1=black), type `pt` (pawn=1 … king=6) on `square`, with `wb`/`bb` the
+For a piece of `color` (0=white, 1=black), type `pt` (pawn=1 … king=6) on `square`, with `wb`/`bb` the
 white/black king buckets (each 0–7 for the shipped net) and `wm`/`bm` each perspective's mirror flip (7
 when that perspective's own king is on files e–h, else 0):
 
 ```
-white-perspective row = wb*768 + ((colour     * 384 + (pt-1)*64 +  square         ) ^ wm)
-black-perspective row = bb*768 + (((1-colour) * 384 + (pt-1)*64 + (square ^ 0x38)) ^ bm)   # 0x38 flips the rank
+white-perspective row = wb*768 + ((color     * 384 + (pt-1)*64 +  square         ) ^ wm)
+black-perspective row = bb*768 + (((1-color) * 384 + (pt-1)*64 + (square ^ 0x38)) ^ bm)   # 0x38 flips the rank
 ```
 
 Two accumulators are built (white-perspective and black-perspective), each seeded with `feature_bias`
@@ -78,12 +78,12 @@ out *= SCALE
 out /= QA * QB            # -> centipawns, side-to-move relative
 ```
 
-**Shipped output layer is int8** (`Network::Evaluate`, the search hot path): the activations are requantised
+**Shipped output layer is int8** (`Network::Evaluate`, the search hot path): the activations are requantized
 to uint8 (`screlu(x) >> 9` → `[0,127]`) and the output weights to int8, with the dot accumulated in int32 —
 ~1.86× faster than the int16 dot (a measured **+31.8 ± 10.3 Elo at 8+0.08**) at a bounded deviation from
 `EvaluateExact` — `test_nnue`'s bound is 40 cp, and the shipped net measures exactly 40 over the 250
 reference positions, against 26 for the retired single-head v12. One int8 scale is shared across all
-eight heads (the dequantisation tail stays head-agnostic), so the head with the largest weight sets the
+eight heads (the dequantization tail stays head-agnostic), so the head with the largest weight sets the
 scale for the rest, which is where the extra deviation comes from. It is integer arithmetic throughout
 and so identical on every platform. The `>>9` keeps every adjacent pair inside int16, so the AVX2 (`pmaddubsw`) and
 AVX-VNNI (`vpdpbusd`) kernels are saturation-free and bit-identical. **Which one runs is decided at runtime
@@ -93,7 +93,7 @@ AVX2-only CPUs (no `make VNNI=1` flag — the gate just never calls the VNNI ker
 The int16 *accumulator* and feature transformer are unchanged (the int8 *feature*-weight experiment was
 measured and **removed** after a definitive −8 Elo SPRT; see [int8_quant_study.md](int8_quant_study.md)).
 
-The net is an `nnue::Network` class (the quantised weights plus `Load`/`Refresh`/`Update`/`Evaluate`
+The net is an `nnue::Network` class (the quantized weights plus `Load`/`Refresh`/`Update`/`Evaluate`
 methods), **owned by the `Game`** — there are no nnue globals. The `Game` is **heap-allocated**
 (`std::make_unique<Game>()` in `main.cpp` and the tests): at 8 king buckets the inline ~12.6 MB
 `feature_weights_` array would overflow the default 8 MB stack if the owning object were a local. The FT
@@ -105,7 +105,7 @@ brought current only when an evaluation reads it (and only on an eval-cache miss
 before evaluating pay nothing (SPRT-measured +20.66 ± 9.04 Elo at 8+0.08, +13.6% nps). The *delta* in the
 common case (no king-bucket
 crossing — the common case) `Network::Update` derives the changed squares directly from
-the parent/child **colour bitboards** — a move touches only 2–4 squares, and captures, en passant,
+the parent/child **color bitboards** — a move touches only 2–4 squares, and captures, en passant,
 castling and promotion all fall out uniformly — and applies just those feature-column deltas to both
 perspectives (no per-piece-type scan; reversible on undo, a no-op for null moves). This is bit-identical to
 a per-piece diff: the same columns are added/subtracted and int16 accumulator add/sub is order-independent.
@@ -113,8 +113,8 @@ When a king move **crosses a bucket boundary** that whole perspective's bank cha
 just that one perspective from scratch (at most one king moves per ply, so at most one perspective
 refreshes per update); `Network::Refresh` rebuilds both at the root.
 `Network::Evaluate(position)` (a full refresh) is the reference the incremental path is checked against
-(§6). Both kernels (accumulator update and forward pass) are **AVX2-vectorised** when built with
-`-mavx2`, with scalar fallbacks behind `#if defined(__AVX2__)`; the vectorised path is bit-identical to
+(§6). Both kernels (accumulator update and forward pass) are **AVX2-vectorized** when built with
+`-mavx2`, with scalar fallbacks behind `#if defined(__AVX2__)`; the vectorized path is bit-identical to
 the scalar one (verified by `test_nnue`).
 
 ### The two network shapes, and the build knob that picks one
@@ -205,7 +205,7 @@ flipped for one engine alone. The mirrored map also changes what a bucket *means
 many there are, which by the container's own rule makes it a format change - hence `format_version` 2.
 
 **Why mirroring needs its own refresh rule, and why getting it wrong is silent.** A perspective can be
-updated incrementally only while its weight bank, its square flip and its colour flip all stay put; if
+updated incrementally only while its weight bank, its square flip and its color flip all stay put; if
 any changes, every feature row it reads moves. Before mirroring there was one way for that to happen, a
 king crossing a bucket boundary, and the code compared bucket indices. Mirroring adds a second, and the
 two are not the same: on the mirrored map a king stepping **d1 -> e1 keeps bucket 3** (file 3 and file 4
@@ -347,7 +347,7 @@ implementation, and the failing verdict asserted for each kind of damage.
 
 **The trainer is the authority on what a net is; the engine is only an authority on what it can
 load.** `tools/stamp_net.cpp` currently derives the header from *this engine's* compile-time
-constants, which describes the reader's expectation rather than the artefact's truth — and that has a
+constants, which describes the reader's expectation rather than the artifact's truth — and that has a
 consequence that is easy to miss:
 
 `king_bucket_map_crc` exists to catch a **trainer/engine map drift**, the failure where the trainer
@@ -384,7 +384,7 @@ is `12582912 + 2048 + 4096 + 4 = 12589060`, i.e. 12589124 with the header.
 
 Two details that catch a reader of the old format out. The output bias is **int32**, one per output
 bucket, where PSN1 stored a single int16; and the payload length is **exact**, where PSN1 kept bullet's
-tail padding (bullet pads its quantised output up to a 64-byte boundary with repeats of the word
+tail padding (bullet pads its quantized output up to a 64-byte boundary with repeats of the word
 "bullet"). `stamp_net` drops that padding, because an exact length is what lets a truncated or an
 appended-to file be told apart from a sound one.
 
@@ -491,7 +491,7 @@ there ever was.)
 *building engine's* constants, so it can only stamp a net that matches that build — a 512-wide net stamped
 by a 1024-wide tool gets a 1024-wide header and is refused on first load, which is the point. It accepts
 only a raw net of the exact payload size (plus at most 63 bytes of bullet padding), so it cannot re-stamp
-an already-stamped file. The forward-pass math and quantisation are kept in lock-step with the trainer
+an already-stamped file. The forward-pass math and quantization are kept in lock-step with the trainer
 ([tools/bullet/pawnstar.rs](../tools/bullet/pawnstar.rs)); §6 verifies they agree to within rounding.
 **Never hand-edit a net file** — nets come from the trainer and are stamped by a `stamp_net` built at that
 net's own architecture. A net file's name says nothing about its architecture; the header does.
@@ -539,7 +539,7 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 | file | purpose |
 |------|---------|
 | `gen_data.cpp`            | self-play training-data generator: the engine plays itself and writes `<fen> \| <eval_cp> \| <wdl>` text shards plus a `.meta` provenance sidecar (`make tools` → `build/gen_data`) — see §6 |
-| `gen_openings.cpp`        | balanced opening generator from **our own play**: short randomised lines from the start position, filtered on the net's static evaluation and deduplicated on the Zobrist key, written as EPD with its provenance header (`make tools` → `build/gen_openings`) — the data campaign's opening source, see §6 |
+| `gen_openings.cpp`        | balanced opening generator from **our own play**: short randomized lines from the start position, filtered on the net's static evaluation and deduplicated on the Zobrist key, written as EPD with its provenance header (`make tools` → `build/gen_openings`) — the data campaign's opening source, see §6 |
 | `run_gendata.sh`          | fan `gen_data` across cores, one shard per worker (each with a disjoint slice of the opening pool), resumable, reporting the pool's duplicate rate at the end |
 | `check_duplicates.sh`     | measure what fraction of an assembled pool is distinct positions — the gate `train_pipeline.sh` runs before converting a directory of shards, and the cheap way to catch a degenerate campaign in minutes |
 | `make_book.cpp`           | build `pawnstar.book`, the shipped opening book, from Lichess PGN on standard input: walk each accepted game's opening into a prefix tree, keep a move only where enough games played it, and write each pruned leaf as one line with the source, the CC0 dedication and the input's SHA-256 in a `#` header (`make tools` -> `build/make_book`) |
@@ -555,7 +555,7 @@ net is a single `nnue::Network` instance owned by the (heap-allocated) `Game` (U
 | `run_sprt.sh`             | SPRT / match: net-vs-net (set `BASELINE_NET`), at fixed depth or time control |
 | `rate.sh`                 | anchored absolute-Elo estimate vs rated reference engines (you supply the opponent binaries) |
 | `run_experiment.sh`       | one-shot: train + **verify** + SPRT from an existing `.data` dataset |
-| `nnue_quant_study.cpp`    | offline int16→int8 quantisation feasibility study (range/saturation histograms + kernel cost split); a measurement tool, not part of the engine — see [int8_quant_study.md](int8_quant_study.md) (`make tools` → `build/nnue_quant_study`) |
+| `nnue_quant_study.cpp`    | offline int16→int8 quantization feasibility study (range/saturation histograms + kernel cost split); a measurement tool, not part of the engine — see [int8_quant_study.md](int8_quant_study.md) (`make tools` → `build/nnue_quant_study`) |
 
 **Screening the opening book is no longer done here.** `tools/filter_book.cpp` searched every book move with
 this engine's own NNUE and marked the ones losing more than a margin against the best with a trailing `?`; it
@@ -653,7 +653,7 @@ is ever *dropped* for agreeing — that would skew the distribution the eval is 
 3000 cp; games are adjudicated at 1500 cp held for four plies and capped at 200 plies. The search runs
 single-threaded, so a shard is reproducible from its seed. Every shard gets a `<shard>.meta` sidecar (a
 separate file, because `convert --from text` would try to parse a comment line as a position) recording
-the engine version, the labelling net **and its SHA-256**, every budget, the seed, the PV cap, the
+the engine version, the labeling net **and its SHA-256**, every budget, the seed, the PV cap, the
 disagreement settings, the opening set with the worker's slice of it (`openings_count`,
 `openings_in_slice`, `worker_index`, `worker_count`) **and the worker's campaign-wide identity**
 (`global_worker_offset`, `global_worker_index`, `global_worker_count`), and the record and game counts, the
@@ -859,8 +859,8 @@ length, and prints `LR CHECK: superbatch <n> -> lr <rate>` every superbatch — 
 the rate actually applied, since bullet logs the scheduler's description instead. Pin
 `PAWNSTAR_LR_STEP` to repair a truncated schedule or to hold the lowest rate across a resume.
 **A run is resumed through this same trainer**, not a copy of it: `PAWNSTAR_RESUME` names a
-checkpoint directory (`<out>/pawnstar-<n>`, which holds the AdamW optimiser state — not a
-quantised `.bin`, which carries none) and `PAWNSTAR_START_SB` the **absolute** superbatch to
+checkpoint directory (`<out>/pawnstar-<n>`, which holds the AdamW optimizer state — not a
+quantized `.bin`, which carries none) and `PAWNSTAR_START_SB` the **absolute** superbatch to
 re-enter the schedule at; both the learning rate and the data position are indexed by that
 number, so those two are the whole of what a resume needs. The resume controls are validated
 before the device, the checkpoint or the data file is touched, and the schedule check above runs
@@ -877,14 +877,14 @@ The SPRT needs an EPD opening book (`OPENINGS=…`) of varied, roughly balanced 
 matches don't all start from the same spot. **[openings.epd](openings.epd) is committed**: 6,433
 positions built by `tools/make_openings.sh` from `pawnstar.book`, which `tools/make_book.cpp` built from the
 [Lichess open database](https://database.lichess.org/) under its **Creative Commons CC0 1.0** public-domain
-dedication, so the set carries no licence restriction of its own and no third party's data. Each book line
+dedication, so the set carries no license restriction of its own and no third party's data. Each book line
 is replayed from the start position and every position it reaches between ply 4 and ply 24 is kept when the
 engine's static evaluation of it is within 125 cp of its evaluation of the start position (which the shipped
-v20 net puts at +62 cp, so a zero-centred filter would keep only the openings it mildly dislikes); then
+v20 net puts at +62 cp, so a zero-centered filter would keep only the openings it mildly dislikes); then
 duplicates are dropped.
 
 Regenerate it with `tools/make_openings.sh [out.epd] [min_ply] [max_ply] [margin_cp]` — worth doing when
-the net changes, since the balance filter is the net's own judgement. **This set used to be the measurement
+the net changes, since the balance filter is the net's own judgment. **This set used to be the measurement
 problem:** it held 306 positions, derived from a 385-line book, which a long match replayed about 13 times
 each - and replayed games are correlated, which is what `tools/opening_icc.py` widens a bar for (ICC
 0.07-0.13 measured). The book behind it is now 3,244 lines as `make_book` wrote them (3,328 since
@@ -901,7 +901,7 @@ a position.
 A few thousand book positions are fine for a match and nowhere near enough for a data campaign (see *Data
 diversity* above), so
 the campaign's openings come from **our own play** instead. **[openings-selfplay.epd](openings-selfplay.epd)
-is committed**: 30,000 positions written by `build/gen_openings`, which plays short randomised lines from the
+is committed**: 30,000 positions written by `build/gen_openings`, which plays short randomized lines from the
 start position and keeps the position a line ends at when it is not in check and the net's static evaluation
 of it is within 125 cp of its evaluation of the start position — the same balance filter as the book set, so
 a game from one of these is decided by the engines and not by the opening. Duplicates are dropped on the
@@ -923,20 +923,20 @@ audit trail for a set with no external source. The output carries the same kind 
 the book set, stating how it was produced; the engine version is stamped into it.
 
 The positions are not book lines and do not look like them — that is the point for training data, where a
-wider distribution of labelled positions is worth more than opening theory, and the balance filter is what
+wider distribution of labeled positions is worth more than opening theory, and the balance filter is what
 keeps them playable. For an SPRT, keep using `openings.epd`.
 
 ### Validate inference (cross-check)
 
 The engine's inference must reproduce the trainer's. Build the reference evaluator, sample some FENs
-(include both side-to-move colours), and compare:
+(include both side-to-move colors), and compare:
 
 ```bash
 # build the bullet-side reference evaluator (CPU is fine; add --features cuda to reuse the GPU build)
 (cd ~/pawnstar_nnue/bullet/crates/bullet_lib && cargo build --release --example pawnstar_eval)
 EVAL=~/pawnstar_nnue/bullet/target/release/examples/pawnstar_eval
 
-# get a FEN list (reuse the checked-in reference FENs; or supply your own, one FEN per line, both colours)
+# get a FEN list (reuse the checked-in reference FENs; or supply your own, one FEN per line, both colors)
 cut -d'|' -f1 test/nnue_reference.txt > fens.txt
 "$EVAL" net.bin fens.txt > ref.txt
 ./build/test_nnue net.bin ref.txt        # EvaluateExact vs ref <=2 cp; int8 Evaluate vs EvaluateExact <=40 cp
@@ -944,7 +944,7 @@ cut -d'|' -f1 test/nnue_reference.txt > fens.txt
 
 `pawnstar_eval` uses bullet's own feature extraction (`ChessBucketsMirrored`), its own output-head
 selection (`MaterialCount<8>`) and the same SCReLU inference, so a match confirms our feature indexing,
-king bucketing, mirroring, perspective/orientation, head selection, SCReLU and dequantisation are all
+king bucketing, mirroring, perspective/orientation, head selection, SCReLU and dequantization are all
 correct. It must be built at the same width, feature set and head count as the engine, or the cross-check
 fails by design.
 

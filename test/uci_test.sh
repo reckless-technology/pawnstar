@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # UCI protocol regression test. Drives the actual engine binary over stdin/stdout with synchronized I/O
 # (read the engine's responses before sending the next command, so `quit` never cancels a running search)
-# and asserts on the protocol behaviour. Usage: test/uci_test.sh [path-to-engine]   (default build/pawnstar)
+# and asserts on the protocol behavior. Usage: test/uci_test.sh [path-to-engine]   (default build/pawnstar)
 #
 # Why a script and not a C++ unit test: these features (seldepth / currmove / searchmoves, the uciok/readyok
-# handshake) are about the engine's behaviour *as a UCI process*, so the only faithful test drives the
+# handshake) are about the engine's behavior *as a UCI process*, so the only faithful test drives the
 # built binary the way a GUI does.
 set -u
 
@@ -157,7 +157,7 @@ done
     fail "go infinite + quit at once: an engine never exited (after $quits_exited that did)"
 
 # 6) bench determinism: single-threaded bench is deterministic, so two runs must agree (guards the
-#    uninitialised-read class of bug that made node counts wobble). Run as a plain pipe — bench is
+#    uninitialized-read class of bug that made node counts wobble). Run as a plain pipe — bench is
 #    synchronous on the main thread and quits cleanly.
 b1=$(printf 'bench\nquit\n' | "$ENGINE" 2>/dev/null | grep -oE '^[0-9]+ nodes' | grep -oE '^[0-9]+')
 b2=$(printf 'bench\nquit\n' | "$ENGINE" 2>/dev/null | grep -oE '^[0-9]+ nodes' | grep -oE '^[0-9]+')

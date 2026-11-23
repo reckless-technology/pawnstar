@@ -239,7 +239,7 @@ workflow creates the release `vMAJOR.MINOR.BUILD` and its tag itself. It never r
 | File | What it is |
 |---|---|
 | `pawnstar-<version>-windows-x86_64.exe` | the engine (AVX2), Authenticode-signed through SSL.com eSigner (Jonathan Reckless) |
-| `pawnstar-<version>-macos-arm64.zip` | the engine for Apple silicon, signed with a Developer ID (hardened runtime) and notarised by Apple |
+| `pawnstar-<version>-macos-arm64.zip` | the engine for Apple silicon, signed with a Developer ID (hardened runtime) and notarized by Apple |
 | `pawnstar-<version>-linux-x86_64` | the engine for Linux (AVX2) |
 | `pawnstar-<version>-docs-html.zip` | the Doxygen HTML documentation |
 
@@ -247,9 +247,9 @@ workflow creates the release `vMAJOR.MINOR.BUILD` and its tag itself. It never r
 automatic "Source code" archives to every release, which are its doing and not the workflow's.)
 
 The binaries are built with `RELEASE=1` (the DEBUGX counters off). The macOS engine ships in a zip because a bare
-binary can't carry a stapled notarisation ticket: Gatekeeper looks its ticket up online, and the zip keeps the
+binary can't carry a stapled notarization ticket: Gatekeeper looks its ticket up online, and the zip keeps the
 executable bit through a browser's download. The signing runs from `tools/sign-macos.sh` and `tools/sign-windows.ps1`,
-with the organisation's signing secrets (the same ones as its other apps). The Windows binary is signed only in a run
+with the organization's signing secrets (the same ones as its other apps). The Windows binary is signed only in a run
 that publishes, since every signing spends the eSigner account's allowance. A publishing run that would ship an
 unsigned binary fails.
 
@@ -276,7 +276,7 @@ help        list all commands
 ```
 
 `eval` and `nnue` are **not** duplicates. `eval` is the value the search actually uses: the draw
-short-circuit (0 for a material/fifty-move/repetition draw), then the NNUE forward pass (memoised in the
+short-circuit (0 for a material/fifty-move/repetition draw), then the NNUE forward pass (memoized in the
 eval cache), then fifty-move scaling (`ScaleByRule50`, which fades the score toward 0 as the fifty-move
 clock climbs past 20 plies). `nnue` is the **bare** network output with none of that wrapping. They agree in a
 plain position but diverge on a draw or once the fifty-move clock is high.
@@ -327,7 +327,7 @@ See [NNUE evaluation](#nnue-evaluation) below for how it works and how to train 
 ### Board representation
 
 `Position` ([src/position.h](src/position.h)) is the central immutable state class. It stores
-per-piece-type bitboards in `pieces_` and per-colour bitboards in `colors_` (public members), a 64-entry square→piece
+per-piece-type bitboards in `pieces_` and per-color bitboards in `colors_` (public members), a 64-entry square→piece
 array for O(1) lookup, the incrementally-maintained Zobrist hash, castling rights, the en passant
 square, the half-move clock, and a `checkers_` bitboard. `MakeMove` and `MakeNullMove` return a brand
 new `Position` by value (copy-make); there is no unmake. The half-move clock is the fifty-move rule's (FIDE
@@ -335,7 +335,7 @@ new `Position` by value (copy-make); there is no unmake. The half-move clock is 
 does not reset it.
 
 `pieces_` is a `std::array<Bitboard, 7>` indexed by piece type, but `pieces_[0]` (the `kNone` slot)
-holds the occupied-squares set — the union of all pieces of both colours — rather than a piece
+holds the occupied-squares set — the union of all pieces of both colors — rather than a piece
 bitboard; the six real piece types occupy indices 1–6. This lets occupancy queries and the magic-bitboard
 attack lookups read it directly without recomputing a union.
 
@@ -383,7 +383,7 @@ each pinned piece may still move to, before move generation.
 ### Search
 
 The search is a fail-soft negamax with alpha-beta pruning, driven by iterative deepening and
-parallelised with Lazy SMP: several threads each run an independent whole-tree search, sharing a single
+parallelized with Lazy SMP: several threads each run an independent whole-tree search, sharing a single
 lockless transposition table rather than splitting the tree between them.
 
 #### Iterative deepening and time management
@@ -521,7 +521,7 @@ Both previous-move tables share a key that abstracts a move down to **`(piece, t
 int Move::piece_to() const;   // (piece() << 6) | to()  →  7 × 64 = kContKeys (448) keys
 ```
 
-This is the standard "a piece lands on a square" abstraction — it generalises across positions (a knight
+This is the standard "a piece lands on a square" abstraction — it generalizes across positions (a knight
 reaching f5 is the *same* follow-up however it got there), and `Move::None` collapses to a harmless slot 0.
 
 - **Countermove** (`countermoves_`, an `array<Move, kContKeys>` of 448) — a single best refutation per previous
@@ -560,7 +560,7 @@ deterministic single-threaded search, used to regenerate Bratko-Kopec reference 
 To keep the helper threads from recomputing the same tree in lockstep, the main thread (thread 0)
 searches every depth while each helper follows a Stockfish-style **iteration-skip schedule**
 (`kSkipSize` / `kSkipPhase` tables in `search_state.h`) that makes it skip selected depths. The
-threads therefore desynchronise and seed the shared table with a diverse mix of depths. Only the main
+threads therefore desynchronize and seed the shared table with a diverse mix of depths. Only the main
 thread prints `info` lines, applies time management and produces the authoritative best move; helpers
 run silently and stop as soon as the shared cancellation flag is set.
 
@@ -602,7 +602,7 @@ intervening work. This is purely a latency optimization and does not change resu
 
 `EvaluatePosition` (declared in [src/evaluation.h](src/evaluation.h), defined in the [src/search_state.h](src/search_state.h) hub) is **NNUE-only**: after a draw
 short-circuit it returns the network's score for the (lazily-maintained) accumulator, clamped to ±30000 so
-a pathological max-material eval can't overflow the int16 eval cache, memoised by Zobrist hash in that eval
+a pathological max-material eval can't overflow the int16 eval cache, memoized by Zobrist hash in that eval
 cache. See [NNUE evaluation](#nnue-evaluation) below. Earlier versions also had a
 tapered hand-crafted evaluation (material, piece-square tables, pawn structure, king safety, mobility);
 it was removed once NNUE became the sole evaluator.
@@ -627,7 +627,7 @@ one [trebuchet](https://github.com/reckless-technology/trebuchet) and the two po
 SCReLU,  concat[side to move | opponent] = 2048  ->  8 material output heads  ->  1 centipawn score
 ```
 
-The 768 base inputs are (piece colour × piece type × square), replicated across **8 king buckets** chosen
+The 768 base inputs are (piece color × piece type × square), replicated across **8 king buckets** chosen
 by the perspective's own king square — its file × board-half, with files e–h **mirrored** onto a–d so the
 whole perspective flips horizontally and every bucket sees both wings. The score comes from one of **8
 output heads** selected by the number of pieces on the board, so the same hidden features are weighed
@@ -652,7 +652,7 @@ replay. The stack is reserved once at construction, so the search performs no he
 
 **Training data, and the notice it obliges.** The shipped net is trained entirely on
 [Leela Chess Zero self-play data](https://storage.lczero.org/files/training_data/), published under the
-Open Database License 1.0. A trained net is a *Produced Work* under that licence, so **distributing one
+Open Database License 1.0. A trained net is a *Produced Work* under that license, so **distributing one
 obliges a notice naming the source** — it does not make the net ODbL-licensed, and does not make it GPL
 merely because this project's code trained it. The notice is in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md), and the engine prints it itself: send `license` over UCI.
@@ -683,7 +683,7 @@ also accepted. Each line is replayed from the standard start position and every 
 recorded. A move may carry a trailing `?`, marking it *questionable*: it is replayed so the rest of
 its line still parses and the engine keeps its prepared reply to it, but it is never selected.
 
-**The shipped book was screened against the engine's own judgement at depth 12 with a 100 cp
+**The shipped book was screened against the engine's own judgment at depth 12 with a 100 cp
 margin**, which is where those marks come from: 555 of its 8,923 (position, move) pairs were marked,
 and 84 positions whose every move was marked were given the engine's own move, unmarked, so no
 position the book reaches is left with nothing to play. The screener lives in the public
@@ -722,7 +722,7 @@ copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of inpu
 | `build/test_bratko_kopec_nnue` | 24 Bratko-Kopec positions searched with the NNUE net; reports moves solved |
 | `build/test_nnue` | NNUE inference cross-check against the trainer's reference evals |
 | `build/test_nnue_incremental` | Incremental accumulator vs full-refresh consistency check |
-| `build/test_eval_symmetry` | The net-independent evaluation check: 24 positions, each against its colour-flipped vertical mirror, which a perspective network must score exactly equally (the White-relative `eval(P) == -eval(flip(P))`) - a mirroring, perspective, colour-mapping or bucketing defect breaks it while the training loss stays perfect. It pins no expected score, so it gates every future net unchanged; the flip itself is checked against hand-computed FENs, for `flip(flip(P)) == P` and for the legal move count |
+| `build/test_eval_symmetry` | The net-independent evaluation check: 24 positions, each against its color-flipped vertical mirror, which a perspective network must score exactly equally (the White-relative `eval(P) == -eval(flip(P))`) - a mirroring, perspective, color-mapping or bucketing defect breaks it while the training loss stays perfect. It pins no expected score, so it gates every future net unchanged; the flip itself is checked against hand-computed FENs, for `flip(flip(P)) == P` and for the legal move count |
 | `build/test_opening_book` | Opening book: loading (file, memory, comments, an illegal move), weighting, display, `?` moves |
 | `build/test_chess_clock` | `ChessClock` `std::chrono` timing logic (deadline / elapsed / ponderhit / reset) |
 | `build/test_bench_golden` | The `bench` signature: each of the 16 positions' best move and node count, and the 5,617,906 total |
@@ -734,7 +734,7 @@ copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of inpu
 | `build/test_net_header` | `tools/net_header_report.h`, the `RNNUE1` header reader `build/print_net_header` wraps: every field decoded at its documented offset from hand-laid fixtures (8 and 4 king buckets, and a header with no two equal fields), both CRCs and the payload length verified, each kind of damage reported, and the build's own net decoded against its known values |
 | `build/test_no_search_moves` | `tools/no_search_moves.h`, which `build/no_search_moves` wraps: which moves in a match's PGN were played with no search and whether each was the only legal move, against two games worked by hand and a fixture of the games it must refuse |
 | `test/pool_matches_test.py` | `tools/pool_matches.py`, the pentanomial pooling tool: five completed matches' `Ptnml(0-2)` vectors pooled to their measured Elo, 95% bar and LOS, the chunk-scatter diagnostics on a known case, and the two traps - a doubled 1.959964 in the bar, and a 95% bar compared against a one-sigma scatter. Run by ctest as `pool_matches` wherever a Python interpreter is found |
-| `test/opening_icc_test.py` | `tools/opening_icc.py`, the opening-replay correction: four hand-computed one-way ANOVA fixtures (perfect correlation, none at all, exactly a third, and an unbalanced case where the balanced-design shortcut understates the inflation), its PGN reader against a fixture holding one of each way a round fails to be a colour-reversed pair, its nominal figures anchored to `pool_matches`' own match A, and the whole report against a sixteen-game match worked by hand. Run by ctest as `opening_icc` |
+| `test/opening_icc_test.py` | `tools/opening_icc.py`, the opening-replay correction: four hand-computed one-way ANOVA fixtures (perfect correlation, none at all, exactly a third, and an unbalanced case where the balanced-design shortcut understates the inflation), its PGN reader against a fixture holding one of each way a round fails to be a color-reversed pair, its nominal figures anchored to `pool_matches`' own match A, and the whole report against a sixteen-game match worked by hand. Run by ctest as `opening_icc` |
 | `test/pgn_nps_test.py` | `tools/pgn_nps.py`, the absolute-nps reader: hand-summed node and time totals, a Black-to-move opening, a book move carrying no node counts, an `n=0` move whose clock is not search time, and a game missing a comment altogether. Run by ctest as `pgn_nps` |
 
 `test_bench_golden` runs the `bench` recipe (`RunBench` in `src/input_handling.h`, the code the `bench` command
@@ -748,7 +748,7 @@ a new net, and re-port the change to both ports.
 `make check` runs the NNUE tests against the shipped `nnue/pawnstar-v20.bin`: `test_nnue` against the
 checked-in `test/nnue_reference.txt` (250 trainer evals; max |diff| 0 cp), `test_nnue_incremental` which
 asserts the incremental accumulator matches a full refresh at every node, `test_eval_symmetry` which asserts
-every position scores exactly as its colour-flipped vertical mirror (net-independent, so it gates a new net
+every position scores exactly as its color-flipped vertical mirror (net-independent, so it gates a new net
 where the reference evals cannot — they are the shipped net's own), and `test_bratko_kopec_nnue`
 which searches the 24 BK positions with the net (single-threaded, deterministic) and **must solve all 24**
 — each position's best move must be in its accepted-move set (the `kCases` array in `test/bratko_kopec_nnue_test.cpp`). The NNUE
@@ -800,7 +800,7 @@ A few deliberate choices shape the codebase:
   history is a `std::vector` that grows only as real moves are played — so the node-by-node search loop
   performs effectively no dynamic allocation.
 - **Everything precomputed that can be.** Attack tables and Zobrist keys are built once at startup
-  (dynamic initialisation of `inline const` globals in `generated_data.h`), so the hot paths are pure lookups.
+  (dynamic initialization of `inline const` globals in `generated_data.h`), so the hot paths are pure lookups.
 - **Lockless sharing.** Under Lazy SMP the transposition tables and the cancellation flag are the only
   cross-thread state — the ordering tables (history, killers, countermove, continuation history) are
   per-thread — and the shared state is accessed
@@ -847,7 +847,7 @@ the published node counts for the standard positions.
   embedded in the binary if the file is **not there**, and **exits** if that copy is refused too (there is no
   hand-crafted fallback); a net file that is read and **refused** is fatal with no fallback. The accumulator is maintained incrementally and **lazily** across make/undo (the
   update is deferred until an evaluation reads it; one perspective is rebuilt when its king crosses a file
-  or board-half bucket boundary, or the mirror's file boundary) and the kernels are AVX2-vectorised,
+  or board-half bucket boundary, or the mirror's file boundary) and the kernels are AVX2-vectorized,
   so it is fast on the clock; the shipped net is a 1024-wide `ChessBucketsMirrored` net with 8 mirrored king
   buckets (file × board-half) and 8 material output heads (v20). The owning `Game` is heap-allocated, since the inline ~12.6 MB weight array would overflow the default stack.
 
@@ -888,6 +888,6 @@ obligation Pawnstar carries - and nothing downstream inherits one either. The NN
 [tools/bullet/](tools/bullet) are written for the [bullet](https://github.com/jw1912/bullet) trainer and
 adapted from it: `pawnstar.rs` from its `simple` example, and `pawnstar_eval.rs` from that example and from its
 `Chess768` and `ChessBucketsMirrored` input code. bullet is MIT-licensed, Copyright (c) 2023 Jamie Whiting, so those two
-files are redistributed here with that attribution in their headers and bullet's licence text in
+files are redistributed here with that attribution in their headers and bullet's license text in
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). bullet itself is not redistributed: `tools/setup_bullet.sh`
 fetches it at a pinned commit.

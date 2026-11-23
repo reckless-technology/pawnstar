@@ -25,7 +25,7 @@
 /// The only `wdl` tokens the parser accepts are `1.0` `0.5` `0.0` `1` `1/2` `0`; `1.0` / `0.5` / `0.0` are
 /// what this writes.
 ///
-/// ## Where the data comes from, and its licence
+/// ## Where the data comes from, and its license
 ///
 /// `https://storage.lczero.org/files/training_data/test80/` publishes one `.tar` per hour, each holding a
 /// few thousand gzip members, each member one self-play game as a run of fixed-size v6 records. Every tar
@@ -36,8 +36,8 @@
 /// > database are licensed under the Database Contents License:
 /// > http://opendatacommons.org/licenses/dbcl/1.0/
 ///
-/// **ODbL is a share-alike licence on the database, not on what is learnt from it.** A net trained on these
-/// positions is a *Produced Work* under ODbL §1.0, which obliges a notice naming the source and its licence
+/// **ODbL is a share-alike license on the database, not on what is learnt from it.** A net trained on these
+/// positions is a *Produced Work* under ODbL §1.0, which obliges a notice naming the source and its license
 /// and does not oblige the net to be ODbL. That is the basis on which this source was accepted
 /// (2026-10-27), and it is why every shard's `.meta` carries a ready-made `attribution` line: the notice
 /// has to be writable from the sidecar, without going back to the web.
@@ -54,7 +54,7 @@
 ///
 ///  * `planes[104]` - 8 history positions of 13 bitboards (ours P N B R Q K, theirs p n b r q k, then a
 ///    repetition flag), from `EncodePositionForNN` in `src/neural/encoder.cc`. Only the first 13 are the
-///    position being labelled; planes 13..18 are read for one thing only, recovering en passant (below).
+///    position being labeled; planes 13..18 are read for one thing only, recovering en passant (below).
 ///  * `castling_us_ooo` / `castling_us_oo` / `castling_them_ooo` / `castling_them_oo` - 0 or 1 for a
 ///    non-Chess960 input format (`trainingdata.cc` sends a rook-file mask only when `Is960CastlingFormat`).
 ///  * `side_to_move_or_enpassant` - for input format 1 this is `position.IsBlackToMove() ? 1 : 0`, nothing
@@ -67,7 +67,7 @@
 /// lc0 keeps every position from the mover's own point of view: `Position::GetBoard()` returns `us_board_`,
 /// which has been vertically mirrored (`BitBoard::Mirror()` is `ReverseBytesInBytes`) once per ply, so
 /// "ours" is always the side to move and always on the low ranks. So a **black-to-move record's planes are
-/// rank-flipped and colour-swapped**, and undoing that is the whole of the orientation work:
+/// rank-flipped and color-swapped**, and undoing that is the whole of the orientation work:
 /// `real_rank = is_black_to_move ? 7 - row : row`, and plane 0..5 are Black's pieces when Black is to move.
 ///
 /// On top of that, the writer stores each plane **bit-reversed within every byte**
@@ -109,7 +109,7 @@
 ///
 /// Lc0 has no centipawn score. It has `best_q` = w - l for the search's best move and `best_d` = the draw
 /// probability, both from the side to move's point of view, both from the root of an MCTS search of a few
-/// hundred visits. The expected score follows exactly, with no modelling assumption:
+/// hundred visits. The expected score follows exactly, with no modeling assumption:
 ///
 ///     expected = w + d / 2 = (1 + q) / 2            since w + d + l = 1 and q = w - l
 ///
@@ -130,12 +130,12 @@
 ///
 /// So there are two settings and they answer different questions. **`--eval-scale` rescales the score
 /// column linearly** (the mapping is `scale * logit`, so halving the scale halves every score), and is the
-/// knob for putting this pool on the same numeric scale as a differently-labelled one - `--eval-scale 276`
+/// knob for putting this pool on the same numeric scale as a differently-labeled one - `--eval-scale 276`
 /// is what the 0.69 slope above implies. **`--q-scale` shrinks `q` before the mapping**, which is not a
 /// linear rescale: it compresses the saturated ends far more than the middle, and so is the knob for an
 /// over-confident value head rather than for a scale mismatch. Both default to no change, and the default
 /// is the self-consistent mapping: the trade is between a label that means exactly what the trainer's loss
-/// targets and a label that sits on the same scale as its neighbours in a blended pool. Pick one knowingly;
+/// targets and a label that sits on the same scale as its neighbors in a blended pool. Pick one knowingly;
 /// do not reach for `--q-scale` to fix a slope.
 ///
 /// The inverse diverges at the ends, and the ends are populated: 9.2% of the records in one tar map past
@@ -157,9 +157,9 @@
 ///  * `|white_score|` must be under kEvalCap (3000);
 ///  * a position whose Zobrist key is already in this shard is dropped (gen_data deduplicates per shard,
 ///    and tools/check_duplicates.sh is what measures the assembled pool);
-///  * the first `skip_plies` plies of each game are dropped (default 8). Lc0 self-play randomises its
+///  * the first `skip_plies` plies of each game are dropped (default 8). Lc0 self-play randomizes its
 ///    opening by sampling from the visit distribution with temperature, so these plies are both shared
-///    between games and labelled by a search whose root was deliberately disturbed;
+///    between games and labeled by a search whose root was deliberately disturbed;
 ///  * nothing past ply `max_plies` (200) is kept, because gen_data adjudicates a draw there;
 ///  * a record with fewer than `min_visits` visits is dropped. Lc0's own smart pruning can end a search
 ///    almost immediately when one move is forced, and `best_q` is then one network evaluation rather than a
@@ -426,7 +426,7 @@ class RecordView
         return ReadUint32(kRecordOffsetInputFormat);
     }
 
-    /// @brief One of the 104 bitboards. @param index 0..103, index 0..12 being the position being labelled.
+    /// @brief One of the 104 bitboards. @param index 0..103, index 0..12 being the position being labeled.
     /// @return The plane, bit-reversed within each byte exactly as the writer stored it.
     uint64_t plane(std::size_t index) const
     {
@@ -508,7 +508,7 @@ class RecordView
         return ReadUint32(kRecordOffsetVisits);
     }
 
-    /// @brief Whether the history slot behind the labelled position holds a board at all.
+    /// @brief Whether the history slot behind the labeled position holds a board at all.
     /// A record with none is ply 0 of a game: lc0 stops filling history where the game started.
     bool has_previous_position() const
     {
@@ -561,8 +561,8 @@ class RecordView
 struct DecodedPosition
 {
     std::string fen;                            ///< The full six-field FEN.
-    int         piece_count            = 0;     ///< Pieces of both colours on the board.
-    int         pawn_count             = 0;     ///< Pawns of both colours on the board.
+    int         piece_count            = 0;     ///< Pieces of both colors on the board.
+    int         pawn_count             = 0;     ///< Pawns of both colors on the board.
     bool        is_castling_consistent = true;  ///< Every castling flag matches a standard king/rook placement.
     bool        is_standard_start      = false; ///< The placement is the standard chess start placement.
 };

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Developer ID signing and notarisation for a macOS release, on a keychain of the job's own, so the runner keeps no
-# certificate between jobs. The organisation's apps sign the same way, with the same organisation secrets (vst-plugins'
+# Developer ID signing and notarization for a macOS release, on a keychain of the job's own, so the runner keeps no
+# certificate between jobs. The organization's apps sign the same way, with the same organization secrets (vst-plugins'
 # tools/sign-mac.sh, which this mirrors; that repository is private, so the steps are written again here).
 #
 #   tools/sign-macos.sh open                     a keychain made from the secrets below, put first on the user's search
@@ -10,25 +10,25 @@
 #                                                identity, the hardened runtime and a secure timestamp (an app's own
 #                                                Mach-O files first, the entitlements on the app alone; a bare binary
 #                                                under the identifier given, not its file name), then held to what
-#                                                notarisation and Gatekeeper ask
+#                                                notarization and Gatekeeper ask
 #   tools/sign-macos.sh notarize <zip|dmg|pkg>   sent to Apple's notary service and waited for; anything but Accepted
 #                                                fails with Apple's log. A bare binary goes inside a zip; a ticket can
 #                                                be stapled only to an .app, a .dmg or a .pkg, which the caller does
-#   tools/sign-macos.sh staple <app>             the app's notarisation ticket fetched from Apple and stapled to it, then
+#   tools/sign-macos.sh staple <app>             the app's notarization ticket fetched from Apple and stapled to it, then
 #                                                validated
 #   tools/sign-macos.sh validate <app>           the ticket stapled to the app validated
 #   tools/sign-macos.sh check <path>...          each signed by this team's Developer ID with the hardened runtime and a
-#                                                timestamp, and known to Apple as notarised (codesign's online check)
+#                                                timestamp, and known to Apple as notarized (codesign's online check)
 #   tools/sign-macos.sh close                    the keychain deleted and the search list put back (run it always)
 #
-# Stapling, validating, codesign's online notarisation check and Gatekeeper's assessment all ask Apple's servers, which
+# Stapling, validating, codesign's online notarization check and Gatekeeper's assessment all ask Apple's servers, which
 # drop connections now and then (stapler's Error 68, NSURLErrorDomain -1005 "The network connection was lost") and
 # take a while to serve a ticket just issued (a check seconds after Accepted fails its 'notarized' requirement; the
 # assessment calls the code Unnotarized). Each is tried again after 10, 20, 30, 45 and 60 seconds, about three minutes
 # in all, but only for those failures: a bad signature, a missing ticket on validation or a rejected submission fails at
 # once, and a failure that lasts through every attempt fails the job. RECKLESS_RETRY_DELAYS replaces the waits.
 #
-# The environment, the organisation secrets: MACOS_DEVELOPER_ID_APPLICATION_P12 (the identity as base64 PKCS #12, in the
+# The environment, the organization secrets: MACOS_DEVELOPER_ID_APPLICATION_P12 (the identity as base64 PKCS #12, in the
 # legacy format macOS's security tool reads), MACOS_SIGNING_P12_PASSWORD, MACOS_TEAM_ID, and for notarize
 # MACOS_NOTARY_KEY_P8, MACOS_NOTARY_KEY_ID and MACOS_NOTARY_ISSUER_ID (an App Store Connect API key). The keychain's
 # password is made at random and never leaves the job. RECKLESS_NOTARY_TIMEOUT bounds the wait (default 3h).
@@ -73,7 +73,7 @@ run_retrying() {
     done
 }
 
-# Gatekeeper's verdict on a path, which must be accepted as notarised Developer ID code: an app as it is launched, a
+# Gatekeeper's verdict on a path, which must be accepted as notarized Developer ID code: an app as it is launched, a
 # bare binary by its signature alone (the assessment "execute" is for bundles). A refusal is printed for
 # run_retrying, which tries again when it calls the code Unnotarized - a ticket Apple has not served yet.
 assess() {
@@ -177,7 +177,7 @@ notarize)
     field() { python3 -I -c "import json,sys; print(json.load(sys.stdin).get('$1',''))" <<< "$result" 2> /dev/null || true; }
     id=$(field id)
     status=$(field status)
-    echo "notarisation ${id:-(no id)}: ${status:-$(field message)}"
+    echo "notarization ${id:-(no id)}: ${status:-$(field message)}"
     if [ "$status" != "Accepted" ]; then
         [ -n "$id" ] && notary log "$id" || true
         rm -f "$key"
@@ -189,7 +189,7 @@ notarize)
 staple)
     app=${2:?usage: tools/sign-macos.sh staple <app>}
     run_retrying "stapling $app" "$network_failure" xcrun stapler staple "$app" ||
-        { echo "::error::the notarisation ticket could not be stapled to $app" >&2; exit 1; }
+        { echo "::error::the notarization ticket could not be stapled to $app" >&2; exit 1; }
     run_retrying "validating $app's ticket" "$network_failure" xcrun stapler validate "$app" ||
         { echo "::error::the ticket stapled to $app does not validate" >&2; exit 1; }
     ;;
@@ -204,17 +204,17 @@ check)
     for path in "$@"; do
         # The signature first, which is local and never tried again: a bad one fails here at once.
         check_one "$path"
-        # Asks Apple whether this code's notarisation ticket exists: the check Gatekeeper makes of a download that
+        # Asks Apple whether this code's notarization ticket exists: the check Gatekeeper makes of a download that
         # carries no stapled ticket (a bare binary can carry none). With the signature already verified, failing its
         # 'notarized' requirement means Apple has no ticket for it - not yet, seconds after Accepted - or could not
         # be asked; either is tried again.
-        run_retrying "the online notarisation check of $path" \
+        run_retrying "the online notarization check of $path" \
             "test-requirement: code failed to satisfy specified code requirement|$network_failure" \
             codesign --verify --check-notarization -R='notarized' --verbose=2 "$path" ||
-            { echo "::error::Apple does not know $path as notarised" >&2; exit 1; }
+            { echo "::error::Apple does not know $path as notarized" >&2; exit 1; }
         # Gatekeeper's own verdict, which asks Apple too for code with no stapled ticket.
         run_retrying "Gatekeeper's assessment of $path" "source=Unnotarized Developer ID|$network_failure" assess "$path" ||
-            { echo "::error::Gatekeeper does not accept $path as notarised Developer ID code" >&2; exit 1; }
+            { echo "::error::Gatekeeper does not accept $path as notarized Developer ID code" >&2; exit 1; }
     done
     ;;
 close)

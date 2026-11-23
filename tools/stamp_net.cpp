@@ -1,13 +1,13 @@
 /// @file stamp_net.cpp Wrap a raw bullet NNUE payload in the shared Reckless `RNNUE1` container.
 ///
-/// The bullet trainer writes a headerless quantised net. This tool prepends the 64-byte NetHeader that
+/// The bullet trainer writes a headerless quantized net. This tool prepends the 64-byte NetHeader that
 /// every Reckless engine reads (src/nnue.h, skill `reckless-nnue`), **written entirely from this build's
 /// own compiled constants** — the architecture fields, the king-bucket map's CRC-64, and then the payload's
 /// and the header's own CRC-64. So the tool can only produce a header describing the engine it was built
 /// as: a 512-wide net stamped by a 1024-wide tool gets a 1024-wide header and is refused on first load,
 /// which is the point. Never hand-edit a net file; stamp it.
 ///
-/// It also **drops bullet's tail padding**. bullet pads its quantised output up to a 64-byte boundary with
+/// It also **drops bullet's tail padding**. bullet pads its quantized output up to a 64-byte boundary with
 /// repeats of the word "bullet"; RNNUE1 records an exact payload length and the loader checks the file has
 /// nothing after it, which is what lets a truncated or an appended-to file be told apart from a sound one.
 ///
@@ -48,7 +48,7 @@ int main(int argc, char **argv)
     payload.resize(nnue::kNetPayloadBytes); // drop bullet's tail padding
 
     nnue::NetHeader header = nnue::ExpectedNetHeader();
-    nnue::FinaliseNetHeader(header, reinterpret_cast<const std::uint8_t *>(payload.data()), payload.size());
+    nnue::FinalizeNetHeader(header, reinterpret_cast<const std::uint8_t *>(payload.data()), payload.size());
 
     std::ofstream out(argv[2], std::ios::binary);
     if (!out)
