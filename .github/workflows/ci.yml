@@ -152,6 +152,14 @@ jobs:
       # still targets the deprecated Node 20): locate Visual Studio with vswhere, run vcvars64.bat,
       # and export the resulting environment to GITHUB_ENV — exactly what that action does internally.
       # Ninja needs no setup step either: the developer environment puts Visual Studio's on the PATH.
+      # The image's own LLVM is 20, and Visual Studio 18's STL (image 20261116) refuses anything under Clang 22 (STL1000,
+      # "expected Clang 22 or newer"). So this job installs LLVM 22 first, the major the formatter is already pinned to.
+      - name: LLVM 22
+        shell: pwsh
+        run: |
+          choco install llvm --version=22.1.8 --allow-downgrade --no-progress -y
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & "C:\Program Files\LLVM\bin\clang++.exe" --version
       - name: MSVC developer environment
         shell: pwsh
         run: |
