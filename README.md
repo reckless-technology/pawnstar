@@ -181,7 +181,7 @@ its latest result on `main`). Every job runs on a GitHub-hosted runner, on an im
 (`ubuntu-24.04`, `windows-2025`), and installs what it needs with pinned versions. The jobs:
 
 - **build + test (make wrapper)** — the Linux gate: `make WERROR=1 CXX=clang++-18 check` drives the CMake
-  build through the wrapper and runs all twenty suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
+  build through the wrapper and runs all twenty-one suites via `ctest`, behind a fail-fast AVX2/BMI2 runner check.
   (Exercising the wrapper also covers the plain CMake path; the Windows artifact job runs CMake directly.)
 - **clang-format** — the whole tree must be clang-format-clean, checked with **clang-format 22.1.8** (the
   PyPI wheel in a venv of the job's own; apt has no `clang-format-22`). This is independent of the
@@ -710,8 +710,8 @@ make check
 ```
 
 builds and runs sixteen standalone test executables (plus a shell-driven UCI integration test,
-`test/uci_test.sh`, run against `build/pawnstar`, and three Python suites, `test/pool_matches_test.py`,
-`test/opening_icc_test.py` and `test/pgn_nps_test.py` — twenty
+`test/uci_test.sh`, run against `build/pawnstar`, and four Python suites, `test/pool_matches_test.py`,
+`test/opening_icc_test.py`, `test/pgn_nps_test.py` and `test/match_core_test.py` — twenty-one
 suites in all; the shell script also checks where the engine finds its net and book at startup, the embedded
 copies it falls back to, `PAWNSTAR_EVALFILE` and a clean exit at the end of input):
 

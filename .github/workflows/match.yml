@@ -4,25 +4,21 @@ name: Match
 # self-hosted Linux machine, which is also where the hand-run matches used to go - and while one ran there, no
 # private repository could push without biasing it). Manual only: nothing here runs on a push or a pull request.
 #
-#   plan   -> turns the inputs into a chunk matrix: each chunk gets a DISJOINT slice of nnue/openings.epd
-#   build  -> builds both engines once (clang-18, release), fastchess at a pinned commit, and gathers the nets and
-#             the opening set into ONE artifact, `match-inputs`. Nothing else is handed to the chunks.
-#   chunk  -> a matrix of jobs, each playing its slice through tools/pawnstar-match.sh and uploading its PGN + log
-#   pool   -> pools every chunk with tools/opening_icc.py and tools/pool_matches.py, counts time forfeits, reads the
-#             nodes per second, writes the lot to the job summary, and FAILS if the game count is short
+# This file is the FIRST CALLER of the reusable workflow match-core.yml, and holds only what is Pawnstar's:
 #
-# THE BOUNDARY. The chunk and pool jobs know nothing about how the engines were built: they take binaries, nets, an
-# opening set and a fastchess from the `match-inputs` artifact and nothing from the build job's workspace. The one
-# Pawnstar-specific thing in a chunk is its "Play the slice" step, whose command is tools/pawnstar-match.sh (the
-# RNNUE1 net preflight); another engine's chunk would swap that one command. That seam is where these two jobs lift
-# out into a reusable workflow (workflow_call) when the other engines want them - not built yet.
+#   refs   -> resolves the two refs to commits (the baseline defaults to the newest vMAJOR.MINOR.PATCH tag)
+#   build  -> builds both engines (clang-18, release) and gathers them, both nets, the opening set and a
+#             manifest.json into ONE artifact, `match-inputs`
+#   match  -> `uses: ./.github/workflows/match-core.yml`: fastchess, the plan, the chunk matrix, the pool. Pawnstar's
+#             own RNNUE1 net preflight (tools/pawnstar-match.sh --dry-run) is passed as that workflow's `preflight`.
 #
-# A workflow_dispatch workflow cannot be dispatched until its file is on the default branch, so this file landed
-# through a pull request that changes nothing else; later edits are dispatched from their own branch with
+# Another engine's repository does the same with its own build job. docs/match-core.md is the guide: the inputs, the
+# manifest format, and an example caller pinned to a commit. A workflow_dispatch workflow cannot be dispatched until
+# its file is on the default branch, so edits are dispatched from their own branch with
 # `gh workflow run match.yml --ref <branch>`.
 #
 # Capacity: the organisation is on GitHub's Team plan, so every public repository's CI shares about 60 concurrent
-# hosted jobs. max-parallel below stays well under that. GitHub's Actions terms allow use for testing the
+# hosted jobs; match-core.yml keeps max-parallel at 40. GitHub's Actions terms allow use for testing the
 # repository's own project, which strength-testing Pawnstar is.
 
 on:
@@ -74,48 +70,32 @@ on:
 permissions:
   contents: read
 
-env:
-  # fastchess, built from source at this commit (the tag v1.8.2-alpha). The same release the Stoopid Chess repository
-  # pins in tools/tuning-tools.txt, so one fastchess serves the organisation.
-  FASTCHESS_TAG: v1.8.2-alpha
-  FASTCHESS_COMMIT: f618e34540f94f4719ad3817950618dabe441318
-
 jobs:
-  plan:
+  refs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
-      matrix: ${{ steps.plan.outputs.matrix }}
-      expect_games: ${{ steps.plan.outputs.expect_games }}
-      candidate_sha: ${{ steps.plan.outputs.candidate_sha }}
-      baseline_sha: ${{ steps.plan.outputs.baseline_sha }}
-      baseline_ref: ${{ steps.plan.outputs.baseline_ref }}
-      clock_flag: ${{ steps.plan.outputs.clock_flag }}
-      clock_value: ${{ steps.plan.outputs.clock_value }}
+      candidate_sha: ${{ steps.refs.outputs.candidate_sha }}
+      baseline_sha: ${{ steps.refs.outputs.baseline_sha }}
+      baseline_ref: ${{ steps.refs.outputs.baseline_ref }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-      - name: Plan the chunks
-        id: plan
+      - name: Resolve the refs
+        id: refs
         env:
           IN_CANDIDATE: ${{ inputs.candidate_ref || 'main' }}
           IN_BASELINE: ${{ inputs.baseline_ref }}
-          IN_TC: ${{ inputs.time_control || '8+0.08' }}
-          IN_DEPTH: ${{ inputs.depth }}
-          IN_GAMES: ${{ inputs.games || '4000' }}
-          IN_CHUNKS: ${{ inputs.chunks || '20' }}
-          IN_CONCURRENCY: ${{ inputs.concurrency || '2' }}
-          IN_FIRST: ${{ inputs.first_opening || '1' }}
         run: |
-          python3 - <<'EOF'
-          import json, math, os, subprocess
+          python3 - <<'PY'
+          import os, subprocess
 
           def sh(*args):
               return subprocess.run(args, check=True, capture_output=True, text=True).stdout.strip()
 
           env = os.environ
-          # Refs: resolved to commits here, once, so every job builds exactly what the plan named.
+          # Resolved to commits here, once, so every job builds exactly what this named.
           sh("git", "fetch", "--tags", "--force", "origin", "+refs/heads/*:refs/remotes/origin/*")
           def resolve(ref):
               for candidate in (ref, "origin/" + ref):
@@ -129,63 +109,31 @@ jobs:
               tags = sh("git", "tag", "--list", "v[0-9]*.[0-9]*.[0-9]*", "--sort=-v:refname").splitlines()
               baseline = tags[0]
           candidate_sha, baseline_sha = resolve(env["IN_CANDIDATE"]), resolve(baseline)
-
-          depth = env["IN_DEPTH"].strip()
-          clock_flag, clock_value = ("--depth", depth) if depth else ("--time-control", env["IN_TC"].strip())
-
-          games = int(env["IN_GAMES"])
-          pairs_total = (games + 1) // 2
-          chunks = min(int(env["IN_CHUNKS"]), pairs_total)
-          per_chunk = math.ceil(pairs_total / chunks)
-          first = int(env["IN_FIRST"])
-          concurrency = [c.strip() for c in env["IN_CONCURRENCY"].split(",") if c.strip()]
-
-          # The opening set the chunks will read: the workflow's own copy, comment header stripped.
-          with open("nnue/openings.epd") as handle:
-              openings = [l for l in handle if l.strip() and not l.lstrip().startswith("#")]
-          last = first + pairs_total - 1
-          if first < 1 or last > len(openings):
-              raise SystemExit(f"::error::{pairs_total} pairs from opening {first} need openings up to {last}, "
-                               f"but the set has {len(openings)}: a match this long would replay openings")
-
-          matrix, done = [], 0
-          for index in range(chunks):
-              pairs = min(per_chunk, pairs_total - done)
-              if pairs <= 0:
-                  break
-              matrix.append({"index": index, "games": pairs * 2, "start": first + done,
-                             "concurrency": concurrency[index % len(concurrency)]})
-              done += pairs
-
           print(f"candidate {env['IN_CANDIDATE']} = {candidate_sha}")
           print(f"baseline  {baseline} = {baseline_sha}")
-          print(f"{len(matrix)} chunks, {pairs_total * 2} games, openings {first}..{last} of {len(openings)}")
           with open(env["GITHUB_OUTPUT"], "a") as out:
-              out.write("matrix=" + json.dumps({"include": matrix}) + "\n")
-              out.write(f"expect_games={pairs_total * 2}\n")
               out.write(f"candidate_sha={candidate_sha}\nbaseline_sha={baseline_sha}\nbaseline_ref={baseline}\n")
-              out.write(f"clock_flag={clock_flag}\nclock_value={clock_value}\n")
-          EOF
+          PY
 
   build:
-    needs: plan
+    needs: refs
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - name: The workflow's own tree (scripts and the opening set)
+      - name: The workflow's own tree (the opening set)
         uses: actions/checkout@v5
         with:
           path: wf
       - name: Candidate checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.plan.outputs.candidate_sha }}
+          ref: ${{ needs.refs.outputs.candidate_sha }}
           fetch-depth: 0
           path: candidate-src
       - name: Baseline checkout
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.plan.outputs.baseline_sha }}
+          ref: ${{ needs.refs.outputs.baseline_sha }}
           fetch-depth: 0
           path: baseline-src
       - name: Install toolchain
@@ -203,37 +151,21 @@ jobs:
         run: |
           cd baseline-src
           make -j"$(nproc)" RELEASE=1 CXX=clang++-18
-      - name: Restore fastchess
-        id: fastchess-cache
-        uses: actions/cache@v4
-        with:
-          path: fastchess-bin
-          key: fastchess-release-${{ env.FASTCHESS_COMMIT }}-ubuntu-24.04
-      - name: Build fastchess ${{ env.FASTCHESS_TAG }} from source
-        if: steps.fastchess-cache.outputs.cache-hit != 'true'
-        run: |
-          git clone --quiet https://github.com/Disservin/fastchess.git fastchess-src
-          cd fastchess-src
-          git checkout --quiet "$FASTCHESS_COMMIT"
-          [ "$(git rev-parse HEAD)" = "$FASTCHESS_COMMIT" ] || { echo "::error::fastchess is not at the pinned commit"; exit 1; }
-          # build=release is -march=x86-64: the default is -march=native, and a binary built on one hosted CPU
-          # (the model varies from job to job) dies with SIGILL, exit 132, on another.
-          make -j"$(nproc)" build=release
-          mkdir -p ../fastchess-bin
-          cp fastchess ../fastchess-bin/fastchess
-      - name: Gather the match inputs
+      - name: Gather the match inputs and write the manifest
         env:
           CANDIDATE_URL: ${{ inputs.candidate_net_url }}
           CANDIDATE_SHA256: ${{ inputs.candidate_net_sha256 }}
           BASELINE_URL: ${{ inputs.baseline_net_url }}
           BASELINE_SHA256: ${{ inputs.baseline_net_sha256 }}
+          CANDIDATE_COMMIT: ${{ needs.refs.outputs.candidate_sha }}
+          BASELINE_COMMIT: ${{ needs.refs.outputs.baseline_sha }}
+          BASELINE_REF: ${{ needs.refs.outputs.baseline_ref }}
         run: |
           set -euo pipefail
           mkdir -p inputs/candidate inputs/baseline
           cp -L candidate-src/build/pawnstar inputs/candidate/pawnstar
           cp -L candidate-src/build/print_net_header inputs/candidate/print_net_header
           cp -L baseline-src/build/pawnstar inputs/baseline/pawnstar
-          cp fastchess-bin/fastchess inputs/fastchess
           cp wf/nnue/openings.epd inputs/openings.epd
 
           fetch_net() {   # <name> <url> <sha256> <the net the ref ships>
@@ -247,14 +179,38 @@ jobs:
           }
           fetch_net candidate "$CANDIDATE_URL" "$CANDIDATE_SHA256" candidate-src/nnue/pawnstar-v20.bin
           fetch_net baseline  "$BASELINE_URL"  "$BASELINE_SHA256"  baseline-src/nnue/pawnstar-v20.bin
-          chmod +x inputs/fastchess inputs/*/pawnstar inputs/candidate/print_net_header
+          chmod +x inputs/*/pawnstar inputs/candidate/print_net_header
 
+          # The manifest tools/match_core.py reads (docs/match-core.md). Each side gets its net at STARTUP through
+          # PAWNSTAR_EVALFILE (so a variant binary survives the handshake) and as the EvalFile option, and is pinned
+          # to one search thread; OwnBook is off for both, since the engine's book move is weighted-random.
+          python3 - <<'PY'
+          import hashlib, json, os
+          def side(role, commit, label):
+              net = "{inputs}/%s.bin" % role
+              return {"name": f"{label} {commit[:8]}",
+                      "command": "{inputs}/%s/pawnstar" % role,
+                      "options": {"EvalFile": net},
+                      "env": {"PAWNSTAR_EVALFILE": net, "PAWNSTAR_THREADS": "1"}}
+          env = os.environ
+          manifest = {
+              "format": 1,
+              "candidate": side("candidate", env["CANDIDATE_COMMIT"], "candidate"),
+              "baseline": side("baseline", env["BASELINE_COMMIT"], env["BASELINE_REF"]),
+              "each_options": {"OwnBook": "false"},
+              "openings": {"path": "openings.epd",
+                           "sha256": hashlib.sha256(open("inputs/openings.epd", "rb").read()).hexdigest()},
+              "notes": [f"candidate commit {env['CANDIDATE_COMMIT']}",
+                        f"baseline {env['BASELINE_REF']} commit {env['BASELINE_COMMIT']}",
+                        f"workflow commit ${{ github.sha }}"],
+          }
+          json.dump(manifest, open("inputs/manifest.json", "w"), indent=2)
+          PY
           {
-            echo "candidate_commit  ${{ needs.plan.outputs.candidate_sha }}"
-            echo "baseline_commit   ${{ needs.plan.outputs.baseline_sha }} (${{ needs.plan.outputs.baseline_ref }})"
-            echo "fastchess         ${FASTCHESS_TAG} ${FASTCHESS_COMMIT}"
+            echo "candidate_commit  $CANDIDATE_COMMIT"
+            echo "baseline_commit   $BASELINE_COMMIT ($BASELINE_REF)"
             echo "workflow_commit   ${{ github.sha }}"
-            (cd inputs && sha256sum candidate.bin baseline.bin openings.epd candidate/pawnstar baseline/pawnstar fastchess)
+            (cd inputs && sha256sum candidate.bin baseline.bin openings.epd candidate/pawnstar baseline/pawnstar)
           } | tee inputs/manifest.txt
           {
             echo '### Match inputs'
@@ -269,151 +225,26 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-  chunk:
-    name: chunk ${{ matrix.index }}
-    needs: [plan, build]
-    runs-on: ubuntu-24.04
-    timeout-minutes: 150
-    strategy:
-      fail-fast: false
-      max-parallel: 40
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          sparse-checkout: tools
-      - uses: actions/download-artifact@v5
-        with:
-          name: match-inputs
-          path: inputs
-      - name: The machine
-        run: |
-          chmod +x inputs/fastchess inputs/*/pawnstar inputs/candidate/print_net_header
-          grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
-            || { echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1; }
-          {
-            echo '### Machine, chunk ${{ matrix.index }}'
-            echo '```'
-            echo "nproc: $(nproc)"
-            lscpu | grep -E 'Model name|^CPU\(s\)|Thread|Core|Socket|MHz|L3'
-            free -m | sed -n 1,2p
-            echo '```'
-          } | tee -a "$GITHUB_STEP_SUMMARY"
-          mkdir -p out
-          echo "$(lscpu | sed -n 's/^Model name: *//p')" > out/machine-${{ matrix.index }}.txt
-      # The Pawnstar-specific step: the RNNUE1 net preflight lives in this script. Another engine's chunk
-      # would replace this one command and keep everything around it.
-      - name: Play the slice (openings ${{ matrix.start }}.., ${{ matrix.games }} games)
-        env:
-          FASTCHESS: ${{ github.workspace }}/inputs/fastchess
-          BASELINE_TC: ${{ inputs.baseline_time_control }}
-        run: |
-          tools/pawnstar-match.sh --repo "$PWD" \
-            --candidate inputs/candidate.bin --baseline inputs/baseline.bin \
-            --candidate-binary inputs/candidate/pawnstar --baseline-binary inputs/baseline/pawnstar \
-            --openings inputs/openings.epd --opening-start ${{ matrix.start }} \
-            --games ${{ matrix.games }} \
-            ${{ needs.plan.outputs.clock_flag }} '${{ needs.plan.outputs.clock_value }}' \
-            ${BASELINE_TC:+--baseline-time-control "$BASELINE_TC"} \
-            --concurrency ${{ matrix.concurrency }} --hash ${{ inputs.hash_mb || '64' }} \
-            --label chunk-${{ matrix.index }} --log-dir out \
-            --pgn out/chunk-${{ matrix.index }}.pgn \
-            --allow-busy-runner
-          # --allow-busy-runner: the hosted runner's own worker is the "running job" the idle check would find.
-      - uses: actions/upload-artifact@v5
-        if: always()
-        with:
-          name: chunk-${{ matrix.index }}
-          path: out
-          retention-days: 14
-          if-no-files-found: warn
-
-  pool:
-    needs: [plan, chunk]
-    if: always() && needs.plan.result == 'success'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          sparse-checkout: tools
-      - uses: actions/download-artifact@v5
-        with:
-          pattern: chunk-*
-          merge-multiple: true
-          path: chunks
-      - name: Pool
-        env:
-          EXPECT_GAMES: ${{ needs.plan.outputs.expect_games }}
-          CHUNK_RESULT: ${{ needs.chunk.result }}
-        run: |
-          set +e -uo pipefail   # Actions runs bash -e; a grep that finds nothing must not end the step
-          shopt -s nullglob
-          pgns=(chunks/chunk-*.pgn)
-          logs=(chunks/chunk-*.log)
-          status=0
-          {
-            echo "## Match: ${{ needs.plan.outputs.candidate_sha }} (candidate) vs ${{ needs.plan.outputs.baseline_ref }} ${{ needs.plan.outputs.baseline_sha }} (baseline)"
-            echo "Clock: ${{ needs.plan.outputs.clock_flag }} ${{ needs.plan.outputs.clock_value }}, ${EXPECT_GAMES} games expected, chunk jobs: ${CHUNK_RESULT}, ${#pgns[@]} PGNs"
-            echo
-            echo '### Opening-corrected result (tools/opening_icc.py)'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "${#pgns[@]}" -eq 0 ]; then
-            echo "no chunk PGNs at all" | tee -a "$GITHUB_STEP_SUMMARY"; status=1
-          else
-            python3 tools/opening_icc.py --candidate candidate --expect-games "$EXPECT_GAMES" "${pgns[@]}" \
-              2>&1 | tee pooled.txt | tee -a "$GITHUB_STEP_SUMMARY" || status=1
-          fi
-          {
-            echo '```'
-            echo '### Pooled pentanomial (tools/pool_matches.py, from each chunk log)'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "${#logs[@]}" -gt 0 ]; then
-            args=(); for log in "${logs[@]}"; do args+=(--log "$log"); done
-            python3 tools/pool_matches.py "${args[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || status=1
-          fi
-          {
-            echo '```'
-            echo '### Per chunk: CPU model and absolute nps (tools/pgn_nps.py) - a mixed-hardware match shows here'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          printf '%-8s %-44s %14s %14s\n' chunk 'CPU model' 'candidate nps' 'baseline nps' | tee -a "$GITHUB_STEP_SUMMARY"
-          for pgn in "${pgns[@]}"; do
-            name=$(basename "$pgn" .pgn); index=${name#chunk-}
-            model=$(cat "chunks/machine-${index}.txt" 2>/dev/null || echo unknown)
-            rows=$(python3 tools/pgn_nps.py "$pgn" 2>/dev/null)
-            cand=$(printf '%s\n' "$rows" | awk '$1=="candidate" && $2 ~ /^[0-9]/{print $7}')
-            base=$(printf '%s\n' "$rows" | awk '$1=="baseline" && $2 ~ /^[0-9]/{print $7}')
-            printf '%-8s %-44s %14s %14s\n' "$index" "$model" "$cand" "$base" | tee -a "$GITHUB_STEP_SUMMARY"
-          done
-          echo "distinct CPU models: $(cat chunks/machine-*.txt 2>/dev/null | sort | uniq -c | sed 's/^ *//' | tr '\n' ';')" | tee -a "$GITHUB_STEP_SUMMARY"
-          {
-            echo '```'
-            echo '### Speed over all chunks (tools/pgn_nps.py) and time losses'
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "${#pgns[@]}" -gt 0 ]; then
-            python3 tools/pgn_nps.py "${pgns[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
-            cat "${pgns[@]}" > all.pgn
-            total=$(grep -c '^\[Result ' all.pgn)
-            forfeits=$(grep -c 'Termination "time forfeit"' all.pgn)
-            echo "games in the PGNs: ${total}; time forfeits: ${forfeits}" | tee -a "$GITHUB_STEP_SUMMARY"
-            grep -h '^\[Termination ' all.pgn | sort | uniq -c | sort -rn | tee -a "$GITHUB_STEP_SUMMARY"
-            if [ "$total" -ne "$EXPECT_GAMES" ]; then
-              echo "::error::${total} games played, ${EXPECT_GAMES} expected"; status=1
-            fi
-          fi
-          echo '```' >> "$GITHUB_STEP_SUMMARY"
-          [ "$CHUNK_RESULT" = success ] || { echo "::error::chunk jobs: ${CHUNK_RESULT}"; status=1; }
-          exit "$status"
-      - uses: actions/upload-artifact@v5
-        if: always()
-        with:
-          name: match-result
-          path: |
-            pooled.txt
-            all.pgn
-          if-no-files-found: ignore
-          retention-days: 30
+  match:
+    needs: [refs, build]
+    uses: ./.github/workflows/match-core.yml
+    with:
+      artifact: match-inputs
+      title: 'Match: ${{ needs.refs.outputs.candidate_sha }} (candidate) vs ${{ needs.refs.outputs.baseline_ref }} ${{ needs.refs.outputs.baseline_sha }} (baseline)'
+      time_control: ${{ inputs.time_control || '8+0.08' }}
+      baseline_time_control: ${{ inputs.baseline_time_control }}
+      depth: ${{ inputs.depth }}
+      games: ${{ inputs.games || '4000' }}
+      chunks: ${{ inputs.chunks || '20' }}
+      concurrency: ${{ inputs.concurrency || '2' }}
+      hash_mb: ${{ inputs.hash_mb || '64' }}
+      first_opening: ${{ inputs.first_opening || '1' }}
+      # Pawnstar's own protection, which a generic engine start-and-search probe cannot give: the RNNUE1 header of
+      # each net decoded by the candidate build's own print_net_header (integrity, shape, both nets distinct) and a
+      # depth-4 search that makes each binary load its own net for real. --dry-run plays nothing.
+      preflight: |
+        "$MATCH_TOOLS/pawnstar-match.sh" --repo "$MATCH_INPUTS" \
+          --candidate candidate.bin --baseline baseline.bin \
+          --candidate-binary candidate/pawnstar --baseline-binary baseline/pawnstar \
+          --openings openings.epd --games 2 $MATCH_CLOCK_ARGS \
+          --log-dir "${RUNNER_TEMP:-/tmp}/preflight" --label preflight --allow-busy-runner --dry-run

@@ -327,6 +327,12 @@ if(PAWNSTAR_TEST_PYTHON)
   add_test(NAME pgn_nps COMMAND "${PAWNSTAR_TEST_PYTHON}" -I
            ${CMAKE_CURRENT_SOURCE_DIR}/test/pgn_nps_test.py
            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  # tools/match_core.py - the engine-neutral plan and chunk of the reusable match workflow (match-core.yml),
+  # against a fake engine and a fake fastchess: the matrix, the openings' SHA-256 refusals, the fastchess command
+  # pinned flag for flag to tools/pawnstar-match.sh's, the environment wrapper and the start-and-search probe.
+  add_test(NAME match_core COMMAND "${PAWNSTAR_TEST_PYTHON}" -I
+           ${CMAKE_CURRENT_SOURCE_DIR}/test/match_core_test.py
+           WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 # NNUE suites take the net (and reference) explicitly; only register them if the shipped net is present
 # (so a checkout without the .bin still configures, matching the Makefile's $(wildcard) degrade-to-no-op).

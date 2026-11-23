@@ -1,0 +1,375 @@
+name: Match core
+
+# The engine-neutral half of a hosted engine-versus-engine match, as a reusable workflow (workflow_call). A calling
+# repository builds its two engines however its language wants, uploads them with a manifest as ONE artifact, and
+# calls this. It plays the match as disjoint chunks on GitHub-hosted runners, pools them, and writes the result to
+# the job summary. The minutes are the CALLER's, which keeps each engine's matches inside GitHub's terms for
+# testing the repository's own project. Pawnstar's own match.yml is the first caller; docs/match-core.md is the
+# caller's guide: the inputs, the manifest format and an example.
+#
+#   fastchess -> builds fastchess v1.8.2-alpha at the pinned commit (build=release), cached; callers do not
+#   plan      -> unpacks the caller's artifact, verifies the opening set's SHA-256, writes the chunk matrix
+#   chunk     -> a matrix of jobs, each playing a disjoint slice of the openings (tools/match_core.py chunk)
+#   pool      -> tools/opening_icc.py, tools/pool_matches.py, tools/pgn_nps.py, per-chunk CPU and nps, forfeits;
+#                FAILS when the game count is short
+#
+# THE TOOLS ARE CHECKED OUT AT THE REF THIS FILE WAS CALLED AT. In a reusable workflow `github.sha` and
+# `github.workflow_sha` are the CALLER's, so a plain checkout would take the caller's own tree (which has no
+# tools/match_core.py) or, with `repository: reckless-technology/pawnstar` and no ref, the default branch, so a
+# caller pinned to a commit would run that commit's workflow against today's tools. The `job` context says
+# where the running workflow file came from: `job.workflow_repository` and `job.workflow_sha` (a commit, even when
+# the caller wrote `@main` or `@v1`). Every job below checks out `tools/` from exactly that pair and refuses to
+# go on if either is empty.
+
+on:
+  workflow_call:
+    inputs:
+      artifact:
+        description: 'Name of the caller-uploaded artifact holding manifest.json, the engines and their nets'
+        type: string
+        required: true
+      title:
+        description: 'Heading for the job summary, e.g. the two refs being compared'
+        type: string
+        default: 'Match'
+      tag:
+        description: 'Prefix for the artifacts this workflow creates; give each call in one run its own'
+        type: string
+        default: 'match'
+      time_control:
+        description: 'Time control, e.g. 8+0.08 (ignored when depth is given)'
+        type: string
+        default: '8+0.08'
+      baseline_time_control:
+        description: 'Time-odds match: the baseline plays this time control instead. Empty = the same clock'
+        type: string
+        default: ''
+      depth:
+        description: 'Fixed search depth instead of a time control (empty = use the time control)'
+        type: string
+        default: ''
+      games:
+        description: 'Total games (rounded up to whole colour-reversed pairs)'
+        type: string
+        default: '4000'
+      chunks:
+        description: 'Number of chunk jobs'
+        type: string
+        default: '20'
+      concurrency:
+        description: 'Games at once per chunk job (a comma list is dealt out round-robin to the chunks)'
+        type: string
+        default: '2'
+      hash_mb:
+        description: 'Hash per engine, MB'
+        type: string
+        default: '64'
+      first_opening:
+        description: 'First position of the opening set to play (1-based; the chunks take consecutive slices)'
+        type: string
+        default: '1'
+      openings_path:
+        description: 'Opening set as a path in the CALLER repository (checked out here), instead of manifest openings.path'
+        type: string
+        default: ''
+      openings_sha256:
+        description: 'SHA-256 of the opening set; overrides the manifest. Required if the manifest has none'
+        type: string
+        default: ''
+      preflight:
+        description: >-
+          Optional shell command run in every chunk before it plays, with the unpacked artifact as its working
+          directory and MATCH_INPUTS, MATCH_TOOLS (this repository's tools/ at the called ref), FASTCHESS,
+          MATCH_CLOCK_ARGS, MATCH_START and MATCH_GAMES set. A non-zero exit stops the chunk. When given, the
+          generic start-and-search probe is skipped: the command replaces it.
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  # fastchess, built from source at this commit (the tag v1.8.2-alpha). The same release the Stoopid Chess repository
+  # pins in tools/tuning-tools.txt, so one fastchess serves the organisation.
+  FASTCHESS_TAG: v1.8.2-alpha
+  FASTCHESS_COMMIT: f618e34540f94f4719ad3817950618dabe441318
+
+jobs:
+  fastchess:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Restore fastchess
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: fastchess-bin
+          key: fastchess-release-${{ env.FASTCHESS_COMMIT }}-ubuntu-24.04
+      - name: Build fastchess ${{ env.FASTCHESS_TAG }} from source
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --quiet https://github.com/Disservin/fastchess.git fastchess-src
+          cd fastchess-src
+          git checkout --quiet "$FASTCHESS_COMMIT"
+          [ "$(git rev-parse HEAD)" = "$FASTCHESS_COMMIT" ] || { echo "::error::fastchess is not at the pinned commit"; exit 1; }
+          # build=release is -march=x86-64: the default is -march=native, and a binary built on one hosted CPU
+          # (the model varies from job to job) dies with SIGILL, exit 132, on another.
+          make -j"$(nproc)" build=release
+          mkdir -p ../fastchess-bin
+          cp fastchess ../fastchess-bin/fastchess
+      - run: chmod +x fastchess-bin/fastchess && fastchess-bin/fastchess --version | head -1
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ inputs.tag }}-fastchess
+          path: fastchess-bin
+          retention-days: 14
+          if-no-files-found: error
+
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      expect_games: ${{ steps.plan.outputs.expect_games }}
+      tools_repository: ${{ job.workflow_repository }}
+      tools_sha: ${{ job.workflow_sha }}
+    steps:
+      - name: Where this workflow came from
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+          WORKFLOW_REF: ${{ job.workflow_ref }}
+        run: |
+          echo "called workflow: ${WORKFLOW_REF} = ${WORKFLOW_REPOSITORY} @ ${WORKFLOW_SHA}"
+          if [ -z "$WORKFLOW_REPOSITORY" ] || [ -z "$WORKFLOW_SHA" ]; then
+            echo "::error::the job context has no workflow_repository/workflow_sha, so the tools cannot be pinned to this workflow's ref"
+            exit 1
+          fi
+      - name: This repository's tools, at the ref this workflow was called at
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          sparse-checkout: tools
+          path: match-tools
+      - name: The caller's opening set (only with openings_path)
+        if: inputs.openings_path != ''
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: ${{ inputs.openings_path }}
+          sparse-checkout-cone-mode: false
+          path: caller
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.artifact }}
+          path: inputs
+      - name: Plan the chunks
+        id: plan
+        env:
+          IN_GAMES: ${{ inputs.games }}
+          IN_CHUNKS: ${{ inputs.chunks }}
+          IN_FIRST: ${{ inputs.first_opening }}
+          IN_CONCURRENCY: ${{ inputs.concurrency }}
+          IN_OPENINGS_PATH: ${{ inputs.openings_path }}
+          IN_OPENINGS_SHA256: ${{ inputs.openings_sha256 }}
+        run: |
+          args=(--inputs inputs --out plan --games "$IN_GAMES" --chunks "$IN_CHUNKS" --first "$IN_FIRST"
+                --concurrency "$IN_CONCURRENCY" --openings-sha256 "$IN_OPENINGS_SHA256")
+          [ -z "$IN_OPENINGS_PATH" ] || args+=(--openings-file "caller/$IN_OPENINGS_PATH")
+          python3 -I match-tools/tools/match_core.py plan "${args[@]}"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ inputs.tag }}-plan
+          path: plan
+          retention-days: 14
+          if-no-files-found: error
+
+  chunk:
+    name: chunk ${{ matrix.index }}
+    needs: [plan, fastchess]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 40
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: This repository's tools, at the ref this workflow was called at
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ needs.plan.outputs.tools_repository }}
+          ref: ${{ needs.plan.outputs.tools_sha }}
+          sparse-checkout: tools
+          path: match-tools
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.artifact }}
+          path: inputs
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.tag }}-plan
+          path: plan
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.tag }}-fastchess
+          path: fastchess-bin
+      - name: The machine
+        run: |
+          chmod -R u+x inputs fastchess-bin || true
+          grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
+            || echo "::warning::runner CPU lacks AVX2/BMI2: an engine that needs them will not start"
+          {
+            echo '### Machine, chunk ${{ matrix.index }}'
+            echo '```'
+            echo "nproc: $(nproc)"
+            lscpu | grep -E 'Model name|^CPU\(s\)|Thread|Core|Socket|MHz|L3'
+            free -m | sed -n 1,2p
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+          mkdir -p out
+          echo "$(lscpu | sed -n 's/^Model name: *//p')" > out/machine-${{ matrix.index }}.txt
+      - name: Preflight (the caller's command)
+        if: inputs.preflight != ''
+        working-directory: inputs
+        env:
+          PREFLIGHT: ${{ inputs.preflight }}
+          MATCH_INPUTS: ${{ github.workspace }}/inputs
+          MATCH_TOOLS: ${{ github.workspace }}/match-tools/tools
+          FASTCHESS: ${{ github.workspace }}/fastchess-bin/fastchess
+          MATCH_CLOCK_ARGS: ${{ inputs.depth != '' && format('--depth {0}', inputs.depth) || format('--time-control {0}', inputs.time_control) }}
+          MATCH_START: ${{ matrix.start }}
+          MATCH_GAMES: ${{ matrix.games }}
+        run: bash -euo pipefail -c "$PREFLIGHT"
+      - name: Play the slice (openings ${{ matrix.start }}.., ${{ matrix.games }} games)
+        env:
+          IN_DEPTH: ${{ inputs.depth }}
+          IN_TC: ${{ inputs.time_control }}
+          IN_BASELINE_TC: ${{ inputs.baseline_time_control }}
+          IN_PREFLIGHT: ${{ inputs.preflight }}
+        run: |
+          args=(--inputs inputs --openings plan/openings.epd --fastchess fastchess-bin/fastchess
+                --start ${{ matrix.start }} --games ${{ matrix.games }} --concurrency ${{ matrix.concurrency }}
+                --hash '${{ inputs.hash_mb }}' --out out --label chunk-${{ matrix.index }})
+          if [ -n "$IN_DEPTH" ]; then args+=(--depth "$IN_DEPTH"); else args+=(--time-control "$IN_TC"); fi
+          [ -z "$IN_BASELINE_TC" ] || args+=(--baseline-time-control "$IN_BASELINE_TC")
+          [ -z "$IN_PREFLIGHT" ] || args+=(--skip-probe)
+          python3 -I match-tools/tools/match_core.py chunk "${args[@]}"
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: ${{ inputs.tag }}-chunk-${{ matrix.index }}
+          path: out
+          retention-days: 14
+          if-no-files-found: warn
+
+  pool:
+    needs: [plan, chunk]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: This repository's tools, at the ref this workflow was called at
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ needs.plan.outputs.tools_repository }}
+          ref: ${{ needs.plan.outputs.tools_sha }}
+          sparse-checkout: tools
+          path: match-tools
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: ${{ inputs.tag }}-chunk-*
+          merge-multiple: true
+          path: chunks
+      - uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.artifact }}
+          path: inputs
+        continue-on-error: true
+      - name: Pool
+        env:
+          EXPECT_GAMES: ${{ needs.plan.outputs.expect_games }}
+          CHUNK_RESULT: ${{ needs.chunk.result }}
+          TITLE: ${{ inputs.title }}
+          CLOCK: ${{ inputs.depth != '' && format('depth {0}', inputs.depth) || format('time control {0}', inputs.time_control) }}
+          BASELINE_CLOCK: ${{ inputs.baseline_time_control }}
+          TOOLS_REF: ${{ needs.plan.outputs.tools_repository }}@${{ needs.plan.outputs.tools_sha }}
+        run: |
+          set +e -uo pipefail   # Actions runs bash -e; a grep that finds nothing must not end the step
+          shopt -s nullglob
+          tools=match-tools/tools
+          pgns=(chunks/chunk-*.pgn)
+          logs=(chunks/chunk-*.log)
+          status=0
+          {
+            echo "## ${TITLE}"
+            [ ! -f inputs/manifest.json ] || python3 -I - <<'PY'
+          import json
+          m = json.load(open("inputs/manifest.json"))
+          print(f"candidate: {m['candidate'].get('name', '?')}  |  baseline: {m['baseline'].get('name', '?')}")
+          for note in m.get("notes", []):
+              print(f"- {note}")
+          PY
+            echo "Clock: ${CLOCK}${BASELINE_CLOCK:+ (baseline: ${BASELINE_CLOCK})}, ${EXPECT_GAMES} games expected, chunk jobs: ${CHUNK_RESULT}, ${#pgns[@]} PGNs"
+            echo "Pool tools: ${TOOLS_REF}"
+            echo
+            echo '### Opening-corrected result (tools/opening_icc.py)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${#pgns[@]}" -eq 0 ]; then
+            echo "no chunk PGNs at all" | tee -a "$GITHUB_STEP_SUMMARY"; status=1
+          else
+            python3 "$tools/opening_icc.py" --candidate candidate --expect-games "$EXPECT_GAMES" "${pgns[@]}" \
+              2>&1 | tee pooled.txt | tee -a "$GITHUB_STEP_SUMMARY" || status=1
+          fi
+          {
+            echo '```'
+            echo '### Pooled pentanomial (tools/pool_matches.py, from each chunk log)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${#logs[@]}" -gt 0 ]; then
+            args=(); for log in "${logs[@]}"; do args+=(--log "$log"); done
+            python3 "$tools/pool_matches.py" "${args[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || status=1
+          fi
+          {
+            echo '```'
+            echo '### Per chunk: CPU model and absolute nps (tools/pgn_nps.py) - a mixed-hardware match shows here'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          printf '%-8s %-44s %14s %14s\n' chunk 'CPU model' 'candidate nps' 'baseline nps' | tee -a "$GITHUB_STEP_SUMMARY"
+          for pgn in "${pgns[@]}"; do
+            name=$(basename "$pgn" .pgn); index=${name#chunk-}
+            model=$(cat "chunks/machine-${index}.txt" 2>/dev/null || echo unknown)
+            rows=$(python3 "$tools/pgn_nps.py" "$pgn" 2>/dev/null)
+            cand=$(printf '%s\n' "$rows" | awk '$1=="candidate" && $2 ~ /^[0-9]/{print $7}')
+            base=$(printf '%s\n' "$rows" | awk '$1=="baseline" && $2 ~ /^[0-9]/{print $7}')
+            printf '%-8s %-44s %14s %14s\n' "$index" "$model" "$cand" "$base" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+          echo "distinct CPU models: $(cat chunks/machine-*.txt 2>/dev/null | sort | uniq -c | sed 's/^ *//' | tr '\n' ';')" | tee -a "$GITHUB_STEP_SUMMARY"
+          {
+            echo '```'
+            echo '### Speed over all chunks (tools/pgn_nps.py) and time losses'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${#pgns[@]}" -gt 0 ]; then
+            python3 "$tools/pgn_nps.py" "${pgns[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+            cat "${pgns[@]}" > all.pgn
+            total=$(grep -c '^\[Result ' all.pgn)
+            forfeits=$(grep -c 'Termination "time forfeit"' all.pgn)
+            echo "games in the PGNs: ${total}; time forfeits: ${forfeits}" | tee -a "$GITHUB_STEP_SUMMARY"
+            grep -h '^\[Termination ' all.pgn | sort | uniq -c | sort -rn | tee -a "$GITHUB_STEP_SUMMARY"
+            if [ "$total" -ne "$EXPECT_GAMES" ]; then
+              echo "::error::${total} games played, ${EXPECT_GAMES} expected"; status=1
+            fi
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          [ "$CHUNK_RESULT" = success ] || { echo "::error::chunk jobs: ${CHUNK_RESULT}"; status=1; }
+          exit "$status"
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: ${{ inputs.tag }}-result
+          path: |
+            pooled.txt
+            all.pgn
+          if-no-files-found: ignore
+          retention-days: 30
