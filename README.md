@@ -109,8 +109,8 @@ engine and the test binaries, writing `build/coverage/coverage.lcov` and an HTML
 `make` configures it back without the instrumentation.
 
 The target is also the **coverage gate**: it fails when `src/`'s line coverage is under
-`PAWNSTAR_COVERAGE_MIN_LINES`, 90 % - one number in `CMakeLists.txt`, which CI's coverage job and a developer's
-`make coverage` both read (`make coverage COVERAGE_MIN_LINES=95`, `tools\build.ps1 coverage -CoverageMinLines 95`;
+`PAWNSTAR_COVERAGE_MIN_LINES`, 95 % - one number in `CMakeLists.txt`, which CI's coverage job and a developer's
+`make coverage` both read (`make coverage COVERAGE_MIN_LINES=97`, `tools\build.ps1 coverage -CoverageMinLines 97`;
 0 reports without gating). What is measured is `src/`: the engine and its UCI front end, every header and
 `main.cpp`. The developer tools in `tools/` (`make_book`, `stamp_net`, `print_net_header`, `nnue_quant_study`, `dump_magics`), which
 no release ships and no ctest runs, and the tests themselves are not counted. The suites cover 98.0 % of `src/`'s
@@ -189,7 +189,7 @@ its latest result on `main`). Every job runs on a GitHub-hosted runner, on an im
   correct, so the two are pinned separately and deliberately.
 - **coverage (src/ lines >= gate)** — `make WERROR=1 CXX=clang++-18 coverage`: every suite on a build
   instrumented with clang's source-based coverage, red when `src/`'s line coverage is under
-  `PAWNSTAR_COVERAGE_MIN_LINES` (90 %), with the per-file table in the job summary. It installs clang-18 with
+  `PAWNSTAR_COVERAGE_MIN_LINES` (95 %), with the per-file table in the job summary. It installs clang-18 with
   llvm-18 from apt, so `llvm-profdata-18` and `llvm-cov-18` match the compiler that instrumented the build.
 - **new NNUE shape (mirroring + 8 output heads)** — the same suite in a build tree of its own with the shape
   named explicitly (`KING_MIRRORING=1 OUTPUT_BUCKETS=8`), then `tools/new-shape-signature.sh` over a net

@@ -28,7 +28,7 @@
 .PARAMETER Coverage
   Instrument for source-based code coverage (the Makefile's COVERAGE=1, -DPAWNSTAR_COVERAGE=ON). The coverage target
   runs every ctest and reports src/'s coverage with llvm-cov, with build\coverage\coverage.lcov and an HTML report
-  in build\coverage\html, and fails when src/'s line coverage is under the gate (PAWNSTAR_COVERAGE_MIN_LINES, 90).
+  in build\coverage\html, and fails when src/'s line coverage is under the gate (PAWNSTAR_COVERAGE_MIN_LINES, 95).
 
 .PARAMETER CoverageMinLines
   Override the coverage gate, src/'s minimum line coverage in percent (the Makefile's COVERAGE_MIN_LINES,

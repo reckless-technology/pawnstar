@@ -82,7 +82,7 @@ option(PAWNSTAR_COVERAGE "Instrument for source-based code coverage (clang)" OFF
 # The coverage gate: the `coverage` target fails when src/'s line coverage is under this percentage. One number, read
 # by CI's coverage job and by a developer's `make coverage` / `tools\build.ps1 coverage` alike (override it with
 # -DPAWNSTAR_COVERAGE_MIN_LINES=..., `make coverage COVERAGE_MIN_LINES=...` or -CoverageMinLines; 0 reports only).
-set(PAWNSTAR_COVERAGE_MIN_LINES 90 CACHE STRING "Minimum src/ line coverage, in percent, for the coverage target")
+set(PAWNSTAR_COVERAGE_MIN_LINES 95 CACHE STRING "Minimum src/ line coverage, in percent, for the coverage target")
 if(PAWNSTAR_COVERAGE)
   add_compile_options(-fprofile-instr-generate -fcoverage-mapping)
   add_link_options(-fprofile-instr-generate)
