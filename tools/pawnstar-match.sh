@@ -747,7 +747,8 @@ fi
 
 pgn_arguments=()
 if [ -n "$pgn_file" ]; then
-    pgn_arguments=(-pgnout "file=$pgn_file")
+    # nodes, nps and seldepth go in the move comments: tools/pgn_nps.py reads its speed figures from them.
+    pgn_arguments=(-pgnout "file=$pgn_file" nodes=true seldepth=true nps=true)
 fi
 
 # Random order by default; a start position means file order from there, one position per pair.
