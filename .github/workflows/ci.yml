@@ -426,6 +426,35 @@ jobs:
           [ "$failures" -eq 0 ] \
             || { echo "::error::$failures busy-runner gate assertion(s) failed"; exit 1; }
           echo 'The busy-runner gate counts processes, not mentions of them.'
+      - name: The harness slices the opening set for a split match
+        run: |
+          # match.yml plays one match as many jobs, each on its own slice of nnue/openings.epd: --opening-start N
+          # must hand fastchess `order=sequential start=N`, and a slice that runs off the end of the set must be
+          # refused rather than wrap round and replay openings.
+          harness() {
+            FASTCHESS=/bin/true PAWNSTAR_PROCESS_LISTER="echo idle" \
+            tools/pawnstar-match.sh --dry-run --allow-same-net \
+              --candidate build-new-shape/synthetic-net.bin --baseline build-new-shape/synthetic-net.bin \
+              --candidate-binary build-new-shape/pawnstar --baseline-binary build-new-shape/pawnstar \
+              --print-net-header build-new-shape/print_net_header --repo . "$@" 2>&1
+          }
+          count=$(grep -v '^[[:space:]]*#' nnue/openings.epd | grep -c .)
+          out=$(harness --games 200 --opening-start 101) || { echo "$out"; echo '::error::a slice inside the set was refused'; exit 1; }
+          printf '%s' "$out" | grep -Eq 'order=sequential +start=101' \
+            || { echo "$out" | tail -20; echo '::error::--opening-start did not reach the fastchess command'; exit 1; }
+          printf '%s' "$out" | grep -Fq 'openings 101..200 of' \
+            || { echo '::error::the slice was not reported as 101..200'; exit 1; }
+          status=0
+          out=$(harness --games 200 --opening-start $((count - 98))) || status=$?
+          if [ "$status" -ne 0 ] && printf '%s' "$out" | grep -Fq 'runs off the end'; then
+            echo "ok     a slice past the end of the $count openings is refused"
+          else
+            echo "$out" | tail -10
+            echo "::error::a slice past the end of the set was not refused (exit $status)"; exit 1
+          fi
+          out=$(harness --games 20) || { echo "$out"; exit 1; }
+          printf '%s' "$out" | grep -Eq 'order=random' || { echo '::error::the default order is no longer random'; exit 1; }
+          echo 'ok     --opening-start gives order=sequential start=N; the default stays random'
       - name: The harness's header report in the job summary
         if: always()
         run: |

@@ -1,0 +1,403 @@
+name: Match
+
+# A long engine-versus-engine match, played on GitHub-hosted runners instead of on lin-0 (the organisation's one
+# self-hosted Linux machine, which is also where the hand-run matches used to go - and while one ran there, no
+# private repository could push without biasing it). Manual only: nothing here runs on a push or a pull request.
+#
+#   plan   -> turns the inputs into a chunk matrix: each chunk gets a DISJOINT slice of nnue/openings.epd
+#   build  -> builds both engines once (clang-18, release), fastchess at a pinned commit, and gathers the nets and
+#             the opening set into ONE artifact, `match-inputs`. Nothing else is handed to the chunks.
+#   chunk  -> a matrix of jobs, each playing its slice through tools/pawnstar-match.sh and uploading its PGN + log
+#   pool   -> pools every chunk with tools/opening_icc.py and tools/pool_matches.py, counts time forfeits, reads the
+#             nodes per second, writes the lot to the job summary, and FAILS if the game count is short
+#
+# THE BOUNDARY. The chunk and pool jobs know nothing about how the engines were built: they take binaries, nets, an
+# opening set and a fastchess from the `match-inputs` artifact and nothing from the build job's workspace. The one
+# Pawnstar-specific thing in a chunk is its "Play the slice" step, whose command is tools/pawnstar-match.sh (the
+# RNNUE1 net preflight); another engine's chunk would swap that one command. That seam is where these two jobs lift
+# out into a reusable workflow (workflow_call) when the other engines want them - not built yet.
+#
+# A workflow_dispatch workflow cannot be dispatched until its file is on the default branch, so this file landed
+# through a pull request that changes nothing else; later edits are dispatched from their own branch with
+# `gh workflow run match.yml --ref <branch>`.
+#
+# Capacity: the organisation is on GitHub's Team plan, so every public repository's CI shares about 60 concurrent
+# hosted jobs. max-parallel below stays well under that. GitHub's Actions terms allow use for testing the
+# repository's own project, which strength-testing Pawnstar is.
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_ref:
+        description: 'Candidate: branch, tag or commit'
+        default: 'main'
+      baseline_ref:
+        description: 'Baseline: branch, tag or commit (empty = the newest vMAJOR.MINOR.PATCH tag)'
+        default: ''
+      candidate_net_url:
+        description: 'Candidate net URL (empty = the net the candidate ref ships, nnue/pawnstar-v20.bin)'
+        default: ''
+      candidate_net_sha256:
+        description: 'SHA-256 of the candidate net (required with a URL)'
+        default: ''
+      baseline_net_url:
+        description: 'Baseline net URL (empty = the net the baseline ref ships)'
+        default: ''
+      baseline_net_sha256:
+        description: 'SHA-256 of the baseline net (required with a URL)'
+        default: ''
+      time_control:
+        description: 'Time control, e.g. 8+0.08 (ignored when a depth is given)'
+        default: '8+0.08'
+      depth:
+        description: 'Fixed search depth instead of a time control (empty = use the time control)'
+        default: ''
+      games:
+        description: 'Total games (rounded up to whole colour-reversed pairs; at most 2 x the openings left)'
+        default: '4000'
+      chunks:
+        description: 'Number of chunk jobs'
+        default: '20'
+      concurrency:
+        description: 'Games at once per chunk job (a comma list is dealt out round-robin to the chunks)'
+        default: '2'
+      hash_mb:
+        description: 'Transposition table per engine, MB'
+        default: '16'
+      first_opening:
+        description: 'First position of nnue/openings.epd to play (1-based; the chunks take consecutive slices)'
+        default: '1'
+  # TEMPORARY, removed before this merges: a push to the working branch runs the smoke test with its defaults, since a
+  # workflow that is not yet on main cannot be dispatched.
+  push:
+    branches: [match-ci]
+
+permissions:
+  contents: read
+
+env:
+  # fastchess, built from source at this commit (the tag v1.8.2-alpha). The same release the Stoopid Chess repository
+  # pins in tools/tuning-tools.txt, so one fastchess serves the organisation.
+  FASTCHESS_TAG: v1.8.2-alpha
+  FASTCHESS_COMMIT: f618e34540f94f4719ad3817950618dabe441318
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      expect_games: ${{ steps.plan.outputs.expect_games }}
+      candidate_sha: ${{ steps.plan.outputs.candidate_sha }}
+      baseline_sha: ${{ steps.plan.outputs.baseline_sha }}
+      baseline_ref: ${{ steps.plan.outputs.baseline_ref }}
+      clock_flag: ${{ steps.plan.outputs.clock_flag }}
+      clock_value: ${{ steps.plan.outputs.clock_value }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Plan the chunks
+        id: plan
+        env:
+          IS_SMOKE: ${{ github.event_name == 'push' }}
+          IN_CANDIDATE: ${{ inputs.candidate_ref || 'main' }}
+          IN_BASELINE: ${{ inputs.baseline_ref }}
+          IN_TC: ${{ inputs.time_control || '8+0.08' }}
+          IN_DEPTH: ${{ inputs.depth }}
+          IN_GAMES: ${{ inputs.games || '4000' }}
+          IN_CHUNKS: ${{ inputs.chunks || '20' }}
+          IN_CONCURRENCY: ${{ inputs.concurrency || '2' }}
+          IN_FIRST: ${{ inputs.first_opening || '1' }}
+        run: |
+          python3 - <<'EOF'
+          import json, math, os, subprocess
+
+          def sh(*args):
+              return subprocess.run(args, check=True, capture_output=True, text=True).stdout.strip()
+
+          env = os.environ
+          if env["IS_SMOKE"] == "true":          # the temporary push trigger: 2 chunks of 20 games
+              env["IN_GAMES"], env["IN_CHUNKS"] = "40", "2"
+          # Refs: resolved to commits here, once, so every job builds exactly what the plan named.
+          sh("git", "fetch", "--tags", "--force", "origin", "+refs/heads/*:refs/remotes/origin/*")
+          def resolve(ref):
+              for candidate in (ref, "origin/" + ref):
+                  try:
+                      return sh("git", "rev-parse", "--verify", candidate + "^{commit}")
+                  except subprocess.CalledProcessError:
+                      continue
+              raise SystemExit(f"::error::cannot resolve '{ref}'")
+          baseline = env["IN_BASELINE"].strip()
+          if not baseline:
+              tags = sh("git", "tag", "--list", "v[0-9]*.[0-9]*.[0-9]*", "--sort=-v:refname").splitlines()
+              baseline = tags[0]
+          candidate_sha, baseline_sha = resolve(env["IN_CANDIDATE"]), resolve(baseline)
+
+          depth = env["IN_DEPTH"].strip()
+          clock_flag, clock_value = ("--depth", depth) if depth else ("--time-control", env["IN_TC"].strip())
+
+          games = int(env["IN_GAMES"])
+          pairs_total = (games + 1) // 2
+          chunks = min(int(env["IN_CHUNKS"]), pairs_total)
+          per_chunk = math.ceil(pairs_total / chunks)
+          first = int(env["IN_FIRST"])
+          concurrency = [c.strip() for c in env["IN_CONCURRENCY"].split(",") if c.strip()]
+
+          # The opening set the chunks will read: the workflow's own copy, comment header stripped.
+          with open("nnue/openings.epd") as handle:
+              openings = [l for l in handle if l.strip() and not l.lstrip().startswith("#")]
+          last = first + pairs_total - 1
+          if first < 1 or last > len(openings):
+              raise SystemExit(f"::error::{pairs_total} pairs from opening {first} need openings up to {last}, "
+                               f"but the set has {len(openings)}: a match this long would replay openings")
+
+          matrix, done = [], 0
+          for index in range(chunks):
+              pairs = min(per_chunk, pairs_total - done)
+              if pairs <= 0:
+                  break
+              matrix.append({"index": index, "games": pairs * 2, "start": first + done,
+                             "concurrency": concurrency[index % len(concurrency)]})
+              done += pairs
+
+          print(f"candidate {env['IN_CANDIDATE']} = {candidate_sha}")
+          print(f"baseline  {baseline} = {baseline_sha}")
+          print(f"{len(matrix)} chunks, {pairs_total * 2} games, openings {first}..{last} of {len(openings)}")
+          with open(env["GITHUB_OUTPUT"], "a") as out:
+              out.write("matrix=" + json.dumps({"include": matrix}) + "\n")
+              out.write(f"expect_games={pairs_total * 2}\n")
+              out.write(f"candidate_sha={candidate_sha}\nbaseline_sha={baseline_sha}\nbaseline_ref={baseline}\n")
+              out.write(f"clock_flag={clock_flag}\nclock_value={clock_value}\n")
+          EOF
+
+  build:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: The workflow's own tree (scripts and the opening set)
+        uses: actions/checkout@v5
+        with:
+          path: wf
+      - name: Candidate checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.plan.outputs.candidate_sha }}
+          fetch-depth: 0
+          path: candidate-src
+      - name: Baseline checkout
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.plan.outputs.baseline_sha }}
+          fetch-depth: 0
+          path: baseline-src
+      - name: Install toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang-18 cmake ninja-build
+      - name: Check runner has AVX2 + BMI2
+        run: |
+          grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
+            || { echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1; }
+      - name: Build the candidate (engine and print_net_header)
+        run: |
+          cd candidate-src
+          make -j"$(nproc)" RELEASE=1 CXX=clang++-18
+          cmake --build build --parallel --target print_net_header
+      - name: Build the baseline (engine)
+        run: |
+          cd baseline-src
+          make -j"$(nproc)" RELEASE=1 CXX=clang++-18
+      - name: Restore fastchess
+        id: fastchess-cache
+        uses: actions/cache@v4
+        with:
+          path: fastchess-bin
+          key: fastchess-${{ env.FASTCHESS_COMMIT }}-ubuntu-24.04
+      - name: Build fastchess ${{ env.FASTCHESS_TAG }} from source
+        if: steps.fastchess-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --quiet https://github.com/Disservin/fastchess.git fastchess-src
+          cd fastchess-src
+          git checkout --quiet "$FASTCHESS_COMMIT"
+          [ "$(git rev-parse HEAD)" = "$FASTCHESS_COMMIT" ] || { echo "::error::fastchess is not at the pinned commit"; exit 1; }
+          make -j"$(nproc)"
+          mkdir -p ../fastchess-bin
+          cp fastchess ../fastchess-bin/fastchess
+      - name: Gather the match inputs
+        env:
+          CANDIDATE_URL: ${{ inputs.candidate_net_url }}
+          CANDIDATE_SHA256: ${{ inputs.candidate_net_sha256 }}
+          BASELINE_URL: ${{ inputs.baseline_net_url }}
+          BASELINE_SHA256: ${{ inputs.baseline_net_sha256 }}
+        run: |
+          set -euo pipefail
+          mkdir -p inputs/candidate inputs/baseline
+          cp -L candidate-src/build/pawnstar inputs/candidate/pawnstar
+          cp -L candidate-src/build/print_net_header inputs/candidate/print_net_header
+          cp -L baseline-src/build/pawnstar inputs/baseline/pawnstar
+          cp fastchess-bin/fastchess inputs/fastchess
+          cp wf/nnue/openings.epd inputs/openings.epd
+
+          fetch_net() {   # <name> <url> <sha256> <the net the ref ships>
+            if [ -n "$2" ]; then
+              [ -n "$3" ] || { echo "::error::$1 net URL given without a SHA-256"; exit 1; }
+              curl -fsSL --retry 3 -o "inputs/$1.bin" "$2"
+              echo "$3  inputs/$1.bin" | sha256sum -c - || { echo "::error::$1 net does not match the SHA-256 given"; exit 1; }
+            else
+              cp "$4" "inputs/$1.bin"
+            fi
+          }
+          fetch_net candidate "$CANDIDATE_URL" "$CANDIDATE_SHA256" candidate-src/nnue/pawnstar-v20.bin
+          fetch_net baseline  "$BASELINE_URL"  "$BASELINE_SHA256"  baseline-src/nnue/pawnstar-v20.bin
+          chmod +x inputs/fastchess inputs/*/pawnstar inputs/candidate/print_net_header
+
+          {
+            echo "candidate_commit  ${{ needs.plan.outputs.candidate_sha }}"
+            echo "baseline_commit   ${{ needs.plan.outputs.baseline_sha }} (${{ needs.plan.outputs.baseline_ref }})"
+            echo "fastchess         ${FASTCHESS_TAG} ${FASTCHESS_COMMIT}"
+            echo "workflow_commit   ${{ github.sha }}"
+            (cd inputs && sha256sum candidate.bin baseline.bin openings.epd candidate/pawnstar baseline/pawnstar fastchess)
+          } | tee inputs/manifest.txt
+          {
+            echo '### Match inputs'
+            echo '```'
+            cat inputs/manifest.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v5
+        with:
+          name: match-inputs
+          path: inputs
+          retention-days: 14
+          if-no-files-found: error
+
+  chunk:
+    name: chunk ${{ matrix.index }}
+    needs: [plan, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 40
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: tools
+      - uses: actions/download-artifact@v5
+        with:
+          name: match-inputs
+          path: inputs
+      - name: The machine
+        run: |
+          chmod +x inputs/fastchess inputs/*/pawnstar inputs/candidate/print_net_header
+          grep -q avx2 /proc/cpuinfo && grep -q bmi2 /proc/cpuinfo \
+            || { echo "::error::runner CPU lacks AVX2/BMI2 — cannot run the engine"; exit 1; }
+          {
+            echo '### Machine, chunk ${{ matrix.index }}'
+            echo '```'
+            echo "nproc: $(nproc)"
+            lscpu | grep -E 'Model name|^CPU\(s\)|Thread|Core|Socket|MHz|L3'
+            free -m | sed -n 1,2p
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      # The Pawnstar-specific step: the RNNUE1 net preflight lives in this script. Another engine's chunk
+      # would replace this one command and keep everything around it.
+      - name: Play the slice (openings ${{ matrix.start }}.., ${{ matrix.games }} games)
+        env:
+          FASTCHESS: ${{ github.workspace }}/inputs/fastchess
+        run: |
+          mkdir -p out
+          tools/pawnstar-match.sh --repo "$PWD" \
+            --candidate inputs/candidate.bin --baseline inputs/baseline.bin \
+            --candidate-binary inputs/candidate/pawnstar --baseline-binary inputs/baseline/pawnstar \
+            --openings inputs/openings.epd --opening-start ${{ matrix.start }} \
+            --games ${{ matrix.games }} \
+            ${{ needs.plan.outputs.clock_flag }} '${{ needs.plan.outputs.clock_value }}' \
+            --concurrency ${{ matrix.concurrency }} --hash ${{ inputs.hash_mb || '16' }} \
+            --label chunk-${{ matrix.index }} --log-dir out \
+            --pgn out/chunk-${{ matrix.index }}.pgn \
+            --allow-busy-runner
+          # --allow-busy-runner: the hosted runner's own worker is the "running job" the idle check would find.
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: chunk-${{ matrix.index }}
+          path: out
+          retention-days: 14
+          if-no-files-found: warn
+
+  pool:
+    needs: [plan, chunk]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: tools
+      - uses: actions/download-artifact@v5
+        with:
+          pattern: chunk-*
+          merge-multiple: true
+          path: chunks
+      - name: Pool
+        env:
+          EXPECT_GAMES: ${{ needs.plan.outputs.expect_games }}
+          CHUNK_RESULT: ${{ needs.chunk.result }}
+        run: |
+          set -uo pipefail
+          shopt -s nullglob
+          pgns=(chunks/chunk-*.pgn)
+          logs=(chunks/chunk-*.log)
+          status=0
+          {
+            echo "## Match: ${{ needs.plan.outputs.candidate_sha }} (candidate) vs ${{ needs.plan.outputs.baseline_ref }} ${{ needs.plan.outputs.baseline_sha }} (baseline)"
+            echo "Clock: ${{ needs.plan.outputs.clock_flag }} ${{ needs.plan.outputs.clock_value }}, ${EXPECT_GAMES} games expected, chunk jobs: ${CHUNK_RESULT}, ${#pgns[@]} PGNs"
+            echo
+            echo '### Opening-corrected result (tools/opening_icc.py)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${#pgns[@]}" -eq 0 ]; then
+            echo "no chunk PGNs at all" | tee -a "$GITHUB_STEP_SUMMARY"; status=1
+          else
+            python3 tools/opening_icc.py --candidate candidate --expect-games "$EXPECT_GAMES" "${pgns[@]}" \
+              2>&1 | tee pooled.txt | tee -a "$GITHUB_STEP_SUMMARY" || status=1
+          fi
+          {
+            echo '```'
+            echo '### Pooled pentanomial (tools/pool_matches.py, from each chunk log)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${#logs[@]}" -gt 0 ]; then
+            args=(); for log in "${logs[@]}"; do args+=(--log "$log"); done
+            python3 tools/pool_matches.py "${args[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY" || status=1
+          fi
+          {
+            echo '```'
+            echo '### Speed (tools/pgn_nps.py) and time losses'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "${#pgns[@]}" -gt 0 ]; then
+            python3 tools/pgn_nps.py "${pgns[@]}" 2>&1 | tee -a "$GITHUB_STEP_SUMMARY"
+            cat "${pgns[@]}" > all.pgn
+            total=$(grep -c '^\[Result ' all.pgn)
+            forfeits=$(grep -c 'Termination "time forfeit"' all.pgn)
+            echo "games in the PGNs: ${total}; time forfeits: ${forfeits}" | tee -a "$GITHUB_STEP_SUMMARY"
+            grep -h '^\[Termination ' all.pgn | sort | uniq -c | sort -rn | tee -a "$GITHUB_STEP_SUMMARY"
+            if [ "$total" -ne "$EXPECT_GAMES" ]; then
+              echo "::error::${total} games played, ${EXPECT_GAMES} expected"; status=1
+            fi
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          [ "$CHUNK_RESULT" = success ] || { echo "::error::chunk jobs: ${CHUNK_RESULT}"; status=1; }
+          exit "$status"
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: match-result
+          path: |
+            pooled.txt
+            all.pgn
+          if-no-files-found: ignore
+          retention-days: 30

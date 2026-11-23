@@ -73,6 +73,15 @@
 #   --openings <file.epd>        Opening set. Default: <repo>/nnue/openings.epd. A '#' provenance
 #                                header is stripped into a scratch copy (fastchess would read those
 #                                lines as positions).
+#   --opening-start <n>          Take the openings IN FILE ORDER, starting at the n-th position (1-based,
+#                                counted AFTER the '#' header is stripped), one per colour-reversed
+#                                pair: pair k plays position n+k-1. Default: not given, and the openings
+#                                are drawn in a random order. Its purpose is the split match: chunk i of
+#                                a match run as several jobs on different machines takes the slice
+#                                [n, n + pairs - 1], and the slices of the chunks do not overlap, so a
+#                                match of up to as many pairs as the set has positions replays no
+#                                opening. The script refuses a slice that runs off the end
+#                                of the set rather than letting fastchess wrap round and replay.
 #   --repo <dir>                 The pawnstar checkout. Default: $PAWNSTAR_REPO, else $HOME/pawnstar.
 #   --print-net-header <path>    The print_net_header tool to decode headers with. Default: a
 #                                print_net_header in the SAME DIRECTORY as --candidate-binary if there
@@ -121,7 +130,7 @@ set -uo pipefail
 readonly kProbeDepth=4
 readonly kProbeTimeoutSeconds=60
 # The comment block above, as --help. One constant so an edit to the block is one edit here.
-readonly kHelpLineRange='3,118p'
+readonly kHelpLineRange='3,127p'
 
 candidate_net=""
 baseline_net=""
@@ -135,6 +144,7 @@ sprt_bounds=""
 concurrency=""
 hash_megabytes=16
 openings_file=""
+opening_start=""
 repository_directory="${PAWNSTAR_REPO:-$HOME/pawnstar}"
 header_tool="${PAWNSTAR_PRINT_NET_HEADER:-}"
 # Whether the decoder was NAMED (by --print-net-header or $PAWNSTAR_PRINT_NET_HEADER) rather than
@@ -179,6 +189,7 @@ while [ $# -gt 0 ]; do
         --concurrency)          concurrency="${2:?}"; shift 2 ;;
         --hash)                 hash_megabytes="${2:?}"; shift 2 ;;
         --openings)             openings_file="${2:?}"; shift 2 ;;
+        --opening-start)        opening_start="${2:?--opening-start needs a position number}"; shift 2 ;;
         --repo)                 repository_directory="${2:?}"; shift 2 ;;
         --print-net-header)     header_tool="${2:?--print-net-header needs a path}"
                                 header_tool_was_named=1; shift 2 ;;
@@ -739,6 +750,21 @@ if [ -n "$pgn_file" ]; then
     pgn_arguments=(-pgnout "file=$pgn_file")
 fi
 
+# Random order by default; a start position means file order from there, one position per pair.
+opening_order_arguments=(order=random)
+if [ -n "$opening_start" ]; then
+    case "$opening_start" in
+        ''|*[!0-9]*|0) die "--opening-start wants a position number of 1 or more, not '$opening_start'" ;;
+    esac
+    [ -n "$game_count" ] || die "--opening-start needs --games: an SPRT has no fixed number of pairs to slice for"
+    opening_count="$(grep -c . "$openings_file")"
+    last_opening=$(( opening_start + round_count - 1 ))
+    [ "$last_opening" -le "$opening_count" ] \
+        || die "the slice of openings $opening_start..$last_opening runs off the end of a $opening_count-position set"
+    opening_order_arguments=(order=sequential start="$opening_start")
+    note "openings $opening_start..$last_opening of $opening_count, in file order (one per pair)"
+fi
+
 fastchess_command=(
     "$fastchess_binary"
     -engine cmd="$candidate_wrapper" name=candidate option.EvalFile="$candidate_net"
@@ -746,7 +772,7 @@ fastchess_command=(
     -each proto=uci option.Threads=1 option.Hash="$hash_megabytes" option.OwnBook="$own_book_setting" "${clock_arguments[@]}"
     "${stop_arguments[@]}"
     -games 2 -repeat
-    -openings "file=$openings_file" format=epd order=random
+    -openings "file=$openings_file" format=epd "${opening_order_arguments[@]}"
     "${adjudication_arguments[@]}"
     "${recover_arguments[@]}"
     "${pgn_arguments[@]}"
