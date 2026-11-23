@@ -10,7 +10,7 @@
 #   DEBUG=1     Debug build with AddressSanitizer + UBSan         -> -DCMAKE_BUILD_TYPE=Debug -DPAWNSTAR_SANITIZE=ON
 #   WERROR=1    warnings-as-errors (CI)                           -> -DWERROR=ON
 #   COVERAGE=1  instrument for source-based coverage (clang)      -> -DPAWNSTAR_COVERAGE=ON (`make coverage` sets it)
-#   COVERAGE_MIN_LINES=<n>  the coverage gate, src/'s minimum line % -> -DPAWNSTAR_COVERAGE_MIN_LINES=<n> (default 90,
+#   COVERAGE_MIN_LINES=<n>  the coverage gate, src/'s minimum line % -> -DPAWNSTAR_COVERAGE_MIN_LINES=<n> (default 95,
 #               set in CMakeLists.txt; 0 reports without gating)
 #   CXX=<cc>    C++ compiler (default clang++, which the engine requires). Changing it for an existing build
 #               tree needs `make clean` first, since CMake caches the compiler.
@@ -116,7 +116,7 @@ check: configure
 	$(CTEST) --test-dir $(BUILD_DIR) $(CTEST_ARGS)
 
 # Build everything instrumented for coverage, run every ctest and report src/'s coverage (llvm-cov; the lcov export
-# and the HTML report land in $(BUILD_DIR)/coverage), failing under the gate (COVERAGE_MIN_LINES, default 90 %).
+# and the HTML report land in $(BUILD_DIR)/coverage), failing under the gate (COVERAGE_MIN_LINES, default 95 %).
 # Configures with COVERAGE=1 whatever the command line says, so
 # a later plain `make` configures the tree back without it.
 coverage:
