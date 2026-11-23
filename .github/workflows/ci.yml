@@ -452,6 +452,9 @@ jobs:
             echo "$out" | tail -10
             echo "::error::a slice past the end of the set was not refused (exit $status)"; exit 1
           fi
+          out=$(harness --games 20 --time-control 8+0.08 --baseline-time-control 4+0.04) || { echo "$out"; exit 1; }
+          printf '%s' "$out" | tr -s ' ' | grep -Eq 'name=candidate option\.EvalFile=[^ ]* tc=8\+0\.08 -engine .* name=baseline option\.EvalFile=[^ ]* tc=4\+0\.04 -each' \
+            || { echo "$out" | tail -8; echo '::error::--baseline-time-control did not put each clock on its own engine'; exit 1; }
           out=$(harness --games 20) || { echo "$out"; exit 1; }
           printf '%s' "$out" | grep -Eq 'order=random' || { echo '::error::the default order is no longer random'; exit 1; }
           echo 'ok     --opening-start gives order=sequential start=N; the default stays random'

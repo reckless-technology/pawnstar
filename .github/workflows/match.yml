@@ -49,6 +49,9 @@ on:
       time_control:
         description: 'Time control, e.g. 8+0.08 (ignored when a depth is given)'
         default: '8+0.08'
+      baseline_time_control:
+        description: 'Time-odds match: the baseline plays this time control instead (e.g. 4+0.04 against 8+0.08). Empty = the same clock'
+        default: ''
       depth:
         description: 'Fixed search depth instead of a time control (empty = use the time control)'
         default: ''
@@ -303,6 +306,7 @@ jobs:
       - name: Play the slice (openings ${{ matrix.start }}.., ${{ matrix.games }} games)
         env:
           FASTCHESS: ${{ github.workspace }}/inputs/fastchess
+          BASELINE_TC: ${{ inputs.baseline_time_control }}
         run: |
           tools/pawnstar-match.sh --repo "$PWD" \
             --candidate inputs/candidate.bin --baseline inputs/baseline.bin \
@@ -310,6 +314,7 @@ jobs:
             --openings inputs/openings.epd --opening-start ${{ matrix.start }} \
             --games ${{ matrix.games }} \
             ${{ needs.plan.outputs.clock_flag }} '${{ needs.plan.outputs.clock_value }}' \
+            ${BASELINE_TC:+--baseline-time-control "$BASELINE_TC"} \
             --concurrency ${{ matrix.concurrency }} --hash ${{ inputs.hash_mb || '64' }} \
             --label chunk-${{ matrix.index }} --log-dir out \
             --pgn out/chunk-${{ matrix.index }}.pgn \
@@ -379,8 +384,8 @@ jobs:
             name=$(basename "$pgn" .pgn); index=${name#chunk-}
             model=$(cat "chunks/machine-${index}.txt" 2>/dev/null || echo unknown)
             rows=$(python3 tools/pgn_nps.py "$pgn" 2>/dev/null)
-            cand=$(printf '%s\n' "$rows" | awk '$1=="candidate"{print $7}')
-            base=$(printf '%s\n' "$rows" | awk '$1=="baseline"{print $7}')
+            cand=$(printf '%s\n' "$rows" | awk '$1=="candidate" && $2 ~ /^[0-9]/{print $7}')
+            base=$(printf '%s\n' "$rows" | awk '$1=="baseline" && $2 ~ /^[0-9]/{print $7}')
             printf '%-8s %-44s %14s %14s\n' "$index" "$model" "$cand" "$base" | tee -a "$GITHUB_STEP_SUMMARY"
           done
           echo "distinct CPU models: $(cat chunks/machine-*.txt 2>/dev/null | sort | uniq -c | sed 's/^ *//' | tr '\n' ';')" | tee -a "$GITHUB_STEP_SUMMARY"
