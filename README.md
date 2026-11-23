@@ -253,6 +253,8 @@ with the organisation's signing secrets (the same ones as its other apps). The W
 that publishes, since every signing spends the eSigner account's allowance. A publishing run that would ship an
 unsigned binary fails.
 
+**Strength matches.** `.github/workflows/match.yml` (manual) plays a candidate against a baseline - two git refs, optionally with their own nets - as a matrix of jobs on GitHub-hosted runners, each on its own slice of `nnue/openings.epd`, and pools them (`tools/opening_icc.py`, `tools/pool_matches.py`) into one Elo with its 95% bar in the job summary: `gh workflow run match.yml -f candidate_ref=main -f baseline_ref=v2.3.0 -f games=4000`. Measured on the hosted runner, 2026-11-23, 4,000 games at 8+0.08, Pawnstar 2.3.1 against 2.3.0: -1.91 Elo (95% -8.51..+4.69), where the documented figure from lin-0 (2026-11-08) is +1.74 (-11.65..+15.13). A hosted runner's CPU model varies, so nodes per second differ between chunks (1.14 to 1.94 M per engine, against lin-0's 1.22 M); the summary lists each chunk's CPU and speed. See `CLAUDE.md` for what is and is not comparable with a match run by hand.
+
 ## Usage
 
 Run as a UCI engine (connect via Arena, Cute Chess, or any UCI-compatible GUI):
