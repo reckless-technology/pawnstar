@@ -346,7 +346,7 @@ jobs:
           EXPECT_GAMES: ${{ needs.plan.outputs.expect_games }}
           CHUNK_RESULT: ${{ needs.chunk.result }}
         run: |
-          set -uo pipefail
+          set +e -uo pipefail   # Actions runs bash -e; a grep that finds nothing must not end the step
           shopt -s nullglob
           pgns=(chunks/chunk-*.pgn)
           logs=(chunks/chunk-*.log)
