@@ -212,7 +212,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: fastchess-bin
-          key: fastchess-${{ env.FASTCHESS_COMMIT }}-ubuntu-24.04
+          key: fastchess-release-${{ env.FASTCHESS_COMMIT }}-ubuntu-24.04
       - name: Build fastchess ${{ env.FASTCHESS_TAG }} from source
         if: steps.fastchess-cache.outputs.cache-hit != 'true'
         run: |
@@ -220,7 +220,9 @@ jobs:
           cd fastchess-src
           git checkout --quiet "$FASTCHESS_COMMIT"
           [ "$(git rev-parse HEAD)" = "$FASTCHESS_COMMIT" ] || { echo "::error::fastchess is not at the pinned commit"; exit 1; }
-          make -j"$(nproc)"
+          # build=release is -march=x86-64: the default is -march=native, and a binary built on one hosted CPU
+          # (the model varies from job to job) dies with SIGILL, exit 132, on another.
+          make -j"$(nproc)" build=release
           mkdir -p ../fastchess-bin
           cp fastchess ../fastchess-bin/fastchess
       - name: Gather the match inputs
