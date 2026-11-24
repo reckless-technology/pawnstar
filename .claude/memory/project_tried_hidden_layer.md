@@ -31,15 +31,11 @@ data; don't just re-run the same recipe.
 - **Kept the FT int16 + incremental (unchanged)**; ran the new head in **float** (f32-saved head weights,
   unquantised) — negligible vs the FT at fixed depth, and it makes the engine forward pass match the trainer
   trivially (no risky multi-layer integer requant). `test_nnue_incremental` passes untouched (FT unchanged).
-- **GOTCHA that cost a debug cycle — bullet affine weight layout is INPUT-MAJOR.** bullet stores an affine
-  weight `w[input*output_dim + output]` (its `transpose_impl` confirms; the FT already reads
-  `feature_weights[feature*HIDDEN + i]` = input-major). The 2048->1 OUTPUT layer hides this (O=1, both
-  layouts coincide), so I first read the 2048->16 `l1` output-major and the net evaluated a near-CONSTANT
-  ~-135 regardless of material (dead head: garbage pre-activations -> SCReLU zeros -> output = l2_bias).
-  The 0cp test_nnue cross-check PASSED while broken because the engine and `pawnstar_eval_h` read it the
-  *same* wrong way — **so a cross-check alone is insufficient; always sanity-check evals track material
-  (up-a-queen -> ~+1200, sign follows side-to-move) before trusting a new arch / running an SPRT.** Fix:
-  read `l1_weights_[k*kHidden2Size + j]` (input-major); no retrain needed (same bytes, correct indexing).
+- **GOTCHA that cost a debug cycle: bullet's affine weight layout is input-major.** The general rule and the
+  "0 cp cross-check passed while broken" lesson (sanity-check that evals track material before trusting a new
+  architecture or running an SPRT) are in the `reckless-nnue` skill, "bullet stores every affine weight input-major".
+  Specific here: the 2048->16 `l1` was first read output-major, the net evaluated a near-constant about -135 cp (dead
+  head), and the fix was to read `l1_weights_[k*kHidden2Size + j]` (input-major); no retrain, same bytes.
 - Arch is header-gated: `NetHeader` format_version bumped to 2 + a `hidden2_size_` field; the candidate
   engine rejects v1 nets (and vice versa), so the SPRT was binary-vs-binary with `CAND_STARTUP_NET` giving
   the candidate engine a compatible net at startup (the [[project_nnue_experiment]] cross-arch SPRT pattern).
