@@ -123,8 +123,9 @@ integer-only eval path) exists precisely to make it possible. Each engine pins t
 here `test_bench_golden` (`test/bench_golden_test.cpp`: every position's best move and node count and the
 total), in Rust `tests/bench_golden_test.rs` (the same 16 pairs and total), in Go `engine/uci_test.go`
 (`benchGoldenNodes`, the total). **Any search/eval/ordering change here breaks parity with both ports until
-re-ported**: `test_bench_golden` fails first, by design; re-bless its table (and the ports' copies, once re-ported)
-only for a deliberate, SPRT-gated change or a new net (the Rust repo's CLAUDE.md documents the procedure). A 900-game round-robin at 10+0.1 (2026-07,
+re-ported**: `test_bench_golden` fails first, by design. The rule (a change is owed to all three; re-bless a golden only
+for a deliberate, SPRT-passed change or a new net) is in the `reckless-chess-engines` skill, "The three pawnstar ports
+are bit-exact"; the Rust repo's CLAUDE.md documents the procedure. A 900-game round-robin at 10+0.1 (2026-07,
 300 games/pairing, UHO openings, single-threaded) measured all three within error bars of one
 another — C++ vs Rust was an exact 150–150 tie.
 

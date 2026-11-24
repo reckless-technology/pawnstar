@@ -13,10 +13,12 @@ metadata:
 
 **The fix** (search_state.h, SearchState ctor): `for (auto &k : killers_) k.fill(Move::None()); countermoves_.fill(Move::None());` — `Move::None()` is `Move{0}` (a value no legal move equals). **Zero perf cost** (once per search, not per node). Verified: O1/O2/O3 `bench` ALL agree; valgrind reports **0 errors** (was 7 contexts); `make check` passes. The signature value was **6,534,680** at the fix; it is now **6,534,681** after the 2026-06-26 score-band rescale (kAlpha/kBeta ±32000, kCheckmatedScore −31900, win/lose threshold ±31000, NNUE eval clamped to ±30000) — that change auto-scaled the RFP mate-zone guard `abs(beta) < -kCheckmatedScore - kMaxPly` from 9936 to 31836, shifting the count by 1 node. Still deterministic across runs/`-O` levels.
 
-**How it was finally caught (the tooling trick that worked):** valgrind memcheck, but three things were needed that prior attempts lacked:
-1. **Scalar build** (`-mbmi2` but NOT `-mavx2`) → the NNUE SIMD kernels fall back to scalar (`#if defined(__AVX2__)`), eliminating the AVX2 false positives that previously "drowned" valgrind.
-2. **`--max-stackframe=16000000`** → deep qsearch recursion makes a ~6 MB single-step SP change that trips valgrind's default 2 MB heuristic ("client switching stacks?"), after which it floods bogus "Invalid read/write of size 8". Raising the limit makes those vanish, leaving the 7 real "Conditional jump depends on uninitialised value" reports, all at `ScoreAndSortMoves` (search_state.h, the `IsCountermove`/killer comparisons).
-3. **Small main-thread scope** → a tiny harness searching ONE complex position (kiwipete) to depth 6 with `thread_count_=1` (so `SearchRootNode` runs on the *main* thread, no worker-thread stack switch) at `-O1` (fast under valgrind, value-tracking intact). Full `bench`/`go` was too slow or used the worker thread.
+**How it was finally caught:** valgrind memcheck on a scalar build with `--max-stackframe=16000000` and a small
+main-thread harness at `-O1`; the recipe, and why each of the three was needed, is in `reckless-working-practice`'s
+`references/tooling-gotchas.md`, "Finding an uninitialised read that valgrind drowns in noise". Specific here: the build
+was `-mbmi2` without `-mavx2`, the harness searched kiwipete to depth 6 with `thread_count_=1`, the stack-pointer step in
+deep qsearch was about 6 MB, and the 7 real reports were all at `ScoreAndSortMoves` (search_state.h, the
+`IsCountermove`/killer comparisons).
 
 MSan was never needed. The earlier "localized to game.cpp's TU" finding was right in spirit (the search lives there) but never pinpointed the variable; the header-only refactor later moved it all into main.cpp's TU. See [[project_tried_search_features]].
 

@@ -6,7 +6,7 @@ metadata:
   type: project
 ---
 
-**Two compounding traps that cost a debugging cycle (2026-06-26) when bootstrapping NNUE training on a
+**Two compounding traps (the second now lives in the skill) that cost a debugging cycle (2026-06-26) when bootstrapping NNUE training on a
 fresh machine.** Both surface as bullet failing with:
 `error: failed to parse manifest ... feature 'edition2024' is required ... not stabilized in this version of Cargo (1.75.0)`.
 
@@ -19,20 +19,11 @@ absolute rustup path `$HOME/.cargo/bin/cargo`** (or `rustup run stable cargo`) i
 the system 1.75 can never shadow it. `. "$HOME/.cargo/env"; cargo --version` does normally pick the 1.96
 shim, but don't rely on PATH order — see trap 2.
 
-**2. A *combined-single-line* `export` silently prepends `/bin` to PATH and lets `/bin/cargo` (1.75) win.**
-This line is BROKEN:
-`export CUDA_PATH=/usr/local/cuda PATH="$CUDA_PATH/bin:$PATH" LD_LIBRARY_PATH="$CUDA_PATH/lib64:$LD_LIBRARY_PATH"`
-In one simple command, all RHS are expanded against the *pre-command* environment, so `$CUDA_PATH` is still
-**empty** when `$PATH` is built → `PATH="/bin:$PATH"`. `/bin/cargo` (apt 1.75) then shadows
-`~/.cargo/bin/cargo` (1.96) → the edition2024 error, even though sourcing `~/.cargo/env` alone resolves to
-1.96. **Use SEPARATE export statements** (set `CUDA_PATH` first, then `PATH`), which is what
-`tools/setup_bullet.sh` / `nnue/README` already do:
-```
-export CUDA_PATH=/usr/local/cuda
-export PATH="$CUDA_PATH/bin:$PATH"
-export LD_LIBRARY_PATH="$CUDA_PATH/lib64:$LD_LIBRARY_PATH"
-```
-The diagnostic tell: `which cargo` prints `/bin/cargo` instead of `~/.cargo/bin/cargo`.
+**2. A combined single-line `export CUDA_PATH=.. PATH="$CUDA_PATH/bin:$PATH"` prepends `/bin` to PATH** and lets
+`/bin/cargo` (1.75) win over `~/.cargo/bin/cargo` (1.96). The mechanism and the fix (separate `export` statements; the
+tell is `which cargo` printing `/bin/cargo`) are in `reckless-working-practice`'s `references/tooling-gotchas.md`,
+"`export A=/x B="$A/bin:$PATH"` on one line expands every right-hand side before any is assigned". It is the 2026-06-26
+incident described there; `tools/setup_bullet.sh` and `nnue/README` already use separate exports.
 
 **Confirmed-good state after the fix (2026-06-26):** rustup stable `cargo 1.96.0`; CUDA 13.2 at
 `/usr/local/cuda`; bullet builds + trains on the **RTX 4070 Laptop (sm_89)** at **~2.48M pos/sec** (≈7× the

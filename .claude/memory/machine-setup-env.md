@@ -1,11 +1,13 @@
 ---
 name: machine-setup-env
-description: "Current dev machine (post-migration 2026-06-23): tool locations, GPU/CUDA, NNUE training stack — what's installed and where, after restoring from a fresh checkout."
+description: "STALE inventory of a June 2026 machine (correction 2026-11-24): see reckless-working-practice references/dev-machines.md for the current machines"
 metadata:
   node_type: memory
   type: project
   originSessionId: 9c8f1d8c-5768-4b87-83c0-07d07141f44a
 ---
+
+**STALE (correction 2026-11-24): a June 2026 inventory of a machine since replaced.** Paths, versions and the "clang-format 18.1.8" note below are history (clang-format is **22.1.8** organisation-wide since 2026-09-26, and the NNUE trainer scripts under `tools/` carry what a fresh machine needs). What each current development machine carries is in `reckless-working-practice`, `references/dev-machines.md`; the CUDA 13.2 / bullet smoke-test result is the part likely to still hold.
 
 The dev/training/testing stack was rebuilt from scratch on a NEW machine (2026-06-23, Linux Mint 22.3,
 32 cores). None of it is version-controlled, so a future fresh checkout must redo this. As-restored state:
