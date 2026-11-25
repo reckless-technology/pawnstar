@@ -1,16 +1,16 @@
 ---
 name: feedback-make-clean
-description: "STALE since the CMake wrapper (2026-11-24 correction): the old premise (stale .d files in the hand-written Makefile) is gone; make clean is only needed when switching CXX"
-metadata: 
+description: Do not run make clean before every build; the Makefile is now a CMake wrapper that reconfigures itself. Clean only for a stale tree or a changed compiler
+metadata:
   node_type: memory
   type: feedback
-  originSessionId: 9060cfe0-a261-495f-b0ec-b6db79ed2919
 ---
 
-**STALE (correction 2026-11-24): the premise is gone.** The Makefile is now a thin wrapper over CMake (build in `build/`, version header regenerated when `HEAD` moves) and has no `.d` dependency rules, so stale `.d` files cannot occur and `make clean && make` every time is unneeded. `make clean` still removes `build/`; the one case that needs it is switching `CXX` for an existing tree (CMake caches the compiler). Kept for the history; see CLAUDE.md, "Build".
+Run plain `make`. Use `make clean` only when a build looks stale (for example "no rule to make target" naming a file
+that was renamed) or after switching `CXX`, which CMake caches.
 
-Always run `make clean && make` rather than just `make` in this repo.
+**Why:** this note once said to always `make clean && make`, because stale `.d` files from an earlier Makefile build
+named old paths after a rename. The `make` wrapper now configures with CMake on every invocation and picks up branch and
+knob changes itself (CLAUDE.md, "Build"), so a blanket clean only throws away a good build tree and slows every loop.
 
-**Why:** Stale `.d` dependency files from previous builds can reference old file paths (e.g. `.c` instead of `.cpp` after a rename) and cause spurious "no rule to make target" failures that have nothing to do with the actual code change.
-
-**How to apply:** Every time a build is triggered, prepend `make clean &&` to ensure a fresh build.
+**How to apply:** build with `make`; reach for `make clean` when the symptom above appears, then say so in the report.
